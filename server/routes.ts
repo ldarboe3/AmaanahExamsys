@@ -1286,21 +1286,84 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "No active exam year found" });
       }
 
+      const { generateCertificatePDF, generateCertificateNumber, generateQRToken } = await import('./certificateService');
+
       const generatedCerts = [];
       for (const studentId of studentIds) {
         const student = await storage.getStudent(studentId);
         if (!student) continue;
         
-        const certNumber = `CERT-${activeExamYear.year}-${String(studentId).padStart(6, '0')}`;
-        const cert = await storage.createCertificate({
-          studentId,
-          examYearId: activeExamYear.id,
-          certificateNumber: certNumber,
-          templateId: 1,
-          generatedDate: new Date(),
-          issuedDate: new Date(),
-        });
-        generatedCerts.push(cert);
+        if (![6, 9, 12].includes(student.grade)) {
+          continue;
+        }
+        
+        const school = await storage.getSchool(student.schoolId);
+        if (!school) continue;
+        
+        const results = await storage.getResultsByStudent(studentId);
+        const passedResults = results.filter(r => r.status === 'published');
+        if (passedResults.length === 0) continue;
+        
+        const totalScore = passedResults.reduce((sum, r) => sum + parseFloat(r.totalScore || '0'), 0);
+        const average = totalScore / passedResults.length;
+        let finalGrade = 'PASS';
+        if (average >= 80) finalGrade = 'A';
+        else if (average >= 70) finalGrade = 'B';
+        else if (average >= 60) finalGrade = 'C';
+        else if (average >= 50) finalGrade = 'D';
+        else finalGrade = 'FAIL';
+        
+        if (finalGrade === 'FAIL') continue;
+        
+        const qrToken = generateQRToken();
+        const certNumber = generateCertificateNumber(activeExamYear.year, student.id);
+        const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/${qrToken}`;
+        
+        try {
+          const pdfPath = await generateCertificatePDF({
+            student: {
+              id: student.id,
+              firstName: student.firstName,
+              lastName: student.lastName,
+              middleName: student.middleName,
+              gender: student.gender as 'male' | 'female',
+              dateOfBirth: student.dateOfBirth,
+              placeOfBirth: student.placeOfBirth,
+              grade: student.grade,
+              indexNumber: student.indexNumber,
+            },
+            school: { id: school.id, name: school.name },
+            examYear: {
+              id: activeExamYear.id,
+              year: activeExamYear.year,
+              examStartDate: activeExamYear.examStartDate,
+              examEndDate: activeExamYear.examEndDate,
+            },
+            finalGrade,
+            totalScore,
+            qrToken,
+            certificateNumber: certNumber,
+            verifyUrl,
+          });
+          
+          const cert = await storage.createCertificate({
+            studentId: student.id,
+            examYearId: activeExamYear.id,
+            certificateNumber: certNumber,
+            grade: student.grade,
+            templateType: student.gender,
+            finalResult: finalGrade,
+            finalGradeWord: finalGrade,
+            totalScore: String(totalScore),
+            qrToken,
+            issuedDate: new Date(),
+            pdfUrl: pdfPath,
+            status: 'generated',
+          });
+          generatedCerts.push(cert);
+        } catch (e: any) {
+          console.error(`Failed to generate certificate for student ${studentId}:`, e.message);
+        }
       }
       
       res.json({ generated: generatedCerts.length, certificates: generatedCerts });
@@ -1321,25 +1384,83 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "No active exam year found" });
       }
 
+      const { generateCertificatePDF, generateCertificateNumber, generateQRToken } = await import('./certificateService');
+
       const students = await storage.getStudentsBySchool(parseInt(schoolId));
+      const school = await storage.getSchool(parseInt(schoolId));
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      
       const generatedCerts = [];
       
       for (const student of students) {
         if (student.status !== 'approved') continue;
+        if (![6, 9, 12].includes(student.grade)) continue;
         
-        const certNumber = `CERT-${activeExamYear.year}-${String(student.id).padStart(6, '0')}`;
+        const results = await storage.getResultsByStudent(student.id);
+        const passedResults = results.filter(r => r.status === 'published');
+        if (passedResults.length === 0) continue;
+        
+        const totalScore = passedResults.reduce((sum, r) => sum + parseFloat(r.totalScore || '0'), 0);
+        const average = totalScore / passedResults.length;
+        let finalGrade = 'PASS';
+        if (average >= 80) finalGrade = 'A';
+        else if (average >= 70) finalGrade = 'B';
+        else if (average >= 60) finalGrade = 'C';
+        else if (average >= 50) finalGrade = 'D';
+        else finalGrade = 'FAIL';
+        
+        if (finalGrade === 'FAIL') continue;
+        
+        const qrToken = generateQRToken();
+        const certNumber = generateCertificateNumber(activeExamYear.year, student.id);
+        const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/${qrToken}`;
+        
         try {
+          const pdfPath = await generateCertificatePDF({
+            student: {
+              id: student.id,
+              firstName: student.firstName,
+              lastName: student.lastName,
+              middleName: student.middleName,
+              gender: student.gender as 'male' | 'female',
+              dateOfBirth: student.dateOfBirth,
+              placeOfBirth: student.placeOfBirth,
+              grade: student.grade,
+              indexNumber: student.indexNumber,
+            },
+            school: { id: school.id, name: school.name },
+            examYear: {
+              id: activeExamYear.id,
+              year: activeExamYear.year,
+              examStartDate: activeExamYear.examStartDate,
+              examEndDate: activeExamYear.examEndDate,
+            },
+            finalGrade,
+            totalScore,
+            qrToken,
+            certificateNumber: certNumber,
+            verifyUrl,
+          });
+          
           const cert = await storage.createCertificate({
             studentId: student.id,
             examYearId: activeExamYear.id,
             certificateNumber: certNumber,
-            templateId: 1,
-            generatedDate: new Date(),
+            grade: student.grade,
+            templateType: student.gender,
+            finalResult: finalGrade,
+            finalGradeWord: finalGrade,
+            totalScore: String(totalScore),
+            qrToken,
             issuedDate: new Date(),
+            pdfUrl: pdfPath,
+            status: 'generated',
           });
           generatedCerts.push(cert);
-        } catch (e) {
-          // Skip duplicates
+        } catch (e: any) {
+          console.error(`Failed to generate certificate for student ${student.id}:`, e.message);
         }
       }
       
@@ -1361,16 +1482,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       for (const student of students) {
         if (student.status !== 'approved') continue;
+        if (![6, 9, 12].includes(student.grade)) continue;
         
-        const certNumber = `CERT-${activeExamYear.year}-${String(student.id).padStart(6, '0')}`;
+        const certNumber = `${activeExamYear.year.toString().slice(-2)}/${String(student.id).padStart(8, '0')}`;
         try {
           const cert = await storage.createCertificate({
             studentId: student.id,
             examYearId: activeExamYear.id,
             certificateNumber: certNumber,
-            templateId: 1,
-            generatedDate: new Date(),
+            grade: student.grade,
+            templateType: student.gender,
             issuedDate: new Date(),
+            status: 'pending',
           });
           generatedCerts.push(cert);
         } catch (e) {
@@ -1397,22 +1520,90 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "No active exam year found" });
       }
 
-      const transcripts = [];
+      const { generateTranscriptPDF, generateQRToken } = await import('./certificateService');
+
+      const generatedTranscripts = [];
       for (const studentId of studentIds) {
         const student = await storage.getStudent(studentId);
         if (!student) continue;
         
+        const school = await storage.getSchool(student.schoolId);
+        if (!school) continue;
+        
         const results = await storage.getResultsByStudent(studentId);
-        transcripts.push({
-          student,
-          examYear: activeExamYear,
-          results,
-          generatedAt: new Date(),
-          transcriptNumber: `TR-${activeExamYear.year}-${String(studentId).padStart(6, '0')}`,
+        const allSubjects = await storage.getAllSubjects();
+        
+        const subjects = results.map(r => {
+          const subject = allSubjects.find(s => s.id === r.subjectId);
+          return {
+            name: subject?.name || 'Unknown',
+            arabicName: subject?.arabicName || null,
+            score: parseFloat(r.totalScore || '0'),
+            grade: r.grade || 'N/A',
+            maxScore: subject?.maxScore || 100,
+          };
         });
+        
+        const totalScore = subjects.reduce((sum, s) => sum + s.score, 0);
+        const maxTotal = subjects.reduce((sum, s) => sum + s.maxScore, 0);
+        const average = maxTotal > 0 ? (totalScore / maxTotal) * 100 : 0;
+        
+        let finalGrade = 'PASS';
+        if (average >= 80) finalGrade = 'A';
+        else if (average >= 70) finalGrade = 'B';
+        else if (average >= 60) finalGrade = 'C';
+        else if (average >= 50) finalGrade = 'D';
+        else finalGrade = 'FAIL';
+        
+        const qrToken = generateQRToken();
+        const transcriptNumber = `TR-${activeExamYear.year}-${String(student.id).padStart(6, '0')}`;
+        const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/transcript/${qrToken}`;
+        
+        try {
+          const pdfPath = await generateTranscriptPDF({
+            student: {
+              id: student.id,
+              firstName: student.firstName,
+              lastName: student.lastName,
+              middleName: student.middleName,
+              gender: student.gender as 'male' | 'female',
+              dateOfBirth: student.dateOfBirth,
+              placeOfBirth: student.placeOfBirth,
+              grade: student.grade,
+              indexNumber: student.indexNumber,
+            },
+            school: { id: school.id, name: school.name },
+            examYear: {
+              id: activeExamYear.id,
+              year: activeExamYear.year,
+              examStartDate: activeExamYear.examStartDate,
+              examEndDate: activeExamYear.examEndDate,
+            },
+            subjects,
+            totalScore,
+            average,
+            finalGrade,
+            qrToken,
+            transcriptNumber,
+            verifyUrl,
+          });
+          
+          const transcript = await storage.createTranscript({
+            studentId: student.id,
+            examYearId: activeExamYear.id,
+            transcriptNumber,
+            grade: student.grade,
+            qrToken,
+            pdfUrl: pdfPath,
+            issuedDate: new Date(),
+          });
+          generatedTranscripts.push(transcript);
+        } catch (e: any) {
+          console.error(`Failed to generate transcript for student ${studentId}:`, e.message);
+        }
       }
       
-      res.json({ generated: transcripts.length, transcripts });
+      res.json({ generated: generatedTranscripts.length, transcripts: generatedTranscripts });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1430,23 +1621,195 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "No active exam year found" });
       }
 
+      const { generateTranscriptPDF, generateQRToken } = await import('./certificateService');
+
       const students = await storage.getStudentsBySchool(parseInt(schoolId));
-      const transcripts = [];
+      const school = await storage.getSchool(parseInt(schoolId));
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      
+      const allSubjects = await storage.getAllSubjects();
+      const generatedTranscripts = [];
       
       for (const student of students) {
         if (student.status !== 'approved') continue;
         
         const results = await storage.getResultsByStudent(student.id);
-        transcripts.push({
-          student,
-          examYear: activeExamYear,
-          results,
-          generatedAt: new Date(),
-          transcriptNumber: `TR-${activeExamYear.year}-${String(student.id).padStart(6, '0')}`,
+        if (results.length === 0) continue;
+        
+        const subjects = results.map(r => {
+          const subject = allSubjects.find(s => s.id === r.subjectId);
+          return {
+            name: subject?.name || 'Unknown',
+            arabicName: subject?.arabicName || null,
+            score: parseFloat(r.totalScore || '0'),
+            grade: r.grade || 'N/A',
+            maxScore: subject?.maxScore || 100,
+          };
         });
+        
+        const totalScore = subjects.reduce((sum, s) => sum + s.score, 0);
+        const maxTotal = subjects.reduce((sum, s) => sum + s.maxScore, 0);
+        const average = maxTotal > 0 ? (totalScore / maxTotal) * 100 : 0;
+        
+        let finalGrade = 'PASS';
+        if (average >= 80) finalGrade = 'A';
+        else if (average >= 70) finalGrade = 'B';
+        else if (average >= 60) finalGrade = 'C';
+        else if (average >= 50) finalGrade = 'D';
+        else finalGrade = 'FAIL';
+        
+        const qrToken = generateQRToken();
+        const transcriptNumber = `TR-${activeExamYear.year}-${String(student.id).padStart(6, '0')}`;
+        const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/transcript/${qrToken}`;
+        
+        try {
+          const pdfPath = await generateTranscriptPDF({
+            student: {
+              id: student.id,
+              firstName: student.firstName,
+              lastName: student.lastName,
+              middleName: student.middleName,
+              gender: student.gender as 'male' | 'female',
+              dateOfBirth: student.dateOfBirth,
+              placeOfBirth: student.placeOfBirth,
+              grade: student.grade,
+              indexNumber: student.indexNumber,
+            },
+            school: { id: school.id, name: school.name },
+            examYear: {
+              id: activeExamYear.id,
+              year: activeExamYear.year,
+              examStartDate: activeExamYear.examStartDate,
+              examEndDate: activeExamYear.examEndDate,
+            },
+            subjects,
+            totalScore,
+            average,
+            finalGrade,
+            qrToken,
+            transcriptNumber,
+            verifyUrl,
+          });
+          
+          const transcript = await storage.createTranscript({
+            studentId: student.id,
+            examYearId: activeExamYear.id,
+            transcriptNumber,
+            grade: student.grade,
+            qrToken,
+            pdfUrl: pdfPath,
+            issuedDate: new Date(),
+          });
+          generatedTranscripts.push(transcript);
+        } catch (e: any) {
+          console.error(`Failed to generate transcript for student ${student.id}:`, e.message);
+        }
       }
       
-      res.json({ generated: transcripts.length, total: students.length, transcripts });
+      res.json({ generated: generatedTranscripts.length, total: students.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Verification Endpoints
+  app.get("/api/verify/certificate/:token", async (req, res) => {
+    try {
+      const certificate = await storage.getCertificateByQrToken(req.params.token);
+      if (!certificate) {
+        return res.status(404).json({ valid: false, message: "Certificate not found or invalid" });
+      }
+      
+      const student = await storage.getStudent(certificate.studentId);
+      const examYear = await storage.getExamYear(certificate.examYearId);
+      
+      res.json({
+        valid: true,
+        certificate: {
+          certificateNumber: certificate.certificateNumber,
+          studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown',
+          grade: certificate.grade,
+          examYear: examYear?.year,
+          finalResult: certificate.finalResult,
+          issuedDate: certificate.issuedDate,
+          status: certificate.status,
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ valid: false, message: error.message });
+    }
+  });
+
+  app.get("/api/verify/transcript/:token", async (req, res) => {
+    try {
+      const transcript = await storage.getTranscriptByQrToken(req.params.token);
+      if (!transcript) {
+        return res.status(404).json({ valid: false, message: "Transcript not found or invalid" });
+      }
+      
+      const student = await storage.getStudent(transcript.studentId);
+      const examYear = await storage.getExamYear(transcript.examYearId);
+      
+      res.json({
+        valid: true,
+        transcript: {
+          transcriptNumber: transcript.transcriptNumber,
+          studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown',
+          grade: transcript.grade,
+          examYear: examYear?.year,
+          issuedDate: transcript.issuedDate,
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ valid: false, message: error.message });
+    }
+  });
+
+  // Download Endpoints
+  app.get("/api/certificates/:id/download", async (req, res) => {
+    try {
+      const certificate = await storage.getCertificate(parseInt(req.params.id));
+      if (!certificate || !certificate.pdfUrl) {
+        return res.status(404).json({ message: "Certificate PDF not found" });
+      }
+      
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      if (!fs.existsSync(certificate.pdfUrl)) {
+        return res.status(404).json({ message: "PDF file not found" });
+      }
+      
+      await storage.incrementCertificatePrintCount(certificate.id);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${certificate.certificateNumber.replace('/', '-')}.pdf"`);
+      fs.createReadStream(certificate.pdfUrl).pipe(res);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/transcripts/:id/download", async (req, res) => {
+    try {
+      const transcript = await storage.getTranscript(parseInt(req.params.id));
+      if (!transcript || !transcript.pdfUrl) {
+        return res.status(404).json({ message: "Transcript PDF not found" });
+      }
+      
+      const fs = await import('fs');
+      
+      if (!fs.existsSync(transcript.pdfUrl)) {
+        return res.status(404).json({ message: "PDF file not found" });
+      }
+      
+      await storage.incrementTranscriptPrintCount(transcript.id);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${transcript.transcriptNumber.replace('/', '-')}.pdf"`);
+      fs.createReadStream(transcript.pdfUrl).pipe(res);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
