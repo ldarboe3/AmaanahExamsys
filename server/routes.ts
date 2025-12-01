@@ -1750,5 +1750,115 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Seed dummy data (dev only)
+  app.post("/api/seed/dummy-data", isAuthenticated, async (req, res) => {
+    try {
+      // Create exam year
+      const examYear = await storage.createExamYear({
+        year: 2025,
+        name: "Academic Year 2024-2025",
+        hijriYear: "1446",
+        isActive: true,
+        registrationStartDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        registrationEndDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+        examStartDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+        examEndDate: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000),
+      });
+
+      // Create regions
+      const region1 = await storage.createRegion({ name: "Northern Region", code: "NR" });
+      const region2 = await storage.createRegion({ name: "Southern Region", code: "SR" });
+
+      // Create clusters
+      const cluster1 = await storage.createCluster({ name: "Cluster 1", code: "C1", regionId: region1.id });
+      const cluster2 = await storage.createCluster({ name: "Cluster 2", code: "C2", regionId: region2.id });
+
+      // Create exam centers
+      const center1 = await storage.createExamCenter({
+        name: "Main Center North",
+        code: "MCN001",
+        address: "123 Main Street, North City",
+        regionId: region1.id,
+        clusterId: cluster1.id,
+        capacity: 500,
+        contactPerson: "Ahmed Al-Mansuri",
+        contactPhone: "+966501234567",
+        contactEmail: "center1@amaanah.local",
+        isActive: true,
+      });
+
+      const center2 = await storage.createExamCenter({
+        name: "Main Center South",
+        code: "MCS001",
+        address: "456 South Avenue, South City",
+        regionId: region2.id,
+        clusterId: cluster2.id,
+        capacity: 400,
+        contactPerson: "Fatima Al-Rashid",
+        contactPhone: "+966502345678",
+        contactEmail: "center2@amaanah.local",
+        isActive: true,
+      });
+
+      // Create schools
+      const school1 = await storage.createSchool({
+        name: "Al-Noor Academy",
+        registrarName: "Mohammad Hassan",
+        email: "school1@amaanah.local",
+        phone: "+966509876543",
+        address: "789 Education Lane, North City",
+        schoolType: "secondary",
+        regionId: region1.id,
+        clusterId: cluster1.id,
+        preferredCenterId: center1.id,
+        assignedCenterId: center1.id,
+        status: "approved",
+        isEmailVerified: true,
+      });
+
+      const school2 = await storage.createSchool({
+        name: "Sunlight Institute",
+        registrarName: "Layla Ahmed",
+        email: "school2@amaanah.local",
+        phone: "+966508765432",
+        address: "321 Learning Street, South City",
+        schoolType: "primary",
+        regionId: region2.id,
+        clusterId: cluster2.id,
+        preferredCenterId: center2.id,
+        assignedCenterId: center2.id,
+        status: "approved",
+        isEmailVerified: true,
+      });
+
+      // Create subjects
+      const subject1 = await storage.createSubject({
+        name: "Arabic Language",
+        code: "ARL",
+        description: "Arabic language examination",
+        examYearId: examYear.id,
+      });
+
+      const subject2 = await storage.createSubject({
+        name: "Islamic Studies",
+        code: "IES",
+        description: "Islamic studies examination",
+        examYearId: examYear.id,
+      });
+
+      res.json({
+        message: "Dummy data created successfully",
+        examYear,
+        regions: [region1, region2],
+        clusters: [cluster1, cluster2],
+        centers: [center1, center2],
+        schools: [school1, school2],
+        subjects: [subject1, subject2],
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }

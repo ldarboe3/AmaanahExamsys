@@ -205,7 +205,14 @@ export default function ExamYears() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ExamYearFormData) => {
-      return apiRequest("POST", "/api/exam-years", data);
+      const payload = {
+        ...data,
+        registrationStartDate: data.registrationStartDate ? new Date(data.registrationStartDate) : undefined,
+        registrationEndDate: data.registrationEndDate ? new Date(data.registrationEndDate) : undefined,
+        examStartDate: data.examStartDate ? new Date(data.examStartDate) : undefined,
+        examEndDate: data.examEndDate ? new Date(data.examEndDate) : undefined,
+      };
+      return apiRequest("POST", "/api/exam-years", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/exam-years"] });
@@ -216,10 +223,10 @@ export default function ExamYears() {
         description: "The examination year has been created successfully.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "Failed to create exam year. Please try again.",
+        description: error?.message || "Failed to create exam year. Please try again.",
         variant: "destructive",
       });
     },
