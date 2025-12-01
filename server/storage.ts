@@ -4,7 +4,7 @@ import {
   users, regions, clusters, examYears, examCenters, schools, students,
   invoices, subjects, examTimetable, examiners, examinerAssignments,
   studentResults, certificates, transcripts, attendanceRecords, malpracticeReports,
-  auditLogs, notifications,
+  auditLogs, notifications, examCards, systemSettings,
   type User, type UpsertUser, type Region, type InsertRegion,
   type Cluster, type InsertCluster, type ExamYear, type InsertExamYear,
   type ExamCenter, type InsertExamCenter, type School, type InsertSchool,
@@ -15,8 +15,10 @@ import {
   type Transcript, type InsertTranscript,
   type AttendanceRecord, type InsertAttendanceRecord, type MalpracticeReport, type InsertMalpracticeReport,
   type AuditLog, type InsertAuditLog, type Notification, type InsertNotification,
+  type ExamCard, type InsertExamCard, type SystemSetting, type InsertSystemSetting,
 } from "@shared/schema";
 import { randomBytes } from "crypto";
+import bcrypt from "bcrypt";
 
 export interface IStorage {
   // Users
@@ -210,6 +212,29 @@ export interface IStorage {
   markNotificationRead(id: number): Promise<Notification | undefined>;
   markAllNotificationsRead(userId: string): Promise<void>;
   deleteNotification(id: number): Promise<boolean>;
+
+  // Authentication
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUserWithPassword(userData: UpsertUser & { password: string }): Promise<User>;
+  verifyPassword(userId: string, password: string): Promise<boolean>;
+  updatePassword(userId: string, newPassword: string): Promise<boolean>;
+  updateUserStatus(userId: string, status: string): Promise<User | undefined>;
+
+  // Exam Cards
+  createExamCard(card: InsertExamCard): Promise<ExamCard>;
+  getExamCard(id: number): Promise<ExamCard | undefined>;
+  getExamCardByCardNumber(cardNumber: string): Promise<ExamCard | undefined>;
+  getExamCardByActivationToken(token: string): Promise<ExamCard | undefined>;
+  getExamCardsByStudent(studentId: number): Promise<ExamCard[]>;
+  activateExamCard(id: number, userId: string): Promise<ExamCard | undefined>;
+  deleteExamCard(id: number): Promise<boolean>;
+
+  // System Settings
+  getSetting(key: string): Promise<SystemSetting | undefined>;
+  getAllSettings(): Promise<SystemSetting[]>;
+  getSettingsByCategory(category: string): Promise<SystemSetting[]>;
+  upsertSetting(key: string, value: string, description?: string, category?: string): Promise<SystemSetting>;
+  deleteSetting(key: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1074,6 +1099,111 @@ export class DatabaseStorage implements IStorage {
 
   async deleteNotification(id: number): Promise<boolean> {
     await db.delete(notifications).where(eq(notifications.id, id));
+    return true;
+  }
+
+  // Authentication
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async createUserWithPassword(userData: UpsertUser & { password: string }): Promise<User> {
+    const passwordHash = await bcrypt.hash(userData.password, 10);
+    const { password, ...rest } = userData;
+    const [user] = await db.insert(users)
+      .values({ ...rest, passwordHash, status: 'active' })
+      .returning();
+    return user;
+  }
+
+  async verifyPassword(userId: string, password: string): Promise<boolean> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user || !user.passwordHash) return false;
+    return bcrypt.compare(password, user.passwordHash);
+  }
+
+  async updatePassword(userId: string, newPassword: string): Promise<boolean> {
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await db.update(users)
+      .set({ passwordHash, mustChangePassword: false, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+    return true;
+  }
+
+  async updateUserStatus(userId: string, status: string): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ status: status as any, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  // Exam Cards
+  async createExamCard(card: InsertExamCard): Promise<ExamCard> {
+    const [created] = await db.insert(examCards).values(card).returning();
+    return created;
+  }
+
+  async getExamCard(id: number): Promise<ExamCard | undefined> {
+    const [card] = await db.select().from(examCards).where(eq(examCards.id, id));
+    return card;
+  }
+
+  async getExamCardByCardNumber(cardNumber: string): Promise<ExamCard | undefined> {
+    const [card] = await db.select().from(examCards).where(eq(examCards.cardNumber, cardNumber));
+    return card;
+  }
+
+  async getExamCardByActivationToken(token: string): Promise<ExamCard | undefined> {
+    const [card] = await db.select().from(examCards).where(eq(examCards.activationToken, token));
+    return card;
+  }
+
+  async getExamCardsByStudent(studentId: number): Promise<ExamCard[]> {
+    return db.select().from(examCards).where(eq(examCards.studentId, studentId));
+  }
+
+  async activateExamCard(id: number, userId: string): Promise<ExamCard | undefined> {
+    const [updated] = await db.update(examCards)
+      .set({ isActivated: true, activatedAt: new Date(), activatedByUserId: userId })
+      .where(eq(examCards.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteExamCard(id: number): Promise<boolean> {
+    await db.delete(examCards).where(eq(examCards.id, id));
+    return true;
+  }
+
+  // System Settings
+  async getSetting(key: string): Promise<SystemSetting | undefined> {
+    const [setting] = await db.select().from(systemSettings).where(eq(systemSettings.key, key));
+    return setting;
+  }
+
+  async getAllSettings(): Promise<SystemSetting[]> {
+    return db.select().from(systemSettings).orderBy(asc(systemSettings.category), asc(systemSettings.key));
+  }
+
+  async getSettingsByCategory(category: string): Promise<SystemSetting[]> {
+    return db.select().from(systemSettings).where(eq(systemSettings.category, category));
+  }
+
+  async upsertSetting(key: string, value: string, description?: string, category?: string): Promise<SystemSetting> {
+    const [setting] = await db.insert(systemSettings)
+      .values({ key, value, description, category: category || 'general' })
+      .onConflictDoUpdate({
+        target: systemSettings.key,
+        set: { value, description, category: category || 'general', updatedAt: new Date() }
+      })
+      .returning();
+    return setting;
+  }
+
+  async deleteSetting(key: string): Promise<boolean> {
+    await db.delete(systemSettings).where(eq(systemSettings.key, key));
     return true;
   }
 }
