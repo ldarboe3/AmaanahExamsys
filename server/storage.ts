@@ -5,6 +5,8 @@ import {
   invoices, subjects, examTimetable, examiners, examinerAssignments,
   studentResults, certificates, transcripts, attendanceRecords, malpracticeReports,
   auditLogs, notifications, examCards, systemSettings,
+  newsCategories, newsArticles, resourceCategories, resources, announcements,
+  newsletterSubscribers, impactStats,
   type User, type UpsertUser, type Region, type InsertRegion,
   type Cluster, type InsertCluster, type ExamYear, type InsertExamYear,
   type ExamCenter, type InsertExamCenter, type School, type InsertSchool,
@@ -16,6 +18,10 @@ import {
   type AttendanceRecord, type InsertAttendanceRecord, type MalpracticeReport, type InsertMalpracticeReport,
   type AuditLog, type InsertAuditLog, type Notification, type InsertNotification,
   type ExamCard, type InsertExamCard, type SystemSetting, type InsertSystemSetting,
+  type NewsCategory, type InsertNewsCategory, type NewsArticle, type InsertNewsArticle,
+  type ResourceCategory, type InsertResourceCategory, type Resource, type InsertResource,
+  type Announcement, type InsertAnnouncement, type NewsletterSubscriber, type InsertNewsletterSubscriber,
+  type ImpactStat, type InsertImpactStat,
 } from "@shared/schema";
 import { randomBytes } from "crypto";
 import bcrypt from "bcrypt";
@@ -235,6 +241,71 @@ export interface IStorage {
   getSettingsByCategory(category: string): Promise<SystemSetting[]>;
   upsertSetting(key: string, value: string, description?: string, category?: string): Promise<SystemSetting>;
   deleteSetting(key: string): Promise<boolean>;
+
+  // ===== WEBSITE CONTENT MANAGEMENT =====
+
+  // News Categories
+  createNewsCategory(category: InsertNewsCategory): Promise<NewsCategory>;
+  getNewsCategory(id: number): Promise<NewsCategory | undefined>;
+  getAllNewsCategories(): Promise<NewsCategory[]>;
+  updateNewsCategory(id: number, category: Partial<InsertNewsCategory>): Promise<NewsCategory | undefined>;
+  deleteNewsCategory(id: number): Promise<boolean>;
+
+  // News Articles
+  createNewsArticle(article: InsertNewsArticle): Promise<NewsArticle>;
+  getNewsArticle(id: number): Promise<NewsArticle | undefined>;
+  getNewsArticleBySlug(slug: string): Promise<NewsArticle | undefined>;
+  getPublishedNewsArticles(): Promise<NewsArticle[]>;
+  getFeaturedNewsArticles(): Promise<NewsArticle[]>;
+  getNewsArticlesByCategory(categoryId: number): Promise<NewsArticle[]>;
+  getAllNewsArticles(): Promise<NewsArticle[]>;
+  updateNewsArticle(id: number, article: Partial<InsertNewsArticle>): Promise<NewsArticle | undefined>;
+  incrementNewsArticleViewCount(id: number): Promise<void>;
+  deleteNewsArticle(id: number): Promise<boolean>;
+
+  // Resource Categories
+  createResourceCategory(category: InsertResourceCategory): Promise<ResourceCategory>;
+  getResourceCategory(id: number): Promise<ResourceCategory | undefined>;
+  getAllResourceCategories(): Promise<ResourceCategory[]>;
+  updateResourceCategory(id: number, category: Partial<InsertResourceCategory>): Promise<ResourceCategory | undefined>;
+  deleteResourceCategory(id: number): Promise<boolean>;
+
+  // Resources
+  createResource(resource: InsertResource): Promise<Resource>;
+  getResource(id: number): Promise<Resource | undefined>;
+  getPublishedResources(): Promise<Resource[]>;
+  getResourcesByCategory(categoryId: number): Promise<Resource[]>;
+  getAllResources(): Promise<Resource[]>;
+  updateResource(id: number, resource: Partial<InsertResource>): Promise<Resource | undefined>;
+  incrementResourceDownloadCount(id: number): Promise<void>;
+  deleteResource(id: number): Promise<boolean>;
+
+  // Announcements
+  createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
+  getAnnouncement(id: number): Promise<Announcement | undefined>;
+  getActiveAnnouncements(): Promise<Announcement[]>;
+  getHomepageAnnouncements(): Promise<Announcement[]>;
+  getAllAnnouncements(): Promise<Announcement[]>;
+  updateAnnouncement(id: number, announcement: Partial<InsertAnnouncement>): Promise<Announcement | undefined>;
+  deleteAnnouncement(id: number): Promise<boolean>;
+
+  // Newsletter Subscribers
+  createNewsletterSubscriber(subscriber: InsertNewsletterSubscriber): Promise<NewsletterSubscriber>;
+  getNewsletterSubscriber(id: number): Promise<NewsletterSubscriber | undefined>;
+  getNewsletterSubscriberByEmail(email: string): Promise<NewsletterSubscriber | undefined>;
+  getActiveNewsletterSubscribers(): Promise<NewsletterSubscriber[]>;
+  getAllNewsletterSubscribers(): Promise<NewsletterSubscriber[]>;
+  updateNewsletterSubscriber(id: number, subscriber: Partial<InsertNewsletterSubscriber>): Promise<NewsletterSubscriber | undefined>;
+  unsubscribeNewsletter(email: string): Promise<boolean>;
+  deleteNewsletterSubscriber(id: number): Promise<boolean>;
+
+  // Impact Stats
+  createImpactStat(stat: InsertImpactStat): Promise<ImpactStat>;
+  getImpactStat(id: number): Promise<ImpactStat | undefined>;
+  getActiveImpactStats(): Promise<ImpactStat[]>;
+  getAllImpactStats(): Promise<ImpactStat[]>;
+  updateImpactStat(id: number, stat: Partial<InsertImpactStat>): Promise<ImpactStat | undefined>;
+  deleteImpactStat(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1204,6 +1275,304 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSetting(key: string): Promise<boolean> {
     await db.delete(systemSettings).where(eq(systemSettings.key, key));
+    return true;
+  }
+
+  // ===== WEBSITE CONTENT MANAGEMENT =====
+
+  // News Categories
+  async createNewsCategory(category: InsertNewsCategory): Promise<NewsCategory> {
+    const [created] = await db.insert(newsCategories).values(category).returning();
+    return created;
+  }
+
+  async getNewsCategory(id: number): Promise<NewsCategory | undefined> {
+    const [category] = await db.select().from(newsCategories).where(eq(newsCategories.id, id));
+    return category;
+  }
+
+  async getAllNewsCategories(): Promise<NewsCategory[]> {
+    return db.select().from(newsCategories).orderBy(asc(newsCategories.name));
+  }
+
+  async updateNewsCategory(id: number, category: Partial<InsertNewsCategory>): Promise<NewsCategory | undefined> {
+    const [updated] = await db.update(newsCategories).set(category).where(eq(newsCategories.id, id)).returning();
+    return updated;
+  }
+
+  async deleteNewsCategory(id: number): Promise<boolean> {
+    await db.delete(newsCategories).where(eq(newsCategories.id, id));
+    return true;
+  }
+
+  // News Articles
+  async createNewsArticle(article: InsertNewsArticle): Promise<NewsArticle> {
+    const [created] = await db.insert(newsArticles).values(article).returning();
+    return created;
+  }
+
+  async getNewsArticle(id: number): Promise<NewsArticle | undefined> {
+    const [article] = await db.select().from(newsArticles).where(eq(newsArticles.id, id));
+    return article;
+  }
+
+  async getNewsArticleBySlug(slug: string): Promise<NewsArticle | undefined> {
+    const [article] = await db.select().from(newsArticles).where(eq(newsArticles.slug, slug));
+    return article;
+  }
+
+  async getPublishedNewsArticles(): Promise<NewsArticle[]> {
+    return db.select().from(newsArticles)
+      .where(eq(newsArticles.isPublished, true))
+      .orderBy(desc(newsArticles.publishedAt));
+  }
+
+  async getFeaturedNewsArticles(): Promise<NewsArticle[]> {
+    return db.select().from(newsArticles)
+      .where(and(eq(newsArticles.isPublished, true), eq(newsArticles.isFeatured, true)))
+      .orderBy(desc(newsArticles.publishedAt));
+  }
+
+  async getNewsArticlesByCategory(categoryId: number): Promise<NewsArticle[]> {
+    return db.select().from(newsArticles)
+      .where(and(eq(newsArticles.categoryId, categoryId), eq(newsArticles.isPublished, true)))
+      .orderBy(desc(newsArticles.publishedAt));
+  }
+
+  async getAllNewsArticles(): Promise<NewsArticle[]> {
+    return db.select().from(newsArticles).orderBy(desc(newsArticles.createdAt));
+  }
+
+  async updateNewsArticle(id: number, article: Partial<InsertNewsArticle>): Promise<NewsArticle | undefined> {
+    const [updated] = await db.update(newsArticles)
+      .set({ ...article, updatedAt: new Date() })
+      .where(eq(newsArticles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async incrementNewsArticleViewCount(id: number): Promise<void> {
+    await db.update(newsArticles)
+      .set({ viewCount: sql`${newsArticles.viewCount} + 1` })
+      .where(eq(newsArticles.id, id));
+  }
+
+  async deleteNewsArticle(id: number): Promise<boolean> {
+    await db.delete(newsArticles).where(eq(newsArticles.id, id));
+    return true;
+  }
+
+  // Resource Categories
+  async createResourceCategory(category: InsertResourceCategory): Promise<ResourceCategory> {
+    const [created] = await db.insert(resourceCategories).values(category).returning();
+    return created;
+  }
+
+  async getResourceCategory(id: number): Promise<ResourceCategory | undefined> {
+    const [category] = await db.select().from(resourceCategories).where(eq(resourceCategories.id, id));
+    return category;
+  }
+
+  async getAllResourceCategories(): Promise<ResourceCategory[]> {
+    return db.select().from(resourceCategories).orderBy(asc(resourceCategories.name));
+  }
+
+  async updateResourceCategory(id: number, category: Partial<InsertResourceCategory>): Promise<ResourceCategory | undefined> {
+    const [updated] = await db.update(resourceCategories).set(category).where(eq(resourceCategories.id, id)).returning();
+    return updated;
+  }
+
+  async deleteResourceCategory(id: number): Promise<boolean> {
+    await db.delete(resourceCategories).where(eq(resourceCategories.id, id));
+    return true;
+  }
+
+  // Resources
+  async createResource(resource: InsertResource): Promise<Resource> {
+    const [created] = await db.insert(resources).values(resource).returning();
+    return created;
+  }
+
+  async getResource(id: number): Promise<Resource | undefined> {
+    const [resource] = await db.select().from(resources).where(eq(resources.id, id));
+    return resource;
+  }
+
+  async getPublishedResources(): Promise<Resource[]> {
+    return db.select().from(resources)
+      .where(eq(resources.isPublished, true))
+      .orderBy(desc(resources.createdAt));
+  }
+
+  async getResourcesByCategory(categoryId: number): Promise<Resource[]> {
+    return db.select().from(resources)
+      .where(and(eq(resources.categoryId, categoryId), eq(resources.isPublished, true)))
+      .orderBy(desc(resources.createdAt));
+  }
+
+  async getAllResources(): Promise<Resource[]> {
+    return db.select().from(resources).orderBy(desc(resources.createdAt));
+  }
+
+  async updateResource(id: number, resource: Partial<InsertResource>): Promise<Resource | undefined> {
+    const [updated] = await db.update(resources)
+      .set({ ...resource, updatedAt: new Date() })
+      .where(eq(resources.id, id))
+      .returning();
+    return updated;
+  }
+
+  async incrementResourceDownloadCount(id: number): Promise<void> {
+    await db.update(resources)
+      .set({ downloadCount: sql`${resources.downloadCount} + 1` })
+      .where(eq(resources.id, id));
+  }
+
+  async deleteResource(id: number): Promise<boolean> {
+    await db.delete(resources).where(eq(resources.id, id));
+    return true;
+  }
+
+  // Announcements
+  async createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement> {
+    const [created] = await db.insert(announcements).values(announcement).returning();
+    return created;
+  }
+
+  async getAnnouncement(id: number): Promise<Announcement | undefined> {
+    const [ann] = await db.select().from(announcements).where(eq(announcements.id, id));
+    return ann;
+  }
+
+  async getActiveAnnouncements(): Promise<Announcement[]> {
+    const now = new Date();
+    return db.select().from(announcements)
+      .where(and(
+        eq(announcements.isActive, true),
+        or(
+          sql`${announcements.displayStartDate} IS NULL`,
+          lte(announcements.displayStartDate, now)
+        ),
+        or(
+          sql`${announcements.displayEndDate} IS NULL`,
+          gte(announcements.displayEndDate, now)
+        )
+      ))
+      .orderBy(desc(announcements.priority), desc(announcements.createdAt));
+  }
+
+  async getHomepageAnnouncements(): Promise<Announcement[]> {
+    const now = new Date();
+    return db.select().from(announcements)
+      .where(and(
+        eq(announcements.isActive, true),
+        eq(announcements.displayOnHomepage, true),
+        or(
+          sql`${announcements.displayStartDate} IS NULL`,
+          lte(announcements.displayStartDate, now)
+        ),
+        or(
+          sql`${announcements.displayEndDate} IS NULL`,
+          gte(announcements.displayEndDate, now)
+        )
+      ))
+      .orderBy(desc(announcements.priority), desc(announcements.createdAt));
+  }
+
+  async getAllAnnouncements(): Promise<Announcement[]> {
+    return db.select().from(announcements).orderBy(desc(announcements.createdAt));
+  }
+
+  async updateAnnouncement(id: number, announcement: Partial<InsertAnnouncement>): Promise<Announcement | undefined> {
+    const [updated] = await db.update(announcements)
+      .set({ ...announcement, updatedAt: new Date() })
+      .where(eq(announcements.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteAnnouncement(id: number): Promise<boolean> {
+    await db.delete(announcements).where(eq(announcements.id, id));
+    return true;
+  }
+
+  // Newsletter Subscribers
+  async createNewsletterSubscriber(subscriber: InsertNewsletterSubscriber): Promise<NewsletterSubscriber> {
+    const [created] = await db.insert(newsletterSubscribers).values(subscriber).returning();
+    return created;
+  }
+
+  async getNewsletterSubscriber(id: number): Promise<NewsletterSubscriber | undefined> {
+    const [sub] = await db.select().from(newsletterSubscribers).where(eq(newsletterSubscribers.id, id));
+    return sub;
+  }
+
+  async getNewsletterSubscriberByEmail(email: string): Promise<NewsletterSubscriber | undefined> {
+    const [sub] = await db.select().from(newsletterSubscribers).where(eq(newsletterSubscribers.email, email));
+    return sub;
+  }
+
+  async getActiveNewsletterSubscribers(): Promise<NewsletterSubscriber[]> {
+    return db.select().from(newsletterSubscribers)
+      .where(eq(newsletterSubscribers.isActive, true))
+      .orderBy(desc(newsletterSubscribers.subscribedAt));
+  }
+
+  async getAllNewsletterSubscribers(): Promise<NewsletterSubscriber[]> {
+    return db.select().from(newsletterSubscribers).orderBy(desc(newsletterSubscribers.subscribedAt));
+  }
+
+  async updateNewsletterSubscriber(id: number, subscriber: Partial<InsertNewsletterSubscriber>): Promise<NewsletterSubscriber | undefined> {
+    const [updated] = await db.update(newsletterSubscribers)
+      .set(subscriber)
+      .where(eq(newsletterSubscribers.id, id))
+      .returning();
+    return updated;
+  }
+
+  async unsubscribeNewsletter(email: string): Promise<boolean> {
+    await db.update(newsletterSubscribers)
+      .set({ isActive: false, unsubscribedAt: new Date() })
+      .where(eq(newsletterSubscribers.email, email));
+    return true;
+  }
+
+  async deleteNewsletterSubscriber(id: number): Promise<boolean> {
+    await db.delete(newsletterSubscribers).where(eq(newsletterSubscribers.id, id));
+    return true;
+  }
+
+  // Impact Stats
+  async createImpactStat(stat: InsertImpactStat): Promise<ImpactStat> {
+    const [created] = await db.insert(impactStats).values(stat).returning();
+    return created;
+  }
+
+  async getImpactStat(id: number): Promise<ImpactStat | undefined> {
+    const [stat] = await db.select().from(impactStats).where(eq(impactStats.id, id));
+    return stat;
+  }
+
+  async getActiveImpactStats(): Promise<ImpactStat[]> {
+    return db.select().from(impactStats)
+      .where(eq(impactStats.isActive, true))
+      .orderBy(asc(impactStats.displayOrder));
+  }
+
+  async getAllImpactStats(): Promise<ImpactStat[]> {
+    return db.select().from(impactStats).orderBy(asc(impactStats.displayOrder));
+  }
+
+  async updateImpactStat(id: number, stat: Partial<InsertImpactStat>): Promise<ImpactStat | undefined> {
+    const [updated] = await db.update(impactStats)
+      .set({ ...stat, updatedAt: new Date() })
+      .where(eq(impactStats.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteImpactStat(id: number): Promise<boolean> {
+    await db.delete(impactStats).where(eq(impactStats.id, id));
     return true;
   }
 }
