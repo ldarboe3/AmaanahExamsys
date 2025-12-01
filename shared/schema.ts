@@ -18,12 +18,14 @@ import { z } from "zod";
 // Enums
 export const userRoleEnum = pgEnum('user_role', [
   'super_admin',
-  'system_admin', 
+  'examination_admin',
+  'logistics_admin',
   'school_admin',
-  'student_parent',
   'examiner',
-  'center_admin'
+  'candidate'
 ]);
+
+export const userStatusEnum = pgEnum('user_status', ['pending', 'active', 'suspended', 'inactive']);
 
 export const schoolTypeEnum = pgEnum('school_type', ['LBS', 'UBS', 'BCS', 'SSS']);
 export const schoolStatusEnum = pgEnum('school_status', ['pending', 'verified', 'approved', 'rejected']);
@@ -44,16 +46,24 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table (IMPORTANT: mandatory for Replit Auth)
+// User storage table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
+  username: varchar("username", { length: 100 }).unique(),
+  passwordHash: varchar("password_hash", { length: 255 }),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
+  phone: varchar("phone", { length: 50 }),
   profileImageUrl: varchar("profile_image_url"),
   role: userRoleEnum("role").default('school_admin'),
+  status: userStatusEnum("status").default('pending'),
   schoolId: integer("school_id"),
   centerId: integer("center_id"),
+  studentId: integer("student_id"),
+  examinerId: integer("examiner_id"),
+  mustChangePassword: boolean("must_change_password").default(false),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -148,8 +158,32 @@ export const students = pgTable("students", {
   schoolId: integer("school_id").notNull().references(() => schools.id),
   examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
   status: studentStatusEnum("status").default('pending'),
+  userId: varchar("user_id").references(() => users.id),
   hasActivatedAccount: boolean("has_activated_account").default(false),
-  password: varchar("password", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Exam Cards for candidate activation
+export const examCards = pgTable("exam_cards", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  cardNumber: varchar("card_number", { length: 20 }).notNull().unique(),
+  activationToken: varchar("activation_token", { length: 100 }).unique(),
+  isActivated: boolean("is_activated").default(false),
+  activatedAt: timestamp("activated_at"),
+  activatedByUserId: varchar("activated_by_user_id").references(() => users.id),
+  printedAt: timestamp("printed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// System Settings
+export const systemSettings = pgTable("system_settings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: text("value"),
+  description: varchar("description", { length: 500 }),
+  category: varchar("category", { length: 100 }).default('general'),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -500,30 +534,274 @@ export const transcriptsRelations = relations(transcripts, ({ one }) => ({
   }),
 }));
 
-// Insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertRegionSchema = createInsertSchema(regions).omit({ id: true, createdAt: true });
-export const insertClusterSchema = createInsertSchema(clusters).omit({ id: true, createdAt: true });
-export const insertExamYearSchema = createInsertSchema(examYears).omit({ id: true, createdAt: true });
-export const insertExamCenterSchema = createInsertSchema(examCenters).omit({ id: true, createdAt: true });
-export const insertSchoolSchema = createInsertSchema(schools).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertStudentSchema = createInsertSchema(students).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertSubjectSchema = createInsertSchema(subjects).omit({ id: true, createdAt: true });
-export const insertExamTimetableSchema = createInsertSchema(examTimetable).omit({ id: true, createdAt: true });
-export const insertExaminerSchema = createInsertSchema(examiners).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertExaminerAssignmentSchema = createInsertSchema(examinerAssignments).omit({ id: true, createdAt: true });
-export const insertStudentResultSchema = createInsertSchema(studentResults).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertCertificateSchema = createInsertSchema(certificates).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertTranscriptSchema = createInsertSchema(transcripts).omit({ id: true, createdAt: true });
-export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords).omit({ id: true, createdAt: true });
-export const insertMalpracticeReportSchema = createInsertSchema(malpracticeReports).omit({ id: true, createdAt: true });
-export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
-export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
+// Insert schemas - using pick pattern to avoid omit type issues
+export const insertUserSchema = createInsertSchema(users, {
+  email: z.string().email().optional(),
+  username: z.string().min(3).max(100).optional(),
+  passwordHash: z.string().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  phone: z.string().optional(),
+}).pick({
+  email: true,
+  username: true,
+  passwordHash: true,
+  firstName: true,
+  lastName: true,
+  phone: true,
+  profileImageUrl: true,
+  role: true,
+  status: true,
+  schoolId: true,
+  centerId: true,
+  studentId: true,
+  examinerId: true,
+  mustChangePassword: true,
+});
+
+export const insertRegionSchema = createInsertSchema(regions).pick({
+  name: true,
+  code: true,
+});
+
+export const insertClusterSchema = createInsertSchema(clusters).pick({
+  name: true,
+  code: true,
+  regionId: true,
+});
+
+export const insertExamYearSchema = createInsertSchema(examYears).pick({
+  year: true,
+  name: true,
+  hijriYear: true,
+  isActive: true,
+  registrationStartDate: true,
+  registrationEndDate: true,
+  examStartDate: true,
+  examEndDate: true,
+  resultsPublishDate: true,
+  createdBy: true,
+});
+
+export const insertExamCenterSchema = createInsertSchema(examCenters).pick({
+  name: true,
+  code: true,
+  address: true,
+  regionId: true,
+  clusterId: true,
+  capacity: true,
+  contactPerson: true,
+  contactPhone: true,
+  contactEmail: true,
+  isActive: true,
+});
+
+export const insertSchoolSchema = createInsertSchema(schools).pick({
+  name: true,
+  registrarName: true,
+  email: true,
+  phone: true,
+  address: true,
+  schoolType: true,
+  regionId: true,
+  clusterId: true,
+  preferredCenterId: true,
+  assignedCenterId: true,
+  status: true,
+  verificationToken: true,
+  verificationExpiry: true,
+  isEmailVerified: true,
+  registrationCertificate: true,
+  landOwnership: true,
+  operationalLicense: true,
+  registrationDeadline: true,
+  hasPenalty: true,
+});
+
+export const insertStudentSchema = createInsertSchema(students).pick({
+  indexNumber: true,
+  confirmationCode: true,
+  firstName: true,
+  lastName: true,
+  middleName: true,
+  dateOfBirth: true,
+  placeOfBirth: true,
+  gender: true,
+  grade: true,
+  schoolId: true,
+  examYearId: true,
+  status: true,
+  userId: true,
+  hasActivatedAccount: true,
+});
+
+export const insertExamCardSchema = createInsertSchema(examCards).pick({
+  studentId: true,
+  cardNumber: true,
+  activationToken: true,
+  isActivated: true,
+  activatedAt: true,
+  activatedByUserId: true,
+  printedAt: true,
+});
+
+export const insertSystemSettingSchema = createInsertSchema(systemSettings).pick({
+  key: true,
+  value: true,
+  description: true,
+  category: true,
+});
+
+export const insertInvoiceSchema = createInsertSchema(invoices).pick({
+  invoiceNumber: true,
+  schoolId: true,
+  examYearId: true,
+  totalStudents: true,
+  feePerStudent: true,
+  totalAmount: true,
+  paidAmount: true,
+  status: true,
+  bankSlipUrl: true,
+  paymentDate: true,
+  paymentMethod: true,
+  notes: true,
+});
+
+export const insertSubjectSchema = createInsertSchema(subjects).pick({
+  name: true,
+  code: true,
+  arabicName: true,
+  grade: true,
+  maxScore: true,
+  passingScore: true,
+  isActive: true,
+});
+
+export const insertExamTimetableSchema = createInsertSchema(examTimetable).pick({
+  examYearId: true,
+  subjectId: true,
+  examDate: true,
+  startTime: true,
+  endTime: true,
+  grade: true,
+});
+
+export const insertExaminerSchema = createInsertSchema(examiners).pick({
+  userId: true,
+  firstName: true,
+  lastName: true,
+  email: true,
+  phone: true,
+  qualification: true,
+  specialization: true,
+  status: true,
+  verificationToken: true,
+  regionId: true,
+  totalScriptsMarked: true,
+  totalAllowance: true,
+});
+
+export const insertExaminerAssignmentSchema = createInsertSchema(examinerAssignments).pick({
+  examinerId: true,
+  examYearId: true,
+  centerId: true,
+  subjectId: true,
+  role: true,
+  assignedDate: true,
+  completedDate: true,
+  scriptsMarked: true,
+  allowanceRate: true,
+  totalAllowance: true,
+});
+
+export const insertStudentResultSchema = createInsertSchema(studentResults).pick({
+  studentId: true,
+  subjectId: true,
+  examYearId: true,
+  rawScore: true,
+  scaledScore: true,
+  grade: true,
+  totalScore: true,
+  status: true,
+  markedBy: true,
+  markedAt: true,
+  verifiedBy: true,
+  verifiedAt: true,
+});
+
+export const insertCertificateSchema = createInsertSchema(certificates).pick({
+  studentId: true,
+  examYearId: true,
+  certificateNumber: true,
+  grade: true,
+  templateType: true,
+  qrToken: true,
+  pdfUrl: true,
+  issuedDate: true,
+  status: true,
+  printCount: true,
+});
+
+export const insertTranscriptSchema = createInsertSchema(transcripts).pick({
+  studentId: true,
+  examYearId: true,
+  transcriptNumber: true,
+  grade: true,
+  qrToken: true,
+  pdfUrl: true,
+  issuedDate: true,
+  status: true,
+  printCount: true,
+});
+
+export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords).pick({
+  studentId: true,
+  centerId: true,
+  subjectId: true,
+  examDate: true,
+  isPresent: true,
+  notes: true,
+  recordedBy: true,
+});
+
+export const insertMalpracticeReportSchema = createInsertSchema(malpracticeReports).pick({
+  studentId: true,
+  centerId: true,
+  subjectId: true,
+  reportType: true,
+  description: true,
+  evidenceUrl: true,
+  reportedBy: true,
+  decision: true,
+  decidedBy: true,
+  decidedAt: true,
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).pick({
+  userId: true,
+  action: true,
+  resourceType: true,
+  resourceId: true,
+  details: true,
+  ipAddress: true,
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).pick({
+  userId: true,
+  title: true,
+  message: true,
+  type: true,
+  isRead: true,
+  link: true,
+});
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type InsertExamCard = z.infer<typeof insertExamCardSchema>;
+export type ExamCard = typeof examCards.$inferSelect;
+export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
+export type SystemSetting = typeof systemSettings.$inferSelect;
 export type InsertRegion = z.infer<typeof insertRegionSchema>;
 export type Region = typeof regions.$inferSelect;
 export type InsertCluster = z.infer<typeof insertClusterSchema>;
