@@ -196,11 +196,20 @@ function CenterCardSkeleton() {
 export default function Centers() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [regionFilter, setRegionFilter] = useState<string>("all");
+  const [clusterFilter, setClusterFilter] = useState<string>("all");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingCenter, setEditingCenter] = useState<CenterWithRelations | null>(null);
 
+  // Build query string for API
+  const queryParams = new URLSearchParams();
+  if (regionFilter !== "all") queryParams.set("regionId", regionFilter);
+  if (clusterFilter !== "all") queryParams.set("clusterId", clusterFilter);
+  const queryString = queryParams.toString();
+  const centersUrl = queryString ? `/api/centers?${queryString}` : "/api/centers";
+
   const { data: centers, isLoading } = useQuery<CenterWithRelations[]>({
-    queryKey: ["/api/exam-centers"],
+    queryKey: [centersUrl],
   });
 
   const { data: regions } = useQuery<Region[]>({
@@ -210,6 +219,11 @@ export default function Centers() {
   const { data: clusters } = useQuery<Cluster[]>({
     queryKey: ["/api/clusters"],
   });
+
+  // Filter clusters based on selected region
+  const clustersForFilter = clusters?.filter(
+    (cluster) => regionFilter === "all" || cluster.regionId === parseInt(regionFilter)
+  );
 
   const form = useForm<CenterFormData>({
     resolver: zodResolver(centerSchema),
@@ -224,12 +238,22 @@ export default function Centers() {
     },
   });
 
+  // Helper to invalidate all center queries (including filtered variants)
+  const invalidateCenterQueries = () => {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === 'string' && key.startsWith('/api/centers');
+      },
+    });
+  };
+
   const createMutation = useMutation({
     mutationFn: async (data: CenterFormData) => {
-      return apiRequest("POST", "/api/exam-centers", data);
+      return apiRequest("POST", "/api/centers", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/exam-centers"] });
+      invalidateCenterQueries();
       setShowCreateDialog(false);
       form.reset();
       toast({
@@ -332,18 +356,51 @@ export default function Centers() {
         </Card>
       </div>
 
-      {/* Search */}
+      {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search centers by name or code..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-              data-testid="input-search-centers"
-            />
+          <div className="flex flex-col gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search centers by name or code..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-centers"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Select value={regionFilter} onValueChange={(value) => {
+                setRegionFilter(value);
+                setClusterFilter("all");
+              }}>
+                <SelectTrigger className="w-[160px]" data-testid="select-region-filter">
+                  <SelectValue placeholder="Region" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Regions</SelectItem>
+                  {regions?.map((region) => (
+                    <SelectItem key={region.id} value={region.id.toString()}>
+                      {region.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={clusterFilter} onValueChange={setClusterFilter} disabled={regionFilter === "all"}>
+                <SelectTrigger className="w-[160px]" data-testid="select-cluster-filter">
+                  <SelectValue placeholder={regionFilter === "all" ? "Select Region First" : "Cluster"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Clusters</SelectItem>
+                  {clustersForFilter?.map((cluster) => (
+                    <SelectItem key={cluster.id} value={cluster.id.toString()}>
+                      {cluster.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
