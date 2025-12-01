@@ -39,6 +39,8 @@ import {
   ChevronUp,
   BookOpen,
   Building2,
+  History,
+  FileDown,
 } from "lucide-react";
 
 const adminMenuItems = [
@@ -137,6 +139,16 @@ const managementItems = [
     title: "Timetable",
     url: "/timetable",
     icon: ClipboardList,
+  },
+  {
+    title: "Reports & Exports",
+    url: "/reports",
+    icon: FileDown,
+  },
+  {
+    title: "Audit Logs",
+    url: "/audit-logs",
+    icon: History,
   },
   {
     title: "Settings",

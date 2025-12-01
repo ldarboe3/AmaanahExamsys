@@ -107,7 +107,7 @@ export default function Results() {
 
   const validateResultMutation = useMutation({
     mutationFn: async (resultId: number) => {
-      return apiRequest("PATCH", `/api/results/${resultId}/validate`);
+      return apiRequest("POST", `/api/results/${resultId}/validate`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/results"] });

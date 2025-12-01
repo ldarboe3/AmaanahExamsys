@@ -293,6 +293,44 @@ export const malpracticeReports = pgTable("malpractice_reports", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Audit Logs
+export const auditLogs = pgTable("audit_logs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").references(() => users.id),
+  action: varchar("action", { length: 100 }).notNull(),
+  entityType: varchar("entity_type", { length: 50 }).notNull(),
+  entityId: varchar("entity_id", { length: 50 }),
+  oldData: jsonb("old_data"),
+  newData: jsonb("new_data"),
+  ipAddress: varchar("ip_address", { length: 50 }),
+  userAgent: varchar("user_agent", { length: 500 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Notifications
+export const notificationTypeEnum = pgEnum('notification_type', [
+  'registration_deadline', 
+  'payment_reminder', 
+  'result_published', 
+  'school_approved',
+  'student_approved',
+  'exam_reminder',
+  'system_alert'
+]);
+
+export const notifications = pgTable("notifications", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").references(() => users.id),
+  type: notificationTypeEnum("type").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  data: jsonb("data"),
+  isRead: boolean("is_read").default(false),
+  sentViaEmail: boolean("sent_via_email").default(false),
+  sentViaSms: boolean("sent_via_sms").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one }) => ({
   school: one(schools, {
@@ -442,6 +480,8 @@ export const insertStudentResultSchema = createInsertSchema(studentResults).omit
 export const insertCertificateSchema = createInsertSchema(certificates).omit({ id: true, createdAt: true });
 export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords).omit({ id: true, createdAt: true });
 export const insertMalpracticeReportSchema = createInsertSchema(malpracticeReports).omit({ id: true, createdAt: true });
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
@@ -476,3 +516,7 @@ export type InsertAttendanceRecord = z.infer<typeof insertAttendanceRecordSchema
 export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 export type InsertMalpracticeReport = z.infer<typeof insertMalpracticeReportSchema>;
 export type MalpracticeReport = typeof malpracticeReports.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
