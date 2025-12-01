@@ -2759,5 +2759,175 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ===== PUBLIC API ENDPOINTS (No authentication required) =====
+  
+  // Public school registration
+  app.post("/api/public/school-registration", async (req, res) => {
+    try {
+      const { 
+        schoolName, 
+        schoolType, 
+        region, 
+        address, 
+        email, 
+        phone, 
+        principalName, 
+        principalEmail, 
+        principalPhone,
+        studentCount,
+        affiliatedOrganization,
+        additionalInfo 
+      } = req.body;
+
+      // Basic validation
+      if (!schoolName || !schoolType || !region || !email || !phone || !principalName) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Email format validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: "Invalid email format" });
+      }
+
+      // Check if email already exists
+      const existingSchools = await storage.getSchools();
+      const emailExists = existingSchools.some(s => s.email?.toLowerCase() === email.toLowerCase());
+      if (emailExists) {
+        return res.status(400).json({ message: "A school with this email already exists" });
+      }
+
+      // Find existing region only (do not create new regions for security)
+      const regions = await storage.getRegions();
+      const regionRecord = regions.find(r => r.name === region);
+      if (!regionRecord) {
+        return res.status(400).json({ message: "Invalid region selected. Please select a valid region." });
+      }
+
+      // Generate verification token
+      const verificationToken = `verify-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Create school with pending status
+      const school = await storage.createSchool({
+        name: schoolName,
+        registrarName: principalName,
+        email,
+        phone,
+        address,
+        schoolType: schoolType.toLowerCase().replace(/\s+/g, '_'),
+        regionId: regionRecord.id,
+        status: "pending",
+        isEmailVerified: false,
+        verificationToken,
+        notes: JSON.stringify({
+          principalEmail,
+          principalPhone,
+          studentCount,
+          affiliatedOrganization,
+          additionalInfo,
+          registeredAt: new Date().toISOString(),
+        }),
+      });
+
+      // In production, send verification email here
+      console.log(`School registration: ${schoolName} - Verification token: ${verificationToken}`);
+
+      res.json({ 
+        message: "Registration submitted successfully. Please check your email for verification.",
+        schoolId: school.id,
+      });
+    } catch (error: any) {
+      console.error("School registration error:", error);
+      res.status(500).json({ message: error.message || "Registration failed" });
+    }
+  });
+
+  // Email verification endpoint
+  app.get("/api/public/verify-email/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const schools = await storage.getSchools();
+      const school = schools.find(s => s.verificationToken === token);
+
+      if (!school) {
+        return res.status(404).json({ message: "Invalid or expired verification token" });
+      }
+
+      // Update school to verified
+      await storage.updateSchool(school.id, {
+        isEmailVerified: true,
+        verificationToken: null,
+      });
+
+      res.json({ message: "Email verified successfully. Your registration is now pending approval." });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public result checker
+  app.get("/api/public/results/:indexNumber", async (req, res) => {
+    try {
+      const { indexNumber } = req.params;
+
+      // Find student by index number using dedicated method if available
+      const students = await storage.getStudents();
+      const student = students.find(s => s.indexNumber?.toUpperCase() === indexNumber.toUpperCase());
+
+      if (!student) {
+        return res.status(404).json({ message: "No results found for this index number" });
+      }
+
+      // Get student's school
+      const school = student.schoolId ? await storage.getSchool(student.schoolId) : null;
+
+      // Get student's results using the correct storage method
+      const allResults = await storage.getResultsByStudent(student.id) || [];
+
+      // Get subjects for result details
+      const subjects = await storage.getSubjects();
+      const subjectMap = new Map(subjects.map(s => [s.id, s]));
+
+      // Get exam year
+      const examYears = await storage.getExamYears();
+      const examYear = examYears.find(ey => ey.id === student.examYearId);
+
+      // Format results
+      const formattedResults = allResults.map(result => {
+        const subject = subjectMap.get(result.subjectId);
+        return {
+          subject: subject?.name || "Unknown Subject",
+          score: result.rawScore || 0,
+          grade: result.grade || 'N/A',
+          status: (result.rawScore || 0) >= 50 ? 'PASSED' : 'FAILED',
+        };
+      });
+
+      // Calculate aggregate (sum of top 6 grades for typical systems)
+      const scores = formattedResults.map(r => r.score).sort((a, b) => b - a);
+      const aggregate = scores.slice(0, 6).reduce((sum, score) => sum + score, 0);
+
+      // Determine overall status
+      const passedCount = formattedResults.filter(r => r.status === 'PASSED').length;
+      const overallStatus = passedCount >= Math.ceil(formattedResults.length * 0.5) ? 'PASSED' : 'FAILED';
+
+      res.json({
+        student: {
+          indexNumber: student.indexNumber,
+          fullName: `${student.firstName} ${student.lastName}`,
+          school: school?.name || 'Unknown School',
+          level: student.gradeLevel || 'N/A',
+          examYear: examYear?.name || 'N/A',
+        },
+        results: formattedResults,
+        aggregate,
+        overallStatus,
+      });
+    } catch (error: any) {
+      console.error("Result lookup error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }
