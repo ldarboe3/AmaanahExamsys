@@ -641,16 +641,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Schools API
   app.get("/api/schools", async (req, res) => {
     try {
+      let schools = await storage.getAllSchools();
+      
+      // Apply filters
       const status = req.query.status as string | undefined;
+      const schoolType = req.query.schoolType as string | undefined;
       const regionId = req.query.regionId ? parseInt(req.query.regionId as string) : undefined;
-      let schools;
-      if (status) {
-        schools = await storage.getSchoolsByStatus(status);
-      } else if (regionId) {
-        schools = await storage.getSchoolsByRegion(regionId);
-      } else {
-        schools = await storage.getAllSchools();
+      const clusterId = req.query.clusterId ? parseInt(req.query.clusterId as string) : undefined;
+      
+      if (status && status !== 'all') {
+        schools = schools.filter(s => s.status === status);
       }
+      if (schoolType && schoolType !== 'all') {
+        schools = schools.filter(s => s.schoolType === schoolType);
+      }
+      if (regionId) {
+        schools = schools.filter(s => s.regionId === regionId);
+      }
+      if (clusterId) {
+        schools = schools.filter(s => s.clusterId === clusterId);
+      }
+      
       res.json(schools);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -762,19 +773,40 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Students API
   app.get("/api/students", async (req, res) => {
     try {
+      let students = await storage.getAllStudents();
+      
+      // Get all schools for region/cluster filtering
+      const allSchools = await storage.getAllSchools();
+      
+      // Apply filters
       const schoolId = req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined;
       const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
       const status = req.query.status as string | undefined;
-      let students;
-      if (status === 'pending') {
-        students = await storage.getPendingStudents();
-      } else if (schoolId) {
-        students = await storage.getStudentsBySchool(schoolId);
-      } else if (examYearId) {
-        students = await storage.getStudentsByExamYear(examYearId);
-      } else {
-        students = await storage.getAllStudents();
+      const grade = req.query.grade ? parseInt(req.query.grade as string) : undefined;
+      const regionId = req.query.regionId ? parseInt(req.query.regionId as string) : undefined;
+      const clusterId = req.query.clusterId ? parseInt(req.query.clusterId as string) : undefined;
+      
+      if (status && status !== 'all') {
+        students = students.filter(s => s.status === status);
       }
+      if (grade) {
+        students = students.filter(s => s.grade === grade);
+      }
+      if (schoolId) {
+        students = students.filter(s => s.schoolId === schoolId);
+      }
+      if (examYearId) {
+        students = students.filter(s => s.examYearId === examYearId);
+      }
+      if (regionId) {
+        const schoolIdsInRegion = allSchools.filter(s => s.regionId === regionId).map(s => s.id);
+        students = students.filter(s => s.schoolId && schoolIdsInRegion.includes(s.schoolId));
+      }
+      if (clusterId) {
+        const schoolIdsInCluster = allSchools.filter(s => s.clusterId === clusterId).map(s => s.id);
+        students = students.filter(s => s.schoolId && schoolIdsInCluster.includes(s.schoolId));
+      }
+      
       res.json(students);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

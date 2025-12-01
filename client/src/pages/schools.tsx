@@ -125,6 +125,8 @@ export default function Schools() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [regionFilter, setRegionFilter] = useState<string>("all");
+  const [clusterFilter, setClusterFilter] = useState<string>("all");
   const [selectedSchool, setSelectedSchool] = useState<SchoolWithRelations | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -145,8 +147,17 @@ export default function Schools() {
 
   const selectedRegionId = form.watch("regionId");
 
+  // Build query string for API
+  const queryParams = new URLSearchParams();
+  if (statusFilter !== "all") queryParams.set("status", statusFilter);
+  if (typeFilter !== "all") queryParams.set("schoolType", typeFilter);
+  if (regionFilter !== "all") queryParams.set("regionId", regionFilter);
+  if (clusterFilter !== "all") queryParams.set("clusterId", clusterFilter);
+  const queryString = queryParams.toString();
+  const schoolsUrl = queryString ? `/api/schools?${queryString}` : "/api/schools";
+
   const { data: schools, isLoading } = useQuery<SchoolWithRelations[]>({
-    queryKey: ["/api/schools", statusFilter, typeFilter],
+    queryKey: [schoolsUrl],
   });
 
   const { data: regions } = useQuery<Region[]>({
@@ -161,6 +172,21 @@ export default function Schools() {
     (cluster) => !selectedRegionId || cluster.regionId === parseInt(selectedRegionId)
   );
 
+  // Clusters filtered by selected region filter (for the filter dropdown)
+  const clustersForFilter = clusters?.filter(
+    (cluster) => regionFilter === "all" || cluster.regionId === parseInt(regionFilter)
+  );
+
+  // Helper to invalidate all school queries (including filtered variants)
+  const invalidateSchoolQueries = () => {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === 'string' && key.startsWith('/api/schools');
+      },
+    });
+  };
+
   const createSchoolMutation = useMutation({
     mutationFn: async (data: AddSchoolFormData) => {
       return apiRequest("POST", "/api/schools", {
@@ -170,7 +196,7 @@ export default function Schools() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schools"] });
+      invalidateSchoolQueries();
       toast({
         title: "School Added",
         description: "The school has been registered successfully.",
@@ -192,7 +218,7 @@ export default function Schools() {
       return apiRequest("POST", `/api/schools/${schoolId}/approve`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schools"] });
+      invalidateSchoolQueries();
       toast({
         title: "School Approved",
         description: "The school has been approved successfully.",
@@ -212,7 +238,7 @@ export default function Schools() {
       return apiRequest("POST", `/api/schools/${schoolId}/reject`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schools"] });
+      invalidateSchoolQueries();
       toast({
         title: "School Rejected",
         description: "The school has been rejected.",
@@ -257,8 +283,8 @@ export default function Schools() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
+          <div className="flex flex-col gap-4">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search schools by name or email..."
@@ -268,21 +294,38 @@ export default function Schools() {
                 data-testid="input-search-schools"
               />
             </div>
-            <div className="flex gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
-                  <SelectValue placeholder="Status" />
+            <div className="flex flex-wrap gap-2">
+              <Select value={regionFilter} onValueChange={(value) => {
+                setRegionFilter(value);
+                setClusterFilter("all");
+              }}>
+                <SelectTrigger className="w-[160px]" data-testid="select-region-filter">
+                  <SelectValue placeholder="Region" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="verified">Verified</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="all">All Regions</SelectItem>
+                  {regions?.map((region) => (
+                    <SelectItem key={region.id} value={region.id.toString()}>
+                      {region.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={clusterFilter} onValueChange={setClusterFilter} disabled={regionFilter === "all"}>
+                <SelectTrigger className="w-[160px]" data-testid="select-cluster-filter">
+                  <SelectValue placeholder={regionFilter === "all" ? "Select Region First" : "Cluster"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Clusters</SelectItem>
+                  {clustersForFilter?.map((cluster) => (
+                    <SelectItem key={cluster.id} value={cluster.id.toString()}>
+                      {cluster.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[150px]" data-testid="select-type-filter">
+                <SelectTrigger className="w-[140px]" data-testid="select-type-filter">
                   <SelectValue placeholder="School Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -291,6 +334,18 @@ export default function Schools() {
                   <SelectItem value="UBS">UBS</SelectItem>
                   <SelectItem value="BCS">BCS</SelectItem>
                   <SelectItem value="SSS">SSS</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="verified">Verified</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>
             </div>
