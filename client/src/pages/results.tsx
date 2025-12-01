@@ -69,6 +69,15 @@ const gradeColors: Record<string, string> = {
   'F': "bg-destructive/10 text-destructive",
 };
 
+const getResultStatusLabel = (status: string, isRTL: boolean) => {
+  const labels: Record<string, { en: string; ar: string }> = {
+    pending: { en: "Pending", ar: "قيد الانتظار" },
+    validated: { en: "Validated", ar: "تم التحقق" },
+    published: { en: "Published", ar: "منشور" },
+  };
+  return isRTL ? labels[status]?.ar || status : labels[status]?.en || status;
+};
+
 interface ResultWithRelations extends StudentResult {
   student?: Student & { school?: { name: string } };
   subject?: Subject;
@@ -114,8 +123,15 @@ export default function Results() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/results"] });
       toast({
-        title: "Result Validated",
-        description: "The result has been validated successfully.",
+        title: isRTL ? "تم التحقق من النتيجة" : "Result Validated",
+        description: isRTL ? "تم التحقق من النتيجة بنجاح." : "The result has been validated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: t.common.error,
+        description: isRTL ? "فشل التحقق من النتيجة." : "Failed to validate result.",
+        variant: "destructive",
       });
     },
   });
@@ -127,8 +143,15 @@ export default function Results() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/results"] });
       toast({
-        title: "Results Published",
-        description: "All validated results have been published.",
+        title: isRTL ? "تم نشر النتائج" : "Results Published",
+        description: isRTL ? "تم نشر جميع النتائج المعتمدة." : "All validated results have been published.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: t.common.error,
+        description: isRTL ? "فشل نشر النتائج." : "Failed to publish results.",
+        variant: "destructive",
       });
     },
   });
@@ -146,28 +169,28 @@ export default function Results() {
   const publishedCount = results?.filter(r => r.status === 'published').length || 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Results Management</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{t.results.title}</h1>
           <p className="text-muted-foreground mt-1">
-            Upload, validate, and publish examination results
+            {isRTL ? "تحميل وتحقق ونشر نتائج الامتحانات" : "Upload, validate, and publish examination results"}
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowUploadDialog(true)} data-testid="button-upload-results">
-            <Upload className="w-4 h-4 mr-2" />
-            Upload Results
+            <Upload className="w-4 h-4 me-2" />
+            {isRTL ? "تحميل النتائج" : "Upload Results"}
           </Button>
           <Button variant="outline" data-testid="button-download-template">
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Template
+            <FileSpreadsheet className="w-4 h-4 me-2" />
+            {isRTL ? "القالب" : "Template"}
           </Button>
           {validatedCount > 0 && (
             <Button onClick={() => publishAllMutation.mutate()} data-testid="button-publish-all">
-              <Send className="w-4 h-4 mr-2" />
-              Publish ({validatedCount})
+              <Send className="w-4 h-4 me-2" />
+              {isRTL ? `نشر (${validatedCount})` : `Publish (${validatedCount})`}
             </Button>
           )}
         </div>
@@ -179,7 +202,7 @@ export default function Results() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Results</p>
+                <p className="text-sm text-muted-foreground">{isRTL ? "إجمالي النتائج" : "Total Results"}</p>
                 <p className="text-2xl font-semibold">{results?.length || 0}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
@@ -192,7 +215,7 @@ export default function Results() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-sm text-muted-foreground">{t.common.pending}</p>
                 <p className="text-2xl font-semibold">{pendingCount}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-5/10 flex items-center justify-center">
@@ -205,7 +228,7 @@ export default function Results() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Validated</p>
+                <p className="text-sm text-muted-foreground">{isRTL ? "تم التحقق" : "Validated"}</p>
                 <p className="text-2xl font-semibold">{validatedCount}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-2/10 flex items-center justify-center">
@@ -218,7 +241,7 @@ export default function Results() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Published</p>
+                <p className="text-sm text-muted-foreground">{isRTL ? "منشور" : "Published"}</p>
                 <p className="text-2xl font-semibold">{publishedCount}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
@@ -234,9 +257,11 @@ export default function Results() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Processing Progress</span>
+              <span className="text-sm font-medium">{isRTL ? "تقدم المعالجة" : "Processing Progress"}</span>
               <span className="text-sm text-muted-foreground">
-                {publishedCount} of {results.length} published
+                {isRTL 
+                  ? `${publishedCount} من ${results.length} منشور` 
+                  : `${publishedCount} of ${results.length} published`}
               </span>
             </div>
             <Progress value={(publishedCount / results.length) * 100} className="h-2" />
@@ -249,37 +274,37 @@ export default function Results() {
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className={`absolute ${isRTL ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground`} />
               <Input
-                placeholder="Search by student name or index number..."
+                placeholder={isRTL ? "البحث باسم الطالب أو رقم الفهرس..." : "Search by student name or index number..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className={isRTL ? "pe-9" : "ps-9"}
                 data-testid="input-search-results"
               />
             </div>
             <div className="flex gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder={t.common.status} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="validated">Validated</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="all">{t.common.allStatus}</SelectItem>
+                  <SelectItem value="pending">{t.common.pending}</SelectItem>
+                  <SelectItem value="validated">{isRTL ? "تم التحقق" : "Validated"}</SelectItem>
+                  <SelectItem value="published">{isRTL ? "منشور" : "Published"}</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={gradeFilter} onValueChange={setGradeFilter}>
                 <SelectTrigger className="w-[140px]" data-testid="select-grade-filter">
-                  <SelectValue placeholder="Grade" />
+                  <SelectValue placeholder={isRTL ? "الصف" : "Grade"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Grades</SelectItem>
-                  <SelectItem value="3">Grade 3</SelectItem>
-                  <SelectItem value="6">Grade 6</SelectItem>
-                  <SelectItem value="9">Grade 9</SelectItem>
-                  <SelectItem value="12">Grade 12</SelectItem>
+                  <SelectItem value="all">{isRTL ? "جميع الصفوف" : "All Grades"}</SelectItem>
+                  <SelectItem value="3">{isRTL ? "الصف 3" : "Grade 3"}</SelectItem>
+                  <SelectItem value="6">{isRTL ? "الصف 6" : "Grade 6"}</SelectItem>
+                  <SelectItem value="9">{isRTL ? "الصف 9" : "Grade 9"}</SelectItem>
+                  <SelectItem value="12">{isRTL ? "الصف 12" : "Grade 12"}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -290,21 +315,21 @@ export default function Results() {
       {/* Results Table */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div>
-              <CardTitle className="text-lg">Results List</CardTitle>
+              <CardTitle className="text-lg">{isRTL ? "قائمة النتائج" : "Results List"}</CardTitle>
               <CardDescription>
-                {filteredResults?.length || 0} results found
+                {filteredResults?.length || 0} {isRTL ? "نتيجة موجودة" : "results found"}
               </CardDescription>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm">
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Analytics
+                <BarChart3 className="w-4 h-4 me-2" />
+                {t.nav.analytics}
               </Button>
               <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-2" />
-                Export
+                <Download className="w-4 h-4 me-2" />
+                {t.common.export}
               </Button>
             </div>
           </div>
@@ -317,12 +342,12 @@ export default function Results() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Score</TableHead>
-                    <TableHead>Grade</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t.students.title}</TableHead>
+                    <TableHead>{t.subjects.title}</TableHead>
+                    <TableHead>{isRTL ? "الدرجة" : "Score"}</TableHead>
+                    <TableHead>{isRTL ? "التقدير" : "Grade"}</TableHead>
+                    <TableHead>{t.common.status}</TableHead>
+                    <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -338,13 +363,13 @@ export default function Results() {
                               {result.student?.firstName} {result.student?.lastName}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {result.student?.indexNumber || "No Index"}
+                              {result.student?.indexNumber || (isRTL ? "لا يوجد فهرس" : "No Index")}
                             </p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm">{result.subject?.name || "Unknown"}</span>
+                        <span className="text-sm">{result.subject?.name || (isRTL ? "غير معروف" : "Unknown")}</span>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
@@ -360,26 +385,26 @@ export default function Results() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge className={`${statusColors[result.status || 'pending']} text-xs capitalize`}>
-                          {result.status}
+                        <Badge className={`${statusColors[result.status || 'pending']} text-xs`}>
+                          {getResultStatusLabel(result.status || 'pending', isRTL)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className={isRTL ? "text-left" : "text-right"}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" data-testid={`button-actions-${result.id}`}>
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align={isRTL ? "start" : "end"}>
                             <DropdownMenuItem
                               onClick={() => {
                                 setSelectedResult(result);
                                 setShowDetailsDialog(true);
                               }}
                             >
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Details
+                              <Eye className="w-4 h-4 me-2" />
+                              {t.common.viewDetails}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {result.status === 'pending' && (
@@ -387,8 +412,8 @@ export default function Results() {
                                 onClick={() => validateResultMutation.mutate(result.id)}
                                 className="text-chart-3"
                               >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Validate
+                                <CheckCircle className="w-4 h-4 me-2" />
+                                {isRTL ? "التحقق" : "Validate"}
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -402,15 +427,15 @@ export default function Results() {
           ) : (
             <div className="text-center py-12">
               <FileCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No results found</h3>
+              <h3 className="text-lg font-medium mb-2">{isRTL ? "لم يتم العثور على نتائج" : "No results found"}</h3>
               <p className="text-muted-foreground mb-4">
                 {searchQuery
-                  ? "Try adjusting your search or filters"
-                  : "Upload results to get started"}
+                  ? (isRTL ? "حاول تعديل البحث أو الفلاتر" : "Try adjusting your search or filters")
+                  : (isRTL ? "قم بتحميل النتائج للبدء" : "Upload results to get started")}
               </p>
               <Button onClick={() => setShowUploadDialog(true)}>
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Results
+                <Upload className="w-4 h-4 me-2" />
+                {isRTL ? "تحميل النتائج" : "Upload Results"}
               </Button>
             </div>
           )}
@@ -421,9 +446,9 @@ export default function Results() {
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Result Details</DialogTitle>
+            <DialogTitle>{isRTL ? "تفاصيل النتيجة" : "Result Details"}</DialogTitle>
             <DialogDescription>
-              Complete result information
+              {isRTL ? "معلومات النتيجة الكاملة" : "Complete result information"}
             </DialogDescription>
           </DialogHeader>
           {selectedResult && (
@@ -437,10 +462,10 @@ export default function Results() {
                     {selectedResult.student?.firstName} {selectedResult.student?.lastName}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {selectedResult.student?.school?.name || "Unknown School"}
+                    {selectedResult.student?.school?.name || (isRTL ? "مدرسة غير معروفة" : "Unknown School")}
                   </p>
                   <Badge className={`${statusColors[selectedResult.status || 'pending']} mt-2`}>
-                    {selectedResult.status}
+                    {getResultStatusLabel(selectedResult.status || 'pending', isRTL)}
                   </Badge>
                 </div>
               </div>
@@ -449,15 +474,15 @@ export default function Results() {
                 <div className="p-4 bg-muted/50 rounded-md">
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">First Term</p>
+                      <p className="text-xs text-muted-foreground mb-1">{isRTL ? "الفصل الأول" : "First Term"}</p>
                       <p className="text-xl font-semibold">{selectedResult.firstTermScore || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Exam</p>
+                      <p className="text-xs text-muted-foreground mb-1">{isRTL ? "الامتحان" : "Exam"}</p>
                       <p className="text-xl font-semibold">{selectedResult.examScore || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Total</p>
+                      <p className="text-xs text-muted-foreground mb-1">{isRTL ? "المجموع" : "Total"}</p>
                       <p className="text-xl font-semibold text-primary">{selectedResult.totalScore || '-'}</p>
                     </div>
                   </div>
@@ -465,14 +490,14 @@ export default function Results() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-muted-foreground">Subject</p>
-                    <p className="font-medium">{selectedResult.subject?.name || "Unknown"}</p>
+                    <p className="text-xs text-muted-foreground">{t.subjects.title}</p>
+                    <p className="font-medium">{selectedResult.subject?.name || (isRTL ? "غير معروف" : "Unknown")}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Final Grade</p>
+                    <p className="text-xs text-muted-foreground">{isRTL ? "التقدير النهائي" : "Final Grade"}</p>
                     {selectedResult.grade && (
                       <Badge className={gradeColors[selectedResult.grade]}>
-                        Grade {selectedResult.grade}
+                        {isRTL ? `تقدير ${selectedResult.grade}` : `Grade ${selectedResult.grade}`}
                       </Badge>
                     )}
                   </div>
@@ -482,7 +507,7 @@ export default function Results() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
-              Close
+              {t.common.close}
             </Button>
             {selectedResult && selectedResult.status === 'pending' && (
               <Button
@@ -491,7 +516,7 @@ export default function Results() {
                   setShowDetailsDialog(false);
                 }}
               >
-                Validate
+                {isRTL ? "التحقق" : "Validate"}
               </Button>
             )}
           </DialogFooter>
@@ -502,35 +527,37 @@ export default function Results() {
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Upload Results</DialogTitle>
+            <DialogTitle>{isRTL ? "تحميل النتائج" : "Upload Results"}</DialogTitle>
             <DialogDescription>
-              Upload a CSV file containing examination results
+              {isRTL ? "تحميل ملف CSV يحتوي على نتائج الامتحان" : "Upload a CSV file containing examination results"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
               <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
               <p className="text-sm text-muted-foreground mb-2">
-                Drag and drop your CSV file here, or click to browse
+                {isRTL 
+                  ? "اسحب وأفلت ملف CSV هنا، أو انقر للتصفح" 
+                  : "Drag and drop your CSV file here, or click to browse"}
               </p>
               <Button variant="outline" size="sm">
-                Choose File
+                {isRTL ? "اختر ملفًا" : "Choose File"}
               </Button>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Need the template?</span>
-              <Button variant="link" size="sm" className="h-auto p-0">
-                <Download className="w-4 h-4 mr-1" />
-                Download Template
+              <span className="text-muted-foreground">{isRTL ? "هل تحتاج القالب؟" : "Need the template?"}</span>
+              <Button variant="ghost" size="sm" className="h-auto p-0">
+                <Download className="w-4 h-4 me-1" />
+                {isRTL ? "تحميل القالب" : "Download Template"}
               </Button>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowUploadDialog(false)}>
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button disabled>
-              Upload & Validate
+              {isRTL ? "تحميل والتحقق" : "Upload & Validate"}
             </Button>
           </DialogFooter>
         </DialogContent>

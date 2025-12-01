@@ -132,15 +132,17 @@ export default function Certificates() {
       queryClient.invalidateQueries({ queryKey: [`/api/students?schoolId=${selectedSchool}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/certificates"] });
       toast({
-        title: "Certificates Generated",
-        description: `${selectedStudents.length} certificate(s) generated successfully.`,
+        title: isRTL ? "تم إنشاء الشهادات" : "Certificates Generated",
+        description: isRTL 
+          ? `تم إنشاء ${selectedStudents.length} شهادة بنجاح.`
+          : `${selectedStudents.length} certificate(s) generated successfully.`,
       });
       setSelectedStudents([]);
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to generate certificates. Please try again.",
+        title: t.common.error,
+        description: isRTL ? "فشل إنشاء الشهادات. يرجى المحاولة مرة أخرى." : "Failed to generate certificates. Please try again.",
         variant: "destructive",
       });
     },
@@ -154,14 +156,14 @@ export default function Certificates() {
       queryClient.invalidateQueries({ queryKey: [`/api/students?schoolId=${selectedSchool}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/certificates"] });
       toast({
-        title: "All Certificates Generated",
-        description: "All student certificates for this school have been generated.",
+        title: isRTL ? "تم إنشاء جميع الشهادات" : "All Certificates Generated",
+        description: isRTL ? "تم إنشاء شهادات جميع الطلاب لهذه المدرسة." : "All student certificates for this school have been generated.",
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to generate certificates. Please try again.",
+        title: t.common.error,
+        description: isRTL ? "فشل إنشاء الشهادات. يرجى المحاولة مرة أخرى." : "Failed to generate certificates. Please try again.",
         variant: "destructive",
       });
     },
@@ -195,8 +197,8 @@ export default function Certificates() {
   const handlePrintSelected = () => {
     if (selectedStudents.length === 0) {
       toast({
-        title: "No Selection",
-        description: "Please select at least one student to generate certificates.",
+        title: isRTL ? "لا يوجد اختيار" : "No Selection",
+        description: isRTL ? "يرجى اختيار طالب واحد على الأقل لإنشاء الشهادات." : "Please select at least one student to generate certificates.",
         variant: "destructive",
       });
       return;
@@ -205,12 +207,12 @@ export default function Certificates() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Certificates</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{t.certificates.title}</h1>
           <p className="text-muted-foreground mt-1">
-            Generate and print student achievement certificates
+            {isRTL ? "إنشاء وطباعة شهادات إنجاز الطلاب" : "Generate and print student achievement certificates"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -220,25 +222,25 @@ export default function Certificates() {
             disabled={selectedStudents.length === 0 || generateCertificateMutation.isPending}
             data-testid="button-generate-selected"
           >
-            <Printer className="w-4 h-4 mr-2" />
-            Generate Selected ({selectedStudents.length})
+            <Printer className="w-4 h-4 me-2" />
+            {isRTL ? `إنشاء المحدد (${selectedStudents.length})` : `Generate Selected (${selectedStudents.length})`}
           </Button>
           <Button
             onClick={() => generateAllMutation.mutate()}
             disabled={!selectedSchool || generateAllMutation.isPending}
             data-testid="button-generate-all"
           >
-            <Download className="w-4 h-4 mr-2" />
-            Generate All for School
+            <Download className="w-4 h-4 me-2" />
+            {isRTL ? "إنشاء الكل للمدرسة" : "Generate All for School"}
           </Button>
         </div>
       </div>
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Filter Students</CardTitle>
+          <CardTitle className="text-lg">{isRTL ? "تصفية الطلاب" : "Filter Students"}</CardTitle>
           <CardDescription>
-            Select region, cluster, and school to view students
+            {isRTL ? "حدد المنطقة والمجموعة والمدرسة لعرض الطلاب" : "Select region, cluster, and school to view students"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -246,7 +248,7 @@ export default function Certificates() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-muted-foreground" />
-                Region
+                {t.schools.region}
               </label>
               <Select value={selectedRegion} onValueChange={(value) => {
                 setSelectedRegion(value);
@@ -255,7 +257,7 @@ export default function Certificates() {
                 setSelectedStudents([]);
               }}>
                 <SelectTrigger data-testid="select-region">
-                  <SelectValue placeholder="Select Region" />
+                  <SelectValue placeholder={isRTL ? "اختر المنطقة" : "Select Region"} />
                 </SelectTrigger>
                 <SelectContent>
                   {regions?.map(region => (
@@ -270,7 +272,7 @@ export default function Certificates() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-muted-foreground" />
-                Cluster
+                {t.schools.cluster}
               </label>
               <Select 
                 value={selectedCluster} 
@@ -282,7 +284,7 @@ export default function Certificates() {
                 disabled={!selectedRegion}
               >
                 <SelectTrigger data-testid="select-cluster">
-                  <SelectValue placeholder="Select Cluster" />
+                  <SelectValue placeholder={isRTL ? "اختر المجموعة" : "Select Cluster"} />
                 </SelectTrigger>
                 <SelectContent>
                   {filteredClusters.map(cluster => (
@@ -297,7 +299,7 @@ export default function Certificates() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <School className="w-4 h-4 text-muted-foreground" />
-                School
+                {t.schools.title}
               </label>
               <Select 
                 value={selectedSchool} 
@@ -308,7 +310,7 @@ export default function Certificates() {
                 disabled={!selectedRegion}
               >
                 <SelectTrigger data-testid="select-school">
-                  <SelectValue placeholder="Select School" />
+                  <SelectValue placeholder={isRTL ? "اختر المدرسة" : "Select School"} />
                 </SelectTrigger>
                 <SelectContent>
                   {filteredSchools.map(school => (
@@ -328,11 +330,11 @@ export default function Certificates() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Eligible Students</p>
+                <p className="text-sm text-muted-foreground">{isRTL ? "الطلاب المؤهلون" : "Eligible Students"}</p>
                 <p className="text-2xl font-semibold">{eligibleStudents.length}</p>
                 {nonEligibleStudents.length > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    ({nonEligibleStudents.length} not eligible)
+                    ({nonEligibleStudents.length} {isRTL ? "غير مؤهل" : "not eligible"})
                   </p>
                 )}
               </div>
@@ -346,7 +348,7 @@ export default function Certificates() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Selected</p>
+                <p className="text-sm text-muted-foreground">{isRTL ? "المحدد" : "Selected"}</p>
                 <p className="text-2xl font-semibold text-chart-2">{selectedStudents.length}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-2/10 flex items-center justify-center">
@@ -359,8 +361,8 @@ export default function Certificates() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Exam Year</p>
-                <p className="text-lg font-semibold">{activeExamYear?.name || "N/A"}</p>
+                <p className="text-sm text-muted-foreground">{t.examYears.title}</p>
+                <p className="text-lg font-semibold">{activeExamYear?.name || (isRTL ? "غير متوفر" : "N/A")}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
                 <Award className="w-5 h-5 text-chart-3" />
@@ -372,9 +374,9 @@ export default function Certificates() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">School</p>
+                <p className="text-sm text-muted-foreground">{t.schools.title}</p>
                 <p className="text-sm font-medium truncate max-w-[120px]">
-                  {filteredSchools.find(s => s.id.toString() === selectedSchool)?.name || "None"}
+                  {filteredSchools.find(s => s.id.toString() === selectedSchool)?.name || (isRTL ? "لا يوجد" : "None")}
                 </p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-5/10 flex items-center justify-center">
@@ -387,11 +389,13 @@ export default function Certificates() {
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div>
-              <CardTitle className="text-lg">Student List</CardTitle>
+              <CardTitle className="text-lg">{isRTL ? "قائمة الطلاب" : "Student List"}</CardTitle>
               <CardDescription>
-                {selectedSchool ? `${students?.length || 0} students found` : "Select a school to view students"}
+                {selectedSchool 
+                  ? (isRTL ? `${students?.length || 0} طالب موجود` : `${students?.length || 0} students found`) 
+                  : (isRTL ? "اختر مدرسة لعرض الطلاب" : "Select a school to view students")}
               </CardDescription>
             </div>
           </div>
@@ -400,9 +404,9 @@ export default function Certificates() {
           {!selectedSchool ? (
             <div className="text-center py-12">
               <School className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No School Selected</h3>
+              <h3 className="text-lg font-medium mb-2">{isRTL ? "لم يتم اختيار مدرسة" : "No School Selected"}</h3>
               <p className="text-muted-foreground">
-                Please select a region, cluster, and school to view students
+                {isRTL ? "يرجى اختيار منطقة ومجموعة ومدرسة لعرض الطلاب" : "Please select a region, cluster, and school to view students"}
               </p>
             </div>
           ) : studentsLoading ? (
@@ -413,7 +417,9 @@ export default function Certificates() {
                 <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-md">
                   <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-500" />
                   <span className="text-sm text-amber-800 dark:text-amber-400">
-                    {nonEligibleStudents.length} student(s) in grades other than 6, 9, or 12 are not eligible for certificates
+                    {isRTL 
+                      ? `${nonEligibleStudents.length} طالب في صفوف غير 6 أو 9 أو 12 غير مؤهلين للحصول على شهادات`
+                      : `${nonEligibleStudents.length} student(s) in grades other than 6, 9, or 12 are not eligible for certificates`}
                   </span>
                 </div>
               )}
@@ -428,12 +434,12 @@ export default function Certificates() {
                           data-testid="checkbox-select-all"
                         />
                       </TableHead>
-                      <TableHead>Student</TableHead>
-                      <TableHead>Index Number</TableHead>
-                      <TableHead>Grade</TableHead>
-                      <TableHead>Gender</TableHead>
-                      <TableHead>Certificate Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>{t.students.title}</TableHead>
+                      <TableHead>{isRTL ? "رقم الفهرس" : "Index Number"}</TableHead>
+                      <TableHead>{isRTL ? "الصف" : "Grade"}</TableHead>
+                      <TableHead>{isRTL ? "الجنس" : "Gender"}</TableHead>
+                      <TableHead>{isRTL ? "حالة الشهادة" : "Certificate Status"}</TableHead>
+                      <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -458,31 +464,33 @@ export default function Certificates() {
                                   {student.firstName} {student.lastName}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : "N/A"}
+                                  {student.dateOfBirth 
+                                    ? new Date(student.dateOfBirth).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US') 
+                                    : (isRTL ? "غير متوفر" : "N/A")}
                                 </p>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
                             <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                              {student.indexNumber || "Pending"}
+                              {student.indexNumber || (isRTL ? "قيد الانتظار" : "Pending")}
                             </code>
                           </TableCell>
-                          <TableCell>Grade {student.grade}</TableCell>
-                          <TableCell className="capitalize">{student.gender}</TableCell>
+                          <TableCell>{isRTL ? `الصف ${student.grade}` : `Grade ${student.grade}`}</TableCell>
+                          <TableCell className="capitalize">{student.gender === 'male' ? (isRTL ? 'ذكر' : 'male') : (isRTL ? 'أنثى' : 'female')}</TableCell>
                           <TableCell>
                             {certificate ? (
                               <Badge variant="default" className="bg-chart-3/10 text-chart-3">
-                                Generated
+                                {isRTL ? "تم الإنشاء" : "Generated"}
                               </Badge>
                             ) : (
                               <Badge variant="secondary">
-                                Pending
+                                {t.common.pending}
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
+                          <TableCell className={isRTL ? "text-left" : "text-right"}>
+                            <div className={`flex items-center gap-2 ${isRTL ? "justify-start" : "justify-end"}`}>
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -527,9 +535,9 @@ export default function Certificates() {
           ) : (
             <div className="text-center py-12">
               <User className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No Students Found</h3>
+              <h3 className="text-lg font-medium mb-2">{isRTL ? "لم يتم العثور على طلاب" : "No Students Found"}</h3>
               <p className="text-muted-foreground">
-                This school has no registered students
+                {isRTL ? "هذه المدرسة ليس بها طلاب مسجلين" : "This school has no registered students"}
               </p>
             </div>
           )}
@@ -539,9 +547,11 @@ export default function Certificates() {
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Certificate Preview</DialogTitle>
+            <DialogTitle>{isRTL ? "معاينة الشهادة" : "Certificate Preview"}</DialogTitle>
             <DialogDescription>
-              Preview certificate for {previewStudent?.firstName} {previewStudent?.lastName}
+              {isRTL 
+                ? `معاينة شهادة ${previewStudent?.firstName} ${previewStudent?.lastName}`
+                : `Preview certificate for ${previewStudent?.firstName} ${previewStudent?.lastName}`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -550,25 +560,34 @@ export default function Certificates() {
                 <div className="flex justify-center">
                   <Award className="w-16 h-16 text-primary" />
                 </div>
-                <h2 className="text-2xl font-serif font-semibold">Certificate of Achievement</h2>
-                <p className="text-muted-foreground">This is to certify that</p>
+                <h2 className="text-2xl font-serif font-semibold">
+                  {isRTL ? "شهادة إنجاز" : "Certificate of Achievement"}
+                </h2>
+                <p className="text-muted-foreground">{isRTL ? "نشهد بأن" : "This is to certify that"}</p>
                 <h3 className="text-xl font-semibold text-primary">
                   {previewStudent?.firstName} {previewStudent?.lastName}
                 </h3>
-                <p className="text-muted-foreground">Index Number: {previewStudent?.indexNumber || "N/A"}</p>
-                <p className="text-muted-foreground">of</p>
+                <p className="text-muted-foreground">
+                  {isRTL ? "رقم الفهرس:" : "Index Number:"} {previewStudent?.indexNumber || (isRTL ? "غير متوفر" : "N/A")}
+                </p>
+                <p className="text-muted-foreground">{isRTL ? "من" : "of"}</p>
                 <p className="font-medium">
-                  {filteredSchools.find(s => s.id.toString() === selectedSchool)?.name || "Unknown School"}
+                  {filteredSchools.find(s => s.id.toString() === selectedSchool)?.name || (isRTL ? "مدرسة غير معروفة" : "Unknown School")}
                 </p>
                 <p className="text-muted-foreground">
-                  has successfully completed the {activeExamYear?.name || "Academic Year"} examinations
+                  {isRTL 
+                    ? `قد أكمل بنجاح امتحانات ${activeExamYear?.name || "العام الدراسي"}`
+                    : `has successfully completed the ${activeExamYear?.name || "Academic Year"} examinations`}
                 </p>
                 <p className="text-lg font-semibold">
-                  Grade Level: <span className="text-chart-3">Grade {previewStudent?.grade}</span>
+                  {isRTL ? "مستوى الصف:" : "Grade Level:"}{" "}
+                  <span className="text-chart-3">
+                    {isRTL ? `الصف ${previewStudent?.grade}` : `Grade ${previewStudent?.grade}`}
+                  </span>
                 </p>
                 <div className="pt-4 border-t mt-4">
                   <p className="text-sm text-muted-foreground">
-                    Certificate will be issued upon generation
+                    {isRTL ? "سيتم إصدار الشهادة عند الإنشاء" : "Certificate will be issued upon generation"}
                   </p>
                 </div>
               </div>
@@ -576,7 +595,7 @@ export default function Certificates() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>
-              Close
+              {t.common.close}
             </Button>
             <Button onClick={() => {
               if (previewStudent) {
@@ -584,8 +603,8 @@ export default function Certificates() {
               }
               setShowPreviewDialog(false);
             }}>
-              <Award className="w-4 h-4 mr-2" />
-              Generate Certificate
+              <Award className="w-4 h-4 me-2" />
+              {isRTL ? "إنشاء الشهادة" : "Generate Certificate"}
             </Button>
           </DialogFooter>
         </DialogContent>
