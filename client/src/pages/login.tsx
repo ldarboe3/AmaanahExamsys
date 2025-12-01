@@ -18,6 +18,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { LanguageToggle } from "@/components/language-toggle";
 import amaanahLogo from "@assets/amaanah-logo-BXDbf4ee_1764613882774.png";
 import studentsBg from "@assets/generated_images/african_islamic_students_in_classroom.png";
 
@@ -32,6 +34,7 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t, isRTL } = useLanguage();
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -65,37 +68,42 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className={`min-h-screen flex ${isRTL ? 'flex-row-reverse' : ''}`}>
       {/* Left Side - Background Image */}
       <div 
         className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative bg-cover bg-center"
         style={{ backgroundImage: `url(${studentsBg})` }}
       >
         {/* Dark overlay for better text visibility */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
+        <div className={`absolute inset-0 ${isRTL ? 'bg-gradient-to-l' : 'bg-gradient-to-r'} from-black/70 via-black/50 to-black/30`} />
         
         {/* Content over the image */}
-        <div className="relative z-10 flex flex-col justify-start p-8 lg:p-12 text-white h-full">
+        <div className={`relative z-10 flex flex-col justify-start p-8 lg:p-12 text-white h-full ${isRTL ? 'text-right' : 'text-left'}`}>
           {/* Tagline */}
           <div className="max-w-md mt-4">
             <h2 className="text-3xl lg:text-4xl font-bold mb-4">
-              Education for Development
+              {t.auth.educationForDevelopment}
             </h2>
             <p className="text-lg text-white/90">
-              Empowering the next generation through quality Islamic and Arabic education across The Gambia.
+              {t.auth.empoweringNextGen}
             </p>
           </div>
           
           {/* Footer */}
           <div className="text-sm text-white/70 mt-6">
-            <p>Examination Management System</p>
-            <p className="mt-1">The Gambia</p>
+            <p>{t.auth.examinationSystem}</p>
+            <p className="mt-1">{t.auth.theGambia}</p>
           </div>
         </div>
       </div>
 
       {/* Right Side - Login Form */}
       <div className="w-full lg:w-1/2 xl:w-2/5 flex flex-col bg-background">
+        {/* Language Toggle */}
+        <div className={`absolute top-4 ${isRTL ? 'left-4' : 'right-4'} z-50`}>
+          <LanguageToggle />
+        </div>
+        
         {/* Mobile Header with Logo */}
         <div className="lg:hidden flex items-center justify-center gap-3 p-6 border-b bg-primary/5">
           <img 
@@ -104,8 +112,8 @@ export default function Login() {
             className="w-12 h-12 object-contain"
           />
           <div>
-            <h1 className="text-lg font-semibold text-foreground">Amaanah</h1>
-            <p className="text-xs text-muted-foreground">Examination System</p>
+            <h1 className="text-lg font-semibold text-foreground">{t.app.name}</h1>
+            <p className="text-xs text-muted-foreground">{t.auth.examinationSystem}</p>
           </div>
         </div>
 
@@ -119,17 +127,17 @@ export default function Login() {
                 alt="Amaanah Logo" 
                 className="w-24 h-24 object-contain mb-4"
               />
-              <h1 className="text-xl font-semibold text-foreground">Welcome Back</h1>
+              <h1 className="text-xl font-semibold text-foreground">{t.auth.welcomeBack}</h1>
               <p className="text-sm text-muted-foreground">
-                Sign in to continue to Amaanah
+                {t.auth.signInToContinue}
               </p>
             </div>
 
             <Card className="border-0 shadow-none lg:border lg:shadow-sm">
               <CardHeader className="text-center pb-4">
-                <CardTitle className="text-xl lg:hidden">Sign In</CardTitle>
+                <CardTitle className="text-xl lg:hidden">{t.auth.signIn}</CardTitle>
                 <CardDescription className="lg:hidden">
-                  Enter your credentials to access the system
+                  {t.auth.enterCredentials}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -147,10 +155,10 @@ export default function Login() {
                       name="username"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Username or Email</FormLabel>
+                          <FormLabel>{t.auth.usernameOrEmail}</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="Enter your username or email"
+                              placeholder={t.auth.enterUsername}
                               autoComplete="username"
                               className="h-11"
                               {...field}
@@ -167,14 +175,14 @@ export default function Login() {
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Password</FormLabel>
+                          <FormLabel>{t.auth.password}</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <Input
                                 type={showPassword ? "text" : "password"}
-                                placeholder="Enter your password"
+                                placeholder={t.auth.enterPassword}
                                 autoComplete="current-password"
-                                className="h-11 pr-10"
+                                className={`h-11 ${isRTL ? 'pl-10' : 'pr-10'}`}
                                 {...field}
                                 data-testid="input-password"
                               />
@@ -182,7 +190,7 @@ export default function Login() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="absolute right-0 top-0 h-full px-3"
+                                className={`absolute ${isRTL ? 'left-0' : 'right-0'} top-0 h-full px-3`}
                                 onClick={() => setShowPassword(!showPassword)}
                                 data-testid="button-toggle-password"
                               >
@@ -206,41 +214,41 @@ export default function Login() {
                       data-testid="button-login-submit"
                     >
                       {loginMutation.isPending && (
-                        <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                        <Loader2 className={`w-4 h-4 ${isRTL ? 'ms-2' : 'me-2'} animate-spin`} />
                       )}
-                      Sign In
+                      {t.auth.signIn}
                     </Button>
                   </form>
                 </Form>
 
                 <div className="mt-6 pt-6 border-t">
                   <p className="text-sm text-muted-foreground text-center mb-4">
-                    Test Credentials (for demonstration)
+                    {t.auth.testCredentials}
                   </p>
                   <div className="space-y-2 text-xs text-muted-foreground">
                     <div className="grid grid-cols-2 gap-2 p-3 bg-muted/50 rounded-md">
                       <div>
-                        <p className="font-medium text-foreground">Super Admin</p>
+                        <p className="font-medium text-foreground">{t.auth.superAdmin}</p>
                         <p>superadmin / Admin@123</p>
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">Exam Admin</p>
+                        <p className="font-medium text-foreground">{t.auth.examAdmin}</p>
                         <p>examinationadmin / Admin@123</p>
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">Logistics Admin</p>
+                        <p className="font-medium text-foreground">{t.auth.logisticsAdmin}</p>
                         <p>logisticsadmin / Admin@123</p>
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">School Admin</p>
+                        <p className="font-medium text-foreground">{t.auth.schoolAdmin}</p>
                         <p>schooladmin / Admin@123</p>
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">Examiner</p>
+                        <p className="font-medium text-foreground">{t.auth.examiner}</p>
                         <p>examiner / Admin@123</p>
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">Candidate</p>
+                        <p className="font-medium text-foreground">{t.auth.candidate}</p>
                         <p>candidate / Admin@123</p>
                       </div>
                     </div>
@@ -251,7 +259,7 @@ export default function Login() {
 
             <div className="mt-6 text-center">
               <p className="text-xs text-muted-foreground">
-                &copy; {new Date().getFullYear()} GSIAE/Amaanah. All rights reserved.
+                &copy; {new Date().getFullYear()} GSIAE/{t.app.name}. {t.auth.allRightsReserved}.
               </p>
             </div>
           </div>
