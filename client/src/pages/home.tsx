@@ -34,7 +34,6 @@ const quickLinks = [
   { name: "Quality Assurance", href: "/programmes#quality", icon: Shield },
   { name: "Endowment & Projects", href: "/programmes#endowment", icon: Building2 },
   { name: "Membership", href: "/membership", icon: Users },
-  { name: "Contact Us", href: "/contact", icon: Mail },
 ];
 
 const defaultImpactStats = [
@@ -176,16 +175,23 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Quick Links Section */}
-      <section className="py-8 bg-primary/5 border-y">
+      {/* Quick Links Section - Modern */}
+      <section className="py-12 md:py-16 bg-gradient-to-b from-background to-primary/5 border-b">
         <div className="container mx-auto px-4">
-          <div className="flex flex-wrap justify-center gap-4 md:gap-8">
+          <div className="text-center mb-10">
+            <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Quick Access</h3>
+            <p className="text-muted-foreground">Explore our key programmes and services</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
             {quickLinks.map((link) => (
               <Link key={link.name} href={link.href}>
-                <Button variant="ghost" className="flex items-center gap-2 text-foreground/80 hover:text-primary">
-                  <link.icon className="w-4 h-4" />
-                  <span className="text-sm">{link.name}</span>
-                </Button>
+                <div className="group relative h-full">
+                  <div className="absolute inset-0 bg-primary/10 rounded-lg blur opacity-0 group-hover:opacity-100 transition duration-300" />
+                  <button className="relative w-full px-4 py-5 bg-card rounded-lg border border-border hover:border-primary transition-all duration-300 flex flex-col items-center gap-3 hover-elevate">
+                    <link.icon className="w-5 h-5 text-primary transition-transform group-hover:scale-110" />
+                    <span className="text-xs md:text-sm font-medium text-foreground text-center leading-tight">{link.name}</span>
+                  </button>
+                </div>
               </Link>
             ))}
           </div>
