@@ -107,7 +107,7 @@ export default function Payments() {
 
   const confirmPaymentMutation = useMutation({
     mutationFn: async (invoiceId: number) => {
-      return apiRequest("PATCH", `/api/invoices/${invoiceId}/confirm`);
+      return apiRequest("POST", `/api/invoices/${invoiceId}/pay`, { paymentMethod: 'bank_slip' });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });

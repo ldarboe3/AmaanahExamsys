@@ -107,7 +107,7 @@ export default function Schools() {
 
   const approveSchoolMutation = useMutation({
     mutationFn: async (schoolId: number) => {
-      return apiRequest("PATCH", `/api/schools/${schoolId}/approve`);
+      return apiRequest("POST", `/api/schools/${schoolId}/approve`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/schools"] });
@@ -127,7 +127,7 @@ export default function Schools() {
 
   const rejectSchoolMutation = useMutation({
     mutationFn: async (schoolId: number) => {
-      return apiRequest("PATCH", `/api/schools/${schoolId}/reject`);
+      return apiRequest("POST", `/api/schools/${schoolId}/reject`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/schools"] });

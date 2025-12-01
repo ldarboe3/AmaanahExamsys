@@ -109,7 +109,7 @@ export default function Students() {
 
   const approveStudentMutation = useMutation({
     mutationFn: async (studentId: number) => {
-      return apiRequest("PATCH", `/api/students/${studentId}/approve`);
+      return apiRequest("POST", `/api/students/${studentId}/approve`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
