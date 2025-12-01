@@ -4,7 +4,6 @@ import { useLanguage } from "@/lib/i18n/LanguageContext";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -13,14 +12,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   GraduationCap,
   LayoutDashboard,
@@ -35,8 +26,6 @@ import {
   Calendar,
   BarChart3,
   Settings,
-  LogOut,
-  ChevronUp,
   BookOpen,
   Building2,
   History,
@@ -81,7 +70,11 @@ const managementDefs: MenuItemDef[] = [
   { key: "settings", url: "/settings", icon: Settings },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  side?: "left" | "right";
+}
+
+export function AppSidebar({ side = "left" }: AppSidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -93,14 +86,8 @@ export function AppSidebar() {
     return (t.nav as Record<string, string>)[key] || key;
   };
 
-  const getInitials = (firstName?: string | null, lastName?: string | null) => {
-    const first = firstName?.charAt(0) || '';
-    const last = lastName?.charAt(0) || '';
-    return (first + last).toUpperCase() || 'U';
-  };
-
   return (
-    <Sidebar>
+    <Sidebar side={side}>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-3">
           <div className="w-9 h-9 rounded-md bg-primary flex items-center justify-center">
@@ -160,57 +147,6 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
       </SidebarContent>
-
-      <SidebarFooter className="border-t border-sidebar-border">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="flex items-center gap-3 w-full p-3 rounded-md hover-elevate text-left"
-              data-testid="button-user-menu"
-            >
-              <Avatar className="w-8 h-8">
-                <AvatarImage 
-                  src={user?.profileImageUrl || undefined} 
-                  alt={`${user?.firstName || 'User'} ${user?.lastName || ''}`}
-                  className="object-cover"
-                />
-                <AvatarFallback className="text-xs">
-                  {getInitials(user?.firstName, user?.lastName)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col items-start min-w-0 flex-1">
-                <span className="text-sm font-medium truncate w-full text-sidebar-foreground">
-                  {user?.firstName || 'User'} {user?.lastName || ''}
-                </span>
-                <span className="text-xs text-muted-foreground truncate w-full">
-                  {user?.email || ''}
-                </span>
-              </div>
-              <ChevronUp className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem asChild>
-              <Link href="/profile" className="cursor-pointer">
-                <Settings className="w-4 h-4 me-2" />
-                {t.user.profileSettings}
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive cursor-pointer"
-              onClick={async () => {
-                await fetch('/api/auth/logout', { method: 'POST' });
-                window.location.href = '/';
-              }}
-              data-testid="button-logout"
-            >
-              <LogOut className="w-4 h-4 me-2" />
-              {t.user.signOut}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarFooter>
     </Sidebar>
   );
 }

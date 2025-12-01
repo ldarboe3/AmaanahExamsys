@@ -5,11 +5,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
-import { LanguageProvider } from "@/lib/i18n/LanguageContext";
+import { LanguageProvider, useLanguage } from "@/lib/i18n/LanguageContext";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { NotificationsDropdown } from "@/components/notifications-dropdown";
+import { UserProfileDropdown } from "@/components/user-profile-dropdown";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
@@ -86,6 +87,8 @@ function PublicRoutes() {
 }
 
 function AuthenticatedLayout() {
+  const { isRTL } = useLanguage();
+  
   const sidebarStyle = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
@@ -94,7 +97,7 @@ function AuthenticatedLayout() {
   return (
     <SidebarProvider style={sidebarStyle as React.CSSProperties}>
       <div className="flex h-screen w-full">
-        <AppSidebar />
+        <AppSidebar side={isRTL ? "right" : "left"} />
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between gap-2 p-4 border-b">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
@@ -102,6 +105,7 @@ function AuthenticatedLayout() {
               <NotificationsDropdown />
               <LanguageToggle />
               <ThemeToggle />
+              <UserProfileDropdown />
             </div>
           </header>
           <main className="flex-1 overflow-auto">
