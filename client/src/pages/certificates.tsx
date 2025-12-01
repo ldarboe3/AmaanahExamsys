@@ -1,3 +1,4 @@
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +73,7 @@ function CertificatesTableSkeleton() {
 
 export default function Certificates() {
   const { toast } = useToast();
+  const { t, isRTL } = useLanguage();
   const [selectedRegion, setSelectedRegion] = useState<string>("");
   const [selectedCluster, setSelectedCluster] = useState<string>("");
   const [selectedSchool, setSelectedSchool] = useState<string>("");

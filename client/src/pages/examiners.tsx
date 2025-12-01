@@ -1,3 +1,4 @@
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -109,6 +110,7 @@ function ExaminersTableSkeleton() {
 
 export default function Examiners() {
   const { toast } = useToast();
+  const { t, isRTL } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showCreateDialog, setShowCreateDialog] = useState(false);

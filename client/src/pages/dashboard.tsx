@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 interface DashboardStats {
   totalSchools: number;
@@ -113,6 +114,9 @@ function QuickActionCard({
   icon: Icon,
   count,
   variant = "default",
+  viewDetailsText,
+  pendingText,
+  isRTL = false,
 }: {
   title: string;
   description: string;
@@ -120,6 +124,9 @@ function QuickActionCard({
   icon: React.ElementType;
   count?: number;
   variant?: "default" | "warning" | "success";
+  viewDetailsText?: string;
+  pendingText?: string;
+  isRTL?: boolean;
 }) {
   const variantStyles = {
     default: "bg-primary/10 text-primary",
@@ -131,23 +138,23 @@ function QuickActionCard({
     <Card className="hover-elevate">
       <Link href={href}>
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
+          <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
             <div className={`w-10 h-10 rounded-md flex items-center justify-center ${variantStyles[variant]}`}>
               <Icon className="w-5 h-5" />
             </div>
             {count !== undefined && count > 0 && (
               <Badge variant="secondary" className="text-xs">
-                {count} pending
+                {count} {pendingText || 'pending'}
               </Badge>
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className={isRTL ? 'text-right' : ''}>
           <CardTitle className="text-base mb-1">{title}</CardTitle>
           <CardDescription className="text-sm">{description}</CardDescription>
-          <div className="flex items-center gap-1 mt-3 text-sm text-primary">
-            <span>View details</span>
-            <ArrowRight className="w-3 h-3" />
+          <div className={`flex items-center gap-1 mt-3 text-sm text-primary ${isRTL ? 'flex-row-reverse justify-end' : ''}`}>
+            <span>{viewDetailsText || 'View details'}</span>
+            <ArrowRight className={`w-3 h-3 ${isRTL ? 'rotate-180' : ''}`} />
           </div>
         </CardContent>
       </Link>
@@ -194,15 +201,16 @@ function ActivityItem({
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { t, language, isRTL } = useLanguage();
 
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
 
-  const isAdmin = user?.role === 'super_admin' || user?.role === 'system_admin';
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'examination_admin';
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat(language === 'ar' ? 'ar-EG' : 'en-US', {
       style: 'currency',
       currency: 'GMD',
       minimumFractionDigits: 0,
@@ -214,22 +222,22 @@ export default function Dashboard() {
     const date = new Date(dateString);
     const now = new Date();
     const diff = date.getTime() - now.getTime();
-    if (diff <= 0) return "Expired";
+    if (diff <= 0) return t.dashboard.expired;
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    return `${days}d ${hours}h remaining`;
+    return `${days}d ${hours}h ${t.dashboard.remaining}`;
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+      <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
+        <div className={isRTL ? 'text-right' : ''}>
           <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
-            Welcome back, {user?.firstName || 'Admin'}
+            {t.dashboard.welcomeBack}, {user?.firstName || 'Admin'}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Here's what's happening with your examinations today.
+            {t.dashboard.whatsHappeningToday}
           </p>
         </div>
         {stats?.activeExamYear && (
@@ -263,34 +271,34 @@ export default function Dashboard() {
         ) : (
           <>
             <StatCard
-              title="Total Schools"
+              title={t.dashboard.totalSchools}
               value={stats?.totalSchools || 0}
-              subtitle={`${stats?.pendingSchools || 0} pending approval`}
+              subtitle={`${stats?.pendingSchools || 0} ${t.dashboard.pendingApproval}`}
               icon={School}
               color="bg-primary/10 text-primary"
               trend="up"
-              trendValue="+12% this month"
+              trendValue={`+12% ${t.dashboard.thisMonth}`}
             />
             <StatCard
-              title="Total Students"
+              title={t.dashboard.totalStudents}
               value={stats?.totalStudents || 0}
-              subtitle={`${stats?.pendingStudents || 0} pending validation`}
+              subtitle={`${stats?.pendingStudents || 0} ${t.dashboard.pendingValidation}`}
               icon={Users}
               color="bg-chart-2/10 text-chart-2"
               trend="up"
-              trendValue="+8% this month"
+              trendValue={`+8% ${t.dashboard.thisMonth}`}
             />
             <StatCard
-              title="Total Revenue"
+              title={t.dashboard.totalRevenue}
               value={formatCurrency(stats?.totalRevenue || 0)}
-              subtitle={`${stats?.pendingPayments || 0} pending payments`}
+              subtitle={`${stats?.pendingPayments || 0} ${t.dashboard.pendingPayments}`}
               icon={CreditCard}
               color="bg-chart-3/10 text-chart-3"
             />
             <StatCard
-              title="Results Status"
-              value={`${stats?.resultsPublished || 0} published`}
-              subtitle={`${stats?.pendingResults || 0} pending review`}
+              title={t.dashboard.resultsStatus}
+              value={`${stats?.resultsPublished || 0} ${t.dashboard.published}`}
+              subtitle={`${stats?.pendingResults || 0} ${t.dashboard.pendingReview}`}
               icon={FileCheck}
               color="bg-chart-4/10 text-chart-4"
             />
@@ -302,68 +310,88 @@ export default function Dashboard() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Quick Actions */}
         <div className="lg:col-span-2">
-          <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+          <h2 className={`text-lg font-semibold mb-4 ${isRTL ? 'text-right' : ''}`}>{t.dashboard.quickActions}</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             {isAdmin ? (
               <>
                 <QuickActionCard
-                  title="Pending Schools"
-                  description="Review and approve school registrations"
+                  title={t.dashboard.pendingSchools}
+                  description={t.dashboard.reviewApprove}
                   href="/schools?status=pending"
                   icon={School}
                   count={stats?.pendingSchools}
                   variant="warning"
+                  viewDetailsText={t.dashboard.viewDetails}
+                  pendingText={t.common.pending}
+                  isRTL={isRTL}
                 />
                 <QuickActionCard
-                  title="Student Validations"
-                  description="Validate uploaded student lists"
+                  title={t.dashboard.studentValidations}
+                  description={t.dashboard.validateUploaded}
                   href="/students?status=pending"
                   icon={Users}
                   count={stats?.pendingStudents}
                   variant="warning"
+                  viewDetailsText={t.dashboard.viewDetails}
+                  pendingText={t.common.pending}
+                  isRTL={isRTL}
                 />
                 <QuickActionCard
-                  title="Payment Processing"
-                  description="Process pending payment slips"
+                  title={t.dashboard.paymentProcessing}
+                  description={t.dashboard.processPending}
                   href="/payments?status=pending"
                   icon={CreditCard}
                   count={stats?.pendingPayments}
+                  viewDetailsText={t.dashboard.viewDetails}
+                  pendingText={t.common.pending}
+                  isRTL={isRTL}
                 />
                 <QuickActionCard
-                  title="Publish Results"
-                  description="Review and publish exam results"
+                  title={t.dashboard.publishResults}
+                  description={t.dashboard.reviewPublish}
                   href="/results?status=pending"
                   icon={FileCheck}
                   count={stats?.pendingResults}
                   variant="success"
+                  viewDetailsText={t.dashboard.viewDetails}
+                  pendingText={t.common.pending}
+                  isRTL={isRTL}
                 />
               </>
             ) : (
               <>
                 <QuickActionCard
-                  title="Register Students"
-                  description="Upload student list via CSV"
+                  title={t.dashboard.registerStudents}
+                  description={t.dashboard.uploadStudentList}
                   href="/students/register"
                   icon={Users}
+                  viewDetailsText={t.dashboard.viewDetails}
+                  isRTL={isRTL}
                 />
                 <QuickActionCard
-                  title="View Invoice"
-                  description="Check payment status and amount"
+                  title={t.dashboard.viewInvoice}
+                  description={t.dashboard.checkPaymentStatus}
                   href="/payments"
                   icon={CreditCard}
+                  viewDetailsText={t.dashboard.viewDetails}
+                  isRTL={isRTL}
                 />
                 <QuickActionCard
-                  title="Exam Center"
-                  description="View assigned center details"
+                  title={t.dashboard.examCenter}
+                  description={t.dashboard.viewAssignedCenter}
                   href="/center-info"
                   icon={CheckCircle2}
                   variant="success"
+                  viewDetailsText={t.dashboard.viewDetails}
+                  isRTL={isRTL}
                 />
                 <QuickActionCard
-                  title="Download Results"
-                  description="Get student results PDF"
+                  title={t.dashboard.downloadResults}
+                  description={t.dashboard.getStudentResults}
                   href="/results"
                   icon={FileCheck}
+                  viewDetailsText={t.dashboard.viewDetails}
+                  isRTL={isRTL}
                 />
               </>
             )}
@@ -372,7 +400,7 @@ export default function Dashboard() {
 
         {/* Recent Activity */}
         <div>
-          <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
+          <h2 className={`text-lg font-semibold mb-4 ${isRTL ? 'text-right' : ''}`}>{t.dashboard.recentActivity}</h2>
           <Card>
             <CardContent className="p-4">
               {isLoading ? (
@@ -401,7 +429,7 @@ export default function Dashboard() {
               ) : (
                 <div className="text-center py-8">
                   <Clock className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">No recent activity</p>
+                  <p className="text-sm text-muted-foreground">{t.dashboard.noRecentActivity}</p>
                 </div>
               )}
             </CardContent>
@@ -412,10 +440,10 @@ export default function Dashboard() {
       {/* Registration Progress (for Admin) */}
       {isAdmin && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Registration Progress by Region</CardTitle>
+          <CardHeader className={isRTL ? 'text-right' : ''}>
+            <CardTitle className="text-lg">{t.dashboard.registrationProgress}</CardTitle>
             <CardDescription>
-              Overview of school and student registration across regions
+              {t.dashboard.overviewOfRegistration}
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import {
   Table,
   TableBody,
@@ -67,11 +68,14 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { School, Region, Cluster } from "@shared/schema";
 
-const schoolTypeLabels: Record<string, string> = {
-  LBS: "Lower Basic School",
-  UBS: "Upper Basic School",
-  BCS: "Basic Cycle School",
-  SSS: "Senior Secondary School",
+const getSchoolTypeLabel = (type: string, isRTL: boolean) => {
+  const labels: Record<string, { en: string; ar: string }> = {
+    LBS: { en: "Lower Basic School", ar: "المدرسة الأساسية الدنيا" },
+    UBS: { en: "Upper Basic School", ar: "المدرسة الأساسية العليا" },
+    BCS: { en: "Basic Cycle School", ar: "مدرسة الدورة الأساسية" },
+    SSS: { en: "Senior Secondary School", ar: "المدرسة الثانوية العليا" },
+  };
+  return isRTL ? labels[type]?.ar || type : labels[type]?.en || type;
 };
 
 const statusColors: Record<string, string> = {
@@ -79,6 +83,16 @@ const statusColors: Record<string, string> = {
   verified: "bg-chart-2/10 text-chart-2",
   approved: "bg-chart-3/10 text-chart-3",
   rejected: "bg-destructive/10 text-destructive",
+};
+
+const getStatusLabel = (status: string, isRTL: boolean) => {
+  const labels: Record<string, { en: string; ar: string }> = {
+    pending: { en: "Pending", ar: "قيد الانتظار" },
+    verified: { en: "Verified", ar: "موثق" },
+    approved: { en: "Approved", ar: "معتمد" },
+    rejected: { en: "Rejected", ar: "مرفوض" },
+  };
+  return isRTL ? labels[status]?.ar || status : labels[status]?.en || status;
 };
 
 const addSchoolSchema = z.object({
@@ -122,6 +136,7 @@ interface SchoolWithRelations extends School {
 
 export default function Schools() {
   const { toast } = useToast();
+  const { t, isRTL } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -198,16 +213,16 @@ export default function Schools() {
     onSuccess: () => {
       invalidateSchoolQueries();
       toast({
-        title: "School Added",
-        description: "The school has been registered successfully.",
+        title: t.common.success,
+        description: t.common.schoolAdded,
       });
       setShowAddDialog(false);
       form.reset();
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to add school. Please try again.",
+        title: t.common.error,
+        description: error.message || t.common.failedToAdd,
         variant: "destructive",
       });
     },
@@ -220,14 +235,14 @@ export default function Schools() {
     onSuccess: () => {
       invalidateSchoolQueries();
       toast({
-        title: "School Approved",
-        description: "The school has been approved successfully.",
+        title: t.common.success,
+        description: t.common.schoolApproved,
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to approve school. Please try again.",
+        title: t.common.error,
+        description: t.common.failedToApprove,
         variant: "destructive",
       });
     },
@@ -240,14 +255,14 @@ export default function Schools() {
     onSuccess: () => {
       invalidateSchoolQueries();
       toast({
-        title: "School Rejected",
-        description: "The school has been rejected.",
+        title: t.common.success,
+        description: t.common.schoolRejected,
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to reject school. Please try again.",
+        title: t.common.error,
+        description: t.common.failedToReject,
         variant: "destructive",
       });
     },
@@ -265,18 +280,18 @@ export default function Schools() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Schools</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{t.schools.title}</h1>
           <p className="text-muted-foreground mt-1">
-            Manage school registrations and approvals
+            {isRTL ? "إدارة تسجيلات المدارس والموافقات" : "Manage school registrations and approvals"}
           </p>
         </div>
         <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-school">
           <Plus className="w-4 h-4 me-2" />
-          Add School
+          {t.schools.addSchool}
         </Button>
       </div>
 
@@ -285,12 +300,12 @@ export default function Schools() {
         <CardContent className="p-4">
           <div className="flex flex-col gap-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className={`absolute ${isRTL ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground`} />
               <Input
-                placeholder="Search schools by name or email..."
+                placeholder={t.common.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="ps-9"
+                className={isRTL ? "pe-9" : "ps-9"}
                 data-testid="input-search-schools"
               />
             </div>
@@ -300,10 +315,10 @@ export default function Schools() {
                 setClusterFilter("all");
               }}>
                 <SelectTrigger className="w-[160px]" data-testid="select-region-filter">
-                  <SelectValue placeholder="Region" />
+                  <SelectValue placeholder={t.schools.region} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Regions</SelectItem>
+                  <SelectItem value="all">{t.common.allRegions}</SelectItem>
                   {regions?.map((region) => (
                     <SelectItem key={region.id} value={region.id.toString()}>
                       {region.name}
@@ -313,10 +328,10 @@ export default function Schools() {
               </Select>
               <Select value={clusterFilter} onValueChange={setClusterFilter} disabled={regionFilter === "all"}>
                 <SelectTrigger className="w-[160px]" data-testid="select-cluster-filter">
-                  <SelectValue placeholder={regionFilter === "all" ? "Select Region First" : "Cluster"} />
+                  <SelectValue placeholder={regionFilter === "all" ? t.common.selectRegionFirst : t.schools.cluster} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Clusters</SelectItem>
+                  <SelectItem value="all">{t.common.allClusters}</SelectItem>
                   {clustersForFilter?.map((cluster) => (
                     <SelectItem key={cluster.id} value={cluster.id.toString()}>
                       {cluster.name}
@@ -326,10 +341,10 @@ export default function Schools() {
               </Select>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger className="w-[140px]" data-testid="select-type-filter">
-                  <SelectValue placeholder="School Type" />
+                  <SelectValue placeholder={t.schools.schoolType} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="all">{t.common.allTypes}</SelectItem>
                   <SelectItem value="LBS">LBS</SelectItem>
                   <SelectItem value="UBS">UBS</SelectItem>
                   <SelectItem value="BCS">BCS</SelectItem>
@@ -338,14 +353,14 @@ export default function Schools() {
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder={t.common.status} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="verified">Verified</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="all">{t.common.allStatus}</SelectItem>
+                  <SelectItem value="pending">{t.common.pending}</SelectItem>
+                  <SelectItem value="verified">{t.common.verified}</SelectItem>
+                  <SelectItem value="approved">{t.common.approved}</SelectItem>
+                  <SelectItem value="rejected">{t.common.rejected}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -358,14 +373,14 @@ export default function Schools() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div>
-              <CardTitle className="text-lg">Registered Schools</CardTitle>
+              <CardTitle className="text-lg">{t.common.registeredSchools}</CardTitle>
               <CardDescription>
-                {filteredSchools?.length || 0} schools found
+                {filteredSchools?.length || 0} {t.schools.title.toLowerCase()} {t.common.found}
               </CardDescription>
             </div>
             <Button variant="outline" size="sm">
               <Download className="w-4 h-4 me-2" />
-              Export
+              {t.common.export}
             </Button>
           </div>
         </CardHeader>
@@ -377,12 +392,12 @@ export default function Schools() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>School</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Region</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Students</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t.schools.title}</TableHead>
+                    <TableHead>{t.common.type}</TableHead>
+                    <TableHead>{t.schools.region}</TableHead>
+                    <TableHead>{t.common.status}</TableHead>
+                    <TableHead>{t.common.students}</TableHead>
+                    <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -401,17 +416,17 @@ export default function Schools() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="text-xs">
-                          {school.schoolType}
+                          {getSchoolTypeLabel(school.schoolType || '', isRTL)}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
-                          {school.region?.name || "Not assigned"}
+                          {school.region?.name || t.common.notAssigned}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge className={`${statusColors[school.status || 'pending']} text-xs capitalize`}>
-                          {school.status}
+                        <Badge className={`${statusColors[school.status || 'pending']} text-xs`}>
+                          {getStatusLabel(school.status || 'pending', isRTL)}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -432,7 +447,7 @@ export default function Schools() {
                               }}
                             >
                               <Eye className="w-4 h-4 me-2" />
-                              View Details
+                              {t.common.viewDetails}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {school.status === 'pending' || school.status === 'verified' ? (
@@ -442,14 +457,14 @@ export default function Schools() {
                                   className="text-chart-3"
                                 >
                                   <CheckCircle className="w-4 h-4 me-2" />
-                                  Approve
+                                  {t.common.approve}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => rejectSchoolMutation.mutate(school.id)}
                                   className="text-destructive"
                                 >
                                   <XCircle className="w-4 h-4 me-2" />
-                                  Reject
+                                  {t.common.reject}
                                 </DropdownMenuItem>
                               </>
                             ) : null}
@@ -464,15 +479,15 @@ export default function Schools() {
           ) : (
             <div className="text-center py-12">
               <SchoolIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No schools found</h3>
+              <h3 className="text-lg font-medium mb-2">{t.common.noResults}</h3>
               <p className="text-muted-foreground mb-4">
                 {searchQuery
-                  ? "Try adjusting your search or filters"
-                  : "No schools have registered yet"}
+                  ? t.common.tryAdjusting
+                  : isRTL ? "لم تسجل أي مدارس بعد" : "No schools have registered yet"}
               </p>
               <Button onClick={() => setShowAddDialog(true)}>
                 <Plus className="w-4 h-4 me-2" />
-                Add First School
+                {t.schools.addSchool}
               </Button>
             </div>
           )}

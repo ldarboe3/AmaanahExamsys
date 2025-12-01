@@ -1,3 +1,4 @@
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -207,6 +208,7 @@ function ExamYearCardSkeleton() {
 
 export default function ExamYears() {
   const { toast } = useToast();
+  const { t, isRTL } = useLanguage();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);

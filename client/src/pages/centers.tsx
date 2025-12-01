@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import {
   Dialog,
   DialogContent,
@@ -216,6 +217,7 @@ function CenterCardSkeleton() {
 
 export default function Centers() {
   const { toast } = useToast();
+  const { t, isRTL } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [clusterFilter, setClusterFilter] = useState<string>("all");

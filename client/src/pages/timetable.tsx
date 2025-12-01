@@ -1,3 +1,4 @@
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -103,6 +104,7 @@ function TimetableTableSkeleton() {
 
 export default function Timetable() {
   const { toast } = useToast();
+  const { t, isRTL } = useLanguage();
   const [gradeFilter, setGradeFilter] = useState<string>("all");
   const [showDialog, setShowDialog] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimetableWithRelations | null>(null);
