@@ -564,9 +564,9 @@ export const translations = {
       examinationsCertification: 'الامتحانات والشهادات',
       qualityAssurance: 'ضمان الجودة',
       endowmentProjects: 'المشاريع والأوقاف',
-      servingGambiaSince1996: 'خدمة السنغال منذ 1996',
+      servingGambiaSince1996: 'خدمة جامبيا منذ 1996',
       educationForDevelopment: 'التعليم من أجل التطور',
-      strengtheningUnity: 'تعزيز الوحدة والجودة عبر مدارس مختلف والتعليم الإسلامي في السنغال. تنسيق المناهج والتقييمات والتدريب ضمان التميز في التعليم الإسلامي والعربي.',
+      strengtheningUnity: 'تعزيز الوحدة والجودة عبر مدارس مختلف والتعليم الإسلامي في جامبيا. تنسيق المناهج والتقييمات والتدريب ضمان التميز في التعليم الإسلامي والعربي.',
     },
   },
 };
