@@ -7,6 +7,14 @@ A comprehensive examination management system for managing countrywide Arabic & 
 The MVP is complete with all core features implemented and verified. PDF generation system for certificates and transcripts is fully functional with Arabic/English bilingual support, QR code verification, and gender-specific templates.
 
 ## Recent Changes (December 2024)
+- **Website Content Management System (CMS)**: Full CMS for managing website content
+  - News Articles with categories, featured articles, and publishing workflow
+  - Resources (downloadable files) management
+  - Announcements management
+  - Newsletter subscriber management
+  - Impact stats management for homepage
+  - Admin access via `/website-management` route (super_admin and examination_admin only)
+- **Public Website Integration**: News and Home pages now fetch content from CMS with graceful fallbacks
 - **PDF Generation System**: Implemented Puppeteer-based HTML-to-PDF rendering for certificates and transcripts
 - **Bilingual Support**: Arabic/English templates with RTL rendering using Amiri/Noto Naskh fonts
 - **QR Verification**: Unique QR tokens for each certificate/transcript with verification endpoints
@@ -91,6 +99,8 @@ PostgreSQL with the following main tables:
 - subjects, results, certificates, examiners
 - examCenters, examinerAssignments, timetableEntries
 - notifications, auditLogs, regions, clusters
+- newsArticles, newsCategories, resources, resourceCategories
+- announcements, newsletterSubscribers, impactStats
 
 ## Running the Application
 The application runs on port 5000 with:

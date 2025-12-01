@@ -44,6 +44,7 @@ import Resources from "@/pages/resources";
 import News from "@/pages/news";
 import ResultChecker from "@/pages/result-checker";
 import SchoolRegistration from "@/pages/school-registration";
+import WebsiteManagement from "@/pages/website-management";
 
 function LoadingScreen() {
   return (
@@ -75,6 +76,7 @@ function AuthenticatedRoutes() {
       <Route path="/regions" component={Regions} />
       <Route path="/audit-logs" component={AuditLogs} />
       <Route path="/reports" component={Reports} />
+      <Route path="/website-management" component={WebsiteManagement} />
       <Route path="/subjects" component={Subjects} />
       <Route path="/timetable" component={Timetable} />
       <Route path="/settings" component={Settings} />

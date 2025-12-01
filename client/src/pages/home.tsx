@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,9 @@ import {
   Handshake
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { format } from "date-fns";
+import type { NewsArticle, ImpactStat, NewsCategory } from "@shared/schema";
 import amaanahLogo from "@assets/amaanah-logo-BXDbf4ee_1764613882774.png";
 import heroImage from "@assets/generated_images/african_madrassah_students_studying.png";
 import teacherImage from "@assets/generated_images/islamic_teacher_teaching_students.png";
@@ -33,14 +37,14 @@ const quickLinks = [
   { name: "Contact Us", href: "/contact", icon: Mail },
 ];
 
-const impactStats = [
+const defaultImpactStats = [
   { label: "Member Schools", value: "400+", description: "Madrassah & Islamic schools" },
   { label: "Years of Service", value: "28+", description: "Since 1996" },
   { label: "Regions Covered", value: "7", description: "Nationwide presence" },
   { label: "Students Certified", value: "50K+", description: "Annual examinations" },
 ];
 
-const newsItems = [
+const defaultNewsItems = [
   {
     title: "2024 Examination Results Released",
     date: "December 2024",
@@ -61,20 +65,74 @@ const newsItems = [
   },
 ];
 
+interface NewsApiResponse {
+  articles: NewsArticle[];
+  categories: NewsCategory[];
+}
+
 export default function Home() {
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
 
-  const handleNewsletterSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email && name) {
+  const { data: newsData } = useQuery<NewsApiResponse>({
+    queryKey: ["/api/public/news"],
+  });
+
+  const { data: impactStatsData } = useQuery<ImpactStat[]>({
+    queryKey: ["/api/public/impact-stats"],
+  });
+
+  const newsletterMutation = useMutation({
+    mutationFn: (data: { email: string; name: string }) => 
+      apiRequest("/api/public/newsletter/subscribe", "POST", data),
+    onSuccess: () => {
       toast({
         title: "Subscribed!",
         description: "Thank you for subscribing to our newsletter.",
       });
       setEmail("");
       setName("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to subscribe. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const formatPublishedDate = (date: Date | string | null): string => {
+    if (!date) return "";
+    try {
+      return format(new Date(date), "MMMM yyyy");
+    } catch {
+      return "";
+    }
+  };
+
+  const newsItems = newsData?.articles?.length 
+    ? newsData.articles.slice(0, 3).map(article => ({
+        title: article.title,
+        date: formatPublishedDate(article.publishedAt),
+        excerpt: article.excerpt || "",
+        category: newsData.categories?.find(c => c.id === article.categoryId)?.name || "General",
+      }))
+    : defaultNewsItems;
+
+  const impactStats = impactStatsData?.length
+    ? impactStatsData.slice(0, 4).map(stat => ({
+        label: stat.label,
+        value: stat.value,
+        description: "",
+      }))
+    : defaultImpactStats;
+
+  const handleNewsletterSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email && name) {
+      newsletterMutation.mutate({ email, name });
     }
   };
 
@@ -284,7 +342,7 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <CardDescription>{item.excerpt}</CardDescription>
-                  <Button variant="link" className="px-0 mt-4">
+                  <Button variant="ghost" className="px-0 mt-4 text-primary hover:text-primary/80">
                     Read More <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 </CardContent>

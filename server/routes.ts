@@ -3043,9 +3043,18 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   });
 
   // ===== WEBSITE CONTENT MANAGEMENT (Admin endpoints) =====
+  // Helper function to check CMS admin role
+  async function checkCmsAdminRole(req: Request): Promise<{ authorized: boolean; user?: any }> {
+    if (!req.session.userId) return { authorized: false };
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !["super_admin", "examination_admin"].includes(user.role || "")) {
+      return { authorized: false };
+    }
+    return { authorized: true, user };
+  }
 
   // News Categories
-  app.get("/api/cms/news-categories", requireAuth, async (_req, res) => {
+  app.get("/api/cms/news-categories", isAuthenticated, async (_req, res) => {
     try {
       const categories = await storage.getAllNewsCategories();
       res.json(categories);
@@ -3054,11 +3063,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.post("/api/cms/news-categories", requireAuth, async (req, res) => {
+  app.post("/api/cms/news-categories", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const category = await storage.createNewsCategory(req.body);
       res.json(category);
     } catch (error: any) {
@@ -3066,11 +3074,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.patch("/api/cms/news-categories/:id", requireAuth, async (req, res) => {
+  app.patch("/api/cms/news-categories/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const category = await storage.updateNewsCategory(parseInt(req.params.id), req.body);
       res.json(category);
     } catch (error: any) {
@@ -3078,11 +3085,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.delete("/api/cms/news-categories/:id", requireAuth, async (req, res) => {
+  app.delete("/api/cms/news-categories/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       await storage.deleteNewsCategory(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
@@ -3091,7 +3097,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   });
 
   // News Articles
-  app.get("/api/cms/news-articles", requireAuth, async (_req, res) => {
+  app.get("/api/cms/news-articles", isAuthenticated, async (_req, res) => {
     try {
       const articles = await storage.getAllNewsArticles();
       res.json(articles);
@@ -3100,7 +3106,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.get("/api/cms/news-articles/:id", requireAuth, async (req, res) => {
+  app.get("/api/cms/news-articles/:id", isAuthenticated, async (req, res) => {
     try {
       const article = await storage.getNewsArticle(parseInt(req.params.id));
       res.json(article);
@@ -3109,14 +3115,13 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.post("/api/cms/news-articles", requireAuth, async (req, res) => {
+  app.post("/api/cms/news-articles", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized, user } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const article = await storage.createNewsArticle({
         ...req.body,
-        authorId: req.user?.id,
+        authorId: user?.id,
         publishedAt: req.body.isPublished ? new Date() : null,
       });
       res.json(article);
@@ -3125,11 +3130,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.patch("/api/cms/news-articles/:id", requireAuth, async (req, res) => {
+  app.patch("/api/cms/news-articles/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const existing = await storage.getNewsArticle(parseInt(req.params.id));
       const article = await storage.updateNewsArticle(parseInt(req.params.id), {
         ...req.body,
@@ -3141,11 +3145,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.delete("/api/cms/news-articles/:id", requireAuth, async (req, res) => {
+  app.delete("/api/cms/news-articles/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       await storage.deleteNewsArticle(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
@@ -3154,7 +3157,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   });
 
   // Resource Categories
-  app.get("/api/cms/resource-categories", requireAuth, async (_req, res) => {
+  app.get("/api/cms/resource-categories", isAuthenticated, async (_req, res) => {
     try {
       const categories = await storage.getAllResourceCategories();
       res.json(categories);
@@ -3163,11 +3166,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.post("/api/cms/resource-categories", requireAuth, async (req, res) => {
+  app.post("/api/cms/resource-categories", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const category = await storage.createResourceCategory(req.body);
       res.json(category);
     } catch (error: any) {
@@ -3175,11 +3177,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.patch("/api/cms/resource-categories/:id", requireAuth, async (req, res) => {
+  app.patch("/api/cms/resource-categories/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const category = await storage.updateResourceCategory(parseInt(req.params.id), req.body);
       res.json(category);
     } catch (error: any) {
@@ -3187,11 +3188,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.delete("/api/cms/resource-categories/:id", requireAuth, async (req, res) => {
+  app.delete("/api/cms/resource-categories/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       await storage.deleteResourceCategory(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
@@ -3200,7 +3200,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   });
 
   // Resources
-  app.get("/api/cms/resources", requireAuth, async (_req, res) => {
+  app.get("/api/cms/resources", isAuthenticated, async (_req, res) => {
     try {
       const resources = await storage.getAllResources();
       res.json(resources);
@@ -3209,7 +3209,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.get("/api/cms/resources/:id", requireAuth, async (req, res) => {
+  app.get("/api/cms/resources/:id", isAuthenticated, async (req, res) => {
     try {
       const resource = await storage.getResource(parseInt(req.params.id));
       res.json(resource);
@@ -3218,14 +3218,13 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.post("/api/cms/resources", requireAuth, async (req, res) => {
+  app.post("/api/cms/resources", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized, user } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const resource = await storage.createResource({
         ...req.body,
-        uploadedBy: req.user?.id,
+        uploadedBy: user?.id,
       });
       res.json(resource);
     } catch (error: any) {
@@ -3233,11 +3232,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.patch("/api/cms/resources/:id", requireAuth, async (req, res) => {
+  app.patch("/api/cms/resources/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const resource = await storage.updateResource(parseInt(req.params.id), req.body);
       res.json(resource);
     } catch (error: any) {
@@ -3245,11 +3243,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.delete("/api/cms/resources/:id", requireAuth, async (req, res) => {
+  app.delete("/api/cms/resources/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       await storage.deleteResource(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
@@ -3258,7 +3255,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   });
 
   // Announcements
-  app.get("/api/cms/announcements", requireAuth, async (_req, res) => {
+  app.get("/api/cms/announcements", isAuthenticated, async (_req, res) => {
     try {
       const announcements = await storage.getAllAnnouncements();
       res.json(announcements);
@@ -3267,7 +3264,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.get("/api/cms/announcements/:id", requireAuth, async (req, res) => {
+  app.get("/api/cms/announcements/:id", isAuthenticated, async (req, res) => {
     try {
       const announcement = await storage.getAnnouncement(parseInt(req.params.id));
       res.json(announcement);
@@ -3276,14 +3273,13 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.post("/api/cms/announcements", requireAuth, async (req, res) => {
+  app.post("/api/cms/announcements", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized, user } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const announcement = await storage.createAnnouncement({
         ...req.body,
-        createdBy: req.user?.id,
+        createdBy: user?.id,
       });
       res.json(announcement);
     } catch (error: any) {
@@ -3291,11 +3287,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.patch("/api/cms/announcements/:id", requireAuth, async (req, res) => {
+  app.patch("/api/cms/announcements/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const announcement = await storage.updateAnnouncement(parseInt(req.params.id), req.body);
       res.json(announcement);
     } catch (error: any) {
@@ -3303,11 +3298,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.delete("/api/cms/announcements/:id", requireAuth, async (req, res) => {
+  app.delete("/api/cms/announcements/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       await storage.deleteAnnouncement(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
@@ -3316,11 +3310,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   });
 
   // Newsletter Subscribers (Admin)
-  app.get("/api/cms/newsletter-subscribers", requireAuth, async (_req, res) => {
+  app.get("/api/cms/newsletter-subscribers", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const subscribers = await storage.getAllNewsletterSubscribers();
       res.json(subscribers);
     } catch (error: any) {
@@ -3328,11 +3321,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.delete("/api/cms/newsletter-subscribers/:id", requireAuth, async (req, res) => {
+  app.delete("/api/cms/newsletter-subscribers/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       await storage.deleteNewsletterSubscriber(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
@@ -3341,7 +3333,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   });
 
   // Impact Stats
-  app.get("/api/cms/impact-stats", requireAuth, async (_req, res) => {
+  app.get("/api/cms/impact-stats", isAuthenticated, async (_req, res) => {
     try {
       const stats = await storage.getAllImpactStats();
       res.json(stats);
@@ -3350,11 +3342,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.post("/api/cms/impact-stats", requireAuth, async (req, res) => {
+  app.post("/api/cms/impact-stats", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const stat = await storage.createImpactStat(req.body);
       res.json(stat);
     } catch (error: any) {
@@ -3362,11 +3353,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.patch("/api/cms/impact-stats/:id", requireAuth, async (req, res) => {
+  app.patch("/api/cms/impact-stats/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       const stat = await storage.updateImpactStat(parseInt(req.params.id), req.body);
       res.json(stat);
     } catch (error: any) {
@@ -3374,11 +3364,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.delete("/api/cms/impact-stats/:id", requireAuth, async (req, res) => {
+  app.delete("/api/cms/impact-stats/:id", isAuthenticated, async (req, res) => {
     try {
-      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
       await storage.deleteImpactStat(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
