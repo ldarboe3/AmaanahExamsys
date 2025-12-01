@@ -66,10 +66,63 @@ const femaleTemplateConfig: TemplateConfig = {
 };
 
 export const certificateTemplates: Record<number, GradeTemplates> = {
+  3: { male: maleTemplateConfig, female: femaleTemplateConfig },
   6: { male: maleTemplateConfig, female: femaleTemplateConfig },
   9: { male: maleTemplateConfig, female: femaleTemplateConfig },
   12: { male: maleTemplateConfig, female: femaleTemplateConfig },
 };
+
+// Get certificate template for any grade - uses a default template for unsupported grades
+export function getCertificateTemplate(grade: number, gender: 'male' | 'female'): TemplateConfig {
+  const gradeTemplates = certificateTemplates[grade];
+  if (gradeTemplates) {
+    return gradeTemplates[gender];
+  }
+  // Default to grade 6 template for unsupported grades
+  return certificateTemplates[6][gender];
+}
+
+// Grade level names in Arabic for certificates (all grades 1-12)
+export const gradeLevelNamesArabic: Record<number, string> = {
+  1: 'المرحلة الابتدائية الدنيا',
+  2: 'المرحلة الابتدائية الدنيا',
+  3: 'المرحلة الابتدائية الدنيا',
+  4: 'المرحلة الابتدائية العليا',
+  5: 'المرحلة الابتدائية العليا',
+  6: 'المرحلة الابتدائية العليا',
+  7: 'المرحلة الإعدادية',
+  8: 'المرحلة الإعدادية',
+  9: 'المرحلة الإعدادية',
+  10: 'المرحلة الثانوية',
+  11: 'المرحلة الثانوية',
+  12: 'المرحلة الثانوية',
+};
+
+// Grade level names in English for certificates (all grades 1-12)
+export const gradeLevelNamesEnglish: Record<number, string> = {
+  1: 'Lower Basic',
+  2: 'Lower Basic',
+  3: 'Lower Basic',
+  4: 'Upper Basic',
+  5: 'Upper Basic',
+  6: 'Upper Basic',
+  7: 'Basic Cycle',
+  8: 'Basic Cycle',
+  9: 'Basic Cycle',
+  10: 'Senior Secondary',
+  11: 'Senior Secondary',
+  12: 'Senior Secondary',
+};
+
+// Get Arabic grade level name with fallback
+export function getGradeLevelNameArabic(grade: number): string {
+  return gradeLevelNamesArabic[grade] || `الصف ${grade}`;
+}
+
+// Get English grade level name with fallback
+export function getGradeLevelNameEnglish(grade: number): string {
+  return gradeLevelNamesEnglish[grade] || `Grade ${grade}`;
+}
 
 export const arabicMonths: Record<number, string> = {
   1: 'يناير',

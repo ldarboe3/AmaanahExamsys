@@ -1841,14 +1841,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const results = await storage.getResultsByStudent(studentId);
         const allSubjects = await storage.getAllSubjects();
         
+        // Filter subjects by student's grade level for proper transcript display
+        const gradeSubjects = allSubjects.filter(s => s.grade === student.grade);
+        
         const subjects = results.map(r => {
-          const subject = allSubjects.find(s => s.id === r.subjectId);
+          const subject = gradeSubjects.find(s => s.id === r.subjectId) || allSubjects.find(s => s.id === r.subjectId);
           return {
             name: subject?.name || 'Unknown',
             arabicName: subject?.arabicName || null,
             score: parseFloat(r.totalScore || '0'),
             grade: r.grade || 'N/A',
             maxScore: subject?.maxScore || 100,
+            passingScore: subject?.passingScore || 50,
           };
         });
         
@@ -1946,14 +1950,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const results = await storage.getResultsByStudent(student.id);
         if (results.length === 0) continue;
         
+        // Filter subjects by student's grade level for proper transcript display
+        const gradeSubjects = allSubjects.filter(s => s.grade === student.grade);
+        
         const subjects = results.map(r => {
-          const subject = allSubjects.find(s => s.id === r.subjectId);
+          const subject = gradeSubjects.find(s => s.id === r.subjectId) || allSubjects.find(s => s.id === r.subjectId);
           return {
             name: subject?.name || 'Unknown',
             arabicName: subject?.arabicName || null,
             score: parseFloat(r.totalScore || '0'),
             grade: r.grade || 'N/A',
             maxScore: subject?.maxScore || 100,
+            passingScore: subject?.passingScore || 50,
           };
         });
         
