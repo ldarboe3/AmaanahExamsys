@@ -248,18 +248,44 @@ export const studentResults = pgTable("student_results", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Certificate status enum
+export const certificateStatusEnum = pgEnum('certificate_status', ['pending', 'generated', 'printed', 'revoked']);
+
 // Certificates
 export const certificates = pgTable("certificates", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   certificateNumber: varchar("certificate_number", { length: 50 }).notNull().unique(),
   studentId: integer("student_id").notNull().references(() => students.id),
   examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
+  grade: integer("grade").notNull(),
   templateType: varchar("template_type", { length: 20 }),
   finalResult: varchar("final_result", { length: 50 }),
+  finalGradeWord: varchar("final_grade_word", { length: 50 }),
   totalScore: decimal("total_score", { precision: 5, scale: 2 }),
   rank: integer("rank"),
+  qrToken: varchar("qr_token", { length: 100 }).unique(),
   issuedDate: timestamp("issued_date"),
+  issuedDateHijri: varchar("issued_date_hijri", { length: 50 }),
+  examWindowStart: varchar("exam_window_start", { length: 50 }),
+  examWindowEnd: varchar("exam_window_end", { length: 50 }),
   pdfUrl: varchar("pdf_url", { length: 500 }),
+  printCount: integer("print_count").default(0),
+  status: certificateStatusEnum("status").default('pending'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Transcripts table
+export const transcripts = pgTable("transcripts", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  transcriptNumber: varchar("transcript_number", { length: 50 }).notNull().unique(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
+  grade: integer("grade").notNull(),
+  qrToken: varchar("qr_token", { length: 100 }).unique(),
+  pdfUrl: varchar("pdf_url", { length: 500 }),
+  printCount: integer("print_count").default(0),
+  issuedDate: timestamp("issued_date"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -463,6 +489,17 @@ export const certificatesRelations = relations(certificates, ({ one }) => ({
   }),
 }));
 
+export const transcriptsRelations = relations(transcripts, ({ one }) => ({
+  student: one(students, {
+    fields: [transcripts.studentId],
+    references: [students.id],
+  }),
+  examYear: one(examYears, {
+    fields: [transcripts.examYearId],
+    references: [examYears.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRegionSchema = createInsertSchema(regions).omit({ id: true, createdAt: true });
@@ -477,7 +514,8 @@ export const insertExamTimetableSchema = createInsertSchema(examTimetable).omit(
 export const insertExaminerSchema = createInsertSchema(examiners).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertExaminerAssignmentSchema = createInsertSchema(examinerAssignments).omit({ id: true, createdAt: true });
 export const insertStudentResultSchema = createInsertSchema(studentResults).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertCertificateSchema = createInsertSchema(certificates).omit({ id: true, createdAt: true });
+export const insertCertificateSchema = createInsertSchema(certificates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTranscriptSchema = createInsertSchema(transcripts).omit({ id: true, createdAt: true });
 export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords).omit({ id: true, createdAt: true });
 export const insertMalpracticeReportSchema = createInsertSchema(malpracticeReports).omit({ id: true, createdAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
@@ -512,6 +550,8 @@ export type InsertStudentResult = z.infer<typeof insertStudentResultSchema>;
 export type StudentResult = typeof studentResults.$inferSelect;
 export type InsertCertificate = z.infer<typeof insertCertificateSchema>;
 export type Certificate = typeof certificates.$inferSelect;
+export type InsertTranscript = z.infer<typeof insertTranscriptSchema>;
+export type Transcript = typeof transcripts.$inferSelect;
 export type InsertAttendanceRecord = z.infer<typeof insertAttendanceRecordSchema>;
 export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 export type InsertMalpracticeReport = z.infer<typeof insertMalpracticeReportSchema>;
