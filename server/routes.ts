@@ -101,7 +101,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const testUserId = "dev-user-" + Date.now();
       const user = await storage.upsertUser({
         id: testUserId,
-        email: "admin@amaanah.local",
+        email: testUserId + "@amaanah.local",
         firstName: "Admin",
         role: "super_admin",
         profileImageUrl: undefined,
