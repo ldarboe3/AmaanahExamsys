@@ -2,152 +2,126 @@
 
 ## Design Approach
 
-**Selected Approach:** Design System - Material Design 3
-**Justification:** This is a utility-focused, information-dense administrative platform requiring efficiency, learnability, and trust. Material Design 3 provides robust patterns for complex data management, forms, and multi-role dashboards.
+**Selected Approach:** Clean, Modern Minimalist with Amaanah Traditional Colors
+**Color Palette:** Green (Primary), White, Black
+**Justification:** A professional, trustworthy aesthetic that reflects Amaanah's identity while maintaining excellent usability for an administrative examination system.
+
+## Color System
+
+### Primary Colors
+| Color | HSL | Hex | Usage |
+|-------|-----|-----|-------|
+| Amaanah Green | 141 72% 32% | #1E8F4D | Primary actions, branding, key highlights |
+| Rich Black | 160 26% 7% | #0B1C16 | Text, dark backgrounds |
+| Pure White | 0 0% 100% | #FFFFFF | Backgrounds, cards |
+
+### Supporting Colors
+| Color | HSL | Hex | Usage |
+|-------|-----|-----|-------|
+| Dark Green | 147 63% 18% | #0F5A2F | Emphasis, dark accents |
+| Mint Accent | 153 45% 92% | #E5F5EA | Soft backgrounds, highlights |
+| Neutral Gray | 150 10% 45% | #6B7A73 | Muted text, borders |
+| Destructive Red | 4 76% 50% | #D92B2B | Errors, warnings, delete actions |
+| Warning Amber | 36 90% 55% | #F5A623 | Caution states |
 
 ## Typography System
 
-**Font Family:** Roboto (primary), Roboto Mono (data/codes)
+**Primary Font:** Inter (clean, modern sans-serif)
+**Arabic Font:** Noto Naskh Arabic, Amiri
+**Monospace:** JetBrains Mono (for codes, index numbers)
 
 **Hierarchy:**
-- Page Titles: 2.5rem (40px), Medium weight
-- Section Headers: 1.75rem (28px), Medium weight
-- Card/Module Headers: 1.25rem (20px), Medium weight
+- Page Titles: 1.875rem (30px), Medium weight, tracking-tight
+- Section Headers: 1.5rem (24px), Medium weight
+- Card Headers: 1.125rem (18px), Medium weight
 - Body Text: 1rem (16px), Regular weight
-- Data Labels: 0.875rem (14px), Medium weight
+- Labels: 0.875rem (14px), Medium weight
 - Helper Text: 0.75rem (12px), Regular weight
-- Index Numbers/Codes: Roboto Mono, 0.875rem, Medium weight
+- Index Numbers/Codes: JetBrains Mono, 0.875rem
 
 ## Layout System
 
-**Spacing Primitives:** Use Tailwind units of 2, 4, 6, and 8 consistently
-- Component padding: p-4 or p-6
-- Section spacing: mb-8, mt-6
-- Card gaps: gap-4 or gap-6
-- Form field spacing: space-y-4
+**Spacing Scale:** 4, 8, 12, 16, 24, 32, 48, 64 (Tailwind: 1, 2, 3, 4, 6, 8, 12, 16)
+
+**Component Padding:**
+- Cards: p-4 to p-6
+- Buttons: Default sizing from shadcn
+- Form fields: Standard shadcn spacing
+- Section gaps: gap-6
 
 **Grid System:**
-- Admin dashboards: 12-column grid for data tables
-- Form layouts: Single column (max-w-2xl) for data entry
-- Card grids: 2-3 columns for stat cards, school lists, student cards
-- Responsive: Stack to single column on mobile
+- Dashboard: 12-column responsive grid
+- Card grids: 1-4 columns depending on viewport
+- Form layouts: max-w-2xl for single column forms
+- Tables: Full width with horizontal scroll on mobile
 
 ## Core Components
 
 ### Navigation
-- **Admin Sidebar:** Fixed left sidebar (w-64) with role-based menu items, collapsible on mobile
-- **Top Bar:** Full-width header with breadcrumbs, user profile, notifications, quick actions
-- **School Dashboard:** Horizontal tab navigation for different modules
-
-### Data Display
-- **Tables:** Striped rows, sortable headers, sticky header on scroll, pagination controls
-- **Stat Cards:** Grid of 2x2 or 3x1 showing key metrics (registered students, pending approvals, revenue)
-- **Status Badges:** Pill-shaped badges for payment status, approval status, registration status
-- **Progress Indicators:** Linear progress bars for registration deadlines, circular for completion percentage
-
-### Forms & Input
-- **Text Fields:** Outlined style with floating labels, helper text below, error states with icons
-- **File Upload:** Drag-and-drop zone with file type indicators and upload progress
-- **CSV Upload:** Dedicated component showing template download link, upload zone, validation feedback
-- **Selectors:** Dropdown menus for grade selection, school type, region/cluster
-- **Date Pickers:** Calendar popup for deadline management
-- **Search Bars:** Prominent search with filter chips for tables
-
-### Action Components
-- **Primary Buttons:** Contained style (filled background), used for main actions (Submit, Approve, Generate)
-- **Secondary Buttons:** Outlined style, used for auxiliary actions (Cancel, Download Template)
-- **Icon Buttons:** Circular, for table actions (Edit, Delete, View)
-- **Floating Action Button:** For quick-add actions (Add Student, Create Exam Year)
+- **Sidebar:** Clean white/off-white with green accents, 16rem width
+- **Header:** Minimal with essential controls (notifications, language, theme, profile)
+- **Active State:** Green background with white text for active menu items
 
 ### Cards & Containers
-- **Dashboard Cards:** Elevated (shadow) cards with header, content area, optional footer actions
-- **Student Cards:** Compact cards showing photo placeholder, name, index number, school, grade
-- **Exam Center Cards:** Display center name, region, assigned schools count, capacity
-- **Document Upload Cards:** Show document name, upload status, preview/download actions
+- **Cards:** Slight off-white (#FAFBFA), subtle border, small shadow
+- **Border Radius:** 0.5rem (8px) - clean and modern
+- **Shadows:** Very subtle for clean look
 
-### Modals & Overlays
-- **Confirmation Dialogs:** For critical actions (approve all students, publish results)
-- **Detail Panels:** Slide-in drawer from right for viewing student details, school profile
-- **Snackbar Notifications:** Bottom notification for success/error feedback
+### Buttons
+- **Primary:** Green background, white text
+- **Secondary:** Light gray background, dark text
+- **Outline:** Transparent with border
+- **Ghost:** Transparent, subtle hover state
+- **Destructive:** Red background for dangerous actions
 
-### Specialized Components
-- **Index Number Display:** Monospace font in prominent card with barcode rendering
-- **Countdown Timer:** Large numeric display with days/hours/minutes for registration deadlines
-- **Exam Card Layout:** 10-per-page grid (2 columns × 5 rows) with barcode, student info, school logo placeholder
-- **Certificate Preview:** A4 ratio container with border, formal layout, bilingual text support
-- **Result Table:** Multi-column table with subject scores, totals, grade calculations
+### Data Display
+- **Tables:** Clean with subtle row borders, sticky headers
+- **Badges:** Small, rounded-full, color-coded by status
+- **Stats Cards:** Grid layout with icon, number, label
 
-## Page-Specific Layouts
+### Forms
+- **Inputs:** Clean borders, focus ring in green
+- **Labels:** Medium weight, positioned above inputs
+- **Error States:** Red border, red helper text
 
-### Admin Dashboard
-- Top stat cards (4 columns)
-- Quick actions section
-- Recent activity table
-- Charts for analytics (if needed)
+## Status Colors
 
-### School Registration
-- Multi-step form wizard with progress indicator
-- Step 1: Basic info + email verification
-- Step 2: Profile details (contacts, address, type, region)
-- Step 3: Document uploads
-- Success confirmation with dashboard redirect
+| Status | Light Mode | Dark Mode | Usage |
+|--------|------------|-----------|-------|
+| Success/Approved | Green | Lighter Green | Approvals, completed |
+| Pending | Amber/Yellow | Amber | Waiting for action |
+| Rejected/Error | Red | Red | Errors, rejections |
+| Active | Green | Green | Currently active items |
+| Inactive | Gray | Gray | Disabled items |
 
-### Student Registration
-- Template download section with instructions
-- CSV upload zone with drag-drop
-- Validation feedback list showing errors/warnings
-- Preview table of uploaded students
-- Submit for approval button
+## Accessibility Guidelines
 
-### Payment Dashboard
-- Invoice summary card
-- Payment method selection (radio buttons)
-- Bank slip upload interface
-- Payment history table
+- Minimum contrast ratio: 4.5:1 for body text
+- Focus indicators on all interactive elements
+- Color is never the sole indicator (use icons + text)
+- Minimum touch target: 44px x 44px
+- Proper ARIA labels on all interactive elements
+- Keyboard navigation fully supported
 
-### Result Management
-- Upload marksheet template section
-- Validation status indicators
-- Bulk approve/reject controls
-- Export/download options
+## RTL/Arabic Support
 
-### Public Result Checker
-- Centered single-column layout (max-w-md)
-- Input form for index number + PIN
-- Result display card with verification seal graphic
+- Full RTL layout support when Arabic selected
+- Sidebar moves to right side
+- Text alignment switches appropriately
+- Arabic fonts loaded for proper rendering
+- All icons and layouts mirror correctly
 
-## Images
+## Responsive Breakpoints
 
-**Hero Images:** Not applicable - this is a utility application focused on data management
+- **Mobile:** < 768px - Single column, stacked layouts
+- **Tablet:** 768px - 1024px - 2 column grids, collapsible sidebar
+- **Desktop:** > 1024px - Full multi-column layouts, fixed sidebar
 
-**Functional Images:**
-- **School Logo Placeholders:** Square avatars (64px × 64px) in school cards and student cards
-- **Document Thumbnails:** PDF/image previews in document management sections
-- **Barcode Generation:** Dynamically generated barcodes on exam cards and certificates
-- **Verification Seals:** SVG graphic on certificates and result verification pages
-- **Empty States:** Illustrations for "no students registered," "no results yet" (use icon-based illustrations)
+## Design Principles
 
-## Iconography
-
-**Library:** Material Icons (via CDN)
-- Dashboard: dashboard, assessment, school
-- Students: person, group, badge
-- Payments: payment, receipt, account_balance
-- Documents: description, upload_file, picture_as_pdf
-- Actions: check_circle, cancel, edit, delete, download
-- Navigation: menu, arrow_back, more_vert
-
-## Accessibility
-
-- All forms must have proper labels and ARIA attributes
-- Tables must have proper headers and scope attributes
-- Color is never the only indicator of status (use icons + text)
-- Keyboard navigation fully supported for all interactive elements
-- Focus indicators on all focusable elements
-- Min touch target size: 44px × 44px for mobile
-
-## Responsive Behavior
-
-- **Desktop (1280px+):** Full sidebar, multi-column layouts, expanded tables
-- **Tablet (768-1279px):** Collapsible sidebar, 2-column grids, horizontal scroll for wide tables
-- **Mobile (< 768px):** Bottom navigation, single column, card-based table alternatives, stacked forms
+1. **Cleanliness:** Generous whitespace, minimal visual clutter
+2. **Consistency:** Same patterns and spacing throughout
+3. **Hierarchy:** Clear visual hierarchy using typography and spacing
+4. **Professionalism:** Trustworthy, official appearance for examination system
+5. **Accessibility:** Inclusive design for all users
+6. **Bilingual:** Equal treatment for English and Arabic content
