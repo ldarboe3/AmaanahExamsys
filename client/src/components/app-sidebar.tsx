@@ -1,5 +1,6 @@
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import {
   Sidebar,
   SidebarContent,
@@ -13,7 +14,6 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,133 +41,57 @@ import {
   Building2,
   History,
   FileDown,
+  type LucideIcon,
 } from "lucide-react";
 
-const adminMenuItems = [
-  {
-    title: "Dashboard",
-    url: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Exam Years",
-    url: "/exam-years",
-    icon: Calendar,
-  },
-  {
-    title: "Schools",
-    url: "/schools",
-    icon: School,
-  },
-  {
-    title: "Students",
-    url: "/students",
-    icon: Users,
-  },
-  {
-    title: "Exam Centers",
-    url: "/centers",
-    icon: MapPin,
-  },
-  {
-    title: "Payments",
-    url: "/payments",
-    icon: CreditCard,
-  },
-  {
-    title: "Results",
-    url: "/results",
-    icon: FileCheck,
-  },
-  {
-    title: "Certificates",
-    url: "/certificates",
-    icon: Award,
-  },
-  {
-    title: "Transcripts",
-    url: "/transcripts",
-    icon: BookOpen,
-  },
-  {
-    title: "Examiners",
-    url: "/examiners",
-    icon: UserCheck,
-  },
-  {
-    title: "Analytics",
-    url: "/analytics",
-    icon: BarChart3,
-  },
+type MenuItemDef = {
+  key: string;
+  url: string;
+  icon: LucideIcon;
+};
+
+const adminMenuDefs: MenuItemDef[] = [
+  { key: "dashboard", url: "/", icon: LayoutDashboard },
+  { key: "examYears", url: "/exam-years", icon: Calendar },
+  { key: "schools", url: "/schools", icon: School },
+  { key: "students", url: "/students", icon: Users },
+  { key: "examCenters", url: "/centers", icon: MapPin },
+  { key: "payments", url: "/payments", icon: CreditCard },
+  { key: "results", url: "/results", icon: FileCheck },
+  { key: "certificates", url: "/certificates", icon: Award },
+  { key: "transcripts", url: "/transcripts", icon: BookOpen },
+  { key: "examiners", url: "/examiners", icon: UserCheck },
+  { key: "analytics", url: "/analytics", icon: BarChart3 },
 ];
 
-const schoolAdminMenuItems = [
-  {
-    title: "Dashboard",
-    url: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Students",
-    url: "/students",
-    icon: Users,
-  },
-  {
-    title: "Payments",
-    url: "/payments",
-    icon: CreditCard,
-  },
-  {
-    title: "Results",
-    url: "/results",
-    icon: FileCheck,
-  },
-  {
-    title: "Exam Center",
-    url: "/center-info",
-    icon: MapPin,
-  },
+const schoolAdminMenuDefs: MenuItemDef[] = [
+  { key: "dashboard", url: "/", icon: LayoutDashboard },
+  { key: "students", url: "/students", icon: Users },
+  { key: "payments", url: "/payments", icon: CreditCard },
+  { key: "results", url: "/results", icon: FileCheck },
+  { key: "examCenter", url: "/center-info", icon: MapPin },
 ];
 
-const managementItems = [
-  {
-    title: "Regions & Clusters",
-    url: "/regions",
-    icon: Building2,
-  },
-  {
-    title: "Subjects",
-    url: "/subjects",
-    icon: BookOpen,
-  },
-  {
-    title: "Timetable",
-    url: "/timetable",
-    icon: ClipboardList,
-  },
-  {
-    title: "Reports & Exports",
-    url: "/reports",
-    icon: FileDown,
-  },
-  {
-    title: "Audit Logs",
-    url: "/audit-logs",
-    icon: History,
-  },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-  },
+const managementDefs: MenuItemDef[] = [
+  { key: "regionsAndClusters", url: "/regions", icon: Building2 },
+  { key: "subjects", url: "/subjects", icon: BookOpen },
+  { key: "timetable", url: "/timetable", icon: ClipboardList },
+  { key: "reportsAndExports", url: "/reports", icon: FileDown },
+  { key: "auditLogs", url: "/audit-logs", icon: History },
+  { key: "settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'system_admin';
-  const menuItems = isAdmin ? adminMenuItems : schoolAdminMenuItems;
+  const menuDefs = isAdmin ? adminMenuDefs : schoolAdminMenuDefs;
+
+  const getNavLabel = (key: string): string => {
+    return (t.nav as Record<string, string>)[key] || key;
+  };
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     const first = firstName?.charAt(0) || '';
@@ -183,27 +107,27 @@ export function AppSidebar() {
             <GraduationCap className="w-5 h-5 text-primary-foreground" />
           </div>
           <div className="flex flex-col">
-            <span className="text-base font-semibold text-sidebar-foreground">Amaanah</span>
-            <span className="text-xs text-muted-foreground">Exam Management</span>
+            <span className="text-base font-semibold text-sidebar-foreground">{t.app.name}</span>
+            <span className="text-xs text-muted-foreground">{t.app.tagline}</span>
           </div>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
+          <SidebarGroupLabel>{t.nav.mainMenu}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+              {menuDefs.map((item) => (
+                <SidebarMenuItem key={item.key}>
                   <SidebarMenuButton
                     asChild
                     isActive={location === item.url}
-                    data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    data-testid={`nav-${item.key}`}
                   >
                     <Link href={item.url}>
                       <item.icon className="w-4 h-4" />
-                      <span>{item.title}</span>
+                      <span>{getNavLabel(item.key)}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -214,19 +138,19 @@ export function AppSidebar() {
 
         {isAdmin && (
           <SidebarGroup>
-            <SidebarGroupLabel>Management</SidebarGroupLabel>
+            <SidebarGroupLabel>{t.nav.management}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {managementItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
+                {managementDefs.map((item) => (
+                  <SidebarMenuItem key={item.key}>
                     <SidebarMenuButton
                       asChild
                       isActive={location === item.url}
-                      data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                      data-testid={`nav-${item.key}`}
                     >
                       <Link href={item.url}>
                         <item.icon className="w-4 h-4" />
-                        <span>{item.title}</span>
+                        <span>{getNavLabel(item.key)}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -271,8 +195,8 @@ export function AppSidebar() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem asChild>
                   <Link href="/profile" className="cursor-pointer">
-                    <Settings className="w-4 h-4 mr-2" />
-                    Profile Settings
+                    <Settings className="w-4 h-4 me-2" />
+                    {t.user.profileSettings}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -281,8 +205,8 @@ export function AppSidebar() {
                   onClick={() => window.location.href = '/api/logout'}
                   data-testid="button-logout"
                 >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
+                  <LogOut className="w-4 h-4 me-2" />
+                  {t.user.signOut}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
