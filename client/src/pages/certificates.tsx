@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,8 @@ import {
   CheckCircle2,
   Eye,
   FileText,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -99,7 +101,19 @@ export default function Certificates() {
     queryKey: ["/api/exam-years"],
   });
 
+  const { data: allCertificates } = useQuery<Certificate[]>({
+    queryKey: ["/api/certificates"],
+  });
+
   const activeExamYear = examYears?.find(ey => ey.isActive);
+
+  const getStudentCertificate = (studentId: number): Certificate | undefined => {
+    return allCertificates?.find(c => c.studentId === studentId && c.examYearId === activeExamYear?.id);
+  };
+
+  const eligibleGrades = [6, 9, 12];
+  const eligibleStudents = students?.filter(s => eligibleGrades.includes(s.grade)) || [];
+  const nonEligibleStudents = students?.filter(s => !eligibleGrades.includes(s.grade)) || [];
 
   const filteredClusters = clusters?.filter(c => c.regionId === parseInt(selectedRegion)) || [];
   const filteredSchools = schools?.filter(s => {
@@ -152,8 +166,8 @@ export default function Certificates() {
   });
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked && students) {
-      setSelectedStudents(students.map(s => s.id));
+    if (checked && eligibleStudents.length > 0) {
+      setSelectedStudents(eligibleStudents.map(s => s.id));
     } else {
       setSelectedStudents([]);
     }
@@ -170,6 +184,10 @@ export default function Certificates() {
   const handlePreview = (student: StudentWithCertificate) => {
     setPreviewStudent(student);
     setShowPreviewDialog(true);
+  };
+
+  const handleDownloadCertificate = (certificateId: number) => {
+    window.open(`/api/certificates/${certificateId}/download`, '_blank');
   };
 
   const handlePrintSelected = () => {
@@ -308,8 +326,13 @@ export default function Certificates() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Students</p>
-                <p className="text-2xl font-semibold">{students?.length || 0}</p>
+                <p className="text-sm text-muted-foreground">Eligible Students</p>
+                <p className="text-2xl font-semibold">{eligibleStudents.length}</p>
+                {nonEligibleStudents.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    ({nonEligibleStudents.length} not eligible)
+                  </p>
+                )}
               </div>
               <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
                 <User className="w-5 h-5 text-primary" />
@@ -382,91 +405,122 @@ export default function Certificates() {
             </div>
           ) : studentsLoading ? (
             <CertificatesTableSkeleton />
-          ) : students && students.length > 0 ? (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={students.length > 0 && selectedStudents.length === students.length}
-                        onCheckedChange={handleSelectAll}
-                        data-testid="checkbox-select-all"
-                      />
-                    </TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Index Number</TableHead>
-                    <TableHead>Grade</TableHead>
-                    <TableHead>Gender</TableHead>
-                    <TableHead>Certificate Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {students.map((student) => (
-                    <TableRow key={student.id} data-testid={`row-student-${student.id}`}>
-                      <TableCell>
+          ) : eligibleStudents.length > 0 || nonEligibleStudents.length > 0 ? (
+            <div className="space-y-4">
+              {nonEligibleStudents.length > 0 && (
+                <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-md">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-500" />
+                  <span className="text-sm text-amber-800 dark:text-amber-400">
+                    {nonEligibleStudents.length} student(s) in grades other than 6, 9, or 12 are not eligible for certificates
+                  </span>
+                </div>
+              )}
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">
                         <Checkbox
-                          checked={selectedStudents.includes(student.id)}
-                          onCheckedChange={(checked) => handleSelectStudent(student.id, !!checked)}
-                          data-testid={`checkbox-student-${student.id}`}
+                          checked={eligibleStudents.length > 0 && selectedStudents.length === eligibleStudents.length}
+                          onCheckedChange={handleSelectAll}
+                          data-testid="checkbox-select-all"
                         />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                            <User className="w-4 h-4 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-foreground">
-                              {student.firstName} {student.lastName}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : "N/A"}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                          {student.indexNumber || "Pending"}
-                        </code>
-                      </TableCell>
-                      <TableCell>Grade {student.gradeLevel}</TableCell>
-                      <TableCell className="capitalize">{student.gender}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={student.certificate ? 'default' : 'secondary'}
-                          className={student.certificate ? 'bg-chart-3/10 text-chart-3' : ''}
-                        >
-                          {student.certificate ? 'Generated' : 'Pending'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handlePreview(student)}
-                            data-testid={`button-preview-${student.id}`}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => generateCertificateMutation.mutate([student.id])}
-                            disabled={generateCertificateMutation.isPending}
-                            data-testid={`button-generate-${student.id}`}
-                          >
-                            <Award className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      </TableHead>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Index Number</TableHead>
+                      <TableHead>Grade</TableHead>
+                      <TableHead>Gender</TableHead>
+                      <TableHead>Certificate Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {eligibleStudents.map((student) => {
+                      const certificate = getStudentCertificate(student.id);
+                      return (
+                        <TableRow key={student.id} data-testid={`row-student-${student.id}`}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedStudents.includes(student.id)}
+                              onCheckedChange={(checked) => handleSelectStudent(student.id, !!checked)}
+                              data-testid={`checkbox-student-${student.id}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                                <User className="w-4 h-4 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-foreground">
+                                  {student.firstName} {student.lastName}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : "N/A"}
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                              {student.indexNumber || "Pending"}
+                            </code>
+                          </TableCell>
+                          <TableCell>Grade {student.grade}</TableCell>
+                          <TableCell className="capitalize">{student.gender}</TableCell>
+                          <TableCell>
+                            {certificate ? (
+                              <Badge variant="default" className="bg-chart-3/10 text-chart-3">
+                                Generated
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">
+                                Pending
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handlePreview(student)}
+                                data-testid={`button-preview-${student.id}`}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              {certificate && certificate.pdfUrl ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDownloadCertificate(certificate.id)}
+                                  data-testid={`button-download-${student.id}`}
+                                >
+                                  <Download className="w-4 h-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => generateCertificateMutation.mutate([student.id])}
+                                  disabled={generateCertificateMutation.isPending}
+                                  data-testid={`button-generate-${student.id}`}
+                                >
+                                  {generateCertificateMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Award className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           ) : (
             <div className="text-center py-12">
@@ -508,7 +562,7 @@ export default function Certificates() {
                   has successfully completed the {activeExamYear?.name || "Academic Year"} examinations
                 </p>
                 <p className="text-lg font-semibold">
-                  Grade Level: <span className="text-chart-3">Grade {previewStudent?.gradeLevel}</span>
+                  Grade Level: <span className="text-chart-3">Grade {previewStudent?.grade}</span>
                 </p>
                 <div className="pt-4 border-t mt-4">
                   <p className="text-sm text-muted-foreground">

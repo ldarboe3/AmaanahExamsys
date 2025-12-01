@@ -1507,6 +1507,31 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Transcripts API
+  app.get("/api/transcripts", async (req, res) => {
+    try {
+      const studentId = req.query.studentId ? parseInt(req.query.studentId as string) : undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      
+      let transcripts;
+      if (studentId) {
+        transcripts = await storage.getTranscriptsByStudent(studentId);
+      } else if (examYearId) {
+        transcripts = await storage.getTranscriptsByExamYear(examYearId);
+      } else {
+        const activeExamYear = await storage.getActiveExamYear();
+        if (activeExamYear) {
+          transcripts = await storage.getTranscriptsByExamYear(activeExamYear.id);
+        } else {
+          transcripts = [];
+        }
+      }
+      res.json(transcripts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Transcript Generation Endpoints
   app.post("/api/transcripts/generate", isAuthenticated, async (req, res) => {
     try {

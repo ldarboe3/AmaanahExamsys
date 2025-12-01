@@ -38,10 +38,11 @@ import {
   Building2,
   CheckCircle2,
   Eye,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Region, Cluster, School as SchoolType, Student, ExamYear } from "@shared/schema";
+import type { Region, Cluster, School as SchoolType, Student, ExamYear, Transcript } from "@shared/schema";
 
 interface StudentWithResults extends Student {
   school?: SchoolType;
@@ -103,7 +104,15 @@ export default function Transcripts() {
     queryKey: ["/api/exam-years"],
   });
 
+  const { data: allTranscripts } = useQuery<Transcript[]>({
+    queryKey: ["/api/transcripts"],
+  });
+
   const activeExamYear = examYears?.find(ey => ey.isActive);
+
+  const getStudentTranscript = (studentId: number): Transcript | undefined => {
+    return allTranscripts?.find(t => t.studentId === studentId && t.examYearId === activeExamYear?.id);
+  };
 
   const filteredClusters = clusters?.filter(c => c.regionId === parseInt(selectedRegion)) || [];
   const filteredSchools = schools?.filter(s => {
@@ -118,6 +127,7 @@ export default function Transcripts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/students?schoolId=${selectedSchool}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transcripts"] });
       toast({
         title: "Transcripts Generated",
         description: `${selectedStudents.length} transcript(s) generated successfully.`,
@@ -139,6 +149,7 @@ export default function Transcripts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/students?schoolId=${selectedSchool}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transcripts"] });
       toast({
         title: "All Transcripts Generated",
         description: "All student transcripts for this school have been generated.",
@@ -172,6 +183,10 @@ export default function Transcripts() {
   const handlePreview = (student: StudentWithResults) => {
     setPreviewStudent(student);
     setShowPreviewDialog(true);
+  };
+
+  const handleDownloadTranscript = (transcriptId: number) => {
+    window.open(`/api/transcripts/${transcriptId}/download`, '_blank');
   };
 
   const handlePrintSelected = () => {
@@ -405,68 +420,89 @@ export default function Transcripts() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {students.map((student) => (
-                    <TableRow key={student.id} data-testid={`row-student-${student.id}`}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedStudents.includes(student.id)}
-                          onCheckedChange={(checked) => handleSelectStudent(student.id, !!checked)}
-                          data-testid={`checkbox-student-${student.id}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                            <User className="w-4 h-4 text-primary" />
+                  {students.map((student) => {
+                    const transcript = getStudentTranscript(student.id);
+                    return (
+                      <TableRow key={student.id} data-testid={`row-student-${student.id}`}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedStudents.includes(student.id)}
+                            onCheckedChange={(checked) => handleSelectStudent(student.id, !!checked)}
+                            data-testid={`checkbox-student-${student.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                              <User className="w-4 h-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {student.firstName} {student.lastName}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : "N/A"}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium text-foreground">
-                              {student.firstName} {student.lastName}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : "N/A"}
-                            </p>
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                            {student.indexNumber || "Pending"}
+                          </code>
+                        </TableCell>
+                        <TableCell>Grade {student.grade}</TableCell>
+                        <TableCell className="capitalize">{student.gender}</TableCell>
+                        <TableCell>
+                          {transcript ? (
+                            <Badge variant="default" className="bg-chart-3/10 text-chart-3">
+                              Generated
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">
+                              {student.status}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handlePreview(student)}
+                              data-testid={`button-preview-${student.id}`}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            {transcript && transcript.pdfUrl ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDownloadTranscript(transcript.id)}
+                                data-testid={`button-download-${student.id}`}
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => generateTranscriptMutation.mutate([student.id])}
+                                disabled={generateTranscriptMutation.isPending}
+                                data-testid={`button-print-${student.id}`}
+                              >
+                                {generateTranscriptMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Printer className="w-4 h-4" />
+                                )}
+                              </Button>
+                            )}
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                          {student.indexNumber || "Pending"}
-                        </code>
-                      </TableCell>
-                      <TableCell>Grade {student.gradeLevel}</TableCell>
-                      <TableCell className="capitalize">{student.gender}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={student.status === 'approved' ? 'default' : 'secondary'}
-                          className={student.status === 'approved' ? 'bg-chart-3/10 text-chart-3' : ''}
-                        >
-                          {student.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handlePreview(student)}
-                            data-testid={`button-preview-${student.id}`}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => generateTranscriptMutation.mutate([student.id])}
-                            disabled={generateTranscriptMutation.isPending}
-                            data-testid={`button-print-${student.id}`}
-                          >
-                            <Printer className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -507,7 +543,7 @@ export default function Transcripts() {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Grade Level</p>
-                  <p className="font-medium">Grade {previewStudent?.gradeLevel}</p>
+                  <p className="font-medium">Grade {previewStudent?.grade}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Exam Year</p>
