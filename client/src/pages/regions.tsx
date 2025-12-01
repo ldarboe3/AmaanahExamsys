@@ -128,14 +128,14 @@ export default function Regions() {
       setShowRegionDialog(false);
       regionForm.reset();
       toast({
-        title: "Region Created",
-        description: "The region has been created successfully.",
+        title: t.regions.regionCreated,
+        description: t.regions.regionCreatedDesc,
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to create region. Please try again.",
+        title: t.common.error,
+        description: t.regions.failedToCreateRegion,
         variant: "destructive",
       });
     },
@@ -150,14 +150,14 @@ export default function Regions() {
       setShowClusterDialog(false);
       clusterForm.reset();
       toast({
-        title: "Cluster Created",
-        description: "The cluster has been created successfully.",
+        title: t.regions.clusterCreated,
+        description: t.regions.clusterCreatedDesc,
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to create cluster. Please try again.",
+        title: t.common.error,
+        description: t.regions.failedToCreateCluster,
         variant: "destructive",
       });
     },
@@ -179,18 +179,18 @@ export default function Regions() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Regions & Clusters</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{t.regions.title}</h1>
           <p className="text-muted-foreground mt-1">
-            Manage geographical regions and clusters for school organization
+            {t.regions.manageDescription}
           </p>
         </div>
         <Button onClick={() => setShowRegionDialog(true)} data-testid="button-add-region">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Region
+          <Plus className="w-4 h-4 me-2" />
+          {t.regions.addRegion}
         </Button>
       </div>
 
@@ -200,8 +200,8 @@ export default function Regions() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Regions</p>
-                <p className="text-2xl font-semibold">{regions?.length || 0}</p>
+                <p className="text-sm text-muted-foreground">{t.regions.totalRegions}</p>
+                <p className="text-2xl font-semibold">{(regions?.length || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
                 <Building2 className="w-5 h-5 text-primary" />
@@ -213,9 +213,9 @@ export default function Regions() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Clusters</p>
+                <p className="text-sm text-muted-foreground">{t.regions.totalClusters}</p>
                 <p className="text-2xl font-semibold">
-                  {regions?.reduce((sum, r) => sum + (r.clusters?.length || 0), 0) || 0}
+                  {(regions?.reduce((sum, r) => sum + (r.clusters?.length || 0), 0) || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
                 </p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-2/10 flex items-center justify-center">
@@ -228,9 +228,9 @@ export default function Regions() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Schools Covered</p>
+                <p className="text-sm text-muted-foreground">{t.regions.schools}</p>
                 <p className="text-2xl font-semibold">
-                  {regions?.reduce((sum, r) => sum + (r.schoolsCount || 0), 0) || 0}
+                  {(regions?.reduce((sum, r) => sum + (r.schoolsCount || 0), 0) || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
                 </p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
@@ -261,7 +261,7 @@ export default function Regions() {
                     </div>
                     <div>
                       <CardTitle className="text-base">{region.name}</CardTitle>
-                      <CardDescription>Code: {region.code}</CardDescription>
+                      <CardDescription>{t.regions.regionCode}: {region.code}</CardDescription>
                     </div>
                   </div>
                   <DropdownMenu>
@@ -270,19 +270,19 @@ export default function Regions() {
                         <MoreVertical className="w-4 h-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align={isRTL ? "start" : "end"}>
                       <DropdownMenuItem onClick={() => openClusterDialog(region.id)}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Cluster
+                        <Plus className="w-4 h-4 me-2" />
+                        {t.regions.addCluster}
                       </DropdownMenuItem>
                       <DropdownMenuItem>
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit Region
+                        <Edit className="w-4 h-4 me-2" />
+                        {t.regions.editRegion}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-destructive">
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
+                        <Trash2 className="w-4 h-4 me-2" />
+                        {t.common.delete}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -292,15 +292,15 @@ export default function Regions() {
                 <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
                   <div className="flex items-center gap-1">
                     <MapPin className="w-4 h-4" />
-                    <span>{region.clusters?.length || 0} clusters</span>
+                    <span>{(region.clusters?.length || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')} {t.regions.clusters}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <School className="w-4 h-4" />
-                    <span>{region.schoolsCount || 0} schools</span>
+                    <span>{(region.schoolsCount || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')} {t.regions.schools}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Users className="w-4 h-4" />
-                    <span>{region.studentsCount || 0} students</span>
+                    <span>{(region.studentsCount || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')} {t.regions.students}</span>
                   </div>
                 </div>
 
@@ -308,7 +308,7 @@ export default function Regions() {
                   <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="clusters" className="border-none">
                       <AccordionTrigger className="py-2 text-sm">
-                        View Clusters
+                        {t.regions.viewClusters}
                       </AccordionTrigger>
                       <AccordionContent>
                         <div className="space-y-2">
@@ -334,7 +334,7 @@ export default function Regions() {
                     </AccordionItem>
                   </Accordion>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No clusters added yet</p>
+                  <p className="text-sm text-muted-foreground">{t.regions.noClustersAdded}</p>
                 )}
               </CardContent>
             </Card>
@@ -344,13 +344,13 @@ export default function Regions() {
         <Card>
           <CardContent className="py-12 text-center">
             <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">No regions found</h3>
+            <h3 className="text-lg font-medium mb-2">{t.regions.noRegionsFound}</h3>
             <p className="text-muted-foreground mb-4">
-              Add your first region to organize schools geographically
+              {t.regions.addFirstRegion}
             </p>
             <Button onClick={() => setShowRegionDialog(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Region
+              <Plus className="w-4 h-4 me-2" />
+              {t.regions.addRegion}
             </Button>
           </CardContent>
         </Card>
@@ -358,11 +358,11 @@ export default function Regions() {
 
       {/* Create Region Dialog */}
       <Dialog open={showRegionDialog} onOpenChange={setShowRegionDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>Add New Region</DialogTitle>
+            <DialogTitle>{t.regions.addNewRegion}</DialogTitle>
             <DialogDescription>
-              Create a new geographical region
+              {t.regions.addNewRegionDesc}
             </DialogDescription>
           </DialogHeader>
           <Form {...regionForm}>
@@ -372,7 +372,7 @@ export default function Regions() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Region Name</FormLabel>
+                    <FormLabel>{t.regions.regionName}</FormLabel>
                     <FormControl>
                       <Input placeholder="Western Region" {...field} data-testid="input-region-name" />
                     </FormControl>
@@ -385,7 +385,7 @@ export default function Regions() {
                 name="code"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Region Code</FormLabel>
+                    <FormLabel>{t.regions.regionCode}</FormLabel>
                     <FormControl>
                       <Input placeholder="WR" {...field} data-testid="input-region-code" />
                     </FormControl>
@@ -395,10 +395,10 @@ export default function Regions() {
               />
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setShowRegionDialog(false)}>
-                  Cancel
+                  {t.common.cancel}
                 </Button>
                 <Button type="submit" disabled={createRegionMutation.isPending}>
-                  {createRegionMutation.isPending ? "Creating..." : "Create Region"}
+                  {createRegionMutation.isPending ? t.regions.creating : t.regions.createRegion}
                 </Button>
               </DialogFooter>
             </form>
@@ -408,11 +408,11 @@ export default function Regions() {
 
       {/* Create Cluster Dialog */}
       <Dialog open={showClusterDialog} onOpenChange={setShowClusterDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>Add New Cluster</DialogTitle>
+            <DialogTitle>{t.regions.addNewCluster}</DialogTitle>
             <DialogDescription>
-              Add a cluster to the selected region
+              {t.regions.addNewClusterDesc}
             </DialogDescription>
           </DialogHeader>
           <Form {...clusterForm}>
@@ -422,7 +422,7 @@ export default function Regions() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cluster Name</FormLabel>
+                    <FormLabel>{t.regions.clusterName}</FormLabel>
                     <FormControl>
                       <Input placeholder="Brikama Cluster" {...field} data-testid="input-cluster-name" />
                     </FormControl>
@@ -435,7 +435,7 @@ export default function Regions() {
                 name="code"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cluster Code</FormLabel>
+                    <FormLabel>{t.regions.clusterCode}</FormLabel>
                     <FormControl>
                       <Input placeholder="BRK" {...field} data-testid="input-cluster-code" />
                     </FormControl>
@@ -445,10 +445,10 @@ export default function Regions() {
               />
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setShowClusterDialog(false)}>
-                  Cancel
+                  {t.common.cancel}
                 </Button>
                 <Button type="submit" disabled={createClusterMutation.isPending}>
-                  {createClusterMutation.isPending ? "Creating..." : "Create Cluster"}
+                  {createClusterMutation.isPending ? t.regions.creating : t.regions.createCluster}
                 </Button>
               </DialogFooter>
             </form>

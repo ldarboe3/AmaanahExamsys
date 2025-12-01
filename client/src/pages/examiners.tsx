@@ -146,14 +146,14 @@ export default function Examiners() {
       setShowCreateDialog(false);
       form.reset();
       toast({
-        title: "Examiner Added",
-        description: "The examiner has been added and will receive a verification email.",
+        title: t.examiners.examinerAdded,
+        description: t.examiners.examinerAddedDesc,
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to add examiner. Please try again.",
+        title: t.common.error,
+        description: t.examiners.failedToAdd,
         variant: "destructive",
       });
     },
@@ -176,7 +176,7 @@ export default function Examiners() {
 
   const formatCurrency = (amount: string | number | null) => {
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : (amount || 0);
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat(isRTL ? 'ar-GM' : 'en-GM', {
       style: 'currency',
       currency: 'GMD',
       minimumFractionDigits: 2,
@@ -184,18 +184,18 @@ export default function Examiners() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Examiners</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{t.examiners.title}</h1>
           <p className="text-muted-foreground mt-1">
-            Manage examiners and marking assignments
+            {t.examiners.manageDescription}
           </p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)} data-testid="button-add-examiner">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Examiner
+          <Plus className="w-4 h-4 me-2" />
+          {t.examiners.addExaminer}
         </Button>
       </div>
 
@@ -205,8 +205,8 @@ export default function Examiners() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Examiners</p>
-                <p className="text-2xl font-semibold">{examiners?.length || 0}</p>
+                <p className="text-sm text-muted-foreground">{t.examiners.totalExaminers}</p>
+                <p className="text-2xl font-semibold">{(examiners?.length || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
                 <UserCheck className="w-5 h-5 text-primary" />
@@ -218,8 +218,8 @@ export default function Examiners() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Active</p>
-                <p className="text-2xl font-semibold">{activeCount}</p>
+                <p className="text-sm text-muted-foreground">{t.common.active}</p>
+                <p className="text-2xl font-semibold">{activeCount.toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
                 <CheckCircle className="w-5 h-5 text-chart-3" />
@@ -231,8 +231,8 @@ export default function Examiners() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Pending Verification</p>
-                <p className="text-2xl font-semibold">{pendingCount}</p>
+                <p className="text-sm text-muted-foreground">{t.examiners.pendingVerification}</p>
+                <p className="text-2xl font-semibold">{pendingCount.toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-5/10 flex items-center justify-center">
                 <Clock className="w-5 h-5 text-chart-5" />
@@ -244,9 +244,9 @@ export default function Examiners() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Scripts Marked</p>
+                <p className="text-sm text-muted-foreground">{t.examiners.totalScriptsMarked}</p>
                 <p className="text-2xl font-semibold">
-                  {examiners?.reduce((sum, e) => sum + (e.totalScriptsMarked || 0), 0) || 0}
+                  {(examiners?.reduce((sum, e) => sum + (e.totalScriptsMarked || 0), 0) || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
                 </p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-2/10 flex items-center justify-center">
@@ -262,25 +262,25 @@ export default function Examiners() {
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground ${isRTL ? 'right-3' : 'left-3'}`} />
               <Input
-                placeholder="Search by name or email..."
+                placeholder={t.examiners.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className={isRTL ? "pr-9" : "pl-9"}
                 data-testid="input-search-examiners"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder={t.common.status} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="verified">Verified</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="all">{t.examiners.allStatus}</SelectItem>
+                <SelectItem value="pending">{t.common.pending}</SelectItem>
+                <SelectItem value="verified">{t.examiners.verified}</SelectItem>
+                <SelectItem value="active">{t.common.active}</SelectItem>
+                <SelectItem value="inactive">{t.common.inactive}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -292,9 +292,9 @@ export default function Examiners() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-lg">Examiner List</CardTitle>
+              <CardTitle className="text-lg">{t.examiners.examinerList}</CardTitle>
               <CardDescription>
-                {filteredExaminers?.length || 0} examiners found
+                {(filteredExaminers?.length || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')} {t.examiners.examinersFound}
               </CardDescription>
             </div>
           </div>
@@ -307,12 +307,12 @@ export default function Examiners() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Examiner</TableHead>
-                    <TableHead>Specialization</TableHead>
-                    <TableHead>Region</TableHead>
-                    <TableHead>Scripts</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t.examiners.examiner}</TableHead>
+                    <TableHead>{t.examiners.specialization}</TableHead>
+                    <TableHead>{t.schools.region}</TableHead>
+                    <TableHead>{t.examiners.scripts}</TableHead>
+                    <TableHead>{t.common.status}</TableHead>
+                    <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -336,42 +336,45 @@ export default function Examiners() {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
-                          {examiner.region?.name || "Not assigned"}
+                          {examiner.region?.name || t.examiners.notAssigned}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm font-medium">{examiner.totalScriptsMarked || 0}</span>
+                        <span className="text-sm font-medium">{(examiner.totalScriptsMarked || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</span>
                       </TableCell>
                       <TableCell>
                         <Badge className={`${statusColors[examiner.status || 'pending']} text-xs capitalize`}>
-                          {examiner.status}
+                          {examiner.status === 'pending' ? t.common.pending :
+                           examiner.status === 'verified' ? t.examiners.verified :
+                           examiner.status === 'active' ? t.common.active :
+                           t.common.inactive}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className={isRTL ? "text-left" : "text-right"}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" data-testid={`button-actions-${examiner.id}`}>
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align={isRTL ? "start" : "end"}>
                             <DropdownMenuItem
                               onClick={() => {
                                 setSelectedExaminer(examiner);
                                 setShowDetailsDialog(true);
                               }}
                             >
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Details
+                              <Eye className="w-4 h-4 me-2" />
+                              {t.examiners.viewDetails}
                             </DropdownMenuItem>
                             <DropdownMenuItem>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
+                              <Edit className="w-4 h-4 me-2" />
+                              {t.common.edit}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem>
-                              <FileCheck className="w-4 h-4 mr-2" />
-                              View Assignments
+                              <FileCheck className="w-4 h-4 me-2" />
+                              {t.examiners.viewAssignments}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -384,15 +387,13 @@ export default function Examiners() {
           ) : (
             <div className="text-center py-12">
               <UserCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No examiners found</h3>
+              <h3 className="text-lg font-medium mb-2">{t.examiners.noExaminersFound}</h3>
               <p className="text-muted-foreground mb-4">
-                {searchQuery
-                  ? "Try adjusting your search"
-                  : "Add your first examiner to get started"}
+                {searchQuery ? t.examiners.tryAdjustSearch : t.examiners.addFirstExaminer}
               </p>
               <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Examiner
+                <Plus className="w-4 h-4 me-2" />
+                {t.examiners.addExaminer}
               </Button>
             </div>
           )}
@@ -401,11 +402,11 @@ export default function Examiners() {
 
       {/* Create Examiner Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>Add New Examiner</DialogTitle>
+            <DialogTitle>{t.examiners.addNewExaminer}</DialogTitle>
             <DialogDescription>
-              Add a new examiner to the system. They will receive a verification email.
+              {t.examiners.addNewExaminerDesc}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -416,9 +417,9 @@ export default function Examiners() {
                   name="firstName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>First Name</FormLabel>
+                      <FormLabel>{t.examiners.firstName}</FormLabel>
                       <FormControl>
-                        <Input placeholder="John" {...field} data-testid="input-first-name" />
+                        <Input placeholder={t.examiners.firstName} {...field} data-testid="input-first-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -429,9 +430,9 @@ export default function Examiners() {
                   name="lastName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Last Name</FormLabel>
+                      <FormLabel>{t.examiners.lastName}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Doe" {...field} data-testid="input-last-name" />
+                        <Input placeholder={t.examiners.lastName} {...field} data-testid="input-last-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -444,7 +445,7 @@ export default function Examiners() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t.common.email}</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="examiner@example.com" {...field} data-testid="input-email" />
                     </FormControl>
@@ -458,7 +459,7 @@ export default function Examiners() {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone (Optional)</FormLabel>
+                    <FormLabel>{t.examiners.phoneOptional}</FormLabel>
                     <FormControl>
                       <Input placeholder="+220 1234567" {...field} data-testid="input-phone" />
                     </FormControl>
@@ -473,9 +474,9 @@ export default function Examiners() {
                   name="qualification"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Qualification</FormLabel>
+                      <FormLabel>{t.examiners.qualification}</FormLabel>
                       <FormControl>
-                        <Input placeholder="M.A. Islamic Studies" {...field} data-testid="input-qualification" />
+                        <Input placeholder={t.examiners.qualification} {...field} data-testid="input-qualification" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -486,9 +487,9 @@ export default function Examiners() {
                   name="specialization"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Specialization</FormLabel>
+                      <FormLabel>{t.examiners.specialization}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Arabic Language" {...field} data-testid="input-specialization" />
+                        <Input placeholder={t.examiners.specialization} {...field} data-testid="input-specialization" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -501,11 +502,11 @@ export default function Examiners() {
                 name="regionId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Region (Optional)</FormLabel>
+                    <FormLabel>{t.examiners.regionOptional}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value?.toString()}>
                       <FormControl>
                         <SelectTrigger data-testid="select-region">
-                          <SelectValue placeholder="Select region" />
+                          <SelectValue placeholder={t.centers.selectRegion} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -523,10 +524,10 @@ export default function Examiners() {
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
-                  Cancel
+                  {t.common.cancel}
                 </Button>
                 <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "Adding..." : "Add Examiner"}
+                  {createMutation.isPending ? t.examiners.adding : t.examiners.addExaminer}
                 </Button>
               </DialogFooter>
             </form>
@@ -536,11 +537,11 @@ export default function Examiners() {
 
       {/* Examiner Details Dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>Examiner Details</DialogTitle>
+            <DialogTitle>{t.examiners.examinerDetails}</DialogTitle>
             <DialogDescription>
-              Complete information about the examiner
+              {t.examiners.completeInfo}
             </DialogDescription>
           </DialogHeader>
           {selectedExaminer && (
@@ -554,10 +555,13 @@ export default function Examiners() {
                     {selectedExaminer.firstName} {selectedExaminer.lastName}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {selectedExaminer.specialization || "No specialization"}
+                    {selectedExaminer.specialization || t.examiners.noSpecialization}
                   </p>
                   <Badge className={`${statusColors[selectedExaminer.status || 'pending']} mt-2`}>
-                    {selectedExaminer.status}
+                    {selectedExaminer.status === 'pending' ? t.common.pending :
+                     selectedExaminer.status === 'verified' ? t.examiners.verified :
+                     selectedExaminer.status === 'active' ? t.common.active :
+                     t.common.inactive}
                   </Badge>
                 </div>
               </div>
@@ -582,14 +586,14 @@ export default function Examiners() {
 
                 <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-md">
                   <div className="text-center">
-                    <p className="text-2xl font-semibold">{selectedExaminer.totalScriptsMarked || 0}</p>
-                    <p className="text-xs text-muted-foreground">Scripts Marked</p>
+                    <p className="text-2xl font-semibold">{(selectedExaminer.totalScriptsMarked || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
+                    <p className="text-xs text-muted-foreground">{t.examiners.scriptsMarked}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-semibold text-chart-3">
                       {formatCurrency(selectedExaminer.totalAllowance)}
                     </p>
-                    <p className="text-xs text-muted-foreground">Total Allowance</p>
+                    <p className="text-xs text-muted-foreground">{t.examiners.totalAllowance}</p>
                   </div>
                 </div>
               </div>
@@ -597,11 +601,11 @@ export default function Examiners() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
-              Close
+              {t.common.close}
             </Button>
             <Button variant="outline">
-              <FileCheck className="w-4 h-4 mr-2" />
-              View Assignments
+              <FileCheck className="w-4 h-4 me-2" />
+              {t.examiners.viewAssignments}
             </Button>
           </DialogFooter>
         </DialogContent>

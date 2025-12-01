@@ -131,15 +131,17 @@ export default function Transcripts() {
       queryClient.invalidateQueries({ queryKey: [`/api/students?schoolId=${selectedSchool}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/transcripts"] });
       toast({
-        title: "Transcripts Generated",
-        description: `${selectedStudents.length} transcript(s) generated successfully.`,
+        title: isRTL ? "تم إنشاء السجلات" : "Transcripts Generated",
+        description: isRTL 
+          ? `تم إنشاء ${selectedStudents.length} سجل بنجاح.`
+          : `${selectedStudents.length} transcript(s) generated successfully.`,
       });
       setSelectedStudents([]);
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to generate transcripts. Please try again.",
+        title: t.common.error,
+        description: isRTL ? "فشل إنشاء السجلات. يرجى المحاولة مرة أخرى." : "Failed to generate transcripts. Please try again.",
         variant: "destructive",
       });
     },
@@ -153,14 +155,14 @@ export default function Transcripts() {
       queryClient.invalidateQueries({ queryKey: [`/api/students?schoolId=${selectedSchool}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/transcripts"] });
       toast({
-        title: "All Transcripts Generated",
-        description: "All student transcripts for this school have been generated.",
+        title: isRTL ? "تم إنشاء جميع السجلات" : "All Transcripts Generated",
+        description: isRTL ? "تم إنشاء سجلات جميع الطلاب لهذه المدرسة." : "All student transcripts for this school have been generated.",
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to generate transcripts. Please try again.",
+        title: t.common.error,
+        description: isRTL ? "فشل إنشاء السجلات. يرجى المحاولة مرة أخرى." : "Failed to generate transcripts. Please try again.",
         variant: "destructive",
       });
     },
@@ -194,8 +196,8 @@ export default function Transcripts() {
   const handlePrintSelected = () => {
     if (selectedStudents.length === 0) {
       toast({
-        title: "No Selection",
-        description: "Please select at least one student to print transcripts.",
+        title: isRTL ? "لا يوجد اختيار" : "No Selection",
+        description: isRTL ? "يرجى اختيار طالب واحد على الأقل لطباعة السجلات." : "Please select at least one student to print transcripts.",
         variant: "destructive",
       });
       return;
@@ -204,12 +206,12 @@ export default function Transcripts() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Transcripts</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{t.transcripts.title}</h1>
           <p className="text-muted-foreground mt-1">
-            Generate and print student academic transcripts
+            {isRTL ? "إنشاء وطباعة السجلات الأكاديمية للطلاب" : "Generate and print student academic transcripts"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -219,25 +221,25 @@ export default function Transcripts() {
             disabled={selectedStudents.length === 0 || generateTranscriptMutation.isPending}
             data-testid="button-print-selected"
           >
-            <Printer className="w-4 h-4 mr-2" />
-            Print Selected ({selectedStudents.length})
+            <Printer className="w-4 h-4 me-2" />
+            {isRTL ? `طباعة المحدد (${selectedStudents.length})` : `Print Selected (${selectedStudents.length})`}
           </Button>
           <Button
             onClick={() => generateAllMutation.mutate()}
             disabled={!selectedSchool || generateAllMutation.isPending}
             data-testid="button-print-all"
           >
-            <Download className="w-4 h-4 mr-2" />
-            Generate All for School
+            <Download className="w-4 h-4 me-2" />
+            {isRTL ? "إنشاء الكل للمدرسة" : "Generate All for School"}
           </Button>
         </div>
       </div>
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Filter Students</CardTitle>
+          <CardTitle className="text-lg">{isRTL ? "تصفية الطلاب" : "Filter Students"}</CardTitle>
           <CardDescription>
-            Select region, cluster, and school to view students
+            {isRTL ? "حدد المنطقة والمجموعة والمدرسة لعرض الطلاب" : "Select region, cluster, and school to view students"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -245,7 +247,7 @@ export default function Transcripts() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-muted-foreground" />
-                Region
+                {t.schools.region}
               </label>
               <Select value={selectedRegion} onValueChange={(value) => {
                 setSelectedRegion(value);
@@ -254,7 +256,7 @@ export default function Transcripts() {
                 setSelectedStudents([]);
               }}>
                 <SelectTrigger data-testid="select-region">
-                  <SelectValue placeholder="Select Region" />
+                  <SelectValue placeholder={isRTL ? "اختر المنطقة" : "Select Region"} />
                 </SelectTrigger>
                 <SelectContent>
                   {regions?.map(region => (
@@ -269,7 +271,7 @@ export default function Transcripts() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-muted-foreground" />
-                Cluster
+                {t.schools.cluster}
               </label>
               <Select 
                 value={selectedCluster} 
@@ -281,7 +283,7 @@ export default function Transcripts() {
                 disabled={!selectedRegion}
               >
                 <SelectTrigger data-testid="select-cluster">
-                  <SelectValue placeholder="Select Cluster" />
+                  <SelectValue placeholder={isRTL ? "اختر المجموعة" : "Select Cluster"} />
                 </SelectTrigger>
                 <SelectContent>
                   {filteredClusters.map(cluster => (
@@ -296,7 +298,7 @@ export default function Transcripts() {
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <School className="w-4 h-4 text-muted-foreground" />
-                School
+                {t.schools.title}
               </label>
               <Select 
                 value={selectedSchool} 
@@ -307,7 +309,7 @@ export default function Transcripts() {
                 disabled={!selectedRegion}
               >
                 <SelectTrigger data-testid="select-school">
-                  <SelectValue placeholder="Select School" />
+                  <SelectValue placeholder={isRTL ? "اختر المدرسة" : "Select School"} />
                 </SelectTrigger>
                 <SelectContent>
                   {filteredSchools.map(school => (
@@ -327,7 +329,7 @@ export default function Transcripts() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Students</p>
+                <p className="text-sm text-muted-foreground">{isRTL ? "إجمالي الطلاب" : "Total Students"}</p>
                 <p className="text-2xl font-semibold">{students?.length || 0}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
@@ -340,7 +342,7 @@ export default function Transcripts() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Selected</p>
+                <p className="text-sm text-muted-foreground">{isRTL ? "المحدد" : "Selected"}</p>
                 <p className="text-2xl font-semibold text-chart-2">{selectedStudents.length}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-2/10 flex items-center justify-center">
@@ -353,8 +355,8 @@ export default function Transcripts() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Exam Year</p>
-                <p className="text-lg font-semibold">{activeExamYear?.name || "N/A"}</p>
+                <p className="text-sm text-muted-foreground">{t.examYears.title}</p>
+                <p className="text-lg font-semibold">{activeExamYear?.name || (isRTL ? "غير متوفر" : "N/A")}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
                 <FileText className="w-5 h-5 text-chart-3" />
@@ -366,9 +368,9 @@ export default function Transcripts() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">School</p>
+                <p className="text-sm text-muted-foreground">{t.schools.title}</p>
                 <p className="text-sm font-medium truncate max-w-[120px]">
-                  {filteredSchools.find(s => s.id.toString() === selectedSchool)?.name || "None"}
+                  {filteredSchools.find(s => s.id.toString() === selectedSchool)?.name || (isRTL ? "لا يوجد" : "None")}
                 </p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-5/10 flex items-center justify-center">
@@ -381,11 +383,13 @@ export default function Transcripts() {
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div>
-              <CardTitle className="text-lg">Student List</CardTitle>
+              <CardTitle className="text-lg">{isRTL ? "قائمة الطلاب" : "Student List"}</CardTitle>
               <CardDescription>
-                {selectedSchool ? `${students?.length || 0} students found` : "Select a school to view students"}
+                {selectedSchool 
+                  ? (isRTL ? `${students?.length || 0} طالب موجود` : `${students?.length || 0} students found`) 
+                  : (isRTL ? "اختر مدرسة لعرض الطلاب" : "Select a school to view students")}
               </CardDescription>
             </div>
           </div>
@@ -394,9 +398,9 @@ export default function Transcripts() {
           {!selectedSchool ? (
             <div className="text-center py-12">
               <School className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No School Selected</h3>
+              <h3 className="text-lg font-medium mb-2">{isRTL ? "لم يتم اختيار مدرسة" : "No School Selected"}</h3>
               <p className="text-muted-foreground">
-                Please select a region, cluster, and school to view students
+                {isRTL ? "يرجى اختيار منطقة ومجموعة ومدرسة لعرض الطلاب" : "Please select a region, cluster, and school to view students"}
               </p>
             </div>
           ) : studentsLoading ? (
@@ -413,12 +417,12 @@ export default function Transcripts() {
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Index Number</TableHead>
-                    <TableHead>Grade</TableHead>
-                    <TableHead>Gender</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t.students.title}</TableHead>
+                    <TableHead>{isRTL ? "رقم الفهرس" : "Index Number"}</TableHead>
+                    <TableHead>{isRTL ? "الصف" : "Grade"}</TableHead>
+                    <TableHead>{isRTL ? "الجنس" : "Gender"}</TableHead>
+                    <TableHead>{t.common.status}</TableHead>
+                    <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -443,31 +447,39 @@ export default function Transcripts() {
                                 {student.firstName} {student.lastName}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : "N/A"}
+                                {student.dateOfBirth 
+                                  ? new Date(student.dateOfBirth).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US') 
+                                  : (isRTL ? "غير متوفر" : "N/A")}
                               </p>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell>
                           <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                            {student.indexNumber || "Pending"}
+                            {student.indexNumber || (isRTL ? "قيد الانتظار" : "Pending")}
                           </code>
                         </TableCell>
-                        <TableCell>Grade {student.grade}</TableCell>
-                        <TableCell className="capitalize">{student.gender}</TableCell>
+                        <TableCell>{isRTL ? `الصف ${student.grade}` : `Grade ${student.grade}`}</TableCell>
+                        <TableCell className="capitalize">{student.gender === 'male' ? (isRTL ? 'ذكر' : 'male') : (isRTL ? 'أنثى' : 'female')}</TableCell>
                         <TableCell>
                           {transcript ? (
                             <Badge variant="default" className="bg-chart-3/10 text-chart-3">
-                              Generated
+                              {isRTL ? "تم الإنشاء" : "Generated"}
                             </Badge>
                           ) : (
                             <Badge variant="secondary">
-                              {student.status}
+                              {student.status === 'approved' 
+                                ? (isRTL ? 'معتمد' : 'Approved') 
+                                : student.status === 'pending' 
+                                  ? t.common.pending 
+                                  : student.status === 'rejected'
+                                    ? (isRTL ? 'مرفوض' : 'Rejected')
+                                    : t.common.pending}
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
+                        <TableCell className={isRTL ? "text-left" : "text-right"}>
+                          <div className={`flex items-center gap-2 ${isRTL ? "justify-start" : "justify-end"}`}>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -511,9 +523,9 @@ export default function Transcripts() {
           ) : (
             <div className="text-center py-12">
               <User className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No Students Found</h3>
+              <h3 className="text-lg font-medium mb-2">{isRTL ? "لم يتم العثور على طلاب" : "No Students Found"}</h3>
               <p className="text-muted-foreground">
-                This school has no registered students
+                {isRTL ? "هذه المدرسة ليس بها طلاب مسجلين" : "This school has no registered students"}
               </p>
             </div>
           )}
@@ -523,46 +535,48 @@ export default function Transcripts() {
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Transcript Preview</DialogTitle>
+            <DialogTitle>{isRTL ? "معاينة السجل الأكاديمي" : "Transcript Preview"}</DialogTitle>
             <DialogDescription>
-              Preview transcript for {previewStudent?.firstName} {previewStudent?.lastName}
+              {isRTL 
+                ? `معاينة سجل ${previewStudent?.firstName} ${previewStudent?.lastName}`
+                : `Preview transcript for ${previewStudent?.firstName} ${previewStudent?.lastName}`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="border rounded-lg p-6 bg-muted/30">
               <div className="text-center mb-6">
-                <h2 className="text-xl font-bold">ACADEMIC TRANSCRIPT</h2>
-                <p className="text-sm text-muted-foreground">Amaanah Examination Board</p>
+                <h2 className="text-xl font-bold">{isRTL ? "السجل الأكاديمي" : "ACADEMIC TRANSCRIPT"}</h2>
+                <p className="text-sm text-muted-foreground">{isRTL ? "مجلس أمانة للامتحانات" : "Amaanah Examination Board"}</p>
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm mb-6">
                 <div>
-                  <p className="text-muted-foreground">Student Name</p>
+                  <p className="text-muted-foreground">{isRTL ? "اسم الطالب" : "Student Name"}</p>
                   <p className="font-medium">{previewStudent?.firstName} {previewStudent?.lastName}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Index Number</p>
-                  <p className="font-medium">{previewStudent?.indexNumber || "N/A"}</p>
+                  <p className="text-muted-foreground">{isRTL ? "رقم الفهرس" : "Index Number"}</p>
+                  <p className="font-medium">{previewStudent?.indexNumber || (isRTL ? "غير متوفر" : "N/A")}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Grade Level</p>
-                  <p className="font-medium">Grade {previewStudent?.grade}</p>
+                  <p className="text-muted-foreground">{isRTL ? "مستوى الصف" : "Grade Level"}</p>
+                  <p className="font-medium">{isRTL ? `الصف ${previewStudent?.grade}` : `Grade ${previewStudent?.grade}`}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Exam Year</p>
-                  <p className="font-medium">{activeExamYear?.name || "N/A"}</p>
+                  <p className="text-muted-foreground">{t.examYears.title}</p>
+                  <p className="font-medium">{activeExamYear?.name || (isRTL ? "غير متوفر" : "N/A")}</p>
                 </div>
               </div>
               <div className="border-t pt-4">
-                <h3 className="font-medium mb-2">Subject Results</h3>
+                <h3 className="font-medium mb-2">{isRTL ? "نتائج المواد" : "Subject Results"}</h3>
                 <p className="text-sm text-muted-foreground italic">
-                  Results will be displayed here once published
+                  {isRTL ? "سيتم عرض النتائج هنا بعد نشرها" : "Results will be displayed here once published"}
                 </p>
               </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>
-              Close
+              {t.common.close}
             </Button>
             <Button onClick={() => {
               if (previewStudent) {
@@ -570,8 +584,8 @@ export default function Transcripts() {
               }
               setShowPreviewDialog(false);
             }}>
-              <Printer className="w-4 h-4 mr-2" />
-              Print Transcript
+              <Printer className="w-4 h-4 me-2" />
+              {isRTL ? "طباعة السجل" : "Print Transcript"}
             </Button>
           </DialogFooter>
         </DialogContent>

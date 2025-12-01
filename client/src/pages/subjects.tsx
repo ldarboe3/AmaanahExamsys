@@ -133,16 +133,16 @@ export default function Subjects() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/subjects"] });
       toast({
-        title: "Subject Created",
-        description: "The subject has been created successfully.",
+        title: t.subjects.subjectCreated,
+        description: t.subjects.subjectCreatedDesc,
       });
       setShowDialog(false);
       form.reset();
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create subject",
+        title: t.common.error,
+        description: error.message || t.subjects.failedToCreate,
         variant: "destructive",
       });
     },
@@ -155,8 +155,8 @@ export default function Subjects() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/subjects"] });
       toast({
-        title: "Subject Updated",
-        description: "The subject has been updated successfully.",
+        title: t.subjects.subjectUpdated,
+        description: t.subjects.subjectUpdatedDesc,
       });
       setShowDialog(false);
       setEditingSubject(null);
@@ -164,8 +164,8 @@ export default function Subjects() {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update subject",
+        title: t.common.error,
+        description: error.message || t.subjects.failedToUpdate,
         variant: "destructive",
       });
     },
@@ -178,16 +178,16 @@ export default function Subjects() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/subjects"] });
       toast({
-        title: "Subject Deleted",
-        description: "The subject has been deleted successfully.",
+        title: t.subjects.subjectDeleted,
+        description: t.subjects.subjectDeletedDesc,
       });
       setShowDeleteDialog(false);
       setSubjectToDelete(null);
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete subject",
+        title: t.common.error,
+        description: error.message || t.subjects.failedToDelete,
         variant: "destructive",
       });
     },
@@ -200,14 +200,14 @@ export default function Subjects() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/subjects"] });
       toast({
-        title: "Status Updated",
-        description: "Subject status has been updated.",
+        title: t.subjects.subjectUpdated,
+        description: t.subjects.subjectUpdatedDesc,
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update status",
+        title: t.common.error,
+        description: error.message || t.subjects.failedToUpdate,
         variant: "destructive",
       });
     },
@@ -266,17 +266,17 @@ export default function Subjects() {
   }, {} as Record<number, Subject[]>);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Subjects Management</h1>
+          <h1 className="text-2xl font-semibold">{t.subjects.title}</h1>
           <p className="text-muted-foreground">
-            Manage examination subjects for all grades
+            {t.subjects.manageDescription}
           </p>
         </div>
         <Button onClick={openCreateDialog} data-testid="button-add-subject">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Subject
+          <Plus className="w-4 h-4 me-2" />
+          {t.subjects.addSubject}
         </Button>
       </div>
 
@@ -284,21 +284,21 @@ export default function Subjects() {
         <CardHeader className="pb-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground ${isRTL ? 'right-3' : 'left-3'}`} />
               <Input
-                placeholder="Search subjects..."
+                placeholder={t.subjects.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className={isRTL ? "pr-9" : "pl-9"}
                 data-testid="input-search-subjects"
               />
             </div>
             <Select value={gradeFilter} onValueChange={setGradeFilter}>
               <SelectTrigger className="w-[180px]" data-testid="select-grade-filter">
-                <SelectValue placeholder="Filter by grade" />
+                <SelectValue placeholder={t.subjects.grade} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Grades</SelectItem>
+                <SelectItem value="all">{t.subjects.allGrades}</SelectItem>
                 <SelectItem value="3">Grade 3 (LBS)</SelectItem>
                 <SelectItem value="6">Grade 6 (UBS)</SelectItem>
                 <SelectItem value="9">Grade 9 (BCS)</SelectItem>
@@ -313,16 +313,16 @@ export default function Subjects() {
           ) : !filteredSubjects?.length ? (
             <div className="text-center py-12">
               <BookOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">No subjects found</h3>
+              <h3 className="text-lg font-medium">{t.subjects.noSubjectsFound}</h3>
               <p className="text-muted-foreground mb-4">
                 {searchQuery || gradeFilter !== "all"
-                  ? "Try adjusting your search or filter"
-                  : "Get started by adding a subject"}
+                  ? t.subjects.tryAdjustSearch
+                  : t.subjects.addFirstSubject}
               </p>
               {!searchQuery && gradeFilter === "all" && (
                 <Button onClick={openCreateDialog}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Subject
+                  <Plus className="w-4 h-4 me-2" />
+                  {t.subjects.addSubject}
                 </Button>
               )}
             </div>
@@ -338,12 +338,12 @@ export default function Subjects() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Code</TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Arabic Name</TableHead>
-                          <TableHead>Max Score</TableHead>
-                          <TableHead>Passing Score</TableHead>
-                          <TableHead>Status</TableHead>
+                          <TableHead>{t.subjects.subjectCode}</TableHead>
+                          <TableHead>{t.subjects.subjectName}</TableHead>
+                          <TableHead>{t.subjects.arabicName}</TableHead>
+                          <TableHead>{t.subjects.maxScore}</TableHead>
+                          <TableHead>{t.subjects.passingScore}</TableHead>
+                          <TableHead>{t.common.status}</TableHead>
                           <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -355,8 +355,8 @@ export default function Subjects() {
                             <TableCell dir="rtl" className="font-arabic">
                               {subject.arabicName || "-"}
                             </TableCell>
-                            <TableCell>{subject.maxScore}</TableCell>
-                            <TableCell>{subject.passingScore}</TableCell>
+                            <TableCell>{(subject.maxScore || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</TableCell>
+                            <TableCell>{(subject.passingScore || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</TableCell>
                             <TableCell>
                               <Badge
                                 variant="outline"
@@ -368,13 +368,13 @@ export default function Subjects() {
                               >
                                 {subject.isActive ? (
                                   <>
-                                    <CheckCircle className="w-3 h-3 mr-1" />
-                                    Active
+                                    <CheckCircle className="w-3 h-3 me-1" />
+                                    {t.common.active}
                                   </>
                                 ) : (
                                   <>
-                                    <XCircle className="w-3 h-3 mr-1" />
-                                    Inactive
+                                    <XCircle className="w-3 h-3 me-1" />
+                                    {t.common.inactive}
                                   </>
                                 )}
                               </Badge>
@@ -390,10 +390,10 @@ export default function Subjects() {
                                     <MoreVertical className="w-4 h-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
+                                <DropdownMenuContent align={isRTL ? "start" : "end"}>
                                   <DropdownMenuItem onClick={() => openEditDialog(subject)}>
-                                    <Edit className="w-4 h-4 mr-2" />
-                                    Edit
+                                    <Edit className="w-4 h-4 me-2" />
+                                    {t.common.edit}
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() =>
@@ -405,13 +405,13 @@ export default function Subjects() {
                                   >
                                     {subject.isActive ? (
                                       <>
-                                        <XCircle className="w-4 h-4 mr-2" />
-                                        Deactivate
+                                        <XCircle className="w-4 h-4 me-2" />
+                                        {t.common.deactivate}
                                       </>
                                     ) : (
                                       <>
-                                        <CheckCircle className="w-4 h-4 mr-2" />
-                                        Activate
+                                        <CheckCircle className="w-4 h-4 me-2" />
+                                        {t.common.activate}
                                       </>
                                     )}
                                   </DropdownMenuItem>
@@ -423,8 +423,8 @@ export default function Subjects() {
                                       setShowDeleteDialog(true);
                                     }}
                                   >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Delete
+                                    <Trash2 className="w-4 h-4 me-2" />
+                                    {t.common.delete}
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -441,15 +441,15 @@ export default function Subjects() {
       </Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px]" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
             <DialogTitle>
-              {editingSubject ? "Edit Subject" : "Add Subject"}
+              {editingSubject ? t.subjects.editSubject : t.subjects.addNewSubject}
             </DialogTitle>
             <DialogDescription>
               {editingSubject
-                ? "Update the subject details below."
-                : "Create a new examination subject."}
+                ? t.subjects.editSubjectDesc
+                : t.subjects.addNewSubjectDesc}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -460,7 +460,7 @@ export default function Subjects() {
                   name="code"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Subject Code</FormLabel>
+                      <FormLabel>{t.subjects.subjectCode}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="e.g., ARA01"
@@ -477,14 +477,14 @@ export default function Subjects() {
                   name="grade"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Grade Level</FormLabel>
+                      <FormLabel>{t.subjects.grade}</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         value={field.value?.toString()}
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-grade">
-                            <SelectValue placeholder="Select grade" />
+                            <SelectValue placeholder={t.subjects.grade} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -504,7 +504,7 @@ export default function Subjects() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Subject Name (English)</FormLabel>
+                    <FormLabel>{t.subjects.subjectName}</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="e.g., Arabic Language"
@@ -521,7 +521,7 @@ export default function Subjects() {
                 name="arabicName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Subject Name (Arabic)</FormLabel>
+                    <FormLabel>{t.subjects.arabicName}</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="اللغة العربية"
@@ -541,7 +541,7 @@ export default function Subjects() {
                   name="maxScore"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Maximum Score</FormLabel>
+                      <FormLabel>{t.subjects.maxScore}</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -558,7 +558,7 @@ export default function Subjects() {
                   name="passingScore"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Passing Score</FormLabel>
+                      <FormLabel>{t.subjects.passingScore}</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -577,9 +577,9 @@ export default function Subjects() {
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base">Active</FormLabel>
+                      <FormLabel className="text-base">{t.common.active}</FormLabel>
                       <p className="text-sm text-muted-foreground">
-                        Subject will be available for examination
+                        {t.subjects.manageDescription}
                       </p>
                     </div>
                     <FormControl>
@@ -598,7 +598,7 @@ export default function Subjects() {
                   variant="outline"
                   onClick={() => setShowDialog(false)}
                 >
-                  Cancel
+                  {t.common.cancel}
                 </Button>
                 <Button
                   type="submit"
@@ -606,10 +606,10 @@ export default function Subjects() {
                   data-testid="button-save-subject"
                 >
                   {createMutation.isPending || updateMutation.isPending
-                    ? "Saving..."
+                    ? t.subjects.saving
                     : editingSubject
-                    ? "Update Subject"
-                    : "Create Subject"}
+                    ? t.subjects.editSubject
+                    : t.subjects.createSubject}
                 </Button>
               </DialogFooter>
             </form>
@@ -618,12 +618,11 @@ export default function Subjects() {
       </Dialog>
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
+        <DialogContent dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>Delete Subject</DialogTitle>
+            <DialogTitle>{t.subjects.deleteSubject}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{subjectToDelete?.name}"? This action
-              cannot be undone.
+              {t.subjects.deleteSubjectConfirm}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -631,7 +630,7 @@ export default function Subjects() {
               variant="outline"
               onClick={() => setShowDeleteDialog(false)}
             >
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button
               variant="destructive"
@@ -639,7 +638,7 @@ export default function Subjects() {
               disabled={deleteMutation.isPending}
               data-testid="button-confirm-delete"
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteMutation.isPending ? t.common.deleting : t.common.delete}
             </Button>
           </DialogFooter>
         </DialogContent>

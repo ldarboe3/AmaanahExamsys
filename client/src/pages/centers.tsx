@@ -94,12 +94,16 @@ function CenterCard({
   center, 
   onEdit, 
   onViewDetails, 
-  onDelete 
+  onDelete,
+  isRTL,
+  t
 }: { 
   center: CenterWithRelations; 
   onEdit: () => void;
   onViewDetails: () => void;
   onDelete: () => void;
+  isRTL: boolean;
+  t: any;
 }) {
   return (
     <Card className="hover-elevate">
@@ -112,7 +116,7 @@ function CenterCard({
             <div>
               <CardTitle className="text-base">{center.name}</CardTitle>
               <CardDescription className="text-sm">
-                Code: {center.code}
+                {t.common.code}: {center.code}
               </CardDescription>
             </div>
           </div>
@@ -122,19 +126,19 @@ function CenterCard({
                 <MoreVertical className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align={isRTL ? "start" : "end"}>
               <DropdownMenuItem onClick={onEdit}>
-                <Edit className="w-4 h-4 mr-2" />
-                Edit
+                <Edit className="w-4 h-4 me-2" />
+                {t.common.edit}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onViewDetails}>
-                <Eye className="w-4 h-4 mr-2" />
-                View Details
+                <Eye className="w-4 h-4 me-2" />
+                {t.centers.viewDetails}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
+                <Trash2 className="w-4 h-4 me-2" />
+                {t.common.delete}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -144,7 +148,7 @@ function CenterCard({
         <div className="space-y-3 text-sm">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Building2 className="w-4 h-4" />
-            <span>{center.region?.name || "No Region"} / {center.cluster?.name || "No Cluster"}</span>
+            <span>{center.region?.name || t.centers.noRegion} / {center.cluster?.name || t.centers.noCluster}</span>
           </div>
           {center.address && (
             <div className="flex items-start gap-2 text-muted-foreground">
@@ -162,22 +166,22 @@ function CenterCard({
 
         <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
           <div className="text-center">
-            <p className="text-lg font-semibold text-foreground">{center.capacity}</p>
-            <p className="text-xs text-muted-foreground">Capacity</p>
+            <p className="text-lg font-semibold text-foreground">{center.capacity?.toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
+            <p className="text-xs text-muted-foreground">{t.centers.capacity}</p>
           </div>
           <div className="text-center">
-            <p className="text-lg font-semibold text-foreground">{center.assignedSchoolsCount || 0}</p>
-            <p className="text-xs text-muted-foreground">Schools</p>
+            <p className="text-lg font-semibold text-foreground">{(center.assignedSchoolsCount || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
+            <p className="text-xs text-muted-foreground">{t.schools.title}</p>
           </div>
           <div className="text-center">
-            <p className="text-lg font-semibold text-foreground">{center.assignedStudentsCount || 0}</p>
-            <p className="text-xs text-muted-foreground">Students</p>
+            <p className="text-lg font-semibold text-foreground">{(center.assignedStudentsCount || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
+            <p className="text-xs text-muted-foreground">{t.students.title}</p>
           </div>
         </div>
 
         <div className="mt-4">
           <Badge variant={center.isActive ? "default" : "secondary"} className="text-xs">
-            {center.isActive ? "Active" : "Inactive"}
+            {center.isActive ? t.common.active : t.common.inactive}
           </Badge>
         </div>
       </CardContent>
@@ -285,14 +289,14 @@ export default function Centers() {
       setShowCreateDialog(false);
       form.reset();
       toast({
-        title: "Center Created",
-        description: "The examination center has been created successfully.",
+        title: t.centers.centerCreated,
+        description: t.centers.centerCreatedDesc,
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to create center. Please try again.",
+        title: t.common.error,
+        description: t.centers.failedToCreate,
         variant: "destructive",
       });
     },
@@ -308,14 +312,14 @@ export default function Centers() {
       setSelectedCenter(null);
       form.reset();
       toast({
-        title: "Center Updated",
-        description: "The examination center has been updated successfully.",
+        title: t.centers.centerUpdated,
+        description: t.centers.centerUpdatedDesc,
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to update center. Please try again.",
+        title: t.common.error,
+        description: t.centers.failedToUpdate,
         variant: "destructive",
       });
     },
@@ -330,14 +334,14 @@ export default function Centers() {
       setShowDeleteDialog(false);
       setSelectedCenter(null);
       toast({
-        title: "Center Deleted",
-        description: "The examination center has been deleted successfully.",
+        title: t.centers.centerDeleted,
+        description: t.centers.centerDeletedDesc,
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to delete center. Please try again.",
+        title: t.common.error,
+        description: t.centers.failedToDelete,
         variant: "destructive",
       });
     },
@@ -386,18 +390,18 @@ export default function Centers() {
   const totalAssigned = centers?.reduce((sum, c) => sum + (c.assignedStudentsCount || 0), 0) || 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Examination Centers</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{t.centers.title}</h1>
           <p className="text-muted-foreground mt-1">
-            Manage exam centers and school assignments
+            {t.centers.manageDescription}
           </p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)} data-testid="button-add-center">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Center
+          <Plus className="w-4 h-4 me-2" />
+          {t.centers.addCenter}
         </Button>
       </div>
 
@@ -407,8 +411,8 @@ export default function Centers() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Centers</p>
-                <p className="text-2xl font-semibold">{centers?.length || 0}</p>
+                <p className="text-sm text-muted-foreground">{t.centers.totalCenters}</p>
+                <p className="text-2xl font-semibold">{(centers?.length || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
                 <MapPin className="w-5 h-5 text-primary" />
@@ -420,8 +424,8 @@ export default function Centers() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Capacity</p>
-                <p className="text-2xl font-semibold">{totalCapacity.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">{t.centers.totalCapacity}</p>
+                <p className="text-2xl font-semibold">{totalCapacity.toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-2/10 flex items-center justify-center">
                 <Users className="w-5 h-5 text-chart-2" />
@@ -433,8 +437,8 @@ export default function Centers() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Students Assigned</p>
-                <p className="text-2xl font-semibold">{totalAssigned.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">{t.centers.studentsAssigned}</p>
+                <p className="text-2xl font-semibold">{totalAssigned.toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
                 <Users className="w-5 h-5 text-chart-3" />
@@ -446,9 +450,9 @@ export default function Centers() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Active</p>
+                <p className="text-sm text-muted-foreground">{t.common.active}</p>
                 <p className="text-2xl font-semibold">
-                  {centers?.filter(c => c.isActive).length || 0}
+                  {(centers?.filter(c => c.isActive).length || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
                 </p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-4/10 flex items-center justify-center">
@@ -464,12 +468,12 @@ export default function Centers() {
         <CardContent className="p-4">
           <div className="flex flex-col gap-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground ${isRTL ? 'right-3' : 'left-3'}`} />
               <Input
-                placeholder="Search centers by name or code..."
+                placeholder={t.centers.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className={isRTL ? "pr-9" : "pl-9"}
                 data-testid="input-search-centers"
               />
             </div>
@@ -479,10 +483,10 @@ export default function Centers() {
                 setClusterFilter("all");
               }}>
                 <SelectTrigger className="w-[160px]" data-testid="select-region-filter">
-                  <SelectValue placeholder="Region" />
+                  <SelectValue placeholder={t.schools.region} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Regions</SelectItem>
+                  <SelectItem value="all">{t.common.allRegions}</SelectItem>
                   {regions?.map((region) => (
                     <SelectItem key={region.id} value={region.id.toString()}>
                       {region.name}
@@ -492,10 +496,12 @@ export default function Centers() {
               </Select>
               <Select value={clusterFilter} onValueChange={setClusterFilter} disabled={regionFilter === "all"}>
                 <SelectTrigger className="w-[160px]" data-testid="select-cluster-filter">
-                  <SelectValue placeholder={regionFilter === "all" ? "Select Region First" : "Cluster"} />
+                  <SelectValue placeholder={regionFilter === "all" 
+                    ? t.common.selectRegionFirst 
+                    : t.schools.cluster} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Clusters</SelectItem>
+                  <SelectItem value="all">{t.common.allClusters}</SelectItem>
                   {clustersForFilter?.map((cluster) => (
                     <SelectItem key={cluster.id} value={cluster.id.toString()}>
                       {cluster.name}
@@ -524,6 +530,8 @@ export default function Centers() {
               onEdit={() => openEditDialog(center)}
               onViewDetails={() => openViewDetails(center)}
               onDelete={() => openDeleteDialog(center)}
+              isRTL={isRTL}
+              t={t}
             />
           ))
         ) : (
@@ -531,15 +539,13 @@ export default function Centers() {
             <Card>
               <CardContent className="py-12 text-center">
                 <MapPin className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No centers found</h3>
+                <h3 className="text-lg font-medium mb-2">{t.centers.noCentersFound}</h3>
                 <p className="text-muted-foreground mb-4">
-                  {searchQuery
-                    ? "Try adjusting your search"
-                    : "Add your first examination center"}
+                  {searchQuery ? t.centers.tryAdjustSearch : t.centers.addFirstCenter}
                 </p>
                 <Button onClick={() => setShowCreateDialog(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Center
+                  <Plus className="w-4 h-4 me-2" />
+                  {t.centers.addCenter}
                 </Button>
               </CardContent>
             </Card>
@@ -549,11 +555,11 @@ export default function Centers() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>Add Examination Center</DialogTitle>
+            <DialogTitle>{t.centers.addCenter}</DialogTitle>
             <DialogDescription>
-              Create a new examination center
+              {t.centers.createNewCenter}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -564,9 +570,9 @@ export default function Centers() {
                   name="name"
                   render={({ field }) => (
                     <FormItem className="col-span-2">
-                      <FormLabel>Center Name</FormLabel>
+                      <FormLabel>{t.centers.centerName}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Central High School" {...field} data-testid="input-center-name" />
+                        <Input placeholder={t.centers.centerName} {...field} data-testid="input-center-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -577,7 +583,7 @@ export default function Centers() {
                   name="code"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Code</FormLabel>
+                      <FormLabel>{t.common.code}</FormLabel>
                       <FormControl>
                         <Input placeholder="CHS001" {...field} data-testid="input-center-code" />
                       </FormControl>
@@ -590,7 +596,7 @@ export default function Centers() {
                   name="capacity"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Capacity</FormLabel>
+                      <FormLabel>{t.centers.capacity}</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} data-testid="input-capacity" />
                       </FormControl>
@@ -605,9 +611,9 @@ export default function Centers() {
                 name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Address</FormLabel>
+                    <FormLabel>{t.common.address}</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Full address..." {...field} data-testid="input-address" />
+                      <Textarea placeholder={t.centers.fullAddress} {...field} data-testid="input-address" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -620,11 +626,11 @@ export default function Centers() {
                   name="regionId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Region</FormLabel>
+                      <FormLabel>{t.schools.region}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value?.toString()}>
                         <FormControl>
                           <SelectTrigger data-testid="select-region">
-                            <SelectValue placeholder="Select region" />
+                            <SelectValue placeholder={t.centers.selectRegion} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -644,11 +650,11 @@ export default function Centers() {
                   name="clusterId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Cluster</FormLabel>
+                      <FormLabel>{t.schools.cluster}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value?.toString()}>
                         <FormControl>
                           <SelectTrigger data-testid="select-cluster">
-                            <SelectValue placeholder="Select cluster" />
+                            <SelectValue placeholder={t.centers.selectCluster} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -671,9 +677,9 @@ export default function Centers() {
                   name="contactPerson"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Contact Person</FormLabel>
+                      <FormLabel>{t.centers.contactPerson}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Name" {...field} data-testid="input-contact-person" />
+                        <Input placeholder={t.common.name} {...field} data-testid="input-contact-person" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -684,7 +690,7 @@ export default function Centers() {
                   name="contactPhone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone</FormLabel>
+                      <FormLabel>{t.common.phone}</FormLabel>
                       <FormControl>
                         <Input placeholder="+220 1234567" {...field} data-testid="input-contact-phone" />
                       </FormControl>
@@ -699,7 +705,7 @@ export default function Centers() {
                 name="contactEmail"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t.common.email}</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="contact@example.com" {...field} data-testid="input-contact-email" />
                     </FormControl>
@@ -710,10 +716,10 @@ export default function Centers() {
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
-                  Cancel
+                  {t.common.cancel}
                 </Button>
                 <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "Creating..." : "Create Center"}
+                  {createMutation.isPending ? t.centers.creating : t.centers.createCenter}
                 </Button>
               </DialogFooter>
             </form>
@@ -723,11 +729,11 @@ export default function Centers() {
 
       {/* Edit Center Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px]" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>Edit Examination Center</DialogTitle>
+            <DialogTitle>{t.centers.editCenter}</DialogTitle>
             <DialogDescription>
-              Update the details of this examination center.
+              {t.centers.updateDetails}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -738,9 +744,9 @@ export default function Centers() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Name</FormLabel>
+                      <FormLabel>{t.centers.centerName}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Center name" {...field} data-testid="input-edit-center-name" />
+                        <Input placeholder={t.centers.centerName} {...field} data-testid="input-edit-center-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -751,7 +757,7 @@ export default function Centers() {
                   name="code"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Code</FormLabel>
+                      <FormLabel>{t.common.code}</FormLabel>
                       <FormControl>
                         <Input placeholder="CHS001" {...field} data-testid="input-edit-center-code" />
                       </FormControl>
@@ -767,7 +773,7 @@ export default function Centers() {
                   name="capacity"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Capacity</FormLabel>
+                      <FormLabel>{t.centers.capacity}</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} data-testid="input-edit-capacity" />
                       </FormControl>
@@ -780,11 +786,11 @@ export default function Centers() {
                   name="regionId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Region</FormLabel>
+                      <FormLabel>{t.schools.region}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value?.toString()}>
                         <FormControl>
                           <SelectTrigger data-testid="select-edit-region">
-                            <SelectValue placeholder="Select region" />
+                            <SelectValue placeholder={t.centers.selectRegion} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -806,11 +812,11 @@ export default function Centers() {
                 name="clusterId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cluster</FormLabel>
+                    <FormLabel>{t.schools.cluster}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value?.toString()}>
                       <FormControl>
                         <SelectTrigger data-testid="select-edit-cluster">
-                          <SelectValue placeholder="Select cluster" />
+                          <SelectValue placeholder={t.centers.selectCluster} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -831,9 +837,9 @@ export default function Centers() {
                 name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Address</FormLabel>
+                    <FormLabel>{t.common.address}</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Full address..." {...field} data-testid="input-edit-address" />
+                      <Textarea placeholder={t.centers.fullAddress} {...field} data-testid="input-edit-address" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -846,9 +852,9 @@ export default function Centers() {
                   name="contactPerson"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Contact Person</FormLabel>
+                      <FormLabel>{t.centers.contactPerson}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Name" {...field} data-testid="input-edit-contact-person" />
+                        <Input placeholder={t.common.name} {...field} data-testid="input-edit-contact-person" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -859,7 +865,7 @@ export default function Centers() {
                   name="contactPhone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone</FormLabel>
+                      <FormLabel>{t.common.phone}</FormLabel>
                       <FormControl>
                         <Input placeholder="+220 1234567" {...field} data-testid="input-edit-contact-phone" />
                       </FormControl>
@@ -874,7 +880,7 @@ export default function Centers() {
                 name="contactEmail"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t.common.email}</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="contact@example.com" {...field} data-testid="input-edit-contact-email" />
                     </FormControl>
@@ -885,11 +891,11 @@ export default function Centers() {
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
-                  Cancel
+                  {t.common.cancel}
                 </Button>
                 <Button type="submit" disabled={updateMutation.isPending}>
-                  {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                  {updateMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+                  {updateMutation.isPending ? t.centers.saving : t.common.save}
                 </Button>
               </DialogFooter>
             </form>
@@ -899,11 +905,11 @@ export default function Centers() {
 
       {/* View Details Dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px]" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>Center Details</DialogTitle>
+            <DialogTitle>{t.centers.centerDetails}</DialogTitle>
             <DialogDescription>
-              Detailed information about this examination center.
+              {t.centers.detailedInfo}
             </DialogDescription>
           </DialogHeader>
           {selectedCenter && (
@@ -914,40 +920,40 @@ export default function Centers() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg">{selectedCenter.name}</h3>
-                  <p className="text-muted-foreground">Code: {selectedCenter.code}</p>
+                  <p className="text-muted-foreground">{t.common.code}: {selectedCenter.code}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 pt-4">
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Region</p>
-                  <p className="font-medium">{selectedCenter.region?.name || "N/A"}</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t.schools.region}</p>
+                  <p className="font-medium">{selectedCenter.region?.name || t.centers.noRegion}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Cluster</p>
-                  <p className="font-medium">{selectedCenter.cluster?.name || "N/A"}</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t.schools.cluster}</p>
+                  <p className="font-medium">{selectedCenter.cluster?.name || t.centers.noCluster}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Capacity</p>
-                  <p className="font-medium">{selectedCenter.capacity?.toLocaleString() || "N/A"}</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t.centers.capacity}</p>
+                  <p className="font-medium">{selectedCenter.capacity?.toLocaleString(isRTL ? 'ar-EG' : 'en-US') || t.centers.noRegion}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Status</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t.common.status}</p>
                   <Badge variant={selectedCenter.isActive ? "default" : "secondary"}>
-                    {selectedCenter.isActive ? "Active" : "Inactive"}
+                    {selectedCenter.isActive ? t.common.active : t.common.inactive}
                   </Badge>
                 </div>
               </div>
 
               {selectedCenter.address && (
                 <div className="pt-2">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Address</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">{t.common.address}</p>
                   <p className="font-medium">{selectedCenter.address}</p>
                 </div>
               )}
 
               <div className="border-t pt-4">
-                <p className="text-sm font-medium text-muted-foreground mb-2">Contact Information</p>
+                <p className="text-sm font-medium text-muted-foreground mb-2">{t.centers.contactInfo}</p>
                 <div className="space-y-2">
                   {selectedCenter.contactPerson && (
                     <div className="flex items-center gap-2">
@@ -972,26 +978,26 @@ export default function Centers() {
 
               <div className="border-t pt-4 grid grid-cols-2 gap-4">
                 <div className="text-center p-3 bg-muted/50 rounded-md">
-                  <p className="text-2xl font-bold">{selectedCenter.assignedSchoolsCount || 0}</p>
-                  <p className="text-sm text-muted-foreground">Schools Assigned</p>
+                  <p className="text-2xl font-bold">{(selectedCenter.assignedSchoolsCount || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
+                  <p className="text-sm text-muted-foreground">{t.centers.schoolsAssigned}</p>
                 </div>
                 <div className="text-center p-3 bg-muted/50 rounded-md">
-                  <p className="text-2xl font-bold">{selectedCenter.assignedStudentsCount || 0}</p>
-                  <p className="text-sm text-muted-foreground">Students Assigned</p>
+                  <p className="text-2xl font-bold">{(selectedCenter.assignedStudentsCount || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
+                  <p className="text-sm text-muted-foreground">{t.centers.studentsAssigned}</p>
                 </div>
               </div>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
-              Close
+              {t.common.close}
             </Button>
             <Button onClick={() => {
               setShowDetailsDialog(false);
               if (selectedCenter) openEditDialog(selectedCenter);
             }}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
+              <Edit className="w-4 h-4 me-2" />
+              {t.common.edit}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -999,22 +1005,21 @@ export default function Centers() {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent dir={isRTL ? "rtl" : "ltr"}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Examination Center</AlertDialogTitle>
+            <AlertDialogTitle>{t.centers.deleteCenter}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{selectedCenter?.name}"? This action cannot be undone.
-              All school assignments to this center will be removed.
+              {t.centers.deleteConfirm.replace('this center', `"${selectedCenter?.name}"`)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => selectedCenter && deleteMutation.mutate(selectedCenter.id)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Delete
+              {deleteMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+              {t.common.delete}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
