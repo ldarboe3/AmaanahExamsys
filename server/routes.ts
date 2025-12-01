@@ -3375,5 +3375,125 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Object Storage - File Upload Routes
+  const { ObjectStorageService, ObjectNotFoundError } = await import("./objectStorage");
+
+  // Get upload URL for file upload
+  app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
+    try {
+      const { authorized } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
+
+      const { filename } = req.body;
+      const objectStorageService = new ObjectStorageService();
+      const { uploadURL, objectPath } = await objectStorageService.getObjectEntityUploadURL(filename);
+      res.json({ uploadURL, objectPath });
+    } catch (error: any) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Finalize resource upload - set ACL and update database
+  app.post("/api/cms/resources/finalize", isAuthenticated, async (req, res) => {
+    try {
+      const { authorized, user } = await checkCmsAdminRole(req);
+      if (!authorized) return res.status(403).json({ message: "Not authorized" });
+
+      const { uploadURL, title, description, fileType, fileSize, categoryId, isPublished, originalFilename } = req.body;
+
+      if (!uploadURL) {
+        return res.status(400).json({ message: "uploadURL is required" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        uploadURL,
+        {
+          owner: user?.id || "system",
+          visibility: "public",
+        }
+      );
+
+      const resource = await storage.createResource({
+        title: title || originalFilename || "Untitled Resource",
+        description,
+        fileUrl: objectPath,
+        fileType: fileType || getFileTypeFromName(originalFilename),
+        fileSize: fileSize || 0,
+        categoryId: categoryId ? parseInt(categoryId) : null,
+        isPublished: isPublished ?? false,
+        uploadedBy: user?.id,
+      });
+
+      res.json(resource);
+    } catch (error: any) {
+      console.error("Error finalizing resource:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Serve uploaded objects (public access for published resources)
+  app.get("/objects/*", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      
+      const filename = req.query.filename as string | undefined;
+      await objectStorageService.downloadObject(objectFile, res, 3600, filename);
+    } catch (error: any) {
+      console.error("Error serving object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.status(404).json({ message: "File not found" });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public Resources API
+  app.get("/api/public/resources", async (_req, res) => {
+    try {
+      const resources = await storage.getPublishedResources();
+      const categories = await storage.getAllResourceCategories();
+      res.json({ resources, categories });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public resource download - increments download count
+  app.get("/api/public/resources/:id/download", async (req, res) => {
+    try {
+      const resource = await storage.getResource(parseInt(req.params.id));
+      if (!resource || !resource.isPublished) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+
+      // Increment download count
+      await storage.incrementResourceDownloadCount(parseInt(req.params.id));
+
+      // If fileUrl is an object path, redirect to the object
+      if (resource.fileUrl?.startsWith("/objects/")) {
+        const filename = resource.title ? `${resource.title}.${resource.fileType?.toLowerCase() || 'pdf'}` : undefined;
+        return res.redirect(`${resource.fileUrl}${filename ? `?filename=${encodeURIComponent(filename)}` : ''}`);
+      }
+
+      // Otherwise redirect to external URL
+      if (resource.fileUrl) {
+        return res.redirect(resource.fileUrl);
+      }
+
+      res.status(404).json({ message: "File not available" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
+}
+
+function getFileTypeFromName(filename?: string): string {
+  if (!filename) return "Unknown";
+  const ext = filename.split('.').pop()?.toUpperCase();
+  return ext || "Unknown";
 }

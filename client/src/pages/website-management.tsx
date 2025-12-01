@@ -55,9 +55,13 @@ import {
   BarChart3,
   FolderOpen,
   Star,
+  Upload,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ObjectUploader } from "@/components/ObjectUploader";
 import type { 
   NewsArticle, NewsCategory, 
   Resource, ResourceCategory,
@@ -406,6 +410,8 @@ function ResourcesTab() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<{ url: string; name: string; size: number } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -474,6 +480,55 @@ function ResourcesTab() {
       isPublished: false,
     });
     setSelectedResource(null);
+    setUploadedFile(null);
+    setIsUploading(false);
+  };
+
+  const handleGetUploadParameters = async (file: { name: string; type: string }) => {
+    setIsUploading(true);
+    const response = await apiRequest("/api/objects/upload", "POST", { filename: file.name }) as unknown as { uploadURL: string; objectPath: string };
+    return {
+      method: "PUT" as const,
+      url: response.uploadURL,
+    };
+  };
+
+  const handleUploadComplete = (result: any) => {
+    setIsUploading(false);
+    if (result.successful && result.successful.length > 0) {
+      const uploadedFileInfo = result.successful[0];
+      const filename = uploadedFileInfo.name || 'file';
+      const fileSize = uploadedFileInfo.size || 0;
+      const fileType = getFileTypeFromName(filename);
+      
+      setUploadedFile({
+        url: uploadedFileInfo.uploadURL,
+        name: filename,
+        size: fileSize,
+      });
+      
+      setFormData(prev => ({
+        ...prev,
+        fileType: fileType,
+        fileSize: fileSize,
+        title: prev.title || filename.replace(/\.[^/.]+$/, ""),
+      }));
+      
+      toast({ title: "File uploaded successfully" });
+    }
+  };
+
+  const getFileTypeFromName = (filename: string): string => {
+    const ext = filename.split('.').pop()?.toUpperCase();
+    return ext || "Unknown";
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
   const openEditDialog = (resource: Resource) => {
@@ -490,14 +545,37 @@ function ResourcesTab() {
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = () => {
-    const data = {
-      ...formData,
-      categoryId: formData.categoryId ? parseInt(formData.categoryId) : null,
-    };
-    if (selectedResource) {
+  const handleSubmit = async () => {
+    if (!selectedResource && uploadedFile) {
+      try {
+        await apiRequest("/api/cms/resources/finalize", "POST", {
+          uploadURL: uploadedFile.url,
+          title: formData.title,
+          description: formData.description,
+          fileType: formData.fileType,
+          fileSize: uploadedFile.size,
+          categoryId: formData.categoryId || null,
+          isPublished: formData.isPublished,
+          originalFilename: uploadedFile.name,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/cms/resources"] });
+        setIsDialogOpen(false);
+        resetForm();
+        toast({ title: "Resource created successfully" });
+      } catch (error: any) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
+    } else if (selectedResource) {
+      const data = {
+        ...formData,
+        categoryId: formData.categoryId ? parseInt(formData.categoryId) : null,
+      };
       updateMutation.mutate(data);
     } else {
+      const data = {
+        ...formData,
+        categoryId: formData.categoryId ? parseInt(formData.categoryId) : null,
+      };
       createMutation.mutate(data);
     }
   };
@@ -603,16 +681,66 @@ function ResourcesTab() {
                 data-testid="input-resource-description"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="fileUrl">File URL</Label>
-              <Input
-                id="fileUrl"
-                value={formData.fileUrl}
-                onChange={(e) => setFormData({ ...formData, fileUrl: e.target.value })}
-                placeholder="https://example.com/file.pdf"
-                data-testid="input-resource-url"
-              />
-            </div>
+            {!selectedResource && (
+              <div className="space-y-2">
+                <Label>Upload File</Label>
+                {uploadedFile ? (
+                  <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
+                    <Check className="h-5 w-5 text-green-600" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{uploadedFile.name}</p>
+                      <p className="text-xs text-muted-foreground">{formatFileSize(uploadedFile.size)}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setUploadedFile(null)}
+                      type="button"
+                    >
+                      Change
+                    </Button>
+                  </div>
+                ) : (
+                  <ObjectUploader
+                    maxNumberOfFiles={1}
+                    maxFileSize={52428800}
+                    onGetUploadParameters={handleGetUploadParameters}
+                    onComplete={handleUploadComplete}
+                    buttonVariant="outline"
+                    buttonClassName="w-full"
+                    disabled={isUploading}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {isUploading ? "Uploading..." : "Choose File"}
+                  </ObjectUploader>
+                )}
+              </div>
+            )}
+            {selectedResource && (
+              <div className="space-y-2">
+                <Label htmlFor="fileUrl">File URL</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="fileUrl"
+                    value={formData.fileUrl}
+                    onChange={(e) => setFormData({ ...formData, fileUrl: e.target.value })}
+                    placeholder="https://example.com/file.pdf"
+                    data-testid="input-resource-url"
+                    className="flex-1"
+                  />
+                  {formData.fileUrl && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => window.open(formData.fileUrl, '_blank')}
+                      type="button"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="fileType">File Type</Label>
@@ -630,7 +758,13 @@ function ResourcesTab() {
                     <SelectItem value="XLS">XLS</SelectItem>
                     <SelectItem value="XLSX">XLSX</SelectItem>
                     <SelectItem value="PPT">PPT</SelectItem>
+                    <SelectItem value="PPTX">PPTX</SelectItem>
                     <SelectItem value="ZIP">ZIP</SelectItem>
+                    <SelectItem value="RAR">RAR</SelectItem>
+                    <SelectItem value="TXT">TXT</SelectItem>
+                    <SelectItem value="CSV">CSV</SelectItem>
+                    <SelectItem value="MP3">MP3</SelectItem>
+                    <SelectItem value="MP4">MP4</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
