@@ -1,3 +1,4 @@
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -97,6 +98,7 @@ function ReportCardSkeleton() {
 
 export default function Reports() {
   const { toast } = useToast();
+  const { t, isRTL } = useLanguage();
   const [selectedExamYear, setSelectedExamYear] = useState<string>("all");
   const [downloading, setDownloading] = useState<string | null>(null);
 

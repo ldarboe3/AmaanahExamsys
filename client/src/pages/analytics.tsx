@@ -20,6 +20,7 @@ import {
   Download,
   Filter,
 } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useState } from "react";
 
 interface AnalyticsData {
@@ -145,6 +146,7 @@ function SubjectCard({ name, avgScore, passRate }: { name: string; avgScore: num
 }
 
 export default function Analytics() {
+  const { t, isRTL } = useLanguage();
   const [yearFilter, setYearFilter] = useState<string>("current");
   const [gradeFilter, setGradeFilter] = useState<string>("all");
 

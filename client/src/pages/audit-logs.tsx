@@ -1,3 +1,4 @@
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,6 +74,7 @@ function AuditLogsSkeleton() {
 }
 
 export default function AuditLogs() {
+  const { t, isRTL } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [entityTypeFilter, setEntityTypeFilter] = useState<string>("all");
   const [actionFilter, setActionFilter] = useState<string>("all");
@@ -94,8 +96,8 @@ export default function AuditLogs() {
     return matchesSearch && matchesEntityType && matchesAction;
   });
 
-  const uniqueEntityTypes = [...new Set(logs?.map(l => l.entityType) || [])];
-  const uniqueActions = [...new Set(logs?.map(l => l.action) || [])];
+  const uniqueEntityTypes = Array.from(new Set(logs?.map(l => l.entityType) || []));
+  const uniqueActions = Array.from(new Set(logs?.map(l => l.action) || []));
 
   return (
     <div className="space-y-6">

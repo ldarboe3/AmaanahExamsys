@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import {
   Table,
   TableBody,
@@ -63,11 +64,20 @@ const statusColors: Record<string, string> = {
   rejected: "bg-destructive/10 text-destructive",
 };
 
-const gradeLabels: Record<number, string> = {
-  3: "Grade 3",
-  6: "Grade 6",
-  9: "Grade 9",
-  12: "Grade 12",
+const getStatusLabel = (status: string, isRTL: boolean) => {
+  const labels: Record<string, { en: string; ar: string }> = {
+    pending: { en: "Pending", ar: "قيد الانتظار" },
+    approved: { en: "Approved", ar: "معتمد" },
+    rejected: { en: "Rejected", ar: "مرفوض" },
+  };
+  return isRTL ? labels[status]?.ar || status : labels[status]?.en || status;
+};
+
+const getGradeLabel = (grade: number, isRTL: boolean) => {
+  if (isRTL) {
+    return `الصف ${grade}`;
+  }
+  return `Grade ${grade}`;
 };
 
 interface StudentWithRelations extends Student {
@@ -101,6 +111,7 @@ function StudentsTableSkeleton() {
 
 export default function Students() {
   const { toast } = useToast();
+  const { t, isRTL } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [gradeFilter, setGradeFilter] = useState<string>("all");
@@ -169,8 +180,8 @@ export default function Students() {
     onSuccess: () => {
       invalidateStudentQueries();
       toast({
-        title: "Student Approved",
-        description: "The student has been approved successfully.",
+        title: t.common.success,
+        description: isRTL ? "تم اعتماد الطالب بنجاح" : "The student has been approved successfully.",
       });
     },
   });
@@ -182,8 +193,8 @@ export default function Students() {
     onSuccess: () => {
       invalidateStudentQueries();
       toast({
-        title: "All Students Approved",
-        description: "All pending students have been approved.",
+        title: t.common.success,
+        description: isRTL ? "تم اعتماد جميع الطلاب المعلقين" : "All pending students have been approved.",
       });
     },
   });
@@ -201,34 +212,34 @@ export default function Students() {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
-      title: "Copied",
-      description: "Index number copied to clipboard",
+      title: isRTL ? "تم النسخ" : "Copied",
+      description: isRTL ? "تم نسخ رقم الفهرس" : "Index number copied to clipboard",
     });
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Students</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{t.students.title}</h1>
           <p className="text-muted-foreground mt-1">
-            Manage student registrations and validations
+            {isRTL ? "إدارة تسجيلات الطلاب والتحقق منها" : "Manage student registrations and validations"}
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowUploadDialog(true)} data-testid="button-upload-csv">
-            <Upload className="w-4 h-4 mr-2" />
-            Upload CSV
+            <Upload className="w-4 h-4 me-2" />
+            {t.common.uploadCSV}
           </Button>
           <Button variant="outline" data-testid="button-download-template">
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Template
+            <FileSpreadsheet className="w-4 h-4 me-2" />
+            {isRTL ? "القالب" : "Template"}
           </Button>
           {pendingCount > 0 && (
             <Button onClick={() => approveAllMutation.mutate()} data-testid="button-approve-all">
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Approve All ({pendingCount})
+              <CheckCircle className="w-4 h-4 me-2" />
+              {isRTL ? `موافقة الكل (${pendingCount})` : `Approve All (${pendingCount})`}
             </Button>
           )}
         </div>
@@ -240,7 +251,7 @@ export default function Students() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Students</p>
+                <p className="text-sm text-muted-foreground">{t.dashboard.totalStudents}</p>
                 <p className="text-2xl font-semibold">{students?.length || 0}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
@@ -253,7 +264,7 @@ export default function Students() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-sm text-muted-foreground">{t.common.pending}</p>
                 <p className="text-2xl font-semibold">{pendingCount}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-5/10 flex items-center justify-center">
@@ -266,7 +277,7 @@ export default function Students() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Approved</p>
+                <p className="text-sm text-muted-foreground">{t.common.approved}</p>
                 <p className="text-2xl font-semibold">
                   {students?.filter(s => s.status === 'approved').length || 0}
                 </p>
@@ -281,7 +292,7 @@ export default function Students() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">With Index #</p>
+                <p className="text-sm text-muted-foreground">{isRTL ? "مع رقم الفهرس" : "With Index #"}</p>
                 <p className="text-2xl font-semibold">
                   {students?.filter(s => s.indexNumber).length || 0}
                 </p>
@@ -299,12 +310,12 @@ export default function Students() {
         <CardContent className="p-4">
           <div className="flex flex-col gap-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className={`absolute ${isRTL ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground`} />
               <Input
-                placeholder="Search by name or index number..."
+                placeholder={t.common.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className={isRTL ? "pe-9" : "ps-9"}
                 data-testid="input-search-students"
               />
             </div>
@@ -315,10 +326,10 @@ export default function Students() {
                 setSchoolFilter("all");
               }}>
                 <SelectTrigger className="w-[160px]" data-testid="select-region-filter">
-                  <SelectValue placeholder="Region" />
+                  <SelectValue placeholder={t.schools.region} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Regions</SelectItem>
+                  <SelectItem value="all">{t.common.allRegions}</SelectItem>
                   {regions?.map((region) => (
                     <SelectItem key={region.id} value={region.id.toString()}>
                       {region.name}
@@ -331,10 +342,10 @@ export default function Students() {
                 setSchoolFilter("all");
               }} disabled={regionFilter === "all"}>
                 <SelectTrigger className="w-[160px]" data-testid="select-cluster-filter">
-                  <SelectValue placeholder={regionFilter === "all" ? "Select Region First" : "Cluster"} />
+                  <SelectValue placeholder={regionFilter === "all" ? t.common.selectRegionFirst : t.schools.cluster} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Clusters</SelectItem>
+                  <SelectItem value="all">{t.common.allClusters}</SelectItem>
                   {clustersForFilter?.map((cluster) => (
                     <SelectItem key={cluster.id} value={cluster.id.toString()}>
                       {cluster.name}
@@ -344,10 +355,10 @@ export default function Students() {
               </Select>
               <Select value={schoolFilter} onValueChange={setSchoolFilter}>
                 <SelectTrigger className="w-[180px]" data-testid="select-school-filter">
-                  <SelectValue placeholder="School" />
+                  <SelectValue placeholder={t.students.school} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Schools</SelectItem>
+                  <SelectItem value="all">{isRTL ? "جميع المدارس" : "All Schools"}</SelectItem>
                   {schoolsForFilter?.map((school) => (
                     <SelectItem key={school.id} value={school.id.toString()}>
                       {school.name}
@@ -357,25 +368,25 @@ export default function Students() {
               </Select>
               <Select value={gradeFilter} onValueChange={setGradeFilter}>
                 <SelectTrigger className="w-[130px]" data-testid="select-grade-filter">
-                  <SelectValue placeholder="Grade" />
+                  <SelectValue placeholder={t.common.grade} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Grades</SelectItem>
-                  <SelectItem value="3">Grade 3</SelectItem>
-                  <SelectItem value="6">Grade 6</SelectItem>
-                  <SelectItem value="9">Grade 9</SelectItem>
-                  <SelectItem value="12">Grade 12</SelectItem>
+                  <SelectItem value="all">{isRTL ? "جميع الصفوف" : "All Grades"}</SelectItem>
+                  <SelectItem value="3">{isRTL ? "الصف 3" : "Grade 3"}</SelectItem>
+                  <SelectItem value="6">{isRTL ? "الصف 6" : "Grade 6"}</SelectItem>
+                  <SelectItem value="9">{isRTL ? "الصف 9" : "Grade 9"}</SelectItem>
+                  <SelectItem value="12">{isRTL ? "الصف 12" : "Grade 12"}</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[130px]" data-testid="select-status-filter">
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder={t.common.status} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="all">{t.common.allStatus}</SelectItem>
+                  <SelectItem value="pending">{t.common.pending}</SelectItem>
+                  <SelectItem value="approved">{t.common.approved}</SelectItem>
+                  <SelectItem value="rejected">{t.common.rejected}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -388,19 +399,19 @@ export default function Students() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-lg">Student List</CardTitle>
+              <CardTitle className="text-lg">{isRTL ? "قائمة الطلاب" : "Student List"}</CardTitle>
               <CardDescription>
-                {filteredStudents?.length || 0} students found
+                {filteredStudents?.length || 0} {t.students.title.toLowerCase()} {t.common.found}
               </CardDescription>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm">
-                <Printer className="w-4 h-4 mr-2" />
-                Print Cards
+                <Printer className="w-4 h-4 me-2" />
+                {isRTL ? "طباعة البطاقات" : "Print Cards"}
               </Button>
               <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-2" />
-                Export
+                <Download className="w-4 h-4 me-2" />
+                {t.common.export}
               </Button>
             </div>
           </div>
@@ -413,12 +424,12 @@ export default function Students() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Index #</TableHead>
-                    <TableHead>Grade</TableHead>
-                    <TableHead>School</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t.students.title}</TableHead>
+                    <TableHead>{t.students.indexNumber}</TableHead>
+                    <TableHead>{t.common.grade}</TableHead>
+                    <TableHead>{t.students.school}</TableHead>
+                    <TableHead>{t.common.status}</TableHead>
+                    <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -455,22 +466,22 @@ export default function Students() {
                             </Button>
                           </div>
                         ) : (
-                          <span className="text-sm text-muted-foreground">Not assigned</span>
+                          <span className="text-sm text-muted-foreground">{t.common.notAssigned}</span>
                         )}
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="text-xs">
-                          {gradeLabels[student.grade] || `Grade ${student.grade}`}
+                          {getGradeLabel(student.grade, isRTL)}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
-                          {student.school?.name || "Unknown"}
+                          {student.school?.name || (isRTL ? "غير معروف" : "Unknown")}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge className={`${statusColors[student.status || 'pending']} text-xs capitalize`}>
-                          {student.status}
+                        <Badge className={`${statusColors[student.status || 'pending']} text-xs`}>
+                          {getStatusLabel(student.status || 'pending', isRTL)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -487,12 +498,12 @@ export default function Students() {
                                 setShowDetailsDialog(true);
                               }}
                             >
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Details
+                              <Eye className="w-4 h-4 me-2" />
+                              {t.common.viewDetails}
                             </DropdownMenuItem>
                             <DropdownMenuItem>
-                              <Printer className="w-4 h-4 mr-2" />
-                              Print Card
+                              <Printer className="w-4 h-4 me-2" />
+                              {isRTL ? "طباعة البطاقة" : "Print Card"}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {student.status === 'pending' && (
@@ -501,12 +512,12 @@ export default function Students() {
                                   onClick={() => approveStudentMutation.mutate(student.id)}
                                   className="text-chart-3"
                                 >
-                                  <CheckCircle className="w-4 h-4 mr-2" />
-                                  Approve
+                                  <CheckCircle className="w-4 h-4 me-2" />
+                                  {t.common.approve}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem className="text-destructive">
-                                  <XCircle className="w-4 h-4 mr-2" />
-                                  Reject
+                                  <XCircle className="w-4 h-4 me-2" />
+                                  {t.common.reject}
                                 </DropdownMenuItem>
                               </>
                             )}
@@ -521,15 +532,15 @@ export default function Students() {
           ) : (
             <div className="text-center py-12">
               <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No students found</h3>
+              <h3 className="text-lg font-medium mb-2">{t.common.noResults}</h3>
               <p className="text-muted-foreground mb-4">
                 {searchQuery
-                  ? "Try adjusting your search or filters"
-                  : "Upload a CSV file to register students"}
+                  ? t.common.tryAdjusting
+                  : isRTL ? "قم برفع ملف CSV لتسجيل الطلاب" : "Upload a CSV file to register students"}
               </p>
               <Button onClick={() => setShowUploadDialog(true)}>
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Students
+                <Upload className="w-4 h-4 me-2" />
+                {isRTL ? "رفع الطلاب" : "Upload Students"}
               </Button>
             </div>
           )}
@@ -538,11 +549,11 @@ export default function Students() {
 
       {/* Student Details Dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>Student Details</DialogTitle>
+            <DialogTitle>{isRTL ? "تفاصيل الطالب" : "Student Details"}</DialogTitle>
             <DialogDescription>
-              Complete information about the student
+              {isRTL ? "معلومات كاملة عن الطالب" : "Complete information about the student"}
             </DialogDescription>
           </DialogHeader>
           {selectedStudent && (
@@ -556,10 +567,10 @@ export default function Students() {
                     {selectedStudent.firstName} {selectedStudent.middleName} {selectedStudent.lastName}
                   </h3>
                   <p className="text-sm text-muted-foreground capitalize">
-                    {selectedStudent.gender} - {gradeLabels[selectedStudent.grade]}
+                    {isRTL ? (selectedStudent.gender === 'male' ? 'ذكر' : 'أنثى') : selectedStudent.gender} - {getGradeLabel(selectedStudent.grade, isRTL)}
                   </p>
                   <Badge className={`${statusColors[selectedStudent.status || 'pending']} mt-2`}>
-                    {selectedStudent.status}
+                    {getStatusLabel(selectedStudent.status || 'pending', isRTL)}
                   </Badge>
                 </div>
               </div>
@@ -567,7 +578,7 @@ export default function Students() {
               <div className="grid gap-4">
                 {selectedStudent.indexNumber && (
                   <div className="p-4 bg-muted/50 rounded-md">
-                    <p className="text-xs text-muted-foreground mb-1">Index Number</p>
+                    <p className="text-xs text-muted-foreground mb-1">{t.students.indexNumber}</p>
                     <div className="flex items-center justify-between">
                       <code className="text-lg font-mono font-semibold">
                         {selectedStudent.indexNumber}
@@ -577,13 +588,13 @@ export default function Students() {
                         size="sm"
                         onClick={() => copyToClipboard(selectedStudent.indexNumber!)}
                       >
-                        <Copy className="w-4 h-4 mr-2" />
-                        Copy
+                        <Copy className="w-4 h-4 me-2" />
+                        {isRTL ? "نسخ" : "Copy"}
                       </Button>
                     </div>
                     {selectedStudent.confirmationCode && (
                       <div className="mt-2">
-                        <p className="text-xs text-muted-foreground mb-1">Confirmation Code</p>
+                        <p className="text-xs text-muted-foreground mb-1">{isRTL ? "رمز التأكيد" : "Confirmation Code"}</p>
                         <code className="text-sm font-mono">
                           {selectedStudent.confirmationCode}
                         </code>
@@ -596,28 +607,28 @@ export default function Students() {
                   <div className="flex items-center gap-2">
                     <School className="w-4 h-4 text-muted-foreground" />
                     <div>
-                      <p className="text-xs text-muted-foreground">School</p>
-                      <p className="text-sm font-medium">{selectedStudent.school?.name || "Unknown"}</p>
+                      <p className="text-xs text-muted-foreground">{t.students.school}</p>
+                      <p className="text-sm font-medium">{selectedStudent.school?.name || (isRTL ? "غير معروف" : "Unknown")}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
                     <div>
-                      <p className="text-xs text-muted-foreground">Exam Year</p>
-                      <p className="text-sm font-medium">{selectedStudent.examYear?.name || "Unknown"}</p>
+                      <p className="text-xs text-muted-foreground">{isRTL ? "سنة الامتحان" : "Exam Year"}</p>
+                      <p className="text-sm font-medium">{selectedStudent.examYear?.name || (isRTL ? "غير معروف" : "Unknown")}</p>
                     </div>
                   </div>
                 </div>
 
                 {selectedStudent.dateOfBirth && (
                   <div>
-                    <p className="text-xs text-muted-foreground">Date of Birth</p>
+                    <p className="text-xs text-muted-foreground">{isRTL ? "تاريخ الميلاد" : "Date of Birth"}</p>
                     <p className="text-sm font-medium">{selectedStudent.dateOfBirth}</p>
                   </div>
                 )}
                 {selectedStudent.placeOfBirth && (
                   <div>
-                    <p className="text-xs text-muted-foreground">Place of Birth</p>
+                    <p className="text-xs text-muted-foreground">{isRTL ? "مكان الميلاد" : "Place of Birth"}</p>
                     <p className="text-sm font-medium">{selectedStudent.placeOfBirth}</p>
                   </div>
                 )}
@@ -626,11 +637,11 @@ export default function Students() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
-              Close
+              {t.common.close}
             </Button>
             <Button variant="outline">
-              <Printer className="w-4 h-4 mr-2" />
-              Print Card
+              <Printer className="w-4 h-4 me-2" />
+              {isRTL ? "طباعة البطاقة" : "Print Card"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -638,37 +649,37 @@ export default function Students() {
 
       {/* Upload CSV Dialog */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent>
+        <DialogContent dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>Upload Student List</DialogTitle>
+            <DialogTitle>{isRTL ? "رفع قائمة الطلاب" : "Upload Student List"}</DialogTitle>
             <DialogDescription>
-              Upload a CSV file containing student information
+              {isRTL ? "قم برفع ملف CSV يحتوي على معلومات الطلاب" : "Upload a CSV file containing student information"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
               <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
               <p className="text-sm text-muted-foreground mb-2">
-                Drag and drop your CSV file here, or click to browse
+                {isRTL ? "اسحب وأفلت ملف CSV هنا، أو انقر للتصفح" : "Drag and drop your CSV file here, or click to browse"}
               </p>
               <Button variant="outline" size="sm">
-                Choose File
+                {isRTL ? "اختر ملف" : "Choose File"}
               </Button>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Need the template?</span>
-              <Button variant="link" size="sm" className="h-auto p-0">
-                <Download className="w-4 h-4 mr-1" />
-                Download CSV Template
+              <span className="text-muted-foreground">{isRTL ? "هل تحتاج إلى القالب؟" : "Need the template?"}</span>
+              <Button variant="ghost" size="sm" className="h-auto p-0 text-primary underline-offset-4 hover:underline">
+                <Download className="w-4 h-4 me-1" />
+                {isRTL ? "تحميل قالب CSV" : "Download CSV Template"}
               </Button>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowUploadDialog(false)}>
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button disabled>
-              Upload & Validate
+              {isRTL ? "رفع والتحقق" : "Upload & Validate"}
             </Button>
           </DialogFooter>
         </DialogContent>
