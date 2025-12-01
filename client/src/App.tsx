@@ -18,6 +18,7 @@ import Payments from "@/pages/payments";
 import Centers from "@/pages/centers";
 import Results from "@/pages/results";
 import Certificates from "@/pages/certificates";
+import Transcripts from "@/pages/transcripts";
 import Examiners from "@/pages/examiners";
 import Analytics from "@/pages/analytics";
 import Verify from "@/pages/verify";
@@ -51,6 +52,7 @@ function AuthenticatedRoutes() {
       <Route path="/center-info" component={Centers} />
       <Route path="/results" component={Results} />
       <Route path="/certificates" component={Certificates} />
+      <Route path="/transcripts" component={Transcripts} />
       <Route path="/examiners" component={Examiners} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/regions" component={Regions} />

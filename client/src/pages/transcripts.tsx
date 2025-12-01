@@ -29,7 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Award,
+  FileText,
   Printer,
   Download,
   User,
@@ -38,18 +38,22 @@ import {
   Building2,
   CheckCircle2,
   Eye,
-  FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Region, Cluster, School as SchoolType, Student, ExamYear, Certificate } from "@shared/schema";
+import type { Region, Cluster, School as SchoolType, Student, ExamYear } from "@shared/schema";
 
-interface StudentWithCertificate extends Student {
+interface StudentWithResults extends Student {
   school?: SchoolType;
-  certificate?: Certificate;
+  results?: Array<{
+    subjectId: number;
+    score: number;
+    grade: string;
+    subjectName?: string;
+  }>;
 }
 
-function CertificatesTableSkeleton() {
+function TranscriptsTableSkeleton() {
   return (
     <div className="space-y-4">
       {[1, 2, 3, 4, 5].map((i) => (
@@ -68,14 +72,14 @@ function CertificatesTableSkeleton() {
   );
 }
 
-export default function Certificates() {
+export default function Transcripts() {
   const { toast } = useToast();
   const [selectedRegion, setSelectedRegion] = useState<string>("");
   const [selectedCluster, setSelectedCluster] = useState<string>("");
   const [selectedSchool, setSelectedSchool] = useState<string>("");
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
-  const [previewStudent, setPreviewStudent] = useState<StudentWithCertificate | null>(null);
+  const [previewStudent, setPreviewStudent] = useState<StudentWithResults | null>(null);
 
   const { data: regions } = useQuery<Region[]>({
     queryKey: ["/api/regions"],
@@ -90,7 +94,7 @@ export default function Certificates() {
     queryKey: ["/api/schools"],
   });
 
-  const { data: students, isLoading: studentsLoading } = useQuery<StudentWithCertificate[]>({
+  const { data: students, isLoading: studentsLoading } = useQuery<StudentWithResults[]>({
     queryKey: [`/api/students?schoolId=${selectedSchool}`],
     enabled: !!selectedSchool,
   });
@@ -108,23 +112,22 @@ export default function Certificates() {
     return true;
   }) || [];
 
-  const generateCertificateMutation = useMutation({
+  const generateTranscriptMutation = useMutation({
     mutationFn: async (studentIds: number[]) => {
-      return apiRequest("POST", "/api/certificates/generate", { studentIds });
+      return apiRequest("POST", "/api/transcripts/generate", { studentIds });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/students?schoolId=${selectedSchool}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/certificates"] });
       toast({
-        title: "Certificates Generated",
-        description: `${selectedStudents.length} certificate(s) generated successfully.`,
+        title: "Transcripts Generated",
+        description: `${selectedStudents.length} transcript(s) generated successfully.`,
       });
       setSelectedStudents([]);
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to generate certificates. Please try again.",
+        description: "Failed to generate transcripts. Please try again.",
         variant: "destructive",
       });
     },
@@ -132,20 +135,19 @@ export default function Certificates() {
 
   const generateAllMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/certificates/generate-school", { schoolId: parseInt(selectedSchool) });
+      return apiRequest("POST", "/api/transcripts/generate-school", { schoolId: parseInt(selectedSchool) });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/students?schoolId=${selectedSchool}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/certificates"] });
       toast({
-        title: "All Certificates Generated",
-        description: "All student certificates for this school have been generated.",
+        title: "All Transcripts Generated",
+        description: "All student transcripts for this school have been generated.",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to generate certificates. Please try again.",
+        description: "Failed to generate transcripts. Please try again.",
         variant: "destructive",
       });
     },
@@ -167,7 +169,7 @@ export default function Certificates() {
     }
   };
 
-  const handlePreview = (student: StudentWithCertificate) => {
+  const handlePreview = (student: StudentWithResults) => {
     setPreviewStudent(student);
     setShowPreviewDialog(true);
   };
@@ -176,37 +178,37 @@ export default function Certificates() {
     if (selectedStudents.length === 0) {
       toast({
         title: "No Selection",
-        description: "Please select at least one student to generate certificates.",
+        description: "Please select at least one student to print transcripts.",
         variant: "destructive",
       });
       return;
     }
-    generateCertificateMutation.mutate(selectedStudents);
+    generateTranscriptMutation.mutate(selectedStudents);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Certificates</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Transcripts</h1>
           <p className="text-muted-foreground mt-1">
-            Generate and print student achievement certificates
+            Generate and print student academic transcripts
           </p>
         </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
             onClick={handlePrintSelected}
-            disabled={selectedStudents.length === 0 || generateCertificateMutation.isPending}
-            data-testid="button-generate-selected"
+            disabled={selectedStudents.length === 0 || generateTranscriptMutation.isPending}
+            data-testid="button-print-selected"
           >
             <Printer className="w-4 h-4 mr-2" />
-            Generate Selected ({selectedStudents.length})
+            Print Selected ({selectedStudents.length})
           </Button>
           <Button
             onClick={() => generateAllMutation.mutate()}
             disabled={!selectedSchool || generateAllMutation.isPending}
-            data-testid="button-generate-all"
+            data-testid="button-print-all"
           >
             <Download className="w-4 h-4 mr-2" />
             Generate All for School
@@ -338,7 +340,7 @@ export default function Certificates() {
                 <p className="text-lg font-semibold">{activeExamYear?.name || "N/A"}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
-                <Award className="w-5 h-5 text-chart-3" />
+                <FileText className="w-5 h-5 text-chart-3" />
               </div>
             </div>
           </CardContent>
@@ -381,7 +383,7 @@ export default function Certificates() {
               </p>
             </div>
           ) : studentsLoading ? (
-            <CertificatesTableSkeleton />
+            <TranscriptsTableSkeleton />
           ) : students && students.length > 0 ? (
             <div className="rounded-md border">
               <Table>
@@ -398,7 +400,7 @@ export default function Certificates() {
                     <TableHead>Index Number</TableHead>
                     <TableHead>Grade</TableHead>
                     <TableHead>Gender</TableHead>
-                    <TableHead>Certificate Status</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -436,10 +438,10 @@ export default function Certificates() {
                       <TableCell className="capitalize">{student.gender}</TableCell>
                       <TableCell>
                         <Badge
-                          variant={student.certificate ? 'default' : 'secondary'}
-                          className={student.certificate ? 'bg-chart-3/10 text-chart-3' : ''}
+                          variant={student.status === 'approved' ? 'default' : 'secondary'}
+                          className={student.status === 'approved' ? 'bg-chart-3/10 text-chart-3' : ''}
                         >
-                          {student.certificate ? 'Generated' : 'Pending'}
+                          {student.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -455,11 +457,11 @@ export default function Certificates() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => generateCertificateMutation.mutate([student.id])}
-                            disabled={generateCertificateMutation.isPending}
-                            data-testid={`button-generate-${student.id}`}
+                            onClick={() => generateTranscriptMutation.mutate([student.id])}
+                            disabled={generateTranscriptMutation.isPending}
+                            data-testid={`button-print-${student.id}`}
                           >
-                            <Award className="w-4 h-4" />
+                            <Printer className="w-4 h-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -483,38 +485,40 @@ export default function Certificates() {
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Certificate Preview</DialogTitle>
+            <DialogTitle>Transcript Preview</DialogTitle>
             <DialogDescription>
-              Preview certificate for {previewStudent?.firstName} {previewStudent?.lastName}
+              Preview transcript for {previewStudent?.firstName} {previewStudent?.lastName}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="border-2 border-primary/20 rounded-lg p-8 bg-gradient-to-b from-primary/5 to-transparent">
-              <div className="text-center space-y-4">
-                <div className="flex justify-center">
-                  <Award className="w-16 h-16 text-primary" />
+            <div className="border rounded-lg p-6 bg-muted/30">
+              <div className="text-center mb-6">
+                <h2 className="text-xl font-bold">ACADEMIC TRANSCRIPT</h2>
+                <p className="text-sm text-muted-foreground">Amaanah Examination Board</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm mb-6">
+                <div>
+                  <p className="text-muted-foreground">Student Name</p>
+                  <p className="font-medium">{previewStudent?.firstName} {previewStudent?.lastName}</p>
                 </div>
-                <h2 className="text-2xl font-serif font-semibold">Certificate of Achievement</h2>
-                <p className="text-muted-foreground">This is to certify that</p>
-                <h3 className="text-xl font-semibold text-primary">
-                  {previewStudent?.firstName} {previewStudent?.lastName}
-                </h3>
-                <p className="text-muted-foreground">Index Number: {previewStudent?.indexNumber || "N/A"}</p>
-                <p className="text-muted-foreground">of</p>
-                <p className="font-medium">
-                  {filteredSchools.find(s => s.id.toString() === selectedSchool)?.name || "Unknown School"}
-                </p>
-                <p className="text-muted-foreground">
-                  has successfully completed the {activeExamYear?.name || "Academic Year"} examinations
-                </p>
-                <p className="text-lg font-semibold">
-                  Grade Level: <span className="text-chart-3">Grade {previewStudent?.gradeLevel}</span>
-                </p>
-                <div className="pt-4 border-t mt-4">
-                  <p className="text-sm text-muted-foreground">
-                    Certificate will be issued upon generation
-                  </p>
+                <div>
+                  <p className="text-muted-foreground">Index Number</p>
+                  <p className="font-medium">{previewStudent?.indexNumber || "N/A"}</p>
                 </div>
+                <div>
+                  <p className="text-muted-foreground">Grade Level</p>
+                  <p className="font-medium">Grade {previewStudent?.gradeLevel}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Exam Year</p>
+                  <p className="font-medium">{activeExamYear?.name || "N/A"}</p>
+                </div>
+              </div>
+              <div className="border-t pt-4">
+                <h3 className="font-medium mb-2">Subject Results</h3>
+                <p className="text-sm text-muted-foreground italic">
+                  Results will be displayed here once published
+                </p>
               </div>
             </div>
           </div>
@@ -524,12 +528,12 @@ export default function Certificates() {
             </Button>
             <Button onClick={() => {
               if (previewStudent) {
-                generateCertificateMutation.mutate([previewStudent.id]);
+                generateTranscriptMutation.mutate([previewStudent.id]);
               }
               setShowPreviewDialog(false);
             }}>
-              <Award className="w-4 h-4 mr-2" />
-              Generate Certificate
+              <Printer className="w-4 h-4 mr-2" />
+              Print Transcript
             </Button>
           </DialogFooter>
         </DialogContent>

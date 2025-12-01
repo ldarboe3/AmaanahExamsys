@@ -85,6 +85,11 @@ const adminMenuItems = [
     icon: Award,
   },
   {
+    title: "Transcripts",
+    url: "/transcripts",
+    icon: BookOpen,
+  },
+  {
     title: "Examiners",
     url: "/examiners",
     icon: UserCheck,
