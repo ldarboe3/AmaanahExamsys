@@ -123,6 +123,175 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     });
   });
 
+  // Password-based login
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+
+      // Try to find user by username or email
+      let user = await storage.getUserByUsername(username);
+      if (!user) {
+        user = await storage.getUserByEmail(username);
+      }
+
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (user.status === 'suspended' || user.status === 'inactive') {
+        return res.status(403).json({ message: "Account is " + user.status });
+      }
+
+      const isValidPassword = await storage.verifyPassword(user.id, password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      req.session.userId = user.id;
+      
+      // Update last login
+      await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
+
+      res.json({ 
+        ...user, 
+        passwordHash: undefined,
+        mustChangePassword: user.mustChangePassword 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Register new user (admin only for most roles)
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { username, email, password, firstName, lastName, phone, role } = req.body;
+      
+      if (!username || !password || !email) {
+        return res.status(400).json({ message: "Username, email, and password are required" });
+      }
+
+      // Check if username or email already exists
+      const existingUsername = await storage.getUserByUsername(username);
+      if (existingUsername) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      const existingEmail = await storage.getUserByEmail(email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      // For non-admin roles, require authentication
+      const allowedPublicRoles = ['school_admin'];
+      if (role && !allowedPublicRoles.includes(role)) {
+        if (!req.session.userId) {
+          return res.status(401).json({ message: "Authentication required for this role" });
+        }
+        const currentUser = await storage.getUser(req.session.userId);
+        if (!currentUser || !['super_admin', 'examination_admin'].includes(currentUser.role || '')) {
+          return res.status(403).json({ message: "Only admins can create users with this role" });
+        }
+      }
+
+      const user = await storage.createUserWithPassword({
+        username,
+        email,
+        firstName,
+        lastName,
+        phone,
+        role: role || 'school_admin',
+        password,
+      });
+
+      res.status(201).json({ ...user, passwordHash: undefined });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Change password
+  app.post("/api/auth/change-password", isAuthenticated, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current and new password are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const isValid = await storage.verifyPassword(req.session.userId!, currentPassword);
+      if (!isValid) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+
+      await storage.updatePassword(req.session.userId!, newPassword);
+      res.json({ message: "Password changed successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Reset password (admin only)
+  app.post("/api/auth/reset-password", isAuthenticated, async (req, res) => {
+    try {
+      const { userId, newPassword } = req.body;
+      
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser || !['super_admin', 'examination_admin'].includes(currentUser.role || '')) {
+        return res.status(403).json({ message: "Only admins can reset passwords" });
+      }
+
+      await storage.updatePassword(userId, newPassword);
+      
+      // Set flag to require password change on next login
+      await db.update(users)
+        .set({ mustChangePassword: true })
+        .where(eq(users.id, userId));
+
+      res.json({ message: "Password reset successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Seed initial users
+  app.post("/api/auth/seed-users", async (req, res) => {
+    try {
+      const seedUsers: Array<{username: string, email: string, firstName: string, lastName: string, role: 'super_admin' | 'examination_admin' | 'logistics_admin' | 'school_admin' | 'examiner' | 'candidate', password: string}> = [
+        { username: 'superadmin', email: 'superadmin@amaanah.org', firstName: 'Super', lastName: 'Admin', role: 'super_admin', password: 'Admin@123' },
+        { username: 'examadmin', email: 'examadmin@amaanah.org', firstName: 'Examination', lastName: 'Admin', role: 'examination_admin', password: 'Admin@123' },
+        { username: 'logisticsadmin', email: 'logistics@amaanah.org', firstName: 'Logistics', lastName: 'Admin', role: 'logistics_admin', password: 'Admin@123' },
+        { username: 'schooladmin', email: 'school@amaanah.org', firstName: 'School', lastName: 'Admin', role: 'school_admin', password: 'Admin@123' },
+        { username: 'examiner1', email: 'examiner@amaanah.org', firstName: 'Test', lastName: 'Examiner', role: 'examiner', password: 'Admin@123' },
+        { username: 'candidate1', email: 'candidate@amaanah.org', firstName: 'Test', lastName: 'Candidate', role: 'candidate', password: 'Admin@123' },
+      ];
+
+      const createdUsers = [];
+      for (const userData of seedUsers) {
+        const existing = await storage.getUserByUsername(userData.username);
+        if (!existing) {
+          const user = await storage.createUserWithPassword(userData as any);
+          createdUsers.push({ ...user, passwordHash: undefined });
+        }
+      }
+
+      res.json({ 
+        message: `Created ${createdUsers.length} users`,
+        users: createdUsers,
+        credentials: seedUsers.map(u => ({ username: u.username, password: u.password, role: u.role }))
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Dashboard stats
   app.get("/api/dashboard/stats", isAuthenticated, async (req, res) => {
     try {
