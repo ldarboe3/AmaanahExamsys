@@ -1,0 +1,207 @@
+What the two PDFs contain (so the dev understands)
+
+Both are “GAMBIA MADRASSAH PRIMARY CERTIFICATE – شهادة إتمام دراسة المرحلة الابتدائية” with the same layout and border. The female version uses feminine grammar; the male version uses masculine grammar. 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+Red fields in the examples include: student full name, birthplace, date of birth, school name, exam window (start–end, month/year), overall grade word (e.g., جيد), certificate number, Hijri issue date, Gregorian issue date. 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+Business rules you asked for
+
+Certificates issued for: Grade 6, Grade 9, Grade 12.
+
+Transcript only for: Grade 3 (no certificate).
+
+Template selection: if gender == 'M' use Male PDF; if gender == 'F' use Female PDF.
+
+Eligibility: only for published results with final status PASS (no ABS/WHD/MP/INC).
+
+Arabic grammar differences (use separate templates)
+
+The Arabic text differs by gender; keep two distinct templates:
+
+Female text uses forms like الطالبة / المولودة / أتمّت / نجحت. See the female PDF sentence showing “الطالبة… المولودة… قد أتمت… بعد أن نجحت…”. 
+
+female certificate (4)
+
+Male text uses الطالب / المولود / أتم / نجح. See the male PDF sentence showing “الطالب… المولود… قد أتم… بعد أن نجح…”. 
+
+certificate for men (4)
+
+Variable fields (the “red text” placeholders)
+
+Treat each red item as a placeholder pulled from the database:
+
+candidate_full_name_ar – e.g., فاطمة محمد جغنا / باكر عمر سيسى. 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+birth_place_ar – e.g., دمبا كندا / بنتغ. 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+dob_greg – e.g., 02/02/2010 or 29/01/2008. 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+school_name_ar – e.g., مدرسة الجماعة الإسلامية السلفية – دمباكندا / مدرسة ابن تيمية الإسلامية – فوني بنتغ. 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+exam_window_text_ar – e.g., الفترة: 20 مايو – 29 يونيو، 2022. 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+final_grade_word_ar – e.g., (جيد). (Keep parentheses exactly like the template.) 
+
+female certificate (4)
+
+certificate_number – e.g., (22/00061407) / (22/00023733). 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+issue_date_hijri – e.g., 12 / 05 / 1444 هـ أو 23 / 02 / 1444 هـ. 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+issue_date_greg – e.g., 06 / 12 / 2022 م أو 19 / 09 / 2022 م. 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+Notes:
+
+The English/Arabic ministry headers, logo, border, and footnote (“أي كشط أو تغيير… يلغيها”) are static artwork; don’t change them. 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+Signatures/stamps are part of the layout; if signatory names change per session, add optional variables: signatory_left_name, signatory_right_name, etc.
+
+Rendering approach (accurate + fast)
+
+Option A (recommended): use each PDF page as a full-page background and overlay the variable Arabic text at precise positions.
+
+Export each template page as 300dpi PNG (male_G6.png, female_G6.png).
+
+Use mPDF or Snappy (wkhtmltopdf); set <html lang="ar" dir="rtl">, embed an Arabic font (Amiri, Noto Naskh Arabic, or Scheherazade New), and position fields absolutely over the image.
+
+Keep positions in a config map so Lamin can fine-tune without touching code, e.g.:
+
+return [
+  'G6' => [
+    'male' => [
+      'bg' => 'storage/cert_templates/G6_male.png',
+      'fields' => [
+        'candidate_full_name_ar' => ['x'=>310, 'y'=>470, 'fs'=>28, 'bold'=>true],
+        'birth_place_ar'         => ['x'=>520, 'y'=>520, 'fs'=>20],
+        'dob_greg'               => ['x'=>360, 'y'=>520, 'fs'=>20],
+        'school_name_ar'         => ['x'=>340, 'y'=>565, 'fs'=>22],
+        'exam_window_text_ar'    => ['x'=>340, 'y'=>640, 'fs'=>20],
+        'final_grade_word_ar'    => ['x'=>690, 'y'=>675, 'fs'=>22, 'bold'=>true], // (جيد)
+        'certificate_number'     => ['x'=>540, 'y'=>735, 'fs'=>18],
+        'issue_date_hijri'       => ['x'=>370, 'y'=>735, 'fs'=>18],
+        'issue_date_greg'        => ['x'=>235, 'y'=>735, 'fs'=>18],
+      ],
+      'qr' => ['x'=>120, 'y'=>780, 'w'=>90, 'h'=>90] // pick a free spot near the stamp
+    ],
+    'female' => [
+      'bg' => 'storage/cert_templates/G6_female.png',
+      'fields' => { /* similar map; grammar handled by choosing female template */ },
+      'qr' => ['x'=>120, 'y'=>780, 'w'=>90, 'h'=>90]
+    ],
+  ],
+  // Reuse same layout for G9/G12 if identical; else add their own maps.
+];
+
+
+(Your dev will tweak the x/y pixel values after one print test.)
+
+Grade logic & issuance
+if ($grade == 3) {
+  // transcript only
+} elseif (in_array($grade, [6,9,12])) {
+  // certificate + transcript
+}
+
+Verification & numbering
+
+Generate a unique certificate number and a QR token per candidate; embed a QR that opens /verify/{token} (shows: name, grade, year, result → Authentic/Invalid).
+
+Store: certificate_id, candidate_id, grade, year, qr_token, print_count, issued_at, file_path.
+
+Arabic/RTL specifics (important)
+
+Use mPDF or Snappy, not plain DomPDF (Arabic shaping/diacritics can break).
+
+Embed Arabic fonts and avoid letter-spacing on Arabic text.
+
+Confirm whether you want Arabic numerals (٠١٢٣٤٥٦٧٨٩) or Western numerals (0–9) for dates/numbers, then apply consistently.
+
+QA checklist for the dev
+
+ Male candidates always use male Arabic grammar template; females use female. 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+ All red fields (name, birthplace, DOB, school, window, grade word, cert no., Hijri & Gregorian dates) render in the right positions. 
+
+female certificate (4)
+
+ 
+
+certificate for men (4)
+
+ G3 blocks certificate generation; G6/9/12 generate certificate + transcript.
+
+ QR scan verifies certificate.
+
+ Print to A4 without clipping; reprints show “REPRINT / إعادة طباعة” watermark and increment print_count.
