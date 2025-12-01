@@ -12,6 +12,7 @@ import { LanguageToggle } from "@/components/language-toggle";
 import { NotificationsDropdown } from "@/components/notifications-dropdown";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
+import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import Schools from "@/pages/schools";
 import Students from "@/pages/students";
@@ -74,6 +75,7 @@ function AuthenticatedRoutes() {
 function PublicRoutes() {
   return (
     <Switch>
+      <Route path="/login" component={Login} />
       <Route path="/verify" component={Verify} />
       <Route path="/" component={Landing} />
       <Route component={Landing} />

@@ -38,7 +38,7 @@ export default function Landing() {
             </a>
             <Button 
               variant="default" 
-              onClick={() => window.location.href = '/api/auth/login'}
+              onClick={() => window.location.href = '/login'}
               data-testid="button-login"
             >
               Sign In
@@ -63,7 +63,7 @@ export default function Landing() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
                 size="lg" 
-                onClick={() => window.location.href = '/api/auth/login'}
+                onClick={() => window.location.href = '/login'}
                 data-testid="button-get-started"
               >
                 Get Started
