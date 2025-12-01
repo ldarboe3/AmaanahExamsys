@@ -3,7 +3,7 @@ import { db } from "./db";
 import {
   users, regions, clusters, examYears, examCenters, schools, students,
   invoices, subjects, examTimetable, examiners, examinerAssignments,
-  studentResults, certificates, attendanceRecords, malpracticeReports,
+  studentResults, certificates, transcripts, attendanceRecords, malpracticeReports,
   auditLogs, notifications,
   type User, type UpsertUser, type Region, type InsertRegion,
   type Cluster, type InsertCluster, type ExamYear, type InsertExamYear,
@@ -12,6 +12,7 @@ import {
   type Subject, type InsertSubject, type ExamTimetable, type InsertExamTimetable,
   type Examiner, type InsertExaminer, type ExaminerAssignment, type InsertExaminerAssignment,
   type StudentResult, type InsertStudentResult, type Certificate, type InsertCertificate,
+  type Transcript, type InsertTranscript,
   type AttendanceRecord, type InsertAttendanceRecord, type MalpracticeReport, type InsertMalpracticeReport,
   type AuditLog, type InsertAuditLog, type Notification, type InsertNotification,
 } from "@shared/schema";
@@ -152,10 +153,24 @@ export interface IStorage {
   createCertificate(certificate: InsertCertificate): Promise<Certificate>;
   getCertificate(id: number): Promise<Certificate | undefined>;
   getCertificateByNumber(certificateNumber: string): Promise<Certificate | undefined>;
+  getCertificateByQrToken(qrToken: string): Promise<Certificate | undefined>;
   getCertificatesByStudent(studentId: number): Promise<Certificate[]>;
   getCertificatesByExamYear(examYearId: number): Promise<Certificate[]>;
+  getAllCertificates(): Promise<Certificate[]>;
   updateCertificate(id: number, certificate: Partial<InsertCertificate>): Promise<Certificate | undefined>;
+  incrementCertificatePrintCount(id: number): Promise<Certificate | undefined>;
   deleteCertificate(id: number): Promise<boolean>;
+
+  // Transcripts
+  createTranscript(transcript: InsertTranscript): Promise<Transcript>;
+  getTranscript(id: number): Promise<Transcript | undefined>;
+  getTranscriptByNumber(transcriptNumber: string): Promise<Transcript | undefined>;
+  getTranscriptByQrToken(qrToken: string): Promise<Transcript | undefined>;
+  getTranscriptsByStudent(studentId: number): Promise<Transcript[]>;
+  getTranscriptsByExamYear(examYearId: number): Promise<Transcript[]>;
+  updateTranscript(id: number, transcript: Partial<InsertTranscript>): Promise<Transcript | undefined>;
+  incrementTranscriptPrintCount(id: number): Promise<Transcript | undefined>;
+  deleteTranscript(id: number): Promise<boolean>;
 
   // Attendance Records
   createAttendanceRecord(record: InsertAttendanceRecord): Promise<AttendanceRecord>;
@@ -777,12 +792,79 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCertificate(id: number, certificate: Partial<InsertCertificate>): Promise<Certificate | undefined> {
-    const [updated] = await db.update(certificates).set(certificate).where(eq(certificates.id, id)).returning();
+    const [updated] = await db.update(certificates).set({ ...certificate, updatedAt: new Date() }).where(eq(certificates.id, id)).returning();
+    return updated;
+  }
+
+  async getCertificateByQrToken(qrToken: string): Promise<Certificate | undefined> {
+    const [certificate] = await db.select().from(certificates).where(eq(certificates.qrToken, qrToken));
+    return certificate;
+  }
+
+  async getAllCertificates(): Promise<Certificate[]> {
+    return db.select().from(certificates).orderBy(desc(certificates.createdAt));
+  }
+
+  async incrementCertificatePrintCount(id: number): Promise<Certificate | undefined> {
+    const cert = await this.getCertificate(id);
+    if (!cert) return undefined;
+    const [updated] = await db.update(certificates).set({ 
+      printCount: (cert.printCount || 0) + 1,
+      updatedAt: new Date()
+    }).where(eq(certificates.id, id)).returning();
     return updated;
   }
 
   async deleteCertificate(id: number): Promise<boolean> {
     await db.delete(certificates).where(eq(certificates.id, id));
+    return true;
+  }
+
+  // Transcripts
+  async createTranscript(transcript: InsertTranscript): Promise<Transcript> {
+    const [created] = await db.insert(transcripts).values(transcript).returning();
+    return created;
+  }
+
+  async getTranscript(id: number): Promise<Transcript | undefined> {
+    const [transcript] = await db.select().from(transcripts).where(eq(transcripts.id, id));
+    return transcript;
+  }
+
+  async getTranscriptByNumber(transcriptNumber: string): Promise<Transcript | undefined> {
+    const [transcript] = await db.select().from(transcripts).where(eq(transcripts.transcriptNumber, transcriptNumber));
+    return transcript;
+  }
+
+  async getTranscriptByQrToken(qrToken: string): Promise<Transcript | undefined> {
+    const [transcript] = await db.select().from(transcripts).where(eq(transcripts.qrToken, qrToken));
+    return transcript;
+  }
+
+  async getTranscriptsByStudent(studentId: number): Promise<Transcript[]> {
+    return db.select().from(transcripts).where(eq(transcripts.studentId, studentId));
+  }
+
+  async getTranscriptsByExamYear(examYearId: number): Promise<Transcript[]> {
+    return db.select().from(transcripts).where(eq(transcripts.examYearId, examYearId));
+  }
+
+  async updateTranscript(id: number, transcript: Partial<InsertTranscript>): Promise<Transcript | undefined> {
+    const [updated] = await db.update(transcripts).set(transcript).where(eq(transcripts.id, id)).returning();
+    return updated;
+  }
+
+  async incrementTranscriptPrintCount(id: number): Promise<Transcript | undefined> {
+    const trans = await this.getTranscript(id);
+    if (!trans) return undefined;
+    const [updated] = await db.update(transcripts).set({ 
+      printCount: (trans.printCount || 0) + 1
+    }).where(eq(transcripts.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTranscript(id: number): Promise<boolean> {
+    await db.delete(transcripts).where(eq(transcripts.id, id));
     return true;
   }
 
