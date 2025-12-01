@@ -36,7 +36,7 @@ export function UserProfileDropdown() {
               alt={`${user?.firstName || 'User'} ${user?.lastName || ''}`}
               className="object-cover"
             />
-            <AvatarFallback className="text-xs">
+            <AvatarFallback className="text-xs bg-primary text-primary-foreground">
               {getInitials(user?.firstName, user?.lastName)}
             </AvatarFallback>
           </Avatar>
