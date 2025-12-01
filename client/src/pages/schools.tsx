@@ -496,11 +496,11 @@ export default function Schools() {
 
       {/* Add School Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>Add New School</DialogTitle>
+            <DialogTitle>{t.schools.addSchool}</DialogTitle>
             <DialogDescription>
-              Register a new school in the examination system
+              {isRTL ? "تسجيل مدرسة جديدة في نظام الامتحانات" : "Register a new school in the examination system"}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -511,10 +511,10 @@ export default function Schools() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>School Name *</FormLabel>
+                      <FormLabel>{isRTL ? "اسم المدرسة *" : "School Name *"}</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Enter school name"
+                          placeholder={isRTL ? "أدخل اسم المدرسة" : "Enter school name"}
                           {...field}
                           data-testid="input-school-name"
                         />
@@ -528,18 +528,18 @@ export default function Schools() {
                   name="schoolType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>School Type *</FormLabel>
+                      <FormLabel>{isRTL ? "نوع المدرسة *" : "School Type *"}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-school-type">
-                            <SelectValue placeholder="Select type" />
+                            <SelectValue placeholder={isRTL ? "اختر النوع" : "Select type"} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="LBS">Lower Basic School (LBS)</SelectItem>
-                          <SelectItem value="UBS">Upper Basic School (UBS)</SelectItem>
-                          <SelectItem value="BCS">Basic Cycle School (BCS)</SelectItem>
-                          <SelectItem value="SSS">Senior Secondary School (SSS)</SelectItem>
+                          <SelectItem value="LBS">{isRTL ? "المدرسة الأساسية الدنيا (LBS)" : "Lower Basic School (LBS)"}</SelectItem>
+                          <SelectItem value="UBS">{isRTL ? "المدرسة الأساسية العليا (UBS)" : "Upper Basic School (UBS)"}</SelectItem>
+                          <SelectItem value="BCS">{isRTL ? "مدرسة الدورة الأساسية (BCS)" : "Basic Cycle School (BCS)"}</SelectItem>
+                          <SelectItem value="SSS">{isRTL ? "المدرسة الثانوية العليا (SSS)" : "Senior Secondary School (SSS)"}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -554,10 +554,10 @@ export default function Schools() {
                   name="registrarName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Registrar Name *</FormLabel>
+                      <FormLabel>{isRTL ? "اسم المسجل *" : "Registrar Name *"}</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Enter registrar full name"
+                          placeholder={isRTL ? "أدخل الاسم الكامل للمسجل" : "Enter registrar full name"}
                           {...field}
                           data-testid="input-registrar-name"
                         />
@@ -571,11 +571,11 @@ export default function Schools() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email Address *</FormLabel>
+                      <FormLabel>{isRTL ? "عنوان البريد الإلكتروني *" : "Email Address *"}</FormLabel>
                       <FormControl>
                         <Input
                           type="email"
-                          placeholder="school@example.com"
+                          placeholder={isRTL ? "school@example.com" : "school@example.com"}
                           {...field}
                           data-testid="input-school-email"
                         />
@@ -592,7 +592,7 @@ export default function Schools() {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
+                      <FormLabel>{isRTL ? "رقم الهاتف" : "Phone Number"}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="+220 XXXXXXX"
@@ -609,7 +609,7 @@ export default function Schools() {
                   name="regionId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Region</FormLabel>
+                      <FormLabel>{t.schools.region}</FormLabel>
                       <Select 
                         onValueChange={(value) => {
                           field.onChange(value);
@@ -619,7 +619,7 @@ export default function Schools() {
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-region">
-                            <SelectValue placeholder="Select region" />
+                            <SelectValue placeholder={isRTL ? "اختر المنطقة" : "Select region"} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -642,7 +642,7 @@ export default function Schools() {
                   name="clusterId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Cluster</FormLabel>
+                      <FormLabel>{isRTL ? "المجموعة" : "Cluster"}</FormLabel>
                       <Select 
                         onValueChange={field.onChange} 
                         defaultValue={field.value}
@@ -650,7 +650,7 @@ export default function Schools() {
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-cluster">
-                            <SelectValue placeholder={selectedRegionId ? "Select cluster" : "Select region first"} />
+                            <SelectValue placeholder={selectedRegionId ? (isRTL ? "اختر المجموعة" : "Select cluster") : (isRTL ? "اختر المنطقة أولاً" : "Select region first")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -672,10 +672,10 @@ export default function Schools() {
                 name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Address</FormLabel>
+                    <FormLabel>{isRTL ? "العنوان" : "Address"}</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Enter school address"
+                        placeholder={isRTL ? "أدخل عنوان المدرسة" : "Enter school address"}
                         {...field}
                         data-testid="input-school-address"
                       />
@@ -694,7 +694,7 @@ export default function Schools() {
                     form.reset();
                   }}
                 >
-                  Cancel
+                  {t.common.cancel}
                 </Button>
                 <Button 
                   type="submit" 
@@ -704,7 +704,7 @@ export default function Schools() {
                   {createSchoolMutation.isPending && (
                     <Loader2 className="w-4 h-4 me-2 animate-spin" />
                   )}
-                  Add School
+                  {t.schools.addSchool}
                 </Button>
               </DialogFooter>
             </form>
@@ -714,11 +714,11 @@ export default function Schools() {
 
       {/* School Details Dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>School Details</DialogTitle>
+            <DialogTitle>{isRTL ? "تفاصيل المدرسة" : "School Details"}</DialogTitle>
             <DialogDescription>
-              Complete information about the school registration
+              {isRTL ? "معلومات كاملة عن تسجيل المدرسة" : "Complete information about the school registration"}
             </DialogDescription>
           </DialogHeader>
           {selectedSchool && (
@@ -730,10 +730,10 @@ export default function Schools() {
                 <div>
                   <h3 className="text-lg font-semibold">{selectedSchool.name}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {schoolTypeLabels[selectedSchool.schoolType]}
+                    {getSchoolTypeLabel(selectedSchool.schoolType || '', isRTL)}
                   </p>
                   <Badge className={`${statusColors[selectedSchool.status || 'pending']} mt-2`}>
-                    {selectedSchool.status}
+                    {getStatusLabel(selectedSchool.status || 'pending', isRTL)}
                   </Badge>
                 </div>
               </div>
@@ -759,15 +759,15 @@ export default function Schools() {
                 </div>
                 <div className="space-y-3">
                   <div className="text-sm">
-                    <span className="text-muted-foreground">Region:</span>{" "}
-                    <span className="font-medium">{selectedSchool.region?.name || "Not assigned"}</span>
+                    <span className="text-muted-foreground">{t.schools.region}:</span>{" "}
+                    <span className="font-medium">{selectedSchool.region?.name || t.common.notAssigned}</span>
                   </div>
                   <div className="text-sm">
-                    <span className="text-muted-foreground">Cluster:</span>{" "}
-                    <span className="font-medium">{selectedSchool.cluster?.name || "Not assigned"}</span>
+                    <span className="text-muted-foreground">{isRTL ? "المجموعة" : "Cluster"}:</span>{" "}
+                    <span className="font-medium">{selectedSchool.cluster?.name || t.common.notAssigned}</span>
                   </div>
                   <div className="text-sm">
-                    <span className="text-muted-foreground">Registrar:</span>{" "}
+                    <span className="text-muted-foreground">{isRTL ? "المسجل" : "Registrar"}:</span>{" "}
                     <span className="font-medium">{selectedSchool.registrarName}</span>
                   </div>
                 </div>
@@ -775,12 +775,12 @@ export default function Schools() {
 
               {/* Documents */}
               <div>
-                <h4 className="text-sm font-medium mb-3">Documents</h4>
+                <h4 className="text-sm font-medium mb-3">{isRTL ? "المستندات" : "Documents"}</h4>
                 <div className="grid md:grid-cols-3 gap-3">
                   {[
-                    { label: "Registration Certificate", url: selectedSchool.registrationCertificate },
-                    { label: "Land Ownership", url: selectedSchool.landOwnership },
-                    { label: "Operational License", url: selectedSchool.operationalLicense },
+                    { label: isRTL ? "شهادة التسجيل" : "Registration Certificate", url: selectedSchool.registrationCertificate },
+                    { label: isRTL ? "ملكية الأرض" : "Land Ownership", url: selectedSchool.landOwnership },
+                    { label: isRTL ? "رخصة التشغيل" : "Operational License", url: selectedSchool.operationalLicense },
                   ].map((doc) => (
                     <div
                       key={doc.label}
@@ -790,7 +790,7 @@ export default function Schools() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{doc.label}</p>
                         <p className="text-xs text-muted-foreground">
-                          {doc.url ? "Uploaded" : "Not uploaded"}
+                          {doc.url ? (isRTL ? "تم الرفع" : "Uploaded") : (isRTL ? "لم يتم الرفع" : "Not uploaded")}
                         </p>
                       </div>
                     </div>
@@ -801,7 +801,7 @@ export default function Schools() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
-              Close
+              {t.common.close}
             </Button>
             {selectedSchool && (selectedSchool.status === 'pending' || selectedSchool.status === 'verified') && (
               <>
@@ -812,7 +812,7 @@ export default function Schools() {
                     setShowDetailsDialog(false);
                   }}
                 >
-                  Reject
+                  {t.common.reject}
                 </Button>
                 <Button
                   onClick={() => {
@@ -820,7 +820,7 @@ export default function Schools() {
                     setShowDetailsDialog(false);
                   }}
                 >
-                  Approve
+                  {t.common.approve}
                 </Button>
               </>
             )}
