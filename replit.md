@@ -7,6 +7,13 @@ A comprehensive examination management system for managing countrywide Arabic & 
 The MVP is complete with all core features implemented and verified. PDF generation system for certificates and transcripts is fully functional with Arabic/English bilingual support, QR code verification, and gender-specific templates.
 
 ## Recent Changes (December 2024)
+- **Public Result Checker**: Full bilingual (English/Arabic) result lookup system
+  - Access via `/results` page on public website
+  - Search by student index number
+  - Displays student info, subject results, summary statistics
+  - PDF result slip download with Amaanah branding
+  - RTL support for Arabic language mode
+  - API endpoints: `/api/public/results/:indexNumber` and `/api/public/results/:indexNumber/pdf`
 - **Website Content Management System (CMS)**: Full CMS for managing website content
   - News Articles with categories, featured articles, and publishing workflow
   - Resources (downloadable files) management
