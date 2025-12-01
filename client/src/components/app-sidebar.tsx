@@ -30,6 +30,7 @@ import {
   Building2,
   History,
   FileDown,
+  Globe,
   type LucideIcon,
 } from "lucide-react";
 
@@ -65,6 +66,7 @@ const managementDefs: MenuItemDef[] = [
   { key: "regionsAndClusters", url: "/regions", icon: Building2 },
   { key: "subjects", url: "/subjects", icon: BookOpen },
   { key: "timetable", url: "/timetable", icon: ClipboardList },
+  { key: "websiteManagement", url: "/website-management", icon: Globe },
   { key: "reportsAndExports", url: "/reports", icon: FileDown },
   { key: "auditLogs", url: "/audit-logs", icon: History },
   { key: "settings", url: "/settings", icon: Settings },

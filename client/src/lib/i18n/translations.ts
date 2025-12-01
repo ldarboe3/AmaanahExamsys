@@ -27,6 +27,7 @@ export const translations = {
       auditLogs: 'Audit Logs',
       settings: 'Settings',
       examCenter: 'Exam Center',
+      websiteManagement: 'Website Management',
     },
     user: {
       profileSettings: 'Profile Settings',
@@ -288,6 +289,7 @@ export const translations = {
       auditLogs: 'سجلات التدقيق',
       settings: 'الإعدادات',
       examCenter: 'مركز الامتحان',
+      websiteManagement: 'إدارة الموقع',
     },
     user: {
       profileSettings: 'إعدادات الملف الشخصي',
