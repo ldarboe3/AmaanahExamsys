@@ -808,6 +808,175 @@ export const insertNotificationSchema = createInsertSchema(notifications).pick({
   link: true,
 });
 
+// ===== WEBSITE CONTENT MANAGEMENT =====
+
+// News Article Categories
+export const newsCategories = pgTable("news_categories", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  description: text("description"),
+  color: varchar("color", { length: 20 }).default("#1E8F4D"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// News Articles
+export const newsArticles = pgTable("news_articles", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  title: varchar("title", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  excerpt: text("excerpt"),
+  content: text("content").notNull(),
+  featuredImage: varchar("featured_image", { length: 500 }),
+  categoryId: integer("category_id").references(() => newsCategories.id),
+  authorId: varchar("author_id").references(() => users.id),
+  isPublished: boolean("is_published").default(false),
+  isFeatured: boolean("is_featured").default(false),
+  publishedAt: timestamp("published_at"),
+  viewCount: integer("view_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Resource Categories
+export const resourceCategories = pgTable("resource_categories", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  description: text("description"),
+  icon: varchar("icon", { length: 50 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Resources/Documents
+export const resources = pgTable("resources", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  fileUrl: varchar("file_url", { length: 500 }),
+  fileType: varchar("file_type", { length: 50 }),
+  fileSize: integer("file_size"),
+  categoryId: integer("category_id").references(() => resourceCategories.id),
+  isPublished: boolean("is_published").default(false),
+  downloadCount: integer("download_count").default(0),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Website Announcements
+export const announcements = pgTable("announcements", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  type: varchar("type", { length: 50 }).default("info"), // info, warning, success, urgent
+  linkUrl: varchar("link_url", { length: 500 }),
+  linkText: varchar("link_text", { length: 100 }),
+  isActive: boolean("is_active").default(true),
+  displayOnHomepage: boolean("display_on_homepage").default(true),
+  displayStartDate: timestamp("display_start_date"),
+  displayEndDate: timestamp("display_end_date"),
+  priority: integer("priority").default(0),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Newsletter Subscribers
+export const newsletterSubscribers = pgTable("newsletter_subscribers", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  name: varchar("name", { length: 255 }),
+  isActive: boolean("is_active").default(true),
+  subscribedAt: timestamp("subscribed_at").defaultNow(),
+  unsubscribedAt: timestamp("unsubscribed_at"),
+  source: varchar("source", { length: 100 }).default("website"),
+});
+
+// Impact Statistics for Homepage
+export const impactStats = pgTable("impact_stats", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  label: varchar("label", { length: 100 }).notNull(),
+  value: varchar("value", { length: 50 }).notNull(),
+  icon: varchar("icon", { length: 50 }),
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Website Content Schemas
+export const insertNewsCategorySchema = createInsertSchema(newsCategories).pick({
+  name: true,
+  slug: true,
+  description: true,
+  color: true,
+  isActive: true,
+});
+
+export const insertNewsArticleSchema = createInsertSchema(newsArticles).pick({
+  title: true,
+  slug: true,
+  excerpt: true,
+  content: true,
+  featuredImage: true,
+  categoryId: true,
+  authorId: true,
+  isPublished: true,
+  isFeatured: true,
+  publishedAt: true,
+});
+
+export const insertResourceCategorySchema = createInsertSchema(resourceCategories).pick({
+  name: true,
+  slug: true,
+  description: true,
+  icon: true,
+  isActive: true,
+});
+
+export const insertResourceSchema = createInsertSchema(resources).pick({
+  title: true,
+  description: true,
+  fileUrl: true,
+  fileType: true,
+  fileSize: true,
+  categoryId: true,
+  isPublished: true,
+  uploadedBy: true,
+});
+
+export const insertAnnouncementSchema = createInsertSchema(announcements).pick({
+  title: true,
+  content: true,
+  type: true,
+  linkUrl: true,
+  linkText: true,
+  isActive: true,
+  displayOnHomepage: true,
+  displayStartDate: true,
+  displayEndDate: true,
+  priority: true,
+  createdBy: true,
+});
+
+export const insertNewsletterSubscriberSchema = createInsertSchema(newsletterSubscribers).pick({
+  email: true,
+  name: true,
+  isActive: true,
+  source: true,
+});
+
+export const insertImpactStatSchema = createInsertSchema(impactStats).pick({
+  label: true,
+  value: true,
+  icon: true,
+  displayOrder: true,
+  isActive: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -851,3 +1020,19 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+
+// Website Content Types
+export type InsertNewsCategory = z.infer<typeof insertNewsCategorySchema>;
+export type NewsCategory = typeof newsCategories.$inferSelect;
+export type InsertNewsArticle = z.infer<typeof insertNewsArticleSchema>;
+export type NewsArticle = typeof newsArticles.$inferSelect;
+export type InsertResourceCategory = z.infer<typeof insertResourceCategorySchema>;
+export type ResourceCategory = typeof resourceCategories.$inferSelect;
+export type InsertResource = z.infer<typeof insertResourceSchema>;
+export type Resource = typeof resources.$inferSelect;
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+export type Announcement = typeof announcements.$inferSelect;
+export type InsertNewsletterSubscriber = z.infer<typeof insertNewsletterSubscriberSchema>;
+export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect;
+export type InsertImpactStat = z.infer<typeof insertImpactStatSchema>;
+export type ImpactStat = typeof impactStats.$inferSelect;
