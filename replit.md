@@ -1,18 +1,22 @@
 # Amaanah Examination Management System
 
 ## Overview
-A comprehensive examination management system for managing countrywide Arabic & Islamic education examinations. The system supports multi-role authentication and provides features for school registration, student enrollment, invoice generation, result processing, and certificate generation.
+A comprehensive examination management system for managing countrywide Arabic & Islamic education examinations. The system supports multi-role authentication and provides features for school registration, student enrollment, invoice generation, result processing, and bilingual PDF certificate/transcript generation with Arabic RTL support.
 
 ## Current State
-The MVP is complete with all core features implemented and verified. The application is ready for testing with authenticated users.
+The MVP is complete with all core features implemented and verified. PDF generation system for certificates and transcripts is fully functional with Arabic/English bilingual support, QR code verification, and gender-specific templates.
 
 ## Recent Changes (December 2024)
+- **PDF Generation System**: Implemented Puppeteer-based HTML-to-PDF rendering for certificates and transcripts
+- **Bilingual Support**: Arabic/English templates with RTL rendering using Amiri/Noto Naskh fonts
+- **QR Verification**: Unique QR tokens for each certificate/transcript with verification endpoints
+- **Gender-Specific Templates**: Male/female Arabic grammatical variations in certificate templates
+- **Hierarchical Selection**: Region → Cluster → School → Students filtering for bulk document generation
 - Fixed frontend-backend API endpoint consistency (all mutations use POST)
 - Implemented notification system with in-app dropdown
 - Added audit logging with comprehensive activity tracking
 - Created advanced export functionality (CSV for schools, students, results, invoices, examiners)
 - Added Reports page with download capabilities
-- Fixed sidebar navigation with new menu items
 
 ## Project Architecture
 
