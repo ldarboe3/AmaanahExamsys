@@ -2,173 +2,195 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE */
+/* LIGHT MODE - Amaanah Green, White, Black Theme */
 :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
   --opaque-button-border-intensity: -8;
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
-  --background: 0deg 100% 99.02%;
-  --foreground: 0deg 0% 3.92%;
-  --border: 0deg 0% 85.88%;
-  --card: 108deg 11.11% 91.18%;
-  --card-foreground: 0 0% 0%;
-  --card-border: 220 8% 94%;
-  --sidebar: 45 25% 97%;
-  --sidebar-foreground: 20 14% 17%;
-  --sidebar-border: 45 15% 80%;
-  --sidebar-primary: 9 75% 61%;
+  
+  /* Clean white backgrounds */
+  --background: 0 0% 100%;
+  --foreground: 160 26% 7%;
+  
+  /* Subtle borders */
+  --border: 150 10% 88%;
+  
+  /* Cards with slight off-white */
+  --card: 150 15% 98%;
+  --card-foreground: 160 26% 7%;
+  --card-border: 150 10% 90%;
+  
+  /* Green-tinted sidebar */
+  --sidebar: 147 30% 97%;
+  --sidebar-foreground: 160 26% 15%;
+  --sidebar-border: 147 20% 88%;
+  --sidebar-primary: 141 72% 32%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 25 45% 80%;
-  --sidebar-accent-foreground: 20 14% 17%;
-  --sidebar-ring: 9 75% 61%;
-  --popover: 60deg 7.14% 94.51%;
-  --popover-foreground: 0deg 0% 0%;
-  --popover-border: 220 6% 90%;
-  --primary: 143.5deg 96.77% 24.31%;
-  --primary-foreground: 0deg 0% 100%;
-  --secondary: 0deg 0% 90.98%;
-  --secondary-foreground: 0 0% 10.2%;
-  --muted: 128.31deg 83.33% 30.59%;
-  --muted-foreground: 0deg 0% 0%;
-  --accent: 133.22deg 83.1% 27.84%;
-  --accent-foreground: 0deg 100% 99.41%;
-  --destructive: 0deg 0% 1.18%;
-  --destructive-foreground: 0deg 0% 92.94%;
-  --input: 0deg 2.44% 40.2%;
-  --ring: 133.55deg 12.65% 51.96%;
-  --chart-1: 203.8863 88.2845% 53.1373%;
-  --chart-2: 159.7826 100% 36.0784%;
-  --chart-3: 42deg 20% 90.2%;
-  --chart-4: 147.1429 78.5047% 41.9608%;
-  --chart-5: 341.4894 75.2000% 50.9804%;
-  --font-sans: 'Poppins', sans-serif;
-  --font-serif: 'Poppins', sans-serif;
-  --font-mono: Menlo, monospace;
-  --radius: 0.8rem;
-  --shadow-2xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 1px 2px -1px hsl(9, 75%, 61% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 1px 2px -1px hsl(9, 75%, 61% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 2px 4px -1px hsl(9, 75%, 61% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 4px 6px -1px hsl(9, 75%, 61% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 8px 10px -1px hsl(9, 75%, 61% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
-  --tracking-normal: 0em;
+  --sidebar-accent: 147 35% 92%;
+  --sidebar-accent-foreground: 160 26% 15%;
+  --sidebar-ring: 141 72% 32%;
+  
+  /* Popovers */
+  --popover: 0 0% 100%;
+  --popover-foreground: 160 26% 7%;
+  --popover-border: 150 10% 90%;
+  
+  /* Primary - Amaanah Green */
+  --primary: 141 72% 32%;
+  --primary-foreground: 0 0% 100%;
+  
+  /* Secondary - Neutral gray */
+  --secondary: 150 10% 94%;
+  --secondary-foreground: 160 26% 15%;
+  
+  /* Muted - Soft gray-green */
+  --muted: 150 10% 94%;
+  --muted-foreground: 160 15% 45%;
+  
+  /* Accent - Light mint green */
+  --accent: 153 45% 92%;
+  --accent-foreground: 147 63% 18%;
+  
+  /* Destructive - Red for errors */
+  --destructive: 4 76% 50%;
+  --destructive-foreground: 0 0% 100%;
+  
+  /* Input styling */
+  --input: 150 10% 85%;
+  --ring: 141 72% 32%;
+  
+  /* Chart colors */
+  --chart-1: 141 72% 32%;
+  --chart-2: 147 63% 25%;
+  --chart-3: 153 56% 50%;
+  --chart-4: 36 90% 55%;
+  --chart-5: 4 76% 55%;
+  
+  /* Typography */
+  --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-serif: 'Georgia', serif;
+  --font-mono: 'JetBrains Mono', Menlo, monospace;
+  
+  /* Spacing and radius */
+  --radius: 0.5rem;
   --spacing: 0.25rem;
+  --tracking-normal: 0em;
+  
+  /* Shadows - subtle for clean look */
+  --shadow-2xs: 0 1px 2px 0 rgba(0,0,0,0.03);
+  --shadow-xs: 0 1px 2px 0 rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 3px 0 rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.03);
+  --shadow: 0 2px 4px 0 rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.03);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -4px rgba(0,0,0,0.03);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.02);
+  --shadow-2xl: 0 25px 50px -12px rgba(0,0,0,0.1);
 
-/* Fallback for older browsers */
+  /* Fallback for older browsers */
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
   --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
   --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
   --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
   --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
   --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
+/* DARK MODE - Amaanah Green, White, Black Theme */
 .dark {
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
-  --background: 20 14% 4%;
-  --foreground: 45 25% 91%;
-  --border: 20 14% 15%;
-  --card: 20 14% 8%;
-  --card-foreground: 45 25% 85%;
-  --card-border: 220 10% 13%;
-  --sidebar: 20 14% 8%;
-  --sidebar-foreground: 45 25% 85%;
-  --sidebar-border: 20 14% 15%;
-  --sidebar-primary: 9 75% 61%;
+  
+  /* Rich dark backgrounds */
+  --background: 160 26% 5%;
+  --foreground: 150 15% 95%;
+  
+  /* Dark borders */
+  --border: 160 20% 15%;
+  
+  /* Dark cards */
+  --card: 160 22% 8%;
+  --card-foreground: 150 15% 92%;
+  --card-border: 160 18% 12%;
+  
+  /* Dark sidebar with green tint */
+  --sidebar: 160 25% 7%;
+  --sidebar-foreground: 150 15% 90%;
+  --sidebar-border: 160 20% 12%;
+  --sidebar-primary: 141 65% 42%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 25 45% 20%;
-  --sidebar-accent-foreground: 45 25% 85%;
-  --sidebar-ring: 9 75% 61%;
-  --popover: 20 14% 4%;
-  --popover-foreground: 45 25% 91%;
-  --popover-border: 220 10% 18%;
-  --primary: 9 75% 61%;
+  --sidebar-accent: 147 30% 15%;
+  --sidebar-accent-foreground: 150 15% 90%;
+  --sidebar-ring: 141 65% 42%;
+  
+  /* Dark popovers */
+  --popover: 160 25% 7%;
+  --popover-foreground: 150 15% 95%;
+  --popover-border: 160 18% 15%;
+  
+  /* Primary - Lighter green for dark mode */
+  --primary: 141 65% 42%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 30 15% 52%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 20 14% 15%;
-  --muted-foreground: 45 15% 46%;
-  --accent: 25 45% 20%;
-  --accent-foreground: 45 25% 85%;
-  --destructive: 356.3033 90.5579% 54.3137%;
+  
+  /* Secondary */
+  --secondary: 160 15% 18%;
+  --secondary-foreground: 150 15% 90%;
+  
+  /* Muted */
+  --muted: 160 15% 15%;
+  --muted-foreground: 150 10% 55%;
+  
+  /* Accent */
+  --accent: 147 30% 18%;
+  --accent-foreground: 150 20% 90%;
+  
+  /* Destructive */
+  --destructive: 4 76% 55%;
   --destructive-foreground: 0 0% 100%;
-  --input: 20 14% 18%;
-  --ring: 9 75% 61%;
-  --chart-1: 203.8863 88.2845% 53.1373%;
-  --chart-2: 159.7826 100% 36.0784%;
-  --chart-3: 42.0290 92.8251% 56.2745%;
-  --chart-4: 147.1429 78.5047% 41.9608%;
-  --chart-5: 341.4894 75.2000% 50.9804%;
-  --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 2px 4px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 4px 6px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 8px 10px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-
-/* Fallback for older browsers */
-  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --radius: 1.3rem;
+  
+  /* Input */
+  --input: 160 15% 18%;
+  --ring: 141 65% 42%;
+  
+  /* Chart colors for dark mode */
+  --chart-1: 141 65% 45%;
+  --chart-2: 147 55% 35%;
+  --chart-3: 153 50% 55%;
+  --chart-4: 36 85% 55%;
+  --chart-5: 4 70% 55%;
+  
+  /* Typography */
+  --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-serif: 'Georgia', serif;
+  --font-mono: 'JetBrains Mono', Menlo, monospace;
+  
+  --radius: 0.5rem;
   --spacing: 0.25rem;
-  --font-mono: Menlo, monospace;
-  --font-sans: Open Sans, sans-serif;
-  --font-serif: Georgia, serif;
   --tracking-normal: 0em;
+  
+  /* Dark mode shadows */
+  --shadow-2xs: 0 1px 2px 0 rgba(0,0,0,0.3);
+  --shadow-xs: 0 1px 2px 0 rgba(0,0,0,0.4);
+  --shadow-sm: 0 1px 3px 0 rgba(0,0,0,0.4), 0 1px 2px -1px rgba(0,0,0,0.3);
+  --shadow: 0 2px 4px 0 rgba(0,0,0,0.4), 0 1px 2px -1px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4), 0 2px 4px -2px rgba(0,0,0,0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.4), 0 4px 6px -4px rgba(0,0,0,0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.4), 0 8px 10px -6px rgba(0,0,0,0.2);
+  --shadow-2xl: 0 25px 50px -12px rgba(0,0,0,0.5);
+
+  /* Fallbacks */
+  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
 @layer base {
@@ -179,31 +201,20 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+  
+  /* Clean typography */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-medium tracking-tight;
+  }
 }
 
 /**
  * Using the elevate system.
  * Automatic contrast adjustment.
- *
- * <element className="hover-elevate" />
- * <element className="active-elevate-2" />
- *
- * // Using the tailwind utility when a data attribute is "on"
- * <element className="toggle-elevate data-[state=on]:toggle-elevated" />
- * // Or manually controlling the toggle state
- * <element className="toggle-elevate toggle-elevated" />
- *
- * Elevation systems have to handle many states.
- * - not-hovered, vs. hovered vs. active  (three mutually exclusive states)
- * - toggled or not
- * - focused or not (this is not handled with these utilities)
- *
- * Even without handling focused or not, this is six possible combinations that
- * need to be distinguished from eachother visually.
  */
 @layer utilities {
 
-  /* Hide ugly search cancel button in Chrome until we can style it properly */
+  /* Hide ugly search cancel button in Chrome */
   input[type="search"]::-webkit-search-cancel-button {
     @apply hidden;
   }
@@ -215,42 +226,27 @@
     pointer-events: none;
   }
 
-  /* .no-default-hover-elevate/no-default-active-elevate is an escape hatch so consumers of
-   * buttons/badges can remove the automatic brightness adjustment on interactions
-   * and program their own. */
   .no-default-hover-elevate {}
-
   .no-default-active-elevate {}
 
-
-  /**
-   * Toggleable backgrounds go behind the content. Hoverable/active goes on top.
-   * This way they can stack/compound. Both will overlap the parent's borders!
-   * So borders will be automatically adjusted both on toggle, and hover/active,
-   * and they will be compounded.
-   */
   .toggle-elevate::before,
   .toggle-elevate-2::before {
     content: "";
     pointer-events: none;
     position: absolute;
     inset: 0px;
-    /*border-radius: inherit;   match rounded corners */
     border-radius: inherit;
     z-index: -1;
-    /* sits behind content but above backdrop */
   }
 
   .toggle-elevate.toggle-elevated::before {
     background-color: var(--elevate-2);
   }
 
-  /* If there's a 1px border, adjust the inset so that it covers that parent's border */
   .border.toggle-elevate::before {
     inset: -1px;
   }
 
-  /* Does not work on elements with overflow:hidden! */
   .hover-elevate:not(.no-default-hover-elevate),
   .active-elevate:not(.no-default-active-elevate),
   .hover-elevate-2:not(.no-default-hover-elevate),
@@ -267,10 +263,8 @@
     pointer-events: none;
     position: absolute;
     inset: 0px;
-    /*border-radius: inherit;   match rounded corners */
     border-radius: inherit;
     z-index: 999;
-    /* sits in front of content */
   }
 
   .hover-elevate:hover:not(.no-default-hover-elevate)::after,
@@ -283,12 +277,10 @@
     background-color: var(--elevate-2);
   }
 
-  /* If there's a 1px border, adjust the inset so that it covers that parent's border */
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after,
   .border.active-elevate:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate-2:not(.no-hover-interaction-elevate)::after,
-  .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
-  .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
+  .border.active-elevate-2:not(.no-active-interaction-elevate)::after {
     inset: -1px;
   }
 }
@@ -304,7 +296,6 @@ html[dir="rtl"] body {
   text-align: right;
 }
 
-/* RTL specific adjustments */
 html.rtl .flex-row-reverse,
 html[dir="rtl"] .flex-row-reverse {
   flex-direction: row;
@@ -334,7 +325,7 @@ html[dir="ltr"] .me-2 {
 
 /* Arabic font support */
 html[dir="rtl"] {
-  font-family: 'Noto Naskh Arabic', 'Amiri', 'Poppins', sans-serif;
+  font-family: 'Noto Naskh Arabic', 'Amiri', 'Inter', sans-serif;
 }
 
 /* Form inputs RTL */
