@@ -86,7 +86,7 @@ export function AppSidebar() {
   const { user } = useAuth();
   const { t } = useLanguage();
 
-  const isAdmin = user?.role === 'super_admin' || user?.role === 'system_admin';
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'examination_admin' || user?.role === 'logistics_admin';
   const menuDefs = isAdmin ? adminMenuDefs : schoolAdminMenuDefs;
 
   const getNavLabel = (key: string): string => {
