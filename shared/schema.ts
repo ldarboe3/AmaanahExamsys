@@ -571,17 +571,29 @@ export const insertClusterSchema = createInsertSchema(clusters).pick({
   regionId: true,
 });
 
+// Helper to convert date strings to Date objects
+const dateStringToDate = z.preprocess(
+  (val) => {
+    if (val === undefined || val === null || val === '') return undefined;
+    if (val instanceof Date) return val;
+    if (typeof val === 'string') return new Date(val);
+    return val;
+  },
+  z.date().optional()
+);
+
 export const insertExamYearSchema = createInsertSchema(examYears).pick({
   year: true,
   name: true,
   hijriYear: true,
   isActive: true,
-  registrationStartDate: true,
-  registrationEndDate: true,
-  examStartDate: true,
-  examEndDate: true,
-  resultsPublishDate: true,
   createdBy: true,
+}).extend({
+  registrationStartDate: dateStringToDate,
+  registrationEndDate: dateStringToDate,
+  examStartDate: dateStringToDate,
+  examEndDate: dateStringToDate,
+  resultsPublishDate: dateStringToDate,
 });
 
 export const insertExamCenterSchema = createInsertSchema(examCenters).pick({
