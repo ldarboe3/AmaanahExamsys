@@ -292,3 +292,80 @@
     inset: -1px;
   }
 }
+
+/* RTL Support for Arabic */
+html.rtl,
+html[dir="rtl"] {
+  direction: rtl;
+}
+
+html.rtl body,
+html[dir="rtl"] body {
+  text-align: right;
+}
+
+/* RTL specific adjustments */
+html.rtl .flex-row-reverse,
+html[dir="rtl"] .flex-row-reverse {
+  flex-direction: row;
+}
+
+/* Sidebar RTL adjustments */
+html[dir="rtl"] [data-sidebar="sidebar"] {
+  border-left: 1px solid hsl(var(--sidebar-border));
+  border-right: none;
+}
+
+html[dir="ltr"] [data-sidebar="sidebar"] {
+  border-right: 1px solid hsl(var(--sidebar-border));
+  border-left: none;
+}
+
+/* Icon spacing for RTL */
+html[dir="rtl"] .me-2 {
+  margin-left: 0.5rem;
+  margin-right: 0;
+}
+
+html[dir="ltr"] .me-2 {
+  margin-right: 0.5rem;
+  margin-left: 0;
+}
+
+/* Arabic font support */
+html[dir="rtl"] {
+  font-family: 'Noto Naskh Arabic', 'Amiri', 'Poppins', sans-serif;
+}
+
+/* Form inputs RTL */
+html[dir="rtl"] input,
+html[dir="rtl"] textarea,
+html[dir="rtl"] select {
+  text-align: right;
+}
+
+/* Table RTL */
+html[dir="rtl"] table {
+  direction: rtl;
+}
+
+html[dir="rtl"] th,
+html[dir="rtl"] td {
+  text-align: right;
+}
+
+/* Dropdown menu RTL */
+html[dir="rtl"] [role="menu"] {
+  text-align: right;
+}
+
+/* Fix flex gaps for RTL */
+html[dir="rtl"] .gap-2 > *:not(:last-child) {
+  margin-left: 0.5rem;
+  margin-right: 0;
+}
+
+/* Card content RTL */
+html[dir="rtl"] .text-left {
+  text-align: right;
+}
