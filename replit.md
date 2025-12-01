@@ -55,12 +55,35 @@ The MVP is complete with all core features implemented and verified. PDF generat
 14. Exam Center Management
 
 ## Authentication
-Uses password-based authentication with bcrypt hashing and session management.
+Uses password-based authentication with bcrypt hashing and session management. The system supports six user roles with different access levels.
+
+### Login Page
+Access the login page at `/login` to sign in with username and password.
+
+### User Roles
+| Role | Description | Access Level |
+|------|-------------|--------------|
+| super_admin | Full system access | All features, user management, system settings |
+| examination_admin | Exam management | Results, certificates, students, subjects |
+| logistics_admin | Center & logistics management | Exam centers, timetables, examiners |
+| school_admin | School-level access | Own school students, payments, results |
+| examiner | Examination duties | Assigned center duties, attendance |
+| candidate | Student access | Own results, certificates |
 
 ### Test Credentials
-All six user roles have test accounts:
-- Username: role name (superadmin, examinationadmin, logisticsadmin, schooladmin, examiner, candidate)
-- Password: Admin@123
+All six user roles have test accounts with the following credentials:
+
+| Role | Username | Password |
+|------|----------|----------|
+| Super Admin | superadmin | Admin@123 |
+| Examination Admin | examinationadmin | Admin@123 |
+| Logistics Admin | logisticsadmin | Admin@123 |
+| School Admin | schooladmin | Admin@123 |
+| Examiner | examiner | Admin@123 |
+| Candidate | candidate | Admin@123 |
+
+### Logout
+Click the user profile in the sidebar and select "Sign Out" to log out.
 
 ## Database
 PostgreSQL with the following main tables:
