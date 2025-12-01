@@ -18,6 +18,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Form,
   FormControl,
   FormDescription,
@@ -45,6 +55,7 @@ import {
   Users,
   School,
   FileCheck,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -63,7 +74,17 @@ const examYearSchema = z.object({
 
 type ExamYearFormData = z.infer<typeof examYearSchema>;
 
-function ExamYearCard({ examYear, onEdit }: { examYear: ExamYear; onEdit: () => void }) {
+function ExamYearCard({ 
+  examYear, 
+  onEdit, 
+  onViewDetails,
+  onDelete 
+}: { 
+  examYear: ExamYear; 
+  onEdit: () => void;
+  onViewDetails: () => void;
+  onDelete: () => void;
+}) {
   const formatDate = (dateString: string | Date | null) => {
     if (!dateString) return "Not set";
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -105,12 +126,12 @@ function ExamYearCard({ examYear, onEdit }: { examYear: ExamYear; onEdit: () => 
                   <Edit className="w-4 h-4 mr-2" />
                   Edit
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={onViewDetails}>
                   <Eye className="w-4 h-4 mr-2" />
                   View Details
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive">
+                <DropdownMenuItem onClick={onDelete} className="text-destructive">
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete
                 </DropdownMenuItem>
@@ -187,7 +208,10 @@ function ExamYearCardSkeleton() {
 export default function ExamYears() {
   const { toast } = useToast();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [editingExamYear, setEditingExamYear] = useState<ExamYear | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedExamYear, setSelectedExamYear] = useState<ExamYear | null>(null);
 
   const { data: examYears, isLoading } = useQuery<ExamYear[]>({
     queryKey: ["/api/exam-years"],
@@ -202,6 +226,37 @@ export default function ExamYears() {
       isActive: false,
     },
   });
+
+  const formatDateForInput = (dateString: string | Date | null) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  };
+
+  const openEditDialog = (examYear: ExamYear) => {
+    setSelectedExamYear(examYear);
+    form.reset({
+      year: examYear.year,
+      name: examYear.name,
+      hijriYear: examYear.hijriYear || "",
+      registrationStartDate: formatDateForInput(examYear.registrationStartDate),
+      registrationEndDate: formatDateForInput(examYear.registrationEndDate),
+      examStartDate: formatDateForInput(examYear.examStartDate),
+      examEndDate: formatDateForInput(examYear.examEndDate),
+      isActive: examYear.isActive ?? false,
+    });
+    setShowEditDialog(true);
+  };
+
+  const openViewDetails = (examYear: ExamYear) => {
+    setSelectedExamYear(examYear);
+    setShowDetailsDialog(true);
+  };
+
+  const openDeleteDialog = (examYear: ExamYear) => {
+    setSelectedExamYear(examYear);
+    setShowDeleteDialog(true);
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: ExamYearFormData) => {
@@ -232,8 +287,64 @@ export default function ExamYears() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: ExamYearFormData }) => {
+      const payload = {
+        ...data,
+        registrationStartDate: data.registrationStartDate ? new Date(data.registrationStartDate) : undefined,
+        registrationEndDate: data.registrationEndDate ? new Date(data.registrationEndDate) : undefined,
+        examStartDate: data.examStartDate ? new Date(data.examStartDate) : undefined,
+        examEndDate: data.examEndDate ? new Date(data.examEndDate) : undefined,
+      };
+      return apiRequest("PATCH", `/api/exam-years/${id}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-years"] });
+      setShowEditDialog(false);
+      setSelectedExamYear(null);
+      form.reset();
+      toast({
+        title: "Exam Year Updated",
+        description: "The examination year has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update exam year. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/exam-years/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-years"] });
+      setShowDeleteDialog(false);
+      setSelectedExamYear(null);
+      toast({
+        title: "Exam Year Deleted",
+        description: "The examination year has been deleted successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to delete exam year. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSubmit = (data: ExamYearFormData) => {
-    createMutation.mutate(data);
+    if (showEditDialog && selectedExamYear) {
+      updateMutation.mutate({ id: selectedExamYear.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
   };
 
   const activeYear = examYears?.find(ey => ey.isActive);
@@ -296,7 +407,9 @@ export default function ExamYears() {
             <ExamYearCard
               key={examYear.id}
               examYear={examYear}
-              onEdit={() => setEditingExamYear(examYear)}
+              onEdit={() => openEditDialog(examYear)}
+              onViewDetails={() => openViewDetails(examYear)}
+              onDelete={() => openDeleteDialog(examYear)}
             />
           ))
         ) : (
@@ -464,6 +577,256 @@ export default function ExamYears() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={(open) => {
+        setShowEditDialog(open);
+        if (!open) {
+          setSelectedExamYear(null);
+          form.reset();
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Examination Year</DialogTitle>
+            <DialogDescription>
+              Update the examination year details
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="year"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Year</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="hijriYear"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Hijri Year</FormLabel>
+                      <FormControl>
+                        <Input placeholder="1446" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="2024/2025 Academic Year" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="registrationStartDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Registration Start</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="registrationEndDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Registration End</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="examStartDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Exam Start</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="examEndDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Exam End</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Set as Active</FormLabel>
+                      <FormDescription>
+                        Make this the current examination year
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : "Update Exam Year"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Details Dialog */}
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{selectedExamYear?.name}</DialogTitle>
+            <DialogDescription>
+              Examination year details and statistics
+            </DialogDescription>
+          </DialogHeader>
+          {selectedExamYear && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Year</p>
+                  <p className="font-medium">{selectedExamYear.year}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Hijri Year</p>
+                  <p className="font-medium">{selectedExamYear.hijriYear || "Not set"}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Registration Period</p>
+                  <p className="font-medium text-sm">
+                    {selectedExamYear.registrationStartDate 
+                      ? new Date(selectedExamYear.registrationStartDate).toLocaleDateString() 
+                      : "Not set"} - {selectedExamYear.registrationEndDate 
+                      ? new Date(selectedExamYear.registrationEndDate).toLocaleDateString() 
+                      : "Not set"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Examination Period</p>
+                  <p className="font-medium text-sm">
+                    {selectedExamYear.examStartDate 
+                      ? new Date(selectedExamYear.examStartDate).toLocaleDateString() 
+                      : "Not set"} - {selectedExamYear.examEndDate 
+                      ? new Date(selectedExamYear.examEndDate).toLocaleDateString() 
+                      : "Not set"}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Status</p>
+                <Badge className={selectedExamYear.isActive ? "bg-primary/10 text-primary" : ""}>
+                  {selectedExamYear.isActive ? "Active" : "Inactive"}
+                </Badge>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
+              Close
+            </Button>
+            <Button onClick={() => {
+              setShowDetailsDialog(false);
+              if (selectedExamYear) openEditDialog(selectedExamYear);
+            }}>
+              <Edit className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Examination Year</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{selectedExamYear?.name}"? This action cannot be undone.
+              All associated data may be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => selectedExamYear && deleteMutation.mutate(selectedExamYear.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

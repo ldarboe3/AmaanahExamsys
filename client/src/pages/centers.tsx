@@ -18,6 +18,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Form,
   FormControl,
   FormField,
@@ -52,6 +62,7 @@ import {
   Phone,
   Mail,
   Building2,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -78,7 +89,17 @@ interface CenterWithRelations extends ExamCenter {
   assignedStudentsCount?: number;
 }
 
-function CenterCard({ center, onEdit }: { center: CenterWithRelations; onEdit: () => void }) {
+function CenterCard({ 
+  center, 
+  onEdit, 
+  onViewDetails, 
+  onDelete 
+}: { 
+  center: CenterWithRelations; 
+  onEdit: () => void;
+  onViewDetails: () => void;
+  onDelete: () => void;
+}) {
   return (
     <Card className="hover-elevate">
       <CardHeader className="pb-3">
@@ -105,12 +126,12 @@ function CenterCard({ center, onEdit }: { center: CenterWithRelations; onEdit: (
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={onViewDetails}>
                 <Eye className="w-4 h-4 mr-2" />
                 View Details
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem onClick={onDelete} className="text-destructive">
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
               </DropdownMenuItem>
@@ -199,7 +220,10 @@ export default function Centers() {
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [clusterFilter, setClusterFilter] = useState<string>("all");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [editingCenter, setEditingCenter] = useState<CenterWithRelations | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedCenter, setSelectedCenter] = useState<CenterWithRelations | null>(null);
 
   // Build query string for API
   const queryParams = new URLSearchParams();
@@ -231,6 +255,8 @@ export default function Centers() {
       name: "",
       code: "",
       address: "",
+      regionId: 0,
+      clusterId: 0,
       capacity: 500,
       contactPerson: "",
       contactPhone: "",
@@ -270,8 +296,83 @@ export default function Centers() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: CenterFormData }) => {
+      return apiRequest("PATCH", `/api/centers/${id}`, data);
+    },
+    onSuccess: () => {
+      invalidateCenterQueries();
+      setShowEditDialog(false);
+      setSelectedCenter(null);
+      form.reset();
+      toast({
+        title: "Center Updated",
+        description: "The examination center has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update center. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/centers/${id}`);
+    },
+    onSuccess: () => {
+      invalidateCenterQueries();
+      setShowDeleteDialog(false);
+      setSelectedCenter(null);
+      toast({
+        title: "Center Deleted",
+        description: "The examination center has been deleted successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete center. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openEditDialog = (center: CenterWithRelations) => {
+    setSelectedCenter(center);
+    form.reset({
+      name: center.name,
+      code: center.code,
+      address: center.address || "",
+      regionId: center.regionId || 0,
+      clusterId: center.clusterId || 0,
+      capacity: center.capacity || 500,
+      contactPerson: center.contactPerson || "",
+      contactPhone: center.contactPhone || "",
+      contactEmail: center.contactEmail || "",
+    });
+    setShowEditDialog(true);
+  };
+
+  const openViewDetails = (center: CenterWithRelations) => {
+    setSelectedCenter(center);
+    setShowDetailsDialog(true);
+  };
+
+  const openDeleteDialog = (center: CenterWithRelations) => {
+    setSelectedCenter(center);
+    setShowDeleteDialog(true);
+  };
+
   const handleSubmit = (data: CenterFormData) => {
-    createMutation.mutate(data);
+    if (showEditDialog && selectedCenter) {
+      updateMutation.mutate({ id: selectedCenter.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
   };
 
   const filteredCenters = centers?.filter((center) =>
@@ -418,7 +519,9 @@ export default function Centers() {
             <CenterCard
               key={center.id}
               center={center}
-              onEdit={() => setEditingCenter(center)}
+              onEdit={() => openEditDialog(center)}
+              onViewDetails={() => openViewDetails(center)}
+              onDelete={() => openDeleteDialog(center)}
             />
           ))
         ) : (
@@ -615,6 +718,305 @@ export default function Centers() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Center Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Examination Center</DialogTitle>
+            <DialogDescription>
+              Update the details of this examination center.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Center name" {...field} data-testid="input-edit-center-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="CHS001" {...field} data-testid="input-edit-center-code" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="capacity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Capacity</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} data-testid="input-edit-capacity" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="regionId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Region</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-region">
+                            <SelectValue placeholder="Select region" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {regions?.map((region) => (
+                            <SelectItem key={region.id} value={region.id.toString()}>
+                              {region.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="clusterId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cluster</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-cluster">
+                          <SelectValue placeholder="Select cluster" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {clusters?.map((cluster) => (
+                          <SelectItem key={cluster.id} value={cluster.id.toString()}>
+                            {cluster.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Full address..." {...field} data-testid="input-edit-address" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="contactPerson"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Person</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Name" {...field} data-testid="input-edit-contact-person" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="contactPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+220 1234567" {...field} data-testid="input-edit-contact-phone" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="contactEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="contact@example.com" {...field} data-testid="input-edit-contact-email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Details Dialog */}
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Center Details</DialogTitle>
+            <DialogDescription>
+              Detailed information about this examination center.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedCenter && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center">
+                  <MapPin className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">{selectedCenter.name}</h3>
+                  <p className="text-muted-foreground">Code: {selectedCenter.code}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 pt-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Region</p>
+                  <p className="font-medium">{selectedCenter.region?.name || "N/A"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Cluster</p>
+                  <p className="font-medium">{selectedCenter.cluster?.name || "N/A"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Capacity</p>
+                  <p className="font-medium">{selectedCenter.capacity?.toLocaleString() || "N/A"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Status</p>
+                  <Badge variant={selectedCenter.isActive ? "default" : "secondary"}>
+                    {selectedCenter.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+              </div>
+
+              {selectedCenter.address && (
+                <div className="pt-2">
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Address</p>
+                  <p className="font-medium">{selectedCenter.address}</p>
+                </div>
+              )}
+
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-muted-foreground mb-2">Contact Information</p>
+                <div className="space-y-2">
+                  {selectedCenter.contactPerson && (
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      <span>{selectedCenter.contactPerson}</span>
+                    </div>
+                  )}
+                  {selectedCenter.contactPhone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-muted-foreground" />
+                      <span>{selectedCenter.contactPhone}</span>
+                    </div>
+                  )}
+                  {selectedCenter.contactEmail && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <span>{selectedCenter.contactEmail}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t pt-4 grid grid-cols-2 gap-4">
+                <div className="text-center p-3 bg-muted/50 rounded-md">
+                  <p className="text-2xl font-bold">{selectedCenter.assignedSchoolsCount || 0}</p>
+                  <p className="text-sm text-muted-foreground">Schools Assigned</p>
+                </div>
+                <div className="text-center p-3 bg-muted/50 rounded-md">
+                  <p className="text-2xl font-bold">{selectedCenter.assignedStudentsCount || 0}</p>
+                  <p className="text-sm text-muted-foreground">Students Assigned</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
+              Close
+            </Button>
+            <Button onClick={() => {
+              setShowDetailsDialog(false);
+              if (selectedCenter) openEditDialog(selectedCenter);
+            }}>
+              <Edit className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Examination Center</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{selectedCenter?.name}"? This action cannot be undone.
+              All school assignments to this center will be removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => selectedCenter && deleteMutation.mutate(selectedCenter.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
