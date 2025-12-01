@@ -40,13 +40,13 @@ type MenuItemDef = {
 };
 
 const adminMenuDefs: MenuItemDef[] = [
-  { key: "dashboard", url: "/", icon: LayoutDashboard },
+  { key: "dashboard", url: "/dashboard", icon: LayoutDashboard },
   { key: "examYears", url: "/exam-years", icon: Calendar },
   { key: "schools", url: "/schools", icon: School },
   { key: "students", url: "/students", icon: Users },
   { key: "examCenters", url: "/centers", icon: MapPin },
   { key: "payments", url: "/payments", icon: CreditCard },
-  { key: "results", url: "/results", icon: FileCheck },
+  { key: "results", url: "/admin-results", icon: FileCheck },
   { key: "certificates", url: "/certificates", icon: Award },
   { key: "transcripts", url: "/transcripts", icon: BookOpen },
   { key: "examiners", url: "/examiners", icon: UserCheck },
@@ -54,10 +54,10 @@ const adminMenuDefs: MenuItemDef[] = [
 ];
 
 const schoolAdminMenuDefs: MenuItemDef[] = [
-  { key: "dashboard", url: "/", icon: LayoutDashboard },
+  { key: "dashboard", url: "/dashboard", icon: LayoutDashboard },
   { key: "students", url: "/students", icon: Users },
   { key: "payments", url: "/payments", icon: CreditCard },
-  { key: "results", url: "/results", icon: FileCheck },
+  { key: "results", url: "/admin-results", icon: FileCheck },
   { key: "examCenter", url: "/center-info", icon: MapPin },
 ];
 
