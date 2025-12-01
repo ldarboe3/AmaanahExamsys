@@ -17,9 +17,12 @@ import {
   User,
   School,
   Calendar,
-  Award
+  Award,
+  BookOpen,
+  BarChart3
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import {
   Table,
   TableBody,
@@ -32,28 +35,47 @@ import {
 interface ResultData {
   student: {
     indexNumber: string;
+    firstName: string;
+    middleName?: string;
+    lastName: string;
     fullName: string;
-    school: string;
-    level: string;
+    schoolEn: string;
+    schoolAr: string;
+    grade: number;
+    levelEn: string;
+    levelAr: string;
     examYear: string;
+    gender: string;
   };
   results: Array<{
-    subject: string;
+    subjectEn: string;
+    subjectAr: string;
     score: number;
+    maxScore: number;
     grade: string;
     status: string;
+    statusAr: string;
   }>;
-  aggregate: number;
+  summary: {
+    totalScore: number;
+    maxPossibleScore: number;
+    averageScore: number;
+    subjectCount: number;
+    passedCount: number;
+    failedCount: number;
+  };
   overallStatus: string;
+  overallStatusAr: string;
 }
 
 export default function ResultChecker() {
   const { toast } = useToast();
+  const { t, language, isRTL } = useLanguage();
   const [indexNumber, setIndexNumber] = useState("");
   const [searchedIndex, setSearchedIndex] = useState("");
 
   const { data: resultData, isLoading, error, refetch } = useQuery<ResultData>({
-    queryKey: ["/api/public/results", searchedIndex],
+    queryKey: [`/api/public/results/${searchedIndex}`],
     enabled: !!searchedIndex,
   });
 
@@ -61,8 +83,8 @@ export default function ResultChecker() {
     e.preventDefault();
     if (!indexNumber.trim()) {
       toast({
-        title: "Index Number Required",
-        description: "Please enter your index number to check results.",
+        title: t.resultChecker.indexNumberRequired,
+        description: t.resultChecker.pleaseEnterIndexNumber,
         variant: "destructive",
       });
       return;
@@ -71,14 +93,22 @@ export default function ResultChecker() {
   };
 
   const getGradeColor = (grade: string) => {
-    switch (grade) {
-      case 'A': case 'A+': return 'text-green-600';
-      case 'B': case 'B+': return 'text-blue-600';
-      case 'C': case 'C+': return 'text-yellow-600';
-      case 'D': return 'text-orange-600';
-      case 'F': return 'text-red-600';
+    switch (grade.toUpperCase()) {
+      case 'A': case 'A+': return 'text-green-600 dark:text-green-400';
+      case 'B': case 'B+': return 'text-blue-600 dark:text-blue-400';
+      case 'C': case 'C+': return 'text-yellow-600 dark:text-yellow-400';
+      case 'D': case 'D+': return 'text-orange-600 dark:text-orange-400';
+      case 'E': case 'F': return 'text-red-600 dark:text-red-400';
       default: return 'text-foreground';
     }
+  };
+
+  const getSubjectName = (result: ResultData['results'][0]) => {
+    return language === 'ar' ? result.subjectAr : result.subjectEn;
+  };
+
+  const getStatusText = (result: ResultData['results'][0]) => {
+    return language === 'ar' ? result.statusAr : result.status;
   };
 
   return (
@@ -89,14 +119,13 @@ export default function ResultChecker() {
           <div className="max-w-3xl mx-auto text-center">
             <Badge className="mb-4">
               <FileCheck className="w-3 h-3 mr-1" />
-              Examination Results
+              {t.resultChecker.examinationResults}
             </Badge>
             <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
-              Result Checker
+              {t.resultChecker.title}
             </h1>
             <p className="text-lg text-muted-foreground">
-              Enter your index number to view your examination results. 
-              Results are available for verified candidates only.
+              {t.resultChecker.subtitle}
             </p>
           </div>
         </div>
@@ -110,20 +139,21 @@ export default function ResultChecker() {
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                 <Search className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-xl">Check Your Results</CardTitle>
+              <CardTitle className="text-xl">{t.resultChecker.checkYourResults}</CardTitle>
               <CardDescription>
-                Enter your examination index number to retrieve your results
+                {t.resultChecker.enterIndexNumber}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSearch} className="space-y-4">
-                <div className="flex gap-3">
+                <div className={`flex gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
                   <Input
                     type="text"
-                    placeholder="Enter Index Number (e.g., AMAANAH-2024-001)"
+                    placeholder={t.resultChecker.indexNumberPlaceholder}
                     value={indexNumber}
                     onChange={(e) => setIndexNumber(e.target.value.toUpperCase())}
-                    className="flex-1"
+                    className={`flex-1 ${isRTL ? 'text-right' : ''}`}
+                    dir={isRTL ? 'rtl' : 'ltr'}
                     data-testid="input-index-number"
                   />
                   <Button type="submit" disabled={isLoading} data-testid="button-search-results">
@@ -135,7 +165,7 @@ export default function ResultChecker() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground text-center">
-                  Your index number was provided on your examination slip
+                  {t.resultChecker.indexNumberHint}
                 </p>
               </form>
             </CardContent>
@@ -151,7 +181,7 @@ export default function ResultChecker() {
               <Card className="max-w-4xl mx-auto">
                 <CardContent className="py-12 text-center">
                   <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
-                  <p className="text-muted-foreground">Searching for results...</p>
+                  <p className="text-muted-foreground">{t.resultChecker.searching}</p>
                 </CardContent>
               </Card>
             ) : error || !resultData ? (
@@ -160,9 +190,7 @@ export default function ResultChecker() {
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      No results found for index number "{searchedIndex}". 
-                      Please verify your index number and try again. If you believe this is an error, 
-                      please contact your school or AMAANAH office.
+                      {t.resultChecker.noResultsDescription.replace('{indexNumber}', searchedIndex)}
                     </AlertDescription>
                   </Alert>
                 </CardContent>
@@ -172,10 +200,10 @@ export default function ResultChecker() {
                 {/* Student Info Card */}
                 <Card>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
+                    <div className={`flex items-center justify-between gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                      <CardTitle className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                         <GraduationCap className="w-5 h-5 text-primary" />
-                        Student Information
+                        {t.resultChecker.studentInformation}
                       </CardTitle>
                       <Badge variant={resultData.overallStatus === 'PASSED' ? 'default' : 'destructive'}>
                         {resultData.overallStatus === 'PASSED' ? (
@@ -183,37 +211,44 @@ export default function ResultChecker() {
                         ) : (
                           <AlertCircle className="w-3 h-3 mr-1" />
                         )}
-                        {resultData.overallStatus}
+                        {language === 'ar' ? resultData.overallStatusAr : resultData.overallStatus}
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                      <div className="flex items-start gap-3">
-                        <User className="w-5 h-5 text-muted-foreground mt-0.5" />
+                    <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 ${isRTL ? 'text-right' : ''}`}>
+                      <div className={`flex items-start gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <User className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <div>
-                          <p className="text-sm text-muted-foreground">Full Name</p>
+                          <p className="text-sm text-muted-foreground">{t.resultChecker.fullName}</p>
                           <p className="font-medium">{resultData.student.fullName}</p>
                         </div>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <FileCheck className="w-5 h-5 text-muted-foreground mt-0.5" />
+                      <div className={`flex items-start gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <FileCheck className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <div>
-                          <p className="text-sm text-muted-foreground">Index Number</p>
-                          <p className="font-medium">{resultData.student.indexNumber}</p>
+                          <p className="text-sm text-muted-foreground">{t.resultChecker.indexNumber}</p>
+                          <p className="font-medium font-mono">{resultData.student.indexNumber}</p>
                         </div>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <School className="w-5 h-5 text-muted-foreground mt-0.5" />
+                      <div className={`flex items-start gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <School className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <div>
-                          <p className="text-sm text-muted-foreground">School</p>
-                          <p className="font-medium">{resultData.student.school}</p>
+                          <p className="text-sm text-muted-foreground">{t.resultChecker.school}</p>
+                          <p className="font-medium">{language === 'ar' ? resultData.student.schoolAr : resultData.student.schoolEn}</p>
                         </div>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <Calendar className="w-5 h-5 text-muted-foreground mt-0.5" />
+                      <div className={`flex items-start gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <BookOpen className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <div>
-                          <p className="text-sm text-muted-foreground">Exam Year</p>
+                          <p className="text-sm text-muted-foreground">{t.resultChecker.gradeLevel}</p>
+                          <p className="font-medium">{language === 'ar' ? resultData.student.levelAr : resultData.student.levelEn}</p>
+                        </div>
+                      </div>
+                      <div className={`flex items-start gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <Calendar className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">{t.resultChecker.examYear}</p>
                           <p className="font-medium">{resultData.student.examYear}</p>
                         </div>
                       </div>
@@ -221,17 +256,59 @@ export default function ResultChecker() {
                   </CardContent>
                 </Card>
 
+                {/* Summary Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
+                        <BarChart3 className="w-6 h-6 text-primary" />
+                      </div>
+                      <p className="text-2xl font-bold text-primary">{resultData.summary.averageScore}%</p>
+                      <p className="text-sm text-muted-foreground">{language === 'ar' ? 'المعدل' : 'Average'}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-2">
+                        <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                      </div>
+                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">{resultData.summary.passedCount}</p>
+                      <p className="text-sm text-muted-foreground">{language === 'ar' ? 'ناجح' : 'Passed'}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-2">
+                        <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                      </div>
+                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">{resultData.summary.failedCount}</p>
+                      <p className="text-sm text-muted-foreground">{language === 'ar' ? 'راسب' : 'Failed'}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-2">
+                        <BookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{resultData.summary.subjectCount}</p>
+                      <p className="text-sm text-muted-foreground">{language === 'ar' ? 'المواد' : 'Subjects'}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
                 {/* Results Table */}
                 <Card>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
+                    <div className={`flex items-center justify-between gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                      <CardTitle className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                         <Award className="w-5 h-5 text-primary" />
-                        Subject Results
+                        {t.resultChecker.subjectResults}
                       </CardTitle>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Aggregate</p>
-                        <p className="text-2xl font-bold text-primary">{resultData.aggregate}</p>
+                      <div className={`text-${isRTL ? 'left' : 'right'}`}>
+                        <p className="text-sm text-muted-foreground">{language === 'ar' ? 'المجموع' : 'Total Score'}</p>
+                        <p className="text-2xl font-bold text-primary">
+                          {resultData.summary.totalScore}/{resultData.summary.maxPossibleScore}
+                        </p>
                       </div>
                     </div>
                   </CardHeader>
@@ -239,23 +316,31 @@ export default function ResultChecker() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Subject</TableHead>
-                          <TableHead className="text-center">Score</TableHead>
-                          <TableHead className="text-center">Grade</TableHead>
-                          <TableHead className="text-center">Status</TableHead>
+                          <TableHead className={isRTL ? 'text-right' : ''}>{t.resultChecker.subject}</TableHead>
+                          <TableHead className="text-center">{t.resultChecker.score}</TableHead>
+                          <TableHead className="text-center">{t.resultChecker.grade}</TableHead>
+                          <TableHead className="text-center">{t.resultChecker.status}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {resultData.results.map((result, i) => (
-                          <TableRow key={i}>
-                            <TableCell className="font-medium">{result.subject}</TableCell>
-                            <TableCell className="text-center">{result.score}</TableCell>
+                          <TableRow key={i} data-testid={`result-row-${i}`}>
+                            <TableCell className={`font-medium ${isRTL ? 'text-right' : ''}`}>
+                              {getSubjectName(result)}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="font-mono">{result.score}</span>
+                              <span className="text-muted-foreground text-xs">/{result.maxScore}</span>
+                            </TableCell>
                             <TableCell className={`text-center font-bold ${getGradeColor(result.grade)}`}>
                               {result.grade}
                             </TableCell>
                             <TableCell className="text-center">
-                              <Badge variant={result.status === 'PASSED' ? 'outline' : 'destructive'} className="text-xs">
-                                {result.status}
+                              <Badge 
+                                variant={result.status === 'PASSED' ? 'outline' : 'destructive'} 
+                                className="text-xs"
+                              >
+                                {getStatusText(result)}
                               </Badge>
                             </TableCell>
                           </TableRow>
@@ -266,13 +351,24 @@ export default function ResultChecker() {
                 </Card>
 
                 {/* Actions */}
-                <div className="flex justify-center gap-4">
-                  <Button variant="outline">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download Result Slip
+                <div className={`flex justify-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                  <Button 
+                    variant="outline" 
+                    data-testid="button-download-result"
+                    onClick={() => {
+                      if (resultData?.student?.indexNumber) {
+                        window.open(`/api/public/results/${resultData.student.indexNumber}/pdf`, '_blank');
+                      }
+                    }}
+                  >
+                    <Download className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                    {t.resultChecker.downloadResultSlip}
                   </Button>
-                  <Button onClick={() => { setSearchedIndex(""); setIndexNumber(""); }}>
-                    Search Another
+                  <Button 
+                    onClick={() => { setSearchedIndex(""); setIndexNumber(""); }}
+                    data-testid="button-search-another"
+                  >
+                    {t.resultChecker.searchAnother}
                   </Button>
                 </div>
               </div>
@@ -289,27 +385,27 @@ export default function ResultChecker() {
               <Card className="text-center hover-elevate">
                 <CardContent className="pt-6">
                   <FileCheck className="w-10 h-10 text-primary mx-auto mb-4" />
-                  <h3 className="font-semibold mb-2">Official Results</h3>
+                  <h3 className="font-semibold mb-2">{t.resultChecker.officialResults}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Results are verified and official from AMAANAH examination records
+                    {t.resultChecker.officialResultsDesc}
                   </p>
                 </CardContent>
               </Card>
               <Card className="text-center hover-elevate">
                 <CardContent className="pt-6">
                   <GraduationCap className="w-10 h-10 text-chart-2 mx-auto mb-4" />
-                  <h3 className="font-semibold mb-2">All Levels</h3>
+                  <h3 className="font-semibold mb-2">{t.resultChecker.allLevels}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Results available for all examination levels and years
+                    {t.resultChecker.allLevelsDesc}
                   </p>
                 </CardContent>
               </Card>
               <Card className="text-center hover-elevate">
                 <CardContent className="pt-6">
                   <Download className="w-10 h-10 text-chart-3 mx-auto mb-4" />
-                  <h3 className="font-semibold mb-2">Download & Print</h3>
+                  <h3 className="font-semibold mb-2">{t.resultChecker.downloadPrint}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Download your result slip for records and verification
+                    {t.resultChecker.downloadPrintDesc}
                   </p>
                 </CardContent>
               </Card>

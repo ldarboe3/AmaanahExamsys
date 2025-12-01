@@ -2891,8 +2891,15 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
 
       // Get student's results using the correct storage method
       const allResults = await storage.getResultsByStudent(student.id) || [];
+      
+      // Filter only published results for public access
+      const publishedResults = allResults.filter(r => r.status === 'published');
+      
+      if (publishedResults.length === 0) {
+        return res.status(404).json({ message: "No published results found for this index number" });
+      }
 
-      // Get subjects for result details
+      // Get subjects for result details (include Arabic names)
       const subjects = await storage.getSubjects();
       const subjectMap = new Map(subjects.map(s => [s.id, s]));
 
@@ -2900,39 +2907,194 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const examYears = await storage.getExamYears();
       const examYear = examYears.find(ey => ey.id === student.examYearId);
 
-      // Format results
-      const formattedResults = allResults.map(result => {
+      // Grade level names for bilingual display
+      const gradeLevelNames: Record<number, { en: string; ar: string }> = {
+        1: { en: 'Grade 1 - Lower Basic', ar: 'الصف الأول - المرحلة الابتدائية الدنيا' },
+        2: { en: 'Grade 2 - Lower Basic', ar: 'الصف الثاني - المرحلة الابتدائية الدنيا' },
+        3: { en: 'Grade 3 - Lower Basic', ar: 'الصف الثالث - المرحلة الابتدائية الدنيا' },
+        4: { en: 'Grade 4 - Upper Basic', ar: 'الصف الرابع - المرحلة الابتدائية العليا' },
+        5: { en: 'Grade 5 - Upper Basic', ar: 'الصف الخامس - المرحلة الابتدائية العليا' },
+        6: { en: 'Grade 6 - Upper Basic', ar: 'الصف السادس - المرحلة الابتدائية العليا' },
+        7: { en: 'Grade 7 - Basic Cycle', ar: 'الصف السابع - المرحلة الإعدادية' },
+        8: { en: 'Grade 8 - Basic Cycle', ar: 'الصف الثامن - المرحلة الإعدادية' },
+        9: { en: 'Grade 9 - Basic Cycle', ar: 'الصف التاسع - المرحلة الإعدادية' },
+        10: { en: 'Grade 10 - Senior Secondary', ar: 'الصف العاشر - المرحلة الثانوية' },
+        11: { en: 'Grade 11 - Senior Secondary', ar: 'الصف الحادي عشر - المرحلة الثانوية' },
+        12: { en: 'Grade 12 - Senior Secondary', ar: 'الصف الثاني عشر - المرحلة الثانوية' },
+      };
+
+      // Format results with bilingual subject names
+      const formattedResults = publishedResults.map(result => {
         const subject = subjectMap.get(result.subjectId);
+        const passingScore = subject?.passingScore || 50;
+        const score = result.rawScore || 0;
         return {
-          subject: subject?.name || "Unknown Subject",
-          score: result.rawScore || 0,
+          subjectEn: subject?.name || "Unknown Subject",
+          subjectAr: subject?.arabicName || subject?.name || "مادة غير معروفة",
+          score: score,
+          maxScore: 100,
           grade: result.grade || 'N/A',
-          status: (result.rawScore || 0) >= 50 ? 'PASSED' : 'FAILED',
+          status: score >= passingScore ? 'PASSED' : 'FAILED',
+          statusAr: score >= passingScore ? 'ناجح' : 'راسب',
         };
       });
 
-      // Calculate aggregate (sum of top 6 grades for typical systems)
-      const scores = formattedResults.map(r => r.score).sort((a, b) => b - a);
-      const aggregate = scores.slice(0, 6).reduce((sum, score) => sum + score, 0);
+      // Calculate aggregate (sum of scores)
+      const totalScore = formattedResults.reduce((sum, r) => sum + r.score, 0);
+      const maxPossibleScore = formattedResults.length * 100;
+      const averageScore = formattedResults.length > 0 ? Math.round(totalScore / formattedResults.length) : 0;
 
       // Determine overall status
       const passedCount = formattedResults.filter(r => r.status === 'PASSED').length;
       const overallStatus = passedCount >= Math.ceil(formattedResults.length * 0.5) ? 'PASSED' : 'FAILED';
 
+      const gradeLevel = gradeLevelNames[student.grade] || { en: `Grade ${student.grade}`, ar: `الصف ${student.grade}` };
+
       res.json({
         student: {
           indexNumber: student.indexNumber,
-          fullName: `${student.firstName} ${student.lastName}`,
-          school: school?.name || 'Unknown School',
-          level: student.gradeLevel || 'N/A',
+          firstName: student.firstName,
+          middleName: student.middleName,
+          lastName: student.lastName,
+          fullName: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+          schoolEn: school?.name || 'Unknown School',
+          schoolAr: school?.arabicName || school?.name || 'مدرسة غير معروفة',
+          grade: student.grade,
+          levelEn: gradeLevel.en,
+          levelAr: gradeLevel.ar,
           examYear: examYear?.name || 'N/A',
+          gender: student.gender,
         },
         results: formattedResults,
-        aggregate,
+        summary: {
+          totalScore,
+          maxPossibleScore,
+          averageScore,
+          subjectCount: formattedResults.length,
+          passedCount,
+          failedCount: formattedResults.length - passedCount,
+        },
         overallStatus,
+        overallStatusAr: overallStatus === 'PASSED' ? 'ناجح' : 'راسب',
       });
     } catch (error: any) {
       console.error("Result lookup error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public result slip PDF download
+  app.get("/api/public/results/:indexNumber/pdf", async (req, res) => {
+    try {
+      const { indexNumber } = req.params;
+
+      // Find student by index number
+      const students = await storage.getStudents();
+      const student = students.find(s => s.indexNumber?.toUpperCase() === indexNumber.toUpperCase());
+
+      if (!student) {
+        return res.status(404).json({ message: "No results found for this index number" });
+      }
+
+      // Get student's school
+      const school = student.schoolId ? await storage.getSchool(student.schoolId) : null;
+
+      // Get student's results
+      const allResults = await storage.getResultsByStudent(student.id) || [];
+      const publishedResults = allResults.filter(r => r.status === 'published');
+      
+      if (publishedResults.length === 0) {
+        return res.status(404).json({ message: "No published results found for this index number" });
+      }
+
+      // Get subjects
+      const subjects = await storage.getSubjects();
+      const subjectMap = new Map(subjects.map(s => [s.id, s]));
+
+      // Get exam year
+      const examYears = await storage.getExamYears();
+      const examYear = examYears.find(ey => ey.id === student.examYearId);
+
+      // Grade level names
+      const gradeLevelNames: Record<number, { en: string; ar: string }> = {
+        1: { en: 'Grade 1 - Lower Basic', ar: 'الصف الأول - المرحلة الابتدائية الدنيا' },
+        2: { en: 'Grade 2 - Lower Basic', ar: 'الصف الثاني - المرحلة الابتدائية الدنيا' },
+        3: { en: 'Grade 3 - Lower Basic', ar: 'الصف الثالث - المرحلة الابتدائية الدنيا' },
+        4: { en: 'Grade 4 - Upper Basic', ar: 'الصف الرابع - المرحلة الابتدائية العليا' },
+        5: { en: 'Grade 5 - Upper Basic', ar: 'الصف الخامس - المرحلة الابتدائية العليا' },
+        6: { en: 'Grade 6 - Upper Basic', ar: 'الصف السادس - المرحلة الابتدائية العليا' },
+        7: { en: 'Grade 7 - Basic Cycle', ar: 'الصف السابع - المرحلة الإعدادية' },
+        8: { en: 'Grade 8 - Basic Cycle', ar: 'الصف الثامن - المرحلة الإعدادية' },
+        9: { en: 'Grade 9 - Basic Cycle', ar: 'الصف التاسع - المرحلة الإعدادية' },
+        10: { en: 'Grade 10 - Senior Secondary', ar: 'الصف العاشر - المرحلة الثانوية' },
+        11: { en: 'Grade 11 - Senior Secondary', ar: 'الصف الحادي عشر - المرحلة الثانوية' },
+        12: { en: 'Grade 12 - Senior Secondary', ar: 'الصف الثاني عشر - المرحلة الثانوية' },
+      };
+
+      // Format results
+      const formattedResults = publishedResults.map(result => {
+        const subject = subjectMap.get(result.subjectId);
+        const passingScore = subject?.passingScore || 50;
+        const score = result.rawScore || 0;
+        return {
+          subjectEn: subject?.name || "Unknown Subject",
+          subjectAr: subject?.arabicName || subject?.name || "مادة غير معروفة",
+          score: score,
+          maxScore: 100,
+          grade: result.grade || 'N/A',
+          status: score >= passingScore ? 'PASSED' : 'FAILED',
+          statusAr: score >= passingScore ? 'ناجح' : 'راسب',
+        };
+      });
+
+      // Calculate summary
+      const totalScore = formattedResults.reduce((sum, r) => sum + r.score, 0);
+      const maxPossibleScore = formattedResults.length * 100;
+      const averageScore = formattedResults.length > 0 ? Math.round(totalScore / formattedResults.length) : 0;
+      const passedCount = formattedResults.filter(r => r.status === 'PASSED').length;
+      const overallStatus = passedCount >= Math.ceil(formattedResults.length * 0.5) ? 'PASSED' : 'FAILED';
+
+      const gradeLevel = gradeLevelNames[student.grade] || { en: `Grade ${student.grade}`, ar: `الصف ${student.grade}` };
+
+      // Import and generate PDF
+      const { generateResultSlipPDF } = await import('./certificateService');
+      
+      const pdfPath = await generateResultSlipPDF({
+        student: {
+          indexNumber: student.indexNumber,
+          fullName: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+          schoolEn: school?.name || 'Unknown School',
+          schoolAr: school?.arabicName || school?.name || 'مدرسة غير معروفة',
+          grade: student.grade,
+          levelEn: gradeLevel.en,
+          levelAr: gradeLevel.ar,
+          examYear: examYear?.name || 'N/A',
+        },
+        results: formattedResults,
+        summary: {
+          totalScore,
+          maxPossibleScore,
+          averageScore,
+          subjectCount: formattedResults.length,
+          passedCount,
+          failedCount: formattedResults.length - passedCount,
+        },
+        overallStatus,
+        overallStatusAr: overallStatus === 'PASSED' ? 'ناجح' : 'راسب',
+      });
+
+      // Send the PDF file
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="result_slip_${indexNumber}.pdf"`);
+      
+      const fs = await import('fs');
+      const pdfBuffer = fs.readFileSync(pdfPath);
+      res.send(pdfBuffer);
+
+      // Clean up the file after sending
+      fs.unlinkSync(pdfPath);
+    } catch (error: any) {
+      console.error("Result slip PDF generation error:", error);
       res.status(500).json({ message: error.message });
     }
   });
