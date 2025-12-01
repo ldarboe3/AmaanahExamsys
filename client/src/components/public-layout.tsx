@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { BackToTop } from "@/components/back-to-top";
 import { Menu, X, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
@@ -230,6 +231,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <PublicFooter />
+      <BackToTop />
     </div>
   );
 }
