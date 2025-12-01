@@ -1273,6 +1273,185 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Certificate Generation Endpoints
+  app.post("/api/certificates/generate", isAuthenticated, async (req, res) => {
+    try {
+      const { studentIds } = req.body;
+      if (!Array.isArray(studentIds) || studentIds.length === 0) {
+        return res.status(400).json({ message: "studentIds array is required" });
+      }
+      
+      const activeExamYear = await storage.getActiveExamYear();
+      if (!activeExamYear) {
+        return res.status(400).json({ message: "No active exam year found" });
+      }
+
+      const generatedCerts = [];
+      for (const studentId of studentIds) {
+        const student = await storage.getStudent(studentId);
+        if (!student) continue;
+        
+        const certNumber = `CERT-${activeExamYear.year}-${String(studentId).padStart(6, '0')}`;
+        const cert = await storage.createCertificate({
+          studentId,
+          examYearId: activeExamYear.id,
+          certificateNumber: certNumber,
+          templateId: 1,
+          generatedDate: new Date(),
+          issuedDate: new Date(),
+        });
+        generatedCerts.push(cert);
+      }
+      
+      res.json({ generated: generatedCerts.length, certificates: generatedCerts });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/certificates/generate-school", isAuthenticated, async (req, res) => {
+    try {
+      const { schoolId } = req.body;
+      if (!schoolId) {
+        return res.status(400).json({ message: "schoolId is required" });
+      }
+      
+      const activeExamYear = await storage.getActiveExamYear();
+      if (!activeExamYear) {
+        return res.status(400).json({ message: "No active exam year found" });
+      }
+
+      const students = await storage.getStudentsBySchool(parseInt(schoolId));
+      const generatedCerts = [];
+      
+      for (const student of students) {
+        if (student.status !== 'approved') continue;
+        
+        const certNumber = `CERT-${activeExamYear.year}-${String(student.id).padStart(6, '0')}`;
+        try {
+          const cert = await storage.createCertificate({
+            studentId: student.id,
+            examYearId: activeExamYear.id,
+            certificateNumber: certNumber,
+            templateId: 1,
+            generatedDate: new Date(),
+            issuedDate: new Date(),
+          });
+          generatedCerts.push(cert);
+        } catch (e) {
+          // Skip duplicates
+        }
+      }
+      
+      res.json({ generated: generatedCerts.length, total: students.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/certificates/generate-all", isAuthenticated, async (req, res) => {
+    try {
+      const activeExamYear = await storage.getActiveExamYear();
+      if (!activeExamYear) {
+        return res.status(400).json({ message: "No active exam year found" });
+      }
+
+      const students = await storage.getAllStudents();
+      const generatedCerts = [];
+      
+      for (const student of students) {
+        if (student.status !== 'approved') continue;
+        
+        const certNumber = `CERT-${activeExamYear.year}-${String(student.id).padStart(6, '0')}`;
+        try {
+          const cert = await storage.createCertificate({
+            studentId: student.id,
+            examYearId: activeExamYear.id,
+            certificateNumber: certNumber,
+            templateId: 1,
+            generatedDate: new Date(),
+            issuedDate: new Date(),
+          });
+          generatedCerts.push(cert);
+        } catch (e) {
+          // Skip duplicates
+        }
+      }
+      
+      res.json({ generated: generatedCerts.length, total: students.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Transcript Generation Endpoints
+  app.post("/api/transcripts/generate", isAuthenticated, async (req, res) => {
+    try {
+      const { studentIds } = req.body;
+      if (!Array.isArray(studentIds) || studentIds.length === 0) {
+        return res.status(400).json({ message: "studentIds array is required" });
+      }
+      
+      const activeExamYear = await storage.getActiveExamYear();
+      if (!activeExamYear) {
+        return res.status(400).json({ message: "No active exam year found" });
+      }
+
+      const transcripts = [];
+      for (const studentId of studentIds) {
+        const student = await storage.getStudent(studentId);
+        if (!student) continue;
+        
+        const results = await storage.getResultsByStudent(studentId);
+        transcripts.push({
+          student,
+          examYear: activeExamYear,
+          results,
+          generatedAt: new Date(),
+          transcriptNumber: `TR-${activeExamYear.year}-${String(studentId).padStart(6, '0')}`,
+        });
+      }
+      
+      res.json({ generated: transcripts.length, transcripts });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/transcripts/generate-school", isAuthenticated, async (req, res) => {
+    try {
+      const { schoolId } = req.body;
+      if (!schoolId) {
+        return res.status(400).json({ message: "schoolId is required" });
+      }
+      
+      const activeExamYear = await storage.getActiveExamYear();
+      if (!activeExamYear) {
+        return res.status(400).json({ message: "No active exam year found" });
+      }
+
+      const students = await storage.getStudentsBySchool(parseInt(schoolId));
+      const transcripts = [];
+      
+      for (const student of students) {
+        if (student.status !== 'approved') continue;
+        
+        const results = await storage.getResultsByStudent(student.id);
+        transcripts.push({
+          student,
+          examYear: activeExamYear,
+          results,
+          generatedAt: new Date(),
+          transcriptNumber: `TR-${activeExamYear.year}-${String(student.id).padStart(6, '0')}`,
+        });
+      }
+      
+      res.json({ generated: transcripts.length, total: students.length, transcripts });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Attendance Records API
   app.get("/api/attendance", async (req, res) => {
     try {
