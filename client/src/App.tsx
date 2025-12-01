@@ -31,6 +31,7 @@ import Reports from "@/pages/reports";
 import Subjects from "@/pages/subjects";
 import Timetable from "@/pages/timetable";
 import Settings from "@/pages/settings";
+import Profile from "@/pages/profile";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -67,6 +68,7 @@ function AuthenticatedRoutes() {
       <Route path="/subjects" component={Subjects} />
       <Route path="/timetable" component={Timetable} />
       <Route path="/settings" component={Settings} />
+      <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>
   );

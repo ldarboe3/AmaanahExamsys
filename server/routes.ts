@@ -238,6 +238,43 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Update user profile
+  app.post("/api/users/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { firstName, lastName, phone } = req.body;
+      
+      // Users can only update their own profile, unless they're admin
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      const isAdmin = ['super_admin', 'examination_admin'].includes(currentUser.role || '');
+      if (currentUser.id !== id && !isAdmin) {
+        return res.status(403).json({ message: "You can only update your own profile" });
+      }
+
+      const updatedUser = await db.update(users)
+        .set({ 
+          firstName: firstName || undefined,
+          lastName: lastName || undefined,
+          phone: phone || undefined,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, id))
+        .returning();
+
+      if (updatedUser.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({ ...updatedUser[0], passwordHash: undefined });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Reset password (admin only)
   app.post("/api/auth/reset-password", isAuthenticated, async (req, res) => {
     try {
