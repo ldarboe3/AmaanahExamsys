@@ -162,59 +162,54 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="w-full"
-                  data-testid="button-user-menu"
-                >
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage 
-                      src={user?.profileImageUrl || undefined} 
-                      alt={`${user?.firstName || 'User'} ${user?.lastName || ''}`}
-                      className="object-cover"
-                    />
-                    <AvatarFallback className="text-xs">
-                      {getInitials(user?.firstName, user?.lastName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col items-start text-left min-w-0 flex-1">
-                    <span className="text-sm font-medium truncate w-full">
-                      {user?.firstName || 'User'} {user?.lastName || ''}
-                    </span>
-                    <span className="text-xs text-muted-foreground truncate w-full">
-                      {user?.email || ''}
-                    </span>
-                  </div>
-                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem asChild>
-                  <Link href="/profile" className="cursor-pointer">
-                    <Settings className="w-4 h-4 me-2" />
-                    {t.user.profileSettings}
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive cursor-pointer"
-                  onClick={async () => {
-                    await fetch('/api/auth/logout', { method: 'POST' });
-                    window.location.href = '/';
-                  }}
-                  data-testid="button-logout"
-                >
-                  <LogOut className="w-4 h-4 me-2" />
-                  {t.user.signOut}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="flex items-center gap-3 w-full p-3 rounded-md hover-elevate text-left"
+              data-testid="button-user-menu"
+            >
+              <Avatar className="w-8 h-8">
+                <AvatarImage 
+                  src={user?.profileImageUrl || undefined} 
+                  alt={`${user?.firstName || 'User'} ${user?.lastName || ''}`}
+                  className="object-cover"
+                />
+                <AvatarFallback className="text-xs">
+                  {getInitials(user?.firstName, user?.lastName)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col items-start min-w-0 flex-1">
+                <span className="text-sm font-medium truncate w-full text-sidebar-foreground">
+                  {user?.firstName || 'User'} {user?.lastName || ''}
+                </span>
+                <span className="text-xs text-muted-foreground truncate w-full">
+                  {user?.email || ''}
+                </span>
+              </div>
+              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem asChild>
+              <Link href="/profile" className="cursor-pointer">
+                <Settings className="w-4 h-4 me-2" />
+                {t.user.profileSettings}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive cursor-pointer"
+              onClick={async () => {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.href = '/';
+              }}
+              data-testid="button-logout"
+            >
+              <LogOut className="w-4 h-4 me-2" />
+              {t.user.signOut}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
     </Sidebar>
   );
