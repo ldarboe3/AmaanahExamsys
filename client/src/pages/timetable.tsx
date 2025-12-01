@@ -144,16 +144,16 @@ export default function Timetable() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
       toast({
-        title: "Entry Created",
-        description: "Timetable entry has been created successfully.",
+        title: t.timetable.entryCreated,
+        description: t.timetable.entryCreatedDesc,
       });
       setShowDialog(false);
       form.reset();
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create timetable entry",
+        title: t.common.error,
+        description: error.message || t.timetable.failedToCreate,
         variant: "destructive",
       });
     },
@@ -166,8 +166,8 @@ export default function Timetable() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
       toast({
-        title: "Entry Updated",
-        description: "Timetable entry has been updated successfully.",
+        title: t.timetable.entryUpdated,
+        description: t.timetable.entryUpdatedDesc,
       });
       setShowDialog(false);
       setEditingEntry(null);
@@ -175,8 +175,8 @@ export default function Timetable() {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update timetable entry",
+        title: t.common.error,
+        description: error.message || t.timetable.failedToUpdate,
         variant: "destructive",
       });
     },
@@ -189,16 +189,16 @@ export default function Timetable() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
       toast({
-        title: "Entry Deleted",
-        description: "Timetable entry has been deleted successfully.",
+        title: t.timetable.entryDeleted,
+        description: t.timetable.entryDeletedDesc,
       });
       setShowDeleteDialog(false);
       setEntryToDelete(null);
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete timetable entry",
+        title: t.common.error,
+        description: error.message || t.timetable.failedToDelete,
         variant: "destructive",
       });
     },
@@ -259,19 +259,19 @@ export default function Timetable() {
   }, {} as Record<string, TimetableWithRelations[]>);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Exam Timetable</h1>
+          <h1 className="text-2xl font-semibold">{t.timetable.title}</h1>
           <p className="text-muted-foreground">
             {activeExamYear
-              ? `Schedule for ${activeExamYear.name}`
-              : "Manage examination schedules"}
+              ? `${t.timetable.timetableList} - ${activeExamYear.name}`
+              : t.timetable.manageDescription}
           </p>
         </div>
         <Button onClick={openCreateDialog} data-testid="button-add-entry">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Entry
+          <Plus className="w-4 h-4 me-2" />
+          {t.timetable.addEntry}
         </Button>
       </div>
 
@@ -280,10 +280,10 @@ export default function Timetable() {
           <div className="flex items-center gap-4">
             <Select value={gradeFilter} onValueChange={setGradeFilter}>
               <SelectTrigger className="w-[180px]" data-testid="select-grade-filter">
-                <SelectValue placeholder="Filter by grade" />
+                <SelectValue placeholder={t.subjects.grade} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Grades</SelectItem>
+                <SelectItem value="all">{t.timetable.allGrades}</SelectItem>
                 <SelectItem value="3">Grade 3 (LBS)</SelectItem>
                 <SelectItem value="6">Grade 6 (UBS)</SelectItem>
                 <SelectItem value="9">Grade 9 (BCS)</SelectItem>
@@ -298,13 +298,13 @@ export default function Timetable() {
           ) : !sortedTimetable?.length ? (
             <div className="text-center py-12">
               <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">No timetable entries</h3>
+              <h3 className="text-lg font-medium">{t.timetable.noEntriesFound}</h3>
               <p className="text-muted-foreground mb-4">
-                Get started by adding an examination schedule
+                {t.timetable.addFirstEntry}
               </p>
               <Button onClick={openCreateDialog}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Entry
+                <Plus className="w-4 h-4 me-2" />
+                {t.timetable.addEntry}
               </Button>
             </div>
           ) : (
@@ -315,17 +315,17 @@ export default function Timetable() {
                     <Calendar className="w-4 h-4 text-muted-foreground" />
                     <h3 className="text-lg font-medium">
                       {dateKey === "unscheduled"
-                        ? "Unscheduled"
-                        : format(new Date(dateKey), "EEEE, MMMM d, yyyy")}
+                        ? t.common.unscheduled
+                        : new Date(dateKey).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     </h3>
                   </div>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Time</TableHead>
-                        <TableHead>Subject</TableHead>
-                        <TableHead>Grade</TableHead>
-                        <TableHead>Venue</TableHead>
+                        <TableHead>{t.timetable.duration}</TableHead>
+                        <TableHead>{t.subjects.subject}</TableHead>
+                        <TableHead>{t.subjects.grade}</TableHead>
+                        <TableHead>{t.timetable.venue}</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -345,7 +345,7 @@ export default function Timetable() {
                               <BookOpen className="w-4 h-4 text-muted-foreground" />
                               <div>
                                 <div className="font-medium">
-                                  {entry.subject?.name || "Unknown Subject"}
+                                  {entry.subject?.name || t.common.unknown}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
                                   {entry.subject?.code}
@@ -357,7 +357,7 @@ export default function Timetable() {
                             <Badge variant="outline">
                               {entry.subject?.grade
                                 ? gradeLabels[entry.subject.grade]
-                                : "Unknown"}
+                                : t.common.unknown}
                             </Badge>
                           </TableCell>
                           <TableCell>{entry.venue || "-"}</TableCell>
@@ -372,10 +372,10 @@ export default function Timetable() {
                                   <MoreVertical className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
+                              <DropdownMenuContent align={isRTL ? "start" : "end"}>
                                 <DropdownMenuItem onClick={() => openEditDialog(entry)}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit
+                                  <Edit className="w-4 h-4 me-2" />
+                                  {t.common.edit}
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
@@ -385,8 +385,8 @@ export default function Timetable() {
                                     setShowDeleteDialog(true);
                                   }}
                                 >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete
+                                  <Trash2 className="w-4 h-4 me-2" />
+                                  {t.common.delete}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -403,15 +403,15 @@ export default function Timetable() {
       </Card>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px]" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
             <DialogTitle>
-              {editingEntry ? "Edit Timetable Entry" : "Add Timetable Entry"}
+              {editingEntry ? t.timetable.editEntry : t.timetable.addNewEntry}
             </DialogTitle>
             <DialogDescription>
               {editingEntry
-                ? "Update the examination schedule."
-                : "Add a new examination to the timetable."}
+                ? t.timetable.editEntryDesc
+                : t.timetable.addNewEntryDesc}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -421,20 +421,20 @@ export default function Timetable() {
                 name="examYearId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Exam Year</FormLabel>
+                    <FormLabel>{t.sidebar.examYears}</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       value={field.value?.toString()}
                     >
                       <FormControl>
                         <SelectTrigger data-testid="select-exam-year">
-                          <SelectValue placeholder="Select exam year" />
+                          <SelectValue placeholder={t.timetable.selectExamYear} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {examYears?.map((ey) => (
                           <SelectItem key={ey.id} value={ey.id.toString()}>
-                            {ey.name} {ey.isActive && "(Active)"}
+                            {ey.name} {ey.isActive && `(${t.common.active})`}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -448,14 +448,14 @@ export default function Timetable() {
                 name="subjectId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Subject</FormLabel>
+                    <FormLabel>{t.subjects.subject}</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       value={field.value?.toString()}
                     >
                       <FormControl>
                         <SelectTrigger data-testid="select-subject">
-                          <SelectValue placeholder="Select subject" />
+                          <SelectValue placeholder={t.timetable.selectSubject} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -477,7 +477,7 @@ export default function Timetable() {
                 name="examDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Exam Date</FormLabel>
+                    <FormLabel>{t.timetable.examDate}</FormLabel>
                     <FormControl>
                       <Input
                         type="date"
@@ -495,7 +495,7 @@ export default function Timetable() {
                   name="startTime"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Start Time</FormLabel>
+                      <FormLabel>{t.timetable.startTime}</FormLabel>
                       <FormControl>
                         <Input
                           type="time"
@@ -512,7 +512,7 @@ export default function Timetable() {
                   name="endTime"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>End Time</FormLabel>
+                      <FormLabel>{t.timetable.endTime}</FormLabel>
                       <FormControl>
                         <Input
                           type="time"
@@ -530,7 +530,7 @@ export default function Timetable() {
                 name="venue"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Venue (Optional)</FormLabel>
+                    <FormLabel>{t.timetable.venue}</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="e.g., Main Hall"
@@ -548,7 +548,7 @@ export default function Timetable() {
                   variant="outline"
                   onClick={() => setShowDialog(false)}
                 >
-                  Cancel
+                  {t.common.cancel}
                 </Button>
                 <Button
                   type="submit"
@@ -556,10 +556,10 @@ export default function Timetable() {
                   data-testid="button-save-entry"
                 >
                   {createMutation.isPending || updateMutation.isPending
-                    ? "Saving..."
+                    ? t.timetable.saving
                     : editingEntry
-                    ? "Update Entry"
-                    : "Create Entry"}
+                    ? t.timetable.editEntry
+                    : t.timetable.addEntry}
                 </Button>
               </DialogFooter>
             </form>
@@ -568,12 +568,11 @@ export default function Timetable() {
       </Dialog>
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
+        <DialogContent dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
-            <DialogTitle>Delete Timetable Entry</DialogTitle>
+            <DialogTitle>{t.timetable.deleteEntry}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this timetable entry for "
-              {entryToDelete?.subject?.name}"? This action cannot be undone.
+              {t.timetable.deleteEntryConfirm}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -581,7 +580,7 @@ export default function Timetable() {
               variant="outline"
               onClick={() => setShowDeleteDialog(false)}
             >
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button
               variant="destructive"
@@ -589,7 +588,7 @@ export default function Timetable() {
               disabled={deleteMutation.isPending}
               data-testid="button-confirm-delete"
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteMutation.isPending ? t.common.deleting : t.common.delete}
             </Button>
           </DialogFooter>
         </DialogContent>
