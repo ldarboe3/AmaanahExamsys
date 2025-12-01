@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { BackToTop } from "@/components/back-to-top";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { Menu, X, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
@@ -51,6 +53,7 @@ function NavLink({ href, children, active }: { href: string; children: React.Rea
 export function PublicHeader() {
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { t } = useLanguage();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -60,7 +63,7 @@ export function PublicHeader() {
             <img src={amaanahLogo} alt="Amaanah Logo" className="w-10 h-10 object-contain" />
             <div className="hidden sm:block">
               <h1 className="text-lg font-semibold text-foreground leading-tight">AMAANAH</h1>
-              <p className="text-xs text-muted-foreground leading-tight">Education for Development</p>
+              <p className="text-xs text-muted-foreground leading-tight">{t.website.educationForDevelopment}</p>
             </div>
           </div>
         </Link>
@@ -101,14 +104,15 @@ export function PublicHeader() {
         <div className="flex items-center gap-2">
           <Link href="/results">
             <Button variant="outline" size="sm" className="hidden sm:inline-flex" data-testid="button-check-results">
-              Check Results
+              {t.website.checkResults}
             </Button>
           </Link>
           <Link href="/login">
             <Button size="sm" data-testid="button-portal-login">
-              Portal Login
+              {t.website.portalLogin}
             </Button>
           </Link>
+          <LanguageToggle />
           <ThemeToggle />
           
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -144,10 +148,10 @@ export function PublicHeader() {
                 ))}
                 <div className="pt-4 border-t space-y-2">
                   <Link href="/results" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="outline" className="w-full">Check Results</Button>
+                    <Button variant="outline" className="w-full">{t.website.checkResults}</Button>
                   </Link>
                   <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                    <Button className="w-full">Portal Login</Button>
+                    <Button className="w-full">{t.website.portalLogin}</Button>
                   </Link>
                 </div>
               </div>
