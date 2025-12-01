@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { PublicLayout } from "@/components/public-layout";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { 
   BookOpen, 
   GraduationCap, 
@@ -28,12 +29,20 @@ import heroImage from "@assets/generated_images/african_madrassah_students_study
 import teacherImage from "@assets/generated_images/islamic_teacher_teaching_students.png";
 import graduationImage from "@assets/generated_images/islamic_school_graduation_ceremony.png";
 
-const quickLinks = [
+const quickLinksEn = [
   { name: "Curriculum & Training", href: "/programmes#curriculum", icon: BookOpen },
   { name: "Examinations & Certification", href: "/programmes#examinations", icon: Award },
   { name: "Quality Assurance", href: "/programmes#quality", icon: Shield },
   { name: "Endowment & Projects", href: "/programmes#endowment", icon: Building2 },
   { name: "Membership", href: "/membership", icon: Users },
+];
+
+const quickLinksAr = [
+  { name: "المناهج والتدريب", href: "/programmes#curriculum", icon: BookOpen },
+  { name: "الامتحانات والشهادات", href: "/programmes#examinations", icon: Award },
+  { name: "ضمان الجودة", href: "/programmes#quality", icon: Shield },
+  { name: "المشاريع والأوقاف", href: "/programmes#endowment", icon: Building2 },
+  { name: "العضوية", href: "/membership", icon: Users },
 ];
 
 const defaultImpactStats = [
@@ -71,8 +80,11 @@ interface NewsApiResponse {
 
 export default function Home() {
   const { toast } = useToast();
+  const { t, language } = useLanguage();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  
+  const quickLinks = language === 'ar' ? quickLinksAr : quickLinksEn;
 
   const { data: newsData } = useQuery<NewsApiResponse>({
     queryKey: ["/api/public/news"],
@@ -149,25 +161,24 @@ export default function Home() {
           <div className="max-w-2xl">
             <Badge className="mb-4 bg-primary/20 text-white border-primary/30 hover:bg-primary/30">
               <Globe className="w-3 h-3 mr-1" />
-              Serving The Gambia Since 1996
+              {t.website.servingGambiaSince1996}
             </Badge>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-              Education for Development
+              {t.website.educationForDevelopment}
             </h1>
             <p className="text-lg md:text-xl text-white/90 mb-8">
-              Strengthening unity and quality across Madrassah and Islamic schools in The Gambia. 
-              Coordinating curricula, assessments, and teacher training for excellence in Islamic and Arabic education.
+              {t.website.strengtheningUnity}
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/membership">
                 <Button size="lg" className="w-full sm:w-auto" data-testid="button-get-involved">
-                  Get Involved
+                  {t.website.getInvolved}
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               </Link>
               <Link href="/about">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto bg-white/10 border-white/30 text-white hover:bg-white/20" data-testid="button-learn-about">
-                  Learn About AMAANAH
+                  {t.website.learnAboutAmaanah}
                 </Button>
               </Link>
             </div>
@@ -179,8 +190,8 @@ export default function Home() {
       <section className="py-12 md:py-16 bg-gradient-to-b from-background to-primary/5 border-b">
         <div className="container mx-auto px-4">
           <div className="text-center mb-10">
-            <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Quick Access</h3>
-            <p className="text-muted-foreground">Explore our key programmes and services</p>
+            <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-2">{t.website.quickAccess}</h3>
+            <p className="text-muted-foreground">{t.website.exploreServices}</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
             {quickLinks.map((link) => (
@@ -203,7 +214,7 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Our Impact
+              {t.common.total} {t.website.home}
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               National coordination of Madrassah and Tahfiz education in partnership with Government on policy and implementation.
