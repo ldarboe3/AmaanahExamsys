@@ -75,9 +75,9 @@ export default function Login() {
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
         
         {/* Content over the image */}
-        <div className="relative z-10 flex flex-col justify-end p-8 lg:p-12 text-white h-full">
+        <div className="relative z-10 flex flex-col justify-start p-8 lg:p-12 text-white h-full">
           {/* Tagline */}
-          <div className="max-w-md mb-8">
+          <div className="max-w-md mt-4">
             <h2 className="text-3xl lg:text-4xl font-bold mb-4">
               Education for Development
             </h2>
@@ -87,7 +87,7 @@ export default function Login() {
           </div>
           
           {/* Footer */}
-          <div className="text-sm text-white/70">
+          <div className="text-sm text-white/70 mt-6">
             <p>Examination Management System</p>
             <p className="mt-1">The Gambia</p>
           </div>
