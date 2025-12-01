@@ -4,6 +4,9 @@ import path from 'path';
 import fs from 'fs';
 import {
   certificateTemplates,
+  getCertificateTemplate,
+  getGradeLevelNameArabic,
+  getGradeLevelNameEnglish,
   formatArabicDate,
   formatHijriDate,
   getGradeWord,
@@ -11,6 +14,7 @@ import {
   generateQRToken,
   arabicMonths,
 } from './certificateTemplates';
+import { gradeTranscriptConfigs, getGradeConfig, getGradeLabelArabic, isEnglishSubject } from './transcriptTemplates';
 
 interface StudentData {
   id: number;
@@ -57,14 +61,12 @@ if (!fs.existsSync(outputDir)) {
 export async function generateCertificatePDF(data: CertificateData): Promise<string> {
   const { student, school, examYear, finalGrade, qrToken, certificateNumber, verifyUrl, isReprint } = data;
   
-  if (![6, 9, 12].includes(student.grade)) {
-    throw new Error(`Certificates can only be generated for grades 6, 9, and 12. Student is in grade ${student.grade}`);
-  }
-
-  const template = certificateTemplates[student.grade][student.gender];
-  if (!template) {
-    throw new Error(`No template found for grade ${student.grade} ${student.gender}`);
-  }
+  // Support all grades with grade-specific templates and fallbacks
+  const template = getCertificateTemplate(student.grade, student.gender);
+  
+  // Get grade level names for the certificate with fallbacks
+  const gradeLevelAr = getGradeLevelNameArabic(student.grade);
+  const gradeLevelEn = getGradeLevelNameEnglish(student.grade);
 
   const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
     width: template.qr.width * 2,
@@ -103,7 +105,7 @@ export async function generateCertificatePDF(data: CertificateData): Promise<str
   const gradeResult = student.gender === 'male' ? 'تقديره' : 'تقديرها';
 
   const arabicText = `
-    تشهد الأمانة العامة بأن ال${genderPrefix}/ ${fullName} ${birthVerb} في ${student.placeOfBirth || ''} بتاريخ: ${dobFormatted} قد ${completeVerb} دراسة المرحلة الابتدائية في مدرسة ${school.name} بعد أن ${passedVerb} في الامتحان النهائي الذي أشرفت عليه الأمانة العامة بالتنسيق مع وزارة التربية والتعليم في غامبيا.
+    تشهد الأمانة العامة بأن ال${genderPrefix}/ ${fullName} ${birthVerb} في ${student.placeOfBirth || ''} بتاريخ: ${dobFormatted} قد ${completeVerb} دراسة ${gradeLevelAr} في مدرسة ${school.name} بعد أن ${passedVerb} في الامتحان النهائي الذي أشرفت عليه الأمانة العامة بالتنسيق مع وزارة التربية والتعليم في غامبيا.
     ${examWindowText}، وكان ${gradeResult} فيه ${gradeWordAr}.
     سُجلت هذه الشهادة تحت رقم (${certificateNumber}) بتاريخ: ${issueDateHijri} الموافق ${issueDateGreg}
   `;
@@ -308,11 +310,11 @@ export async function generateCertificatePDF(data: CertificateData): Promise<str
             </div>
           </div>
           
-          <div class="title-english">GAMBIA MADRASSAH PRIMARY CERTIFICATE</div>
-          <div class="title-arabic">شهادة إتمام دراسة المرحلة الابتدائية</div>
+          <div class="title-english">GAMBIA MADRASSAH ${gradeLevelEn.toUpperCase()} CERTIFICATE</div>
+          <div class="title-arabic">شهادة إتمام دراسة ${gradeLevelAr}</div>
           
           <div class="content">
-            تشهد الأمانة العامة بأن ال${genderPrefix}/ <span class="student-name">${fullName}</span> ${birthVerb} في <span class="cert-number">${student.placeOfBirth || ''}</span> بتاريخ: <span class="cert-number">${dobFormatted}</span> قد ${completeVerb} دراسة المرحلة الابتدائية في مدرسة <span class="school-name">${school.name}</span> بعد أن ${passedVerb} في الامتحان النهائي الذي أشرفت عليه الأمانة العامة بالتنسيق مع وزارة التربية والتعليم في غامبيا.
+            تشهد الأمانة العامة بأن ال${genderPrefix}/ <span class="student-name">${fullName}</span> ${birthVerb} في <span class="cert-number">${student.placeOfBirth || ''}</span> بتاريخ: <span class="cert-number">${dobFormatted}</span> قد ${completeVerb} دراسة ${gradeLevelAr} في مدرسة <span class="school-name">${school.name}</span> بعد أن ${passedVerb} في الامتحان النهائي الذي أشرفت عليه الأمانة العامة بالتنسيق مع وزارة التربية والتعليم في غامبيا.
             <br>
             <span class="cert-number">${examWindowText}</span>، وكان ${gradeResult} فيه <span class="grade-word">${gradeWordAr}</span>.
             
@@ -382,6 +384,7 @@ interface TranscriptSubject {
   score: number;
   grade: string;
   maxScore: number;
+  passingScore?: number;
 }
 
 interface TranscriptData {
@@ -399,10 +402,10 @@ interface TranscriptData {
 }
 
 export async function generateTranscriptPDF(data: TranscriptData): Promise<string> {
-  const { student, school, examYear, subjects, totalScore, average, finalGrade, qrToken, transcriptNumber, verifyUrl, isReprint } = data;
+  const { student, school, examYear, subjects, totalScore, average, finalGrade, transcriptNumber, verifyUrl, isReprint } = data;
 
   const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
-    width: 100,
+    width: 80,
     margin: 1,
     color: { dark: '#000000', light: '#ffffff' }
   });
@@ -411,19 +414,25 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
     .filter(Boolean)
     .join(' ');
 
-  const issueDate = new Date();
-  const issueDateFormatted = formatArabicDate(issueDate);
+  // Use helper functions with proper fallbacks for all grades
+  const gradeConfig = getGradeConfig(student.grade);
+  const gradeLabel = getGradeLabelArabic(student.grade);
 
-  const subjectRows = subjects.map((subject, index) => `
+  const subjectRows = subjects.map((subject, index) => {
+    const subjectName = subject.arabicName || subject.name;
+    const isEnglish = isEnglishSubject(subjectName);
+    
+    return `
     <tr>
-      <td>${index + 1}</td>
-      <td>${subject.arabicName || subject.name}</td>
-      <td>${subject.name}</td>
-      <td>${subject.score}</td>
-      <td>${subject.maxScore}</td>
-      <td>${subject.grade}</td>
+      <td class="score-cell">${subject.score || ''}</td>
+      <td class="score-cell">${subject.passingScore || 50}</td>
+      <td class="score-cell">${subject.maxScore || 100}</td>
+      <td class="${isEnglish ? 'subject-cell ltr-text' : 'subject-cell'}">${subjectName}</td>
+      <td class="num-cell">${index + 1}</td>
     </tr>
-  `).join('');
+  `;}).join('');
+
+  const maxPossibleScore = subjects.length * 100;
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -437,108 +446,168 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
         
         body {
           font-family: 'Amiri', 'Noto Naskh Arabic', serif;
-          font-size: 12px;
-          padding: 20px;
+          font-size: 13px;
+          direction: rtl;
+          background: white;
         }
         
-        .transcript {
-          width: 100%;
-          max-width: 800px;
-          margin: 0 auto;
+        .transcript-page {
+          width: 210mm;
+          min-height: 297mm;
+          padding: 15mm;
           position: relative;
+          background: white;
         }
         
         .header {
-          text-align: center;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
           margin-bottom: 20px;
-          border-bottom: 2px solid #1a5276;
+          border-bottom: 2px solid #1E8F4D;
           padding-bottom: 15px;
         }
         
-        .bismillah {
-          font-size: 16px;
-          margin-bottom: 10px;
+        .header-left {
+          text-align: left;
+          direction: ltr;
+          font-size: 11px;
+          line-height: 1.5;
+          width: 35%;
         }
         
-        .title {
-          font-size: 20px;
+        .header-right {
+          text-align: right;
+          font-size: 12px;
+          line-height: 1.6;
+          width: 35%;
+        }
+        
+        .header-center {
+          text-align: center;
+          width: 30%;
+        }
+        
+        .org-title {
           font-weight: bold;
-          color: #1a5276;
-          margin: 10px 0;
+          color: #0F5A2F;
         }
         
-        .sub-title {
-          font-size: 14px;
-          color: #333;
+        .dept-title {
+          color: #1E8F4D;
+          font-weight: bold;
+          margin-top: 8px;
         }
         
         .student-info {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 15px;
-          margin: 20px 0;
-          padding: 15px;
+          margin: 15px 0;
+          padding: 10px 15px;
           background: #f8f9fa;
+          border: 1px solid #ddd;
           border-radius: 5px;
         }
         
-        .info-item {
-          flex: 1 1 200px;
+        .info-row {
+          display: flex;
+          margin: 8px 0;
+          font-size: 14px;
         }
         
         .info-label {
           font-weight: bold;
-          color: #666;
+          min-width: 120px;
         }
         
         .info-value {
-          color: #c0392b;
+          color: #0F5A2F;
+          flex: 1;
+          border-bottom: 1px dotted #999;
+          padding-bottom: 2px;
         }
         
-        table {
+        .results-table {
           width: 100%;
           border-collapse: collapse;
-          margin: 20px 0;
+          margin: 15px 0;
+          font-size: 13px;
         }
         
-        th, td {
-          border: 1px solid #ddd;
+        .results-table th {
+          background: #1E8F4D;
+          color: white;
+          padding: 10px 8px;
+          border: 1px solid #0F5A2F;
+          font-weight: bold;
+        }
+        
+        .results-table td {
           padding: 8px;
+          border: 1px solid #ddd;
           text-align: center;
         }
         
-        th {
-          background: #1a5276;
-          color: white;
-        }
-        
-        tr:nth-child(even) {
+        .results-table tbody tr:nth-child(even) {
           background: #f9f9f9;
         }
         
-        .summary {
-          display: flex;
-          justify-content: space-around;
-          padding: 15px;
-          background: #1a5276;
-          color: white;
-          margin: 20px 0;
-          border-radius: 5px;
+        .subject-cell {
+          text-align: right;
+          padding-right: 15px !important;
         }
         
-        .summary-item {
-          text-align: center;
+        .ltr-text {
+          direction: ltr;
+          text-align: left;
+          padding-left: 15px !important;
+          padding-right: 8px !important;
         }
         
-        .summary-value {
-          font-size: 18px;
+        .num-cell {
+          width: 40px;
           font-weight: bold;
+        }
+        
+        .score-cell {
+          width: 80px;
+        }
+        
+        .summary-row {
+          background: #e8f5e9 !important;
+          font-weight: bold;
+        }
+        
+        .summary-row td {
+          border-top: 2px solid #1E8F4D;
+        }
+        
+        .footer-section {
+          display: flex;
+          justify-content: space-between;
+          margin-top: 30px;
+          padding-top: 15px;
+        }
+        
+        .signature-block {
+          text-align: center;
+          width: 45%;
+        }
+        
+        .signature-title {
+          font-weight: bold;
+          margin-bottom: 40px;
+        }
+        
+        .signature-line {
+          border-top: 1px dotted #333;
+          width: 150px;
+          margin: 0 auto;
         }
         
         .qr-section {
           position: absolute;
-          bottom: 20px;
-          left: 20px;
+          bottom: 20mm;
+          left: 20mm;
+          text-align: center;
         }
         
         .qr-section img {
@@ -546,11 +615,10 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
           height: 60px;
         }
         
-        .footer {
-          text-align: center;
-          margin-top: 30px;
-          font-size: 10px;
+        .qr-label {
+          font-size: 9px;
           color: #666;
+          margin-top: 3px;
         }
         
         .reprint-watermark {
@@ -558,91 +626,121 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%) rotate(-45deg);
-          font-size: 60px;
-          color: rgba(192, 57, 43, 0.15);
+          font-size: 70px;
+          color: rgba(30, 143, 77, 0.12);
           font-weight: bold;
-          z-index: 1;
           pointer-events: none;
+          z-index: 1;
+        }
+        
+        .grade-indicator {
+          text-align: center;
+          font-size: 16px;
+          font-weight: bold;
+          color: #1E8F4D;
+          margin: 10px 0;
+          padding: 8px;
+          background: #e8f5e9;
+          border-radius: 5px;
         }
       </style>
     </head>
     <body>
-      <div class="transcript">
+      <div class="transcript-page">
         ${isReprint ? '<div class="reprint-watermark">إعادة طباعة</div>' : ''}
         
         <div class="header">
-          <div class="bismillah">بسم الله الرحمن الرحيم</div>
-          <div class="title">كشف الدرجات / TRANSCRIPT OF RESULTS</div>
-          <div class="sub-title">الأمانة العامة للتعليم الإسلامي العربي في غامبيا</div>
-          <div class="sub-title">The General Secretariat for Islamic/Arabic Education - The Gambia</div>
+          <div class="header-left">
+            <div class="org-title">The General Secretariat for</div>
+            <div>Islamic/Arabic Education in</div>
+            <div>The Gambia</div>
+            <div class="dept-title" style="margin-top: 10px;">Examination affairs unit</div>
+          </div>
+          <div class="header-center">
+            <!-- Logo placeholder -->
+          </div>
+          <div class="header-right">
+            <div class="org-title">الأمانة العامة للتعليم الإسلامي العربي</div>
+            <div>في غامبيا</div>
+            <div class="dept-title">قسم الامتحانات</div>
+          </div>
+        </div>
+        
+        <div class="grade-indicator">
+          ${gradeConfig?.certificateTitleArabic || 'كشف الدرجات'} - ${gradeLabel}
         </div>
         
         <div class="student-info">
-          <div class="info-item">
-            <span class="info-label">اسم الطالب / Student Name:</span>
+          <div class="info-row">
+            <span class="info-label">اسم الطالب\\ة:</span>
             <span class="info-value">${fullName}</span>
           </div>
-          <div class="info-item">
-            <span class="info-label">رقم القيد / Index Number:</span>
-            <span class="info-value">${student.indexNumber || 'N/A'}</span>
+          <div class="info-row">
+            <span class="info-label">الجنسية:</span>
+            <span class="info-value">${student.placeOfBirth || 'غامبية'}</span>
           </div>
-          <div class="info-item">
-            <span class="info-label">المدرسة / School:</span>
+          <div class="info-row">
+            <span class="info-label">المدرسة:</span>
             <span class="info-value">${school.name}</span>
           </div>
-          <div class="info-item">
-            <span class="info-label">الصف / Grade:</span>
-            <span class="info-value">${student.grade}</span>
+          <div class="info-row">
+            <span class="info-label">رقم القيد:</span>
+            <span class="info-value">${student.indexNumber || 'N/A'}</span>
           </div>
-          <div class="info-item">
-            <span class="info-label">العام الدراسي / Exam Year:</span>
+          <div class="info-row">
+            <span class="info-label">العام الدراسي:</span>
             <span class="info-value">${examYear.year}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">رقم الكشف / Transcript No:</span>
-            <span class="info-value">${transcriptNumber}</span>
           </div>
         </div>
         
-        <table>
+        <table class="results-table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>المادة (عربي)</th>
-              <th>Subject (English)</th>
-              <th>الدرجة / Score</th>
-              <th>من / Out of</th>
-              <th>التقدير / Grade</th>
+              <th colspan="3">الدرجات المكتسبة</th>
+              <th rowspan="2">المادة</th>
+              <th rowspan="2">م</th>
+            </tr>
+            <tr>
+              <th>رقماً</th>
+              <th>الصغرى</th>
+              <th>الكبرى</th>
             </tr>
           </thead>
           <tbody>
             ${subjectRows}
+            <tr class="summary-row">
+              <td>${totalScore}</td>
+              <td colspan="2">مجموع الدرجات</td>
+              <td colspan="2"></td>
+            </tr>
+            <tr class="summary-row">
+              <td>${average.toFixed(1)}%</td>
+              <td colspan="2">النسبة</td>
+              <td colspan="2"></td>
+            </tr>
+            <tr class="summary-row">
+              <td>${getGradeWord(finalGrade)}</td>
+              <td colspan="2">التقدير</td>
+              <td colspan="2"></td>
+            </tr>
           </tbody>
         </table>
         
-        <div class="summary">
-          <div class="summary-item">
-            <div>المجموع الكلي</div>
-            <div class="summary-value">${totalScore}</div>
+        <div class="footer-section">
+          <div class="signature-block">
+            <div class="signature-title">توقيع إدارة الأمانة</div>
+            <div class="signature-line"></div>
           </div>
-          <div class="summary-item">
-            <div>المعدل</div>
-            <div class="summary-value">${average.toFixed(2)}%</div>
-          </div>
-          <div class="summary-item">
-            <div>التقدير العام</div>
-            <div class="summary-value">${getGradeWord(finalGrade)}</div>
+          <div class="signature-block">
+            <div class="signature-title">توقيع رئيس لجنة الامتحانات</div>
+            <div class="signature-line"></div>
           </div>
         </div>
         
         <div class="qr-section">
           <img src="${qrDataUrl}" alt="QR Code">
-          <div style="font-size: 8px; text-align: center;">امسح للتحقق</div>
-        </div>
-        
-        <div class="footer">
-          تاريخ الإصدار: ${issueDateFormatted}<br>
-          أي كشط أو تغيير في هذا الكشف يلغيه
+          <div class="qr-label">امسح للتحقق</div>
+          <div class="qr-label">${transcriptNumber}</div>
         </div>
       </div>
     </body>
@@ -658,14 +756,14 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
     
-    const fileName = `transcript_${student.indexNumber || student.id}_${Date.now()}.pdf`;
+    const fileName = `transcript_${student.indexNumber || student.id}_g${student.grade}_${Date.now()}.pdf`;
     const filePath = path.join(outputDir, fileName);
     
     await page.pdf({
       path: filePath,
       format: 'A4',
       printBackground: true,
-      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
+      margin: { top: '0', right: '0', bottom: '0', left: '0' }
     });
     
     return filePath;

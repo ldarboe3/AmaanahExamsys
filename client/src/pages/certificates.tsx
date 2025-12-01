@@ -113,9 +113,10 @@ export default function Certificates() {
     return allCertificates?.find(c => c.studentId === studentId && c.examYearId === activeExamYear?.id);
   };
 
-  const eligibleGrades = [6, 9, 12];
-  const eligibleStudents = students?.filter(s => eligibleGrades.includes(s.grade)) || [];
-  const nonEligibleStudents = students?.filter(s => !eligibleGrades.includes(s.grade)) || [];
+  // All grades are now supported with grade-specific templates and fallbacks
+  // Filter students into eligible (grades 1-12) and non-eligible groups
+  const eligibleStudents = students?.filter(s => s.grade >= 1 && s.grade <= 12) || [];
+  const nonEligibleStudents = students?.filter(s => s.grade < 1 || s.grade > 12) || [];
 
   const filteredClusters = clusters?.filter(c => c.regionId === parseInt(selectedRegion)) || [];
   const filteredSchools = schools?.filter(s => {
