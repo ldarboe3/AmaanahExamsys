@@ -83,19 +83,35 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const userName = req.headers["x-replit-user-name"] as string;
     const userProfileImage = req.headers["x-replit-user-profile-image"] as string;
 
-    if (!userId) {
-      return res.status(401).json({ message: "Replit auth headers missing" });
+    // Check if we have Replit auth headers
+    if (userId) {
+      const user = await storage.upsertUser({
+        id: userId,
+        email: userName ? `${userName}@replit.user` : undefined,
+        firstName: userName,
+        profileImageUrl: userProfileImage,
+      });
+
+      req.session.userId = user.id;
+      return res.json(user);
     }
 
-    const user = await storage.upsertUser({
-      id: userId,
-      email: userName ? `${userName}@replit.user` : undefined,
-      firstName: userName,
-      profileImageUrl: userProfileImage,
-    });
+    // Dev mode fallback - create a test user if no Replit headers
+    if (process.env.NODE_ENV !== "production") {
+      const testUserId = "dev-user-" + Date.now();
+      const user = await storage.upsertUser({
+        id: testUserId,
+        email: "admin@amaanah.local",
+        firstName: "Admin",
+        role: "super_admin",
+        profileImageUrl: undefined,
+      });
 
-    req.session.userId = user.id;
-    res.json(user);
+      req.session.userId = user.id;
+      return res.json(user);
+    }
+
+    return res.status(401).json({ message: "Replit auth headers missing" });
   });
 
   app.post("/api/auth/logout", (req, res) => {
