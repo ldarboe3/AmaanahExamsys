@@ -53,7 +53,7 @@ function NavLink({ href, children, active }: { href: string; children: React.Rea
 export function PublicHeader() {
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { t } = useLanguage();
+  const { t, isRTL } = useLanguage();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -164,10 +164,12 @@ export function PublicHeader() {
 }
 
 export function PublicFooter() {
+  const { t, isRTL } = useLanguage();
+  
   return (
     <footer className="bg-primary text-primary-foreground">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 ${isRTL ? 'text-right' : 'text-left'}`}>
           <div>
             <div className="flex items-center gap-3 mb-4">
               <img src={amaanahLogo} alt="Amaanah Logo" className="w-12 h-12 object-contain bg-white rounded-md p-1" />
@@ -182,44 +184,44 @@ export function PublicFooter() {
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4">Quick Links</h4>
+            <h4 className="font-semibold mb-4">{isRTL ? 'الروابط السريعة' : 'Quick Links'}</h4>
             <ul className="space-y-2 text-sm">
-              <li><Link href="/about"><span className="hover:underline cursor-pointer">About Us</span></Link></li>
-              <li><Link href="/programmes"><span className="hover:underline cursor-pointer">Programmes & Services</span></Link></li>
-              <li><Link href="/membership"><span className="hover:underline cursor-pointer">Membership</span></Link></li>
-              <li><Link href="/resources"><span className="hover:underline cursor-pointer">Resources</span></Link></li>
+              <li><Link href="/about"><span className="hover:underline cursor-pointer">{isRTL ? 'عن الأمانة' : 'About Us'}</span></Link></li>
+              <li><Link href="/programmes"><span className="hover:underline cursor-pointer">{isRTL ? 'البرامج والخدمات' : 'Programmes & Services'}</span></Link></li>
+              <li><Link href="/membership"><span className="hover:underline cursor-pointer">{isRTL ? 'العضوية' : 'Membership'}</span></Link></li>
+              <li><Link href="/resources"><span className="hover:underline cursor-pointer">{isRTL ? 'المراجع' : 'Resources'}</span></Link></li>
             </ul>
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4">Services</h4>
+            <h4 className="font-semibold mb-4">{isRTL ? 'الخدمات' : 'Services'}</h4>
             <ul className="space-y-2 text-sm">
-              <li><Link href="/results"><span className="hover:underline cursor-pointer">Result Checker</span></Link></li>
-              <li><Link href="/school-registration"><span className="hover:underline cursor-pointer">School Registration</span></Link></li>
-              <li><Link href="/verify"><span className="hover:underline cursor-pointer">Verify Certificate</span></Link></li>
-              <li><Link href="/login"><span className="hover:underline cursor-pointer">Portal Login</span></Link></li>
+              <li><Link href="/results"><span className="hover:underline cursor-pointer">{isRTL ? 'فحص النتائج' : 'Result Checker'}</span></Link></li>
+              <li><Link href="/school-registration"><span className="hover:underline cursor-pointer">{isRTL ? 'تسجيل المدرسة' : 'School Registration'}</span></Link></li>
+              <li><Link href="/verify"><span className="hover:underline cursor-pointer">{isRTL ? 'التحقق من الشهادة' : 'Verify Certificate'}</span></Link></li>
+              <li><Link href="/login"><span className="hover:underline cursor-pointer">{t.website.portalLogin}</span></Link></li>
             </ul>
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4">Contact</h4>
+            <h4 className="font-semibold mb-4">{isRTL ? 'اتصل بنا' : 'Contact'}</h4>
             <ul className="space-y-2 text-sm text-primary-foreground/80">
               <li>Email: info@amaanah.gm</li>
-              <li>The Gambia, West Africa</li>
+              <li>{isRTL ? 'السنغال، غرب أفريقيا' : 'The Gambia, West Africa'}</li>
               <li className="pt-2">
-                <span className="text-primary-foreground/60 text-xs">Working Languages: Arabic & English</span>
+                <span className="text-primary-foreground/60 text-xs">{isRTL ? 'لغات العمل: العربية والإنجليزية' : 'Working Languages: Arabic & English'}</span>
               </li>
             </ul>
           </div>
         </div>
 
-        <div className="border-t border-primary-foreground/20 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className={`border-t border-primary-foreground/20 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 ${isRTL ? 'text-right' : 'text-left'}`}>
           <p className="text-sm text-primary-foreground/80">
-            &copy; {new Date().getFullYear()} AMAANAH - General Secretariat for Islamic & Arabic Education. All rights reserved.
+            &copy; {new Date().getFullYear()} AMAANAH - {isRTL ? 'الأمانة - الأمانة العامة للتعليم الإسلامي والعربي. جميع الحقوق محفوظة.' : 'General Secretariat for Islamic & Arabic Education. All rights reserved.'}
           </p>
           <div className="flex gap-4 text-sm">
-            <Link href="/contact"><span className="hover:underline cursor-pointer">Contact</span></Link>
-            <Link href="/news"><span className="hover:underline cursor-pointer">News</span></Link>
+            <Link href="/contact"><span className="hover:underline cursor-pointer">{t.website.contact}</span></Link>
+            <Link href="/news"><span className="hover:underline cursor-pointer">{t.website.news}</span></Link>
           </div>
         </div>
       </div>
@@ -228,8 +230,10 @@ export function PublicFooter() {
 }
 
 export function PublicLayout({ children }: { children: React.ReactNode }) {
+  const { isRTL } = useLanguage();
+  
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className={`min-h-screen flex flex-col bg-background ${isRTL ? 'rtl' : 'ltr'}`}>
       <PublicHeader />
       <main className="flex-1">
         {children}
