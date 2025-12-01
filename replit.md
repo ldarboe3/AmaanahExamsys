@@ -55,7 +55,12 @@ The MVP is complete with all core features implemented and verified. PDF generat
 14. Exam Center Management
 
 ## Authentication
-Uses Replit Auth with session management. Users authenticate via Replit identity headers.
+Uses password-based authentication with bcrypt hashing and session management.
+
+### Test Credentials
+All six user roles have test accounts:
+- Username: role name (superadmin, examinationadmin, logisticsadmin, schooladmin, examiner, candidate)
+- Password: Admin@123
 
 ## Database
 PostgreSQL with the following main tables:

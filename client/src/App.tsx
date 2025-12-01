@@ -25,6 +25,9 @@ import Verify from "@/pages/verify";
 import Regions from "@/pages/regions";
 import AuditLogs from "@/pages/audit-logs";
 import Reports from "@/pages/reports";
+import Subjects from "@/pages/subjects";
+import Timetable from "@/pages/timetable";
+import Settings from "@/pages/settings";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -58,6 +61,9 @@ function AuthenticatedRoutes() {
       <Route path="/regions" component={Regions} />
       <Route path="/audit-logs" component={AuditLogs} />
       <Route path="/reports" component={Reports} />
+      <Route path="/subjects" component={Subjects} />
+      <Route path="/timetable" component={Timetable} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
