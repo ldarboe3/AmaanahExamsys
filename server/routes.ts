@@ -1023,6 +1023,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.post("/api/subjects/:id", isAuthenticated, async (req, res) => {
+    try {
+      const subject = await storage.updateSubject(parseInt(req.params.id), req.body);
+      if (!subject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+      res.json(subject);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/subjects/:id", isAuthenticated, async (req, res) => {
     try {
       await storage.deleteSubject(parseInt(req.params.id));
@@ -1037,13 +1049,34 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
       const grade = req.query.grade ? parseInt(req.query.grade as string) : undefined;
-      if (!examYearId) {
-        return res.status(400).json({ message: "examYearId is required" });
+      
+      // If no examYearId provided, get active exam year
+      let targetExamYearId = examYearId;
+      if (!targetExamYearId) {
+        const activeYear = await storage.getActiveExamYear();
+        if (activeYear) {
+          targetExamYearId = activeYear.id;
+        }
       }
+      
+      if (!targetExamYearId) {
+        return res.json([]);
+      }
+      
       const timetable = grade
-        ? await storage.getTimetableByGrade(examYearId, grade)
-        : await storage.getTimetableByExamYear(examYearId);
-      res.json(timetable);
+        ? await storage.getTimetableByGrade(targetExamYearId, grade)
+        : await storage.getTimetableByExamYear(targetExamYearId);
+      
+      // Add subject relations
+      const subjects = await storage.getAllSubjects();
+      const examYears = await storage.getAllExamYears();
+      const enrichedTimetable = timetable.map((entry: any) => ({
+        ...entry,
+        subject: subjects.find(s => s.id === entry.subjectId),
+        examYear: examYears.find(ey => ey.id === entry.examYearId),
+      }));
+      
+      res.json(enrichedTimetable);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1063,6 +1096,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.patch("/api/timetable/:id", isAuthenticated, async (req, res) => {
+    try {
+      const entry = await storage.updateTimetableEntry(parseInt(req.params.id), req.body);
+      if (!entry) {
+        return res.status(404).json({ message: "Timetable entry not found" });
+      }
+      res.json(entry);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/timetable/:id", isAuthenticated, async (req, res) => {
     try {
       const entry = await storage.updateTimetableEntry(parseInt(req.params.id), req.body);
       if (!entry) {
@@ -2591,6 +2636,55 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         schools: [school1, school2],
         subjects: [subject1, subject2],
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // System Settings API
+  app.get("/api/settings", isAuthenticated, async (req, res) => {
+    try {
+      const allSettings = await storage.getAllSettings();
+      // Convert array of {key, value} to object
+      const settingsObj: Record<string, any> = {};
+      for (const setting of allSettings) {
+        try {
+          settingsObj[setting.key] = JSON.parse(setting.value);
+        } catch {
+          settingsObj[setting.key] = setting.value;
+        }
+      }
+      res.json(settingsObj);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/settings", isAuthenticated, async (req, res) => {
+    try {
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser || !['super_admin', 'examination_admin'].includes(currentUser.role || '')) {
+        return res.status(403).json({ message: "Only admins can update settings" });
+      }
+      
+      // Save each key-value pair
+      const { key, value, description, category } = req.body;
+      if (key && value !== undefined) {
+        const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        await storage.upsertSetting(key, valueStr, description, category);
+      }
+      
+      // Return all settings
+      const allSettings = await storage.getAllSettings();
+      const settingsObj: Record<string, any> = {};
+      for (const setting of allSettings) {
+        try {
+          settingsObj[setting.key] = JSON.parse(setting.value);
+        } catch {
+          settingsObj[setting.key] = setting.value;
+        }
+      }
+      res.json(settingsObj);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

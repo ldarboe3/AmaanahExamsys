@@ -228,6 +228,7 @@ export const examTimetable = pgTable("exam_timetable", {
   examDate: date("exam_date").notNull(),
   startTime: varchar("start_time", { length: 10 }).notNull(),
   endTime: varchar("end_time", { length: 10 }).notNull(),
+  venue: varchar("venue", { length: 255 }),
   grade: integer("grade").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
