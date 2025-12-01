@@ -2929,5 +2929,462 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Public newsletter subscription
+  app.post("/api/public/newsletter/subscribe", async (req, res) => {
+    try {
+      const { email, name } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Check if already subscribed
+      const existing = await storage.getNewsletterSubscriberByEmail(email);
+      if (existing) {
+        if (existing.isActive) {
+          return res.status(400).json({ message: "You are already subscribed to our newsletter" });
+        } else {
+          // Reactivate subscription
+          await storage.updateNewsletterSubscriber(existing.id, { isActive: true, name });
+          return res.json({ message: "Welcome back! Your subscription has been reactivated." });
+        }
+      }
+
+      await storage.createNewsletterSubscriber({ email, name, source: "website" });
+      res.json({ message: "Thank you for subscribing to our newsletter!" });
+    } catch (error: any) {
+      console.error("Newsletter subscription error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public unsubscribe
+  app.post("/api/public/newsletter/unsubscribe", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      await storage.unsubscribeNewsletter(email);
+      res.json({ message: "You have been unsubscribed from our newsletter" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public news articles
+  app.get("/api/public/news", async (_req, res) => {
+    try {
+      const articles = await storage.getPublishedNewsArticles();
+      const categories = await storage.getAllNewsCategories();
+      res.json({ articles, categories });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/public/news/:slug", async (req, res) => {
+    try {
+      const article = await storage.getNewsArticleBySlug(req.params.slug);
+      if (!article || !article.isPublished) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+      // Increment view count
+      await storage.incrementNewsArticleViewCount(article.id);
+      res.json(article);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public resources
+  app.get("/api/public/resources", async (_req, res) => {
+    try {
+      const resources = await storage.getPublishedResources();
+      const categories = await storage.getAllResourceCategories();
+      res.json({ resources, categories });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/public/resources/:id/download", async (req, res) => {
+    try {
+      const resource = await storage.getResource(parseInt(req.params.id));
+      if (!resource || !resource.isPublished) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      // Increment download count
+      await storage.incrementResourceDownloadCount(resource.id);
+      res.json({ fileUrl: resource.fileUrl });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public announcements
+  app.get("/api/public/announcements", async (_req, res) => {
+    try {
+      const announcements = await storage.getActiveAnnouncements();
+      res.json(announcements);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public impact stats
+  app.get("/api/public/impact-stats", async (_req, res) => {
+    try {
+      const stats = await storage.getActiveImpactStats();
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===== WEBSITE CONTENT MANAGEMENT (Admin endpoints) =====
+
+  // News Categories
+  app.get("/api/cms/news-categories", requireAuth, async (_req, res) => {
+    try {
+      const categories = await storage.getAllNewsCategories();
+      res.json(categories);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/cms/news-categories", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const category = await storage.createNewsCategory(req.body);
+      res.json(category);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/cms/news-categories/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const category = await storage.updateNewsCategory(parseInt(req.params.id), req.body);
+      res.json(category);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/cms/news-categories/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      await storage.deleteNewsCategory(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // News Articles
+  app.get("/api/cms/news-articles", requireAuth, async (_req, res) => {
+    try {
+      const articles = await storage.getAllNewsArticles();
+      res.json(articles);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/cms/news-articles/:id", requireAuth, async (req, res) => {
+    try {
+      const article = await storage.getNewsArticle(parseInt(req.params.id));
+      res.json(article);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/cms/news-articles", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const article = await storage.createNewsArticle({
+        ...req.body,
+        authorId: req.user?.id,
+        publishedAt: req.body.isPublished ? new Date() : null,
+      });
+      res.json(article);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/cms/news-articles/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const existing = await storage.getNewsArticle(parseInt(req.params.id));
+      const article = await storage.updateNewsArticle(parseInt(req.params.id), {
+        ...req.body,
+        publishedAt: req.body.isPublished && !existing?.publishedAt ? new Date() : existing?.publishedAt,
+      });
+      res.json(article);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/cms/news-articles/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      await storage.deleteNewsArticle(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Resource Categories
+  app.get("/api/cms/resource-categories", requireAuth, async (_req, res) => {
+    try {
+      const categories = await storage.getAllResourceCategories();
+      res.json(categories);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/cms/resource-categories", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const category = await storage.createResourceCategory(req.body);
+      res.json(category);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/cms/resource-categories/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const category = await storage.updateResourceCategory(parseInt(req.params.id), req.body);
+      res.json(category);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/cms/resource-categories/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      await storage.deleteResourceCategory(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Resources
+  app.get("/api/cms/resources", requireAuth, async (_req, res) => {
+    try {
+      const resources = await storage.getAllResources();
+      res.json(resources);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/cms/resources/:id", requireAuth, async (req, res) => {
+    try {
+      const resource = await storage.getResource(parseInt(req.params.id));
+      res.json(resource);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/cms/resources", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const resource = await storage.createResource({
+        ...req.body,
+        uploadedBy: req.user?.id,
+      });
+      res.json(resource);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/cms/resources/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const resource = await storage.updateResource(parseInt(req.params.id), req.body);
+      res.json(resource);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/cms/resources/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      await storage.deleteResource(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Announcements
+  app.get("/api/cms/announcements", requireAuth, async (_req, res) => {
+    try {
+      const announcements = await storage.getAllAnnouncements();
+      res.json(announcements);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/cms/announcements/:id", requireAuth, async (req, res) => {
+    try {
+      const announcement = await storage.getAnnouncement(parseInt(req.params.id));
+      res.json(announcement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/cms/announcements", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const announcement = await storage.createAnnouncement({
+        ...req.body,
+        createdBy: req.user?.id,
+      });
+      res.json(announcement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/cms/announcements/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const announcement = await storage.updateAnnouncement(parseInt(req.params.id), req.body);
+      res.json(announcement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/cms/announcements/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      await storage.deleteAnnouncement(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Newsletter Subscribers (Admin)
+  app.get("/api/cms/newsletter-subscribers", requireAuth, async (_req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const subscribers = await storage.getAllNewsletterSubscribers();
+      res.json(subscribers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/cms/newsletter-subscribers/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      await storage.deleteNewsletterSubscriber(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Impact Stats
+  app.get("/api/cms/impact-stats", requireAuth, async (_req, res) => {
+    try {
+      const stats = await storage.getAllImpactStats();
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/cms/impact-stats", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const stat = await storage.createImpactStat(req.body);
+      res.json(stat);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/cms/impact-stats/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const stat = await storage.updateImpactStat(parseInt(req.params.id), req.body);
+      res.json(stat);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/cms/impact-stats/:id", requireAuth, async (req, res) => {
+    try {
+      if (!["super_admin", "examination_admin"].includes(req.user?.role || "")) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      await storage.deleteImpactStat(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }
