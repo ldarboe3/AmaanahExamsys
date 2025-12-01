@@ -75,24 +75,9 @@ export default function Login() {
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
         
         {/* Content over the image */}
-        <div className="relative z-10 flex flex-col justify-between p-8 lg:p-12 text-white">
-          {/* Logo and Title */}
-          <div className="flex items-center gap-4">
-            <img 
-              src={amaanahLogo} 
-              alt="Amaanah Logo" 
-              className="w-16 h-16 object-contain"
-            />
-            <div>
-              <h1 className="text-2xl font-bold">GSIAE / Amaanah</h1>
-              <p className="text-sm text-white/80">
-                General Secretariat for Islamic & Arabic Education
-              </p>
-            </div>
-          </div>
-          
+        <div className="relative z-10 flex flex-col justify-end p-8 lg:p-12 text-white h-full">
           {/* Tagline */}
-          <div className="max-w-md">
+          <div className="max-w-md mb-8">
             <h2 className="text-3xl lg:text-4xl font-bold mb-4">
               Education for Development
             </h2>
