@@ -1100,6 +1100,47 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.post("/api/schools/:id/resend-verification", isAuthenticated, async (req, res) => {
+    try {
+      const school = await storage.getSchool(parseInt(req.params.id));
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      
+      // Generate new verification token
+      const verificationToken = generateVerificationToken();
+      const verificationExpiry = getVerificationExpiry();
+      
+      // Update school with new token
+      await db.update(schools)
+        .set({
+          verificationToken,
+          verificationExpiry,
+          updatedAt: new Date()
+        })
+        .where(eq(schools.id, school.id));
+      
+      // Send verification email
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const emailSent = await sendSchoolVerificationEmail(
+        school.email,
+        school.name,
+        school.registrarName,
+        verificationToken,
+        baseUrl
+      );
+      
+      if (!emailSent) {
+        return res.status(500).json({ message: "Failed to send verification email" });
+      }
+      
+      res.json({ message: "Verification email sent successfully" });
+    } catch (error: any) {
+      console.error('Resend verification error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/schools/:id/assign-center", isAuthenticated, async (req, res) => {
     try {
       const { centerId } = req.body;

@@ -315,6 +315,26 @@ export default function Schools() {
     },
   });
 
+  const resendVerificationMutation = useMutation({
+    mutationFn: async (schoolId: number) => {
+      return apiRequest("POST", `/api/schools/${schoolId}/resend-verification`);
+    },
+    onSuccess: () => {
+      invalidateSchoolQueries();
+      toast({
+        title: t.common.success,
+        description: isRTL ? "تم إرسال رسالة التحقق بنجاح" : "Verification email sent successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل في إرسال البريد" : "Failed to send email"),
+        variant: "destructive",
+      });
+    },
+  });
+
   const updateSchoolMutation = useMutation({
     mutationFn: async (data: AddSchoolFormData & { id: number }) => {
       const { id, ...updateData } = data;
@@ -558,6 +578,15 @@ export default function Schools() {
                               {isRTL ? "تعديل" : "Edit"}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
+                            {!school.isEmailVerified && school.status === 'pending' ? (
+                              <DropdownMenuItem
+                                onClick={() => resendVerificationMutation.mutate(school.id)}
+                                className="text-chart-2"
+                              >
+                                <Mail className="w-4 h-4 me-2" />
+                                {isRTL ? "إعادة إرسال البريد" : "Resend Verification Email"}
+                              </DropdownMenuItem>
+                            ) : null}
                             {school.status === 'pending' || school.status === 'verified' ? (
                               <>
                                 <DropdownMenuItem
