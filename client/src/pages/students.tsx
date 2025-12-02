@@ -354,44 +354,35 @@ export default function Students() {
         </div>
       </div>
 
-      {/* School Type Selector and Dynamic Grade Tabs */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="space-y-4">
-            {activeExamYear && (
-              <div className="bg-primary/10 border border-primary/20 rounded-md p-3 mb-4">
-                <p className="text-sm font-medium text-primary">
-                  {isRTL ? `السنة الامتحانية النشطة: ${activeExamYear.name}` : `Active Exam Year: ${activeExamYear.name}`}
-                </p>
-              </div>
-            )}
+      {/* Active Exam Year Banner */}
+      {activeExamYear && (
+        <div className="bg-primary/10 border border-primary/20 rounded-md p-3">
+          <p className="text-sm font-medium text-primary">
+            {isRTL ? `السنة الامتحانية النشطة: ${activeExamYear.name}` : `Active Exam Year: ${activeExamYear.name}`}
+          </p>
+        </div>
+      )}
 
-            <div>
-              <label className="text-sm font-medium">{isRTL ? "نوع المدرسة" : "School Type"}</label>
-              <div className="flex gap-2 mt-2 flex-wrap">
-                {Object.keys(SCHOOL_TYPE_GRADES).map(type => (
-                  <Button
-                    key={type}
-                    variant={selectedSchoolType === type ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedSchoolType(type);
-                      // Use exam year grades if available, otherwise use school type grades
-                      const gradesToUse = availableGrades.length > 0 ? availableGrades : getGradesForSchoolType(type);
-                      setSelectedGrade(gradesToUse.length > 0 ? gradesToUse[0].toString() : "all");
-                    }}
-                    data-testid={`button-school-type-${type}`}
-                  >
-                    {getSchoolTypeLabel(type, isRTL)}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {(availableGrades.length > 0 || getGradesForSchoolType(selectedSchoolType).length > 0) && (
-              <div>
-                <label className="text-sm font-medium">{isRTL ? "الفصل" : "Class/Grade"}</label>
-                <div className="flex gap-2 mt-2 flex-wrap">
+      {/* School Type Tabs */}
+      <Tabs value={selectedSchoolType} onValueChange={(value) => {
+        setSelectedSchoolType(value);
+        // Use exam year grades if available, otherwise use school type grades
+        const gradesToUse = availableGrades.length > 0 ? availableGrades : getGradesForSchoolType(value);
+        setSelectedGrade(gradesToUse.length > 0 ? gradesToUse[0].toString() : "all");
+      }} className="w-full">
+        <TabsList className="grid w-full gap-1" style={{ gridTemplateColumns: `repeat(${Object.keys(SCHOOL_TYPE_GRADES).length}, minmax(0, 1fr))` }}>
+          {Object.keys(SCHOOL_TYPE_GRADES).map(type => (
+            <TabsTrigger key={type} value={type} data-testid={`tab-school-type-${type}`}>
+              {getSchoolTypeLabel(type, isRTL)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent value={selectedSchoolType} className="mt-4">
+          {(availableGrades.length > 0 || getGradesForSchoolType(selectedSchoolType).length > 0) && (
+            <Card>
+              <CardContent className="p-4">
+                <label className="text-sm font-medium block mb-3">{isRTL ? "الفصل" : "Class/Grade"}</label>
+                <div className="flex gap-2 flex-wrap">
                   {(availableGrades.length > 0 ? availableGrades : getGradesForSchoolType(selectedSchoolType)).map(grade => (
                     <Button
                       key={grade}
@@ -404,11 +395,11 @@ export default function Students() {
                     </Button>
                   ))}
                 </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
