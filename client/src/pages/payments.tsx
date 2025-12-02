@@ -146,7 +146,18 @@ export default function Payments() {
 
   // For admin users: fetch all invoices
   const { data: invoices, isLoading } = useQuery<InvoiceWithRelations[]>({
-    queryKey: ["/api/invoices", statusFilter],
+    queryKey: ["/api/invoices", { status: statusFilter }],
+    queryFn: async () => {
+      const url = statusFilter && statusFilter !== "all" 
+        ? `/api/invoices?status=${statusFilter}` 
+        : "/api/invoices";
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Failed to fetch invoices");
+      }
+      return response.json();
+    },
     enabled: !isSchoolAdmin,
   });
 
@@ -278,6 +289,45 @@ export default function Payments() {
       currency: 'GMD',
       minimumFractionDigits: 2,
     }).format(numAmount);
+  };
+
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  
+  const handleDownloadInvoice = async (invoiceId: number) => {
+    try {
+      setDownloadingInvoice(true);
+      const response = await fetch(`/api/invoices/${invoiceId}/pdf`, {
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to download invoice');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${invoiceId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: isRTL ? "تم التحميل" : "Downloaded",
+        description: isRTL ? "تم تحميل الفاتورة بنجاح" : "Invoice downloaded successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل تحميل الفاتورة" : "Failed to download invoice"),
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingInvoice(false);
+    }
   };
 
   const totalRevenue = invoices?.reduce((sum, inv) => sum + parseFloat(inv.paidAmount?.toString() || '0'), 0) || 0;
@@ -438,8 +488,17 @@ export default function Payments() {
                     {generateInvoiceMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
                     {isRTL ? "تحديث الفاتورة" : "Refresh Invoice"}
                   </Button>
-                  <Button variant="outline">
-                    <Download className="w-4 h-4 me-2" />
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleDownloadInvoice(invoice.id)}
+                    disabled={downloadingInvoice}
+                    data-testid="button-download-invoice"
+                  >
+                    {downloadingInvoice ? (
+                      <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4 me-2" />
+                    )}
                     {isRTL ? "تحميل الفاتورة" : "Download Invoice"}
                   </Button>
                   {invoice.status === 'pending' && (
@@ -713,7 +772,7 @@ export default function Payments() {
                                 <Eye className="w-4 h-4 me-2" />
                                 {t.common.viewDetails}
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDownloadInvoice(invoice.id)}>
                                 <Download className="w-4 h-4 me-2" />
                                 {isRTL ? "تحميل الفاتورة" : "Download Invoice"}
                               </DropdownMenuItem>
@@ -881,8 +940,16 @@ export default function Payments() {
             <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
               {t.common.close}
             </Button>
-            <Button variant="outline">
-              <Download className="w-4 h-4 me-2" />
+            <Button 
+              variant="outline" 
+              onClick={() => selectedInvoice && handleDownloadInvoice(selectedInvoice.id)}
+              disabled={downloadingInvoice || !selectedInvoice}
+            >
+              {downloadingInvoice ? (
+                <Loader2 className="w-4 h-4 me-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 me-2" />
+              )}
               {t.common.download}
             </Button>
             {canConfirmPayments && selectedInvoice && selectedInvoice.status === 'processing' && selectedInvoice.bankSlipUrl && (

@@ -2477,6 +2477,352 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Generate and download invoice PDF
+  app.get("/api/invoices/:id/pdf", async (req, res) => {
+    try {
+      const invoice = await storage.getInvoice(parseInt(req.params.id));
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      const items = await storage.getInvoiceItems(invoice.id);
+      const school = await storage.getSchool(invoice.schoolId);
+      const examYear = invoice.examYearId ? await storage.getExamYear(invoice.examYearId) : null;
+      
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      
+      const puppeteer = (await import('puppeteer')).default;
+      
+      // Parse fee values
+      const registrationFee = parseFloat(invoice.feePerStudent || '0');
+      const certificateFee = parseFloat(invoice.certificateFee || '0');
+      const transcriptFee = parseFloat(invoice.transcriptFee || '0');
+      const totalFeePerStudent = registrationFee + certificateFee + transcriptFee;
+      
+      // Generate invoice items HTML
+      const itemRows = items.map((item, index) => `
+        <tr>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">${index + 1}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">Grade ${item.grade} Registration</td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">${item.studentCount}</td>
+          <td style="padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb;">D${totalFeePerStudent.toFixed(2)}</td>
+          <td style="padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb;">D${item.subtotal}</td>
+        </tr>
+      `).join('');
+      
+      const issueDate = invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }) : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      
+      const statusColor = invoice.status === 'paid' ? '#16a34a' : invoice.status === 'processing' ? '#f59e0b' : '#dc2626';
+      const statusText = invoice.status === 'paid' ? 'PAID' : invoice.status === 'processing' ? 'PROCESSING' : 'PENDING';
+      
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: 'Segoe UI', Arial, sans-serif;
+              font-size: 12pt;
+              line-height: 1.5;
+              background: #fff;
+              color: #1f2937;
+            }
+            .container {
+              max-width: 800px;
+              margin: 0 auto;
+              padding: 40px;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 40px;
+              padding-bottom: 20px;
+              border-bottom: 3px solid #1E8F4D;
+            }
+            .logo-section {
+              display: flex;
+              align-items: center;
+              gap: 15px;
+            }
+            .logo {
+              width: 60px;
+              height: 60px;
+              background: #1E8F4D;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              font-size: 24px;
+              font-weight: bold;
+            }
+            .company-name {
+              font-size: 24px;
+              font-weight: bold;
+              color: #1E8F4D;
+            }
+            .company-subtitle {
+              font-size: 12px;
+              color: #6b7280;
+            }
+            .invoice-title {
+              text-align: right;
+            }
+            .invoice-title h1 {
+              font-size: 32px;
+              color: #1E8F4D;
+              margin-bottom: 5px;
+            }
+            .invoice-number {
+              font-size: 14px;
+              color: #6b7280;
+            }
+            .status-badge {
+              display: inline-block;
+              padding: 4px 12px;
+              border-radius: 12px;
+              font-size: 12px;
+              font-weight: bold;
+              color: white;
+              background: ${statusColor};
+              margin-top: 10px;
+            }
+            .info-section {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 30px;
+            }
+            .info-block {
+              max-width: 45%;
+            }
+            .info-block h3 {
+              font-size: 11px;
+              text-transform: uppercase;
+              color: #6b7280;
+              margin-bottom: 8px;
+              letter-spacing: 0.5px;
+            }
+            .info-block p {
+              font-size: 13px;
+              margin-bottom: 4px;
+            }
+            .info-block .school-name {
+              font-size: 16px;
+              font-weight: bold;
+              color: #1f2937;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 30px;
+            }
+            th {
+              background: #1E8F4D;
+              color: white;
+              padding: 12px;
+              text-align: left;
+              font-size: 12px;
+              text-transform: uppercase;
+            }
+            th:first-child { border-radius: 8px 0 0 0; }
+            th:last-child { border-radius: 0 8px 0 0; text-align: right; }
+            th:nth-child(3), th:nth-child(4) { text-align: center; }
+            .fee-breakdown {
+              background: #f9fafb;
+              padding: 20px;
+              border-radius: 8px;
+              margin-bottom: 30px;
+            }
+            .fee-breakdown h3 {
+              font-size: 14px;
+              margin-bottom: 15px;
+              color: #374151;
+            }
+            .fee-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 8px 0;
+              border-bottom: 1px solid #e5e7eb;
+            }
+            .fee-row:last-child {
+              border-bottom: none;
+            }
+            .totals {
+              margin-left: auto;
+              width: 300px;
+            }
+            .total-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 8px 0;
+            }
+            .total-row.grand-total {
+              border-top: 2px solid #1E8F4D;
+              margin-top: 10px;
+              padding-top: 15px;
+              font-size: 18px;
+              font-weight: bold;
+              color: #1E8F4D;
+            }
+            .payment-info {
+              background: #fef3cd;
+              border: 1px solid #ffc107;
+              padding: 20px;
+              border-radius: 8px;
+              margin-bottom: 30px;
+            }
+            .payment-info h3 {
+              color: #856404;
+              margin-bottom: 10px;
+            }
+            .payment-info p {
+              font-size: 13px;
+              color: #856404;
+              margin-bottom: 5px;
+            }
+            .footer {
+              text-align: center;
+              padding-top: 20px;
+              border-top: 1px solid #e5e7eb;
+              font-size: 11px;
+              color: #6b7280;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo-section">
+                <div class="logo">A</div>
+                <div>
+                  <div class="company-name">Amaanah</div>
+                  <div class="company-subtitle">Islamic Education Trust - The Gambia</div>
+                </div>
+              </div>
+              <div class="invoice-title">
+                <h1>INVOICE</h1>
+                <div class="invoice-number">${invoice.invoiceNumber}</div>
+                <div class="status-badge">${statusText}</div>
+              </div>
+            </div>
+            
+            <div class="info-section">
+              <div class="info-block">
+                <h3>Bill To</h3>
+                <p class="school-name">${school.name}</p>
+                <p>${school.address || 'The Gambia'}</p>
+                <p>Email: ${school.email || 'N/A'}</p>
+                <p>Phone: ${school.phone || 'N/A'}</p>
+              </div>
+              <div class="info-block" style="text-align: right;">
+                <h3>Invoice Details</h3>
+                <p><strong>Invoice Date:</strong> ${issueDate}</p>
+                <p><strong>Exam Year:</strong> ${examYear?.name || 'N/A'}</p>
+                <p><strong>Total Students:</strong> ${invoice.totalStudents}</p>
+              </div>
+            </div>
+            
+            <div class="fee-breakdown">
+              <h3>Fee Structure (per student)</h3>
+              <div class="fee-row">
+                <span>Registration Fee</span>
+                <span>D${registrationFee.toFixed(2)}</span>
+              </div>
+              <div class="fee-row">
+                <span>Certificate Fee</span>
+                <span>D${certificateFee.toFixed(2)}</span>
+              </div>
+              <div class="fee-row">
+                <span>Transcript Fee</span>
+                <span>D${transcriptFee.toFixed(2)}</span>
+              </div>
+              <div class="fee-row" style="font-weight: bold; color: #1E8F4D;">
+                <span>Total per Student</span>
+                <span>D${totalFeePerStudent.toFixed(2)}</span>
+              </div>
+            </div>
+            
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 50px;">#</th>
+                  <th>Description</th>
+                  <th style="width: 100px; text-align: center;">Students</th>
+                  <th style="width: 120px; text-align: right;">Rate</th>
+                  <th style="width: 120px; text-align: right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemRows}
+              </tbody>
+            </table>
+            
+            <div class="totals">
+              <div class="total-row">
+                <span>Subtotal:</span>
+                <span>D${parseFloat(invoice.totalAmount || '0').toFixed(2)}</span>
+              </div>
+              <div class="total-row grand-total">
+                <span>Total Due:</span>
+                <span>D${parseFloat(invoice.totalAmount || '0').toFixed(2)}</span>
+              </div>
+            </div>
+            
+            ${invoice.status !== 'paid' ? `
+            <div class="payment-info">
+              <h3>Payment Instructions</h3>
+              <p><strong>Bank:</strong> Guaranty Trust Bank (Gambia) Ltd</p>
+              <p><strong>Account Name:</strong> Amaanah Islamic Education Trust</p>
+              <p><strong>Account Number:</strong> 211-123456789-01</p>
+              <p style="margin-top: 10px;">Please upload your bank slip after payment for verification.</p>
+            </div>
+            ` : ''}
+            
+            <div class="footer">
+              <p>Thank you for your registration with Amaanah Examination Board</p>
+              <p>For inquiries: info@amaanah.gm | Tel: +220-1234567</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      });
+      
+      try {
+        const page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+        
+        const pdfBuffer = await page.pdf({
+          format: 'A4',
+          printBackground: true,
+          margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
+        });
+        
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`);
+        res.send(pdfBuffer);
+      } finally {
+        await browser.close();
+      }
+    } catch (error: any) {
+      console.error("Invoice PDF generation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get school's invoice for active exam year
   app.get("/api/school/invoice", isAuthenticated, async (req, res) => {
     try {
