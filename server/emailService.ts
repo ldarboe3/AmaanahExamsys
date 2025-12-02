@@ -132,7 +132,7 @@ export async function sendSchoolVerificationEmail(
   verificationToken: string,
   baseUrl: string
 ): Promise<boolean> {
-  const verificationLink = `${baseUrl}/verify-school?token=${verificationToken}`;
+  const verificationLink = `${baseUrl}/school-verify/${verificationToken}`;
   
   const htmlBody = `
     <!DOCTYPE html>
@@ -173,12 +173,12 @@ export async function sendSchoolVerificationEmail(
           <p>If the button doesn't work, copy and paste this link into your browser:</p>
           <p style="word-break: break-all; color: #1E8F4D;">${verificationLink}</p>
           
-          <p>After verification, you will be able to:</p>
+          <p>During verification, you will:</p>
           <ul>
-            <li>Complete your school profile details</li>
-            <li>Register students for examinations</li>
-            <li>View and print student index numbers</li>
-            <li>Access examination results</li>
+            <li>Create your login username and password</li>
+            <li>Get immediate access to your school dashboard</li>
+            <li>Be able to register students for examinations</li>
+            <li>View and print student index numbers after payment</li>
           </ul>
           
           <p>If you did not register for this account, please ignore this email.</p>
@@ -395,6 +395,75 @@ export async function sendCenterAllocationEmail(
   return sendEmail({
     to: schoolEmail,
     subject: `Examination Center Allocated - ${examYearName}`,
+    htmlBody: htmlBody
+  });
+}
+
+// Send password reset email
+export async function sendPasswordResetEmail(
+  schoolEmail: string,
+  schoolName: string,
+  registrarName: string,
+  resetToken: string,
+  baseUrl: string
+): Promise<boolean> {
+  const resetLink = `${baseUrl}/forgot-password/${resetToken}`;
+  
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1E8F4D, #166534); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .btn { display: inline-block; background: #1E8F4D; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+        .btn:hover { background: #166534; }
+        .warning { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+        .arabic { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Password Reset Request</h1>
+          <p class="arabic">إعادة تعيين كلمة المرور</p>
+        </div>
+        <div class="content">
+          <h2>Reset Your Password</h2>
+          <p>Dear ${registrarName},</p>
+          <p>We received a request to reset the password for your school account <strong>${schoolName}</strong>. Click the button below to create a new password.</p>
+          
+          <div style="text-align: center;">
+            <a href="${resetLink}" class="btn">Reset Password</a>
+          </div>
+          
+          <div class="warning">
+            <strong>Important:</strong> This password reset link will expire in <strong>2 hours</strong>. If you do not reset your password within this time, you will need to request a new link.
+          </div>
+          
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #1E8F4D;">${resetLink}</p>
+          
+          <p>If you did not request a password reset, please ignore this email. Your password will remain unchanged.</p>
+          
+          <p>Best regards,<br>Amaanah Examination Team</p>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} Amaanah Islamic Education - The Gambia</p>
+          <p>This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: schoolEmail,
+    subject: 'Password Reset Request - Amaanah Exam System',
     htmlBody: htmlBody
   });
 }

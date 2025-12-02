@@ -22,11 +22,13 @@ import {
   sendPaymentConfirmationEmail,
   sendResultsPublishedEmail,
   sendCenterAllocationEmail,
+  sendPasswordResetEmail,
   generateVerificationToken,
   getVerificationExpiry,
   generateIndexNumber,
   generateInvoiceNumber,
 } from "./emailService";
+import bcrypt from "bcrypt";
 
 declare module "express-session" {
   interface SessionData {
@@ -775,9 +777,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.get("/api/schools/verify/:token", async (req, res) => {
+  // Get school info for verification page (validates token without consuming it)
+  app.get("/api/schools/verify-info/:token", async (req, res) => {
     try {
-      // Find school by verification token
       const result = await db.select().from(schools)
         .where(eq(schools.verificationToken, req.params.token));
       
@@ -792,19 +794,272 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "Verification link has expired. Please request a new one." });
       }
       
-      // Mark email as verified
+      // Check if already verified and has admin user
+      const isAlreadyVerified = school.isEmailVerified && school.adminUserId;
+      
+      res.json({
+        id: school.id,
+        name: school.name,
+        registrarName: school.registrarName,
+        email: school.email,
+        isAlreadyVerified: !!isAlreadyVerified,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Complete verification with username/password setup (auto-approves school)
+  app.post("/api/schools/verify/:token/complete", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+      
+      // Validate password strength
+      if (password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+      
+      // Find school by verification token
+      const result = await db.select().from(schools)
+        .where(eq(schools.verificationToken, req.params.token));
+      
+      if (result.length === 0) {
+        return res.status(400).json({ message: "Invalid verification token" });
+      }
+      
+      const school = result[0];
+      
+      // SECURITY: Prevent token re-use - check if already verified with admin
+      if (school.adminUserId) {
+        return res.status(400).json({ message: "This school has already been verified and set up." });
+      }
+      
+      // Check if token has expired (2-hour window)
+      if (school.verificationExpiry && new Date() > new Date(school.verificationExpiry)) {
+        return res.status(400).json({ message: "Verification link has expired. Please request a new one." });
+      }
+      
+      // Check if username already exists
+      const existingUser = await db.select().from(users)
+        .where(eq(users.username, username));
+      
+      if (existingUser.length > 0) {
+        return res.status(400).json({ message: "Username already taken. Please choose another." });
+      }
+      
+      // Hash the password
+      const passwordHash = await bcrypt.hash(password, 10);
+      
+      // Create the school admin user account
+      const [newUser] = await db.insert(users).values({
+        username,
+        passwordHash,
+        email: school.email,
+        firstName: school.registrarName.split(' ')[0] || school.registrarName,
+        lastName: school.registrarName.split(' ').slice(1).join(' ') || '',
+        role: 'school_admin',
+        status: 'active',
+        schoolId: school.id,
+      }).returning();
+      
+      // Mark school as verified, approved, and link to admin user
       const [updatedSchool] = await db.update(schools)
         .set({ 
           isEmailVerified: true, 
           verificationToken: null,
-          status: 'verified',
+          verificationExpiry: null,
+          status: 'approved',
+          adminUserId: newUser.id,
           updatedAt: new Date()
         })
         .where(eq(schools.id, school.id))
         .returning();
       
-      res.json({ message: "Email verified successfully", school: updatedSchool });
+      // Create audit log entry
+      try {
+        await storage.createAuditLog({
+          userId: newUser.id,
+          action: 'school_verified',
+          resourceType: 'school',
+          resourceId: school.id,
+          details: { 
+            schoolName: school.name,
+            username,
+            status: 'approved'
+          },
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log:', auditError);
+      }
+      
+      res.json({ 
+        message: "School verification and account setup complete", 
+        school: updatedSchool,
+        username 
+      });
     } catch (error: any) {
+      console.error('Verification error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Legacy endpoint - redirect to new flow info
+  app.get("/api/schools/verify/:token", async (req, res) => {
+    try {
+      const result = await db.select().from(schools)
+        .where(eq(schools.verificationToken, req.params.token));
+      
+      if (result.length === 0) {
+        return res.status(400).json({ message: "Invalid verification token" });
+      }
+      
+      const school = result[0];
+      
+      if (school.verificationExpiry && new Date() > new Date(school.verificationExpiry)) {
+        return res.status(400).json({ message: "Verification link has expired. Please request a new one." });
+      }
+      
+      // Redirect to the new verification page
+      res.json({ 
+        message: "Please complete verification at the verification page",
+        redirectUrl: `/school-verify/${req.params.token}`
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Request password reset
+  app.post("/api/schools/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      // Find school by email
+      const result = await db.select().from(schools)
+        .where(eq(schools.email, email));
+      
+      // Always return success to prevent email enumeration
+      if (result.length === 0) {
+        return res.json({ message: "If an account exists with that email, you will receive reset instructions." });
+      }
+      
+      const school = result[0];
+      
+      // Only allow reset for verified schools with an admin user
+      if (!school.isEmailVerified || !school.adminUserId) {
+        return res.json({ message: "If an account exists with that email, you will receive reset instructions." });
+      }
+      
+      // Generate reset token with 2-hour expiry
+      const resetToken = generateVerificationToken();
+      const resetExpiry = getVerificationExpiry();
+      
+      // Save reset token to school
+      await db.update(schools)
+        .set({ 
+          passwordResetToken: resetToken,
+          passwordResetExpiry: resetExpiry,
+          updatedAt: new Date()
+        })
+        .where(eq(schools.id, school.id));
+      
+      // Send password reset email
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      await sendPasswordResetEmail(
+        school.email,
+        school.name,
+        school.registrarName,
+        resetToken,
+        baseUrl
+      );
+      
+      res.json({ message: "If an account exists with that email, you will receive reset instructions." });
+    } catch (error: any) {
+      console.error('Password reset request error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Reset password with token
+  app.post("/api/schools/reset-password", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      
+      if (!token || !password) {
+        return res.status(400).json({ message: "Token and password are required" });
+      }
+      
+      // Validate password strength
+      if (password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+      
+      // Find school by reset token
+      const result = await db.select().from(schools)
+        .where(eq(schools.passwordResetToken, token));
+      
+      if (result.length === 0) {
+        return res.status(400).json({ message: "Invalid or expired reset link" });
+      }
+      
+      const school = result[0];
+      
+      // Check if token has expired (2-hour window)
+      if (school.passwordResetExpiry && new Date() > new Date(school.passwordResetExpiry)) {
+        return res.status(400).json({ message: "Reset link has expired. Please request a new one." });
+      }
+      
+      if (!school.adminUserId) {
+        return res.status(400).json({ message: "No admin account found for this school" });
+      }
+      
+      // Hash the new password
+      const passwordHash = await bcrypt.hash(password, 10);
+      
+      // Update user's password
+      await db.update(users)
+        .set({ 
+          passwordHash,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, school.adminUserId));
+      
+      // Clear reset token
+      await db.update(schools)
+        .set({ 
+          passwordResetToken: null,
+          passwordResetExpiry: null,
+          updatedAt: new Date()
+        })
+        .where(eq(schools.id, school.id));
+      
+      // Create audit log entry
+      try {
+        await storage.createAuditLog({
+          userId: school.adminUserId,
+          action: 'password_reset',
+          resourceType: 'user',
+          resourceId: parseInt(school.adminUserId) || 0,
+          details: { 
+            schoolName: school.name,
+            method: 'email_link'
+          },
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log:', auditError);
+      }
+      
+      res.json({ message: "Password reset successfully" });
+    } catch (error: any) {
+      console.error('Password reset error:', error);
       res.status(500).json({ message: error.message });
     }
   });
