@@ -54,6 +54,8 @@ export default function Statistics() {
     queryKey: ['/api/regions'],
   });
 
+  const statisticsUrl = `/api/public/statistics?category=${activeTab}&groupBy=${groupBy}${selectedRegion !== 'all' ? `&regionId=${selectedRegion}` : ''}`;
+  
   const { data: statistics, isLoading, error } = useQuery<{
     results: StatResult[];
     total: number;
@@ -61,7 +63,7 @@ export default function Statistics() {
     category: string;
     availableInEmis: boolean;
   }>({
-    queryKey: ['/api/public/statistics', activeTab, groupBy, selectedRegion],
+    queryKey: [statisticsUrl],
   });
 
   const studentGroupOptions: { value: GroupBy; label: string; labelAr: string }[] = [
