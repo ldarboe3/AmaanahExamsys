@@ -540,51 +540,6 @@ export default function Students() {
           </CardContent>
         </Card>
       )}
-
-      {/* Summary Stats */}
-      {availableGrades.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{t.dashboard.totalStudents}</p>
-                  <p className="text-2xl font-semibold">{allStudents?.length || 0}</p>
-                </div>
-                <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-primary" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{t.common.pending}</p>
-                  <p className="text-2xl font-semibold">{allStudents?.filter(s => s.status === 'pending').length || 0}</p>
-                </div>
-                <div className="w-10 h-10 rounded-md bg-chart-5/10 flex items-center justify-center">
-                  <ClipboardList className="w-5 h-5 text-chart-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{t.common.approved}</p>
-                  <p className="text-2xl font-semibold">{allStudents?.filter(s => s.status === 'approved').length || 0}</p>
-                </div>
-                <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-chart-3" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 
