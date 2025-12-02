@@ -2654,9 +2654,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
   
-  // Confirm payment by admin and generate index numbers
+  // Confirm payment by admin (examination_admin or super_admin only)
+  // This only marks payment as confirmed, does NOT approve students or generate index numbers
   app.post("/api/invoices/:id/confirm-payment", isAuthenticated, async (req, res) => {
     try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Only examination_admin and super_admin can confirm payments
+      if (user.role !== 'examination_admin' && user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only examination admin or super admin can confirm payments" });
+      }
+      
       const invoiceId = parseInt(req.params.id);
       const invoice = await storage.getInvoice(invoiceId);
       
@@ -2668,50 +2679,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "Invoice already paid" });
       }
       
+      if (invoice.status !== 'processing') {
+        return res.status(400).json({ message: "Invoice must have a bank slip uploaded before payment can be confirmed" });
+      }
+      
       // Update invoice status to paid
       const [paidInvoice] = await db.update(invoices)
         .set({ 
           status: 'paid', 
           paymentDate: new Date(),
+          paidAmount: invoice.totalAmount,
+          paymentMethod: 'bank_transfer',
           updatedAt: new Date()
         })
         .where(eq(invoices.id, invoiceId))
         .returning();
       
-      // Generate index numbers for approved students
-      const allStudents = await storage.getStudentsBySchool(invoice.schoolId);
-      const studentsToIndex = allStudents.filter(s => 
-        s.examYearId === invoice.examYearId && 
-        s.status === 'approved' && 
-        !s.indexNumber
-      );
-      
-      const generatedStudents = [];
-      const usedIndexNumbers = new Set<string>();
-      
-      // Get existing index numbers to avoid duplicates
-      const existingStudents = await storage.getAllStudents();
-      existingStudents.forEach(s => {
-        if (s.indexNumber) usedIndexNumbers.add(s.indexNumber);
-      });
-      
-      for (const student of studentsToIndex) {
-        let indexNumber: string;
-        do {
-          indexNumber = generateIndexNumber();
-        } while (usedIndexNumbers.has(indexNumber));
-        
-        usedIndexNumbers.add(indexNumber);
-        
-        const [updatedStudent] = await db.update(students)
-          .set({ indexNumber, updatedAt: new Date() })
-          .where(eq(students.id, student.id))
-          .returning();
-        
-        generatedStudents.push(updatedStudent);
-      }
-      
-      // Send payment confirmation email
+      // Send payment confirmation email to school
       const school = await storage.getSchool(invoice.schoolId);
       if (school) {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -2729,10 +2713,107 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
       
+      // Get count of pending students for this school/exam year
+      const allStudents = await storage.getStudentsBySchool(invoice.schoolId);
+      const pendingStudents = allStudents.filter(s => 
+        s.examYearId === invoice.examYearId && 
+        s.status === 'pending'
+      );
+      
       res.json({
         invoice: paidInvoice,
-        indexNumbersGenerated: generatedStudents.length,
-        students: generatedStudents
+        message: "Payment confirmed successfully. You can now approve students.",
+        pendingStudentsCount: pendingStudents.length
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Bulk approve students for a school after payment is confirmed
+  // This approves all pending students and generates index numbers
+  app.post("/api/invoices/:id/bulk-approve-students", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Only examination_admin and super_admin can bulk approve students
+      if (user.role !== 'examination_admin' && user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only examination admin or super admin can approve students" });
+      }
+      
+      const invoiceId = parseInt(req.params.id);
+      const invoice = await storage.getInvoice(invoiceId);
+      
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      // Payment must be confirmed before approving students
+      if (invoice.status !== 'paid') {
+        return res.status(400).json({ message: "Payment must be confirmed before approving students" });
+      }
+      
+      // Get all pending students for this school and exam year
+      const allStudents = await storage.getStudentsBySchool(invoice.schoolId);
+      const pendingStudents = allStudents.filter(s => 
+        s.examYearId === invoice.examYearId && 
+        s.status === 'pending'
+      );
+      
+      if (pendingStudents.length === 0) {
+        return res.json({
+          message: "No pending students to approve",
+          approvedCount: 0,
+          indexNumbersGenerated: 0
+        });
+      }
+      
+      // Get existing index numbers to avoid duplicates
+      const usedIndexNumbers = new Set<string>();
+      const existingStudents = await storage.getAllStudents();
+      existingStudents.forEach(s => {
+        if (s.indexNumber) usedIndexNumbers.add(s.indexNumber);
+      });
+      
+      const approvedStudents = [];
+      
+      // Approve each pending student and generate index number
+      for (const student of pendingStudents) {
+        // Generate unique index number
+        let indexNumber: string;
+        do {
+          indexNumber = generateIndexNumber();
+        } while (usedIndexNumbers.has(indexNumber));
+        
+        usedIndexNumbers.add(indexNumber);
+        
+        // Update student: approve and assign index number
+        const [updatedStudent] = await db.update(students)
+          .set({ 
+            status: 'approved',
+            indexNumber, 
+            updatedAt: new Date() 
+          })
+          .where(eq(students.id, student.id))
+          .returning();
+        
+        if (updatedStudent) {
+          approvedStudents.push(updatedStudent);
+        }
+      }
+      
+      // Get school info for notification
+      const school = await storage.getSchool(invoice.schoolId);
+      
+      res.json({
+        message: `Successfully approved ${approvedStudents.length} students and generated index numbers`,
+        approvedCount: approvedStudents.length,
+        indexNumbersGenerated: approvedStudents.length,
+        students: approvedStudents,
+        school: school ? { id: school.id, name: school.name } : null
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
