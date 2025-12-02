@@ -1,46 +1,17 @@
-// AgentMail Email Service for Amaanah Exam System
+// SendGrid Email Service for Amaanah Exam System
 // Handles verification emails, notifications, and system communications
 
-import { AgentMailClient } from 'agentmail';
+import sgMail from '@sendgrid/mail';
 import crypto from 'crypto';
 
-let connectionSettings: any;
-
-async function getCredentials() {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+// Initialize SendGrid with API key
+const initializeSendGrid = () => {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    throw new Error('SENDGRID_API_KEY not configured');
   }
-
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=agentmail',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  if (!connectionSettings || !connectionSettings.settings.api_key) {
-    throw new Error('AgentMail not connected');
-  }
-  return { apiKey: connectionSettings.settings.api_key };
-}
-
-// WARNING: Never cache this client - tokens expire
-export async function getAgentMailClient() {
-  const { apiKey } = await getCredentials();
-  return new AgentMailClient({
-    apiKey: apiKey
-  });
-}
+  sgMail.setApiKey(apiKey);
+};
 
 // Generate a cryptographically secure verification token
 export function generateVerificationToken(): string {
@@ -79,74 +50,23 @@ interface EmailOptions {
   textBody?: string;
 }
 
-// Send email using AgentMail
+// Send email using SendGrid
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
-    const client = await getAgentMailClient();
-    
-    // Get existing inboxes
-    let inboxes: any[] = [];
-    try {
-      const inboxesResponse = await client.inboxes.list();
-      
-      // Handle different response formats
-      if (Array.isArray(inboxesResponse)) {
-        inboxes = inboxesResponse;
-      } else if (inboxesResponse?.items && Array.isArray(inboxesResponse.items)) {
-        inboxes = inboxesResponse.items;
-      } else if (inboxesResponse && typeof inboxesResponse[Symbol.asyncIterator] === 'function') {
-        // Handle async iterable
-        for await (const item of inboxesResponse) {
-          inboxes.push(item);
-        }
-      }
-    } catch (listError: any) {
-      console.error('Failed to list inboxes:', listError?.message);
-      throw new Error('Unable to access email inboxes');
-    }
+    initializeSendGrid();
 
-    if (!inboxes || inboxes.length === 0) {
-      throw new Error('No email inboxes available for sending');
-    }
+    const fromEmail = process.env.FROM_EMAIL || 'info@amaanah.gm';
 
-    const inbox = inboxes[0];
-    
-    // Use configured FROM_EMAIL or derive from inbox
-    let fromAddress = process.env.FROM_EMAIL || 'info@amaanah.gm';
-    if (!fromAddress || !fromAddress.includes('@')) {
-      // Fallback to inbox address if configured one is invalid
-      if (inbox.address) {
-        fromAddress = inbox.address;
-      } else if (inbox.username && inbox.domain) {
-        fromAddress = `${inbox.username}@${inbox.domain}`;
-      } else if (inbox.email) {
-        fromAddress = inbox.email;
-      } else {
-        fromAddress = 'noreply@agentmail.to';
-      }
-    }
-
-    // Validate from address
-    if (!fromAddress || typeof fromAddress !== 'string' || !fromAddress.includes('@')) {
-      console.error('Invalid from address:', fromAddress);
-      throw new Error('Invalid email address for sending');
-    }
-
-    // Send the email
-    const inboxId = inbox.id || inbox.inbox_id;
-    if (!inboxId) {
-      throw new Error('Invalid inbox ID');
-    }
-
-    await client.inboxes.messages.send(inboxId, {
-      to: [options.to],
-      from: fromAddress,
+    const msg = {
+      to: options.to,
+      from: fromEmail,
       subject: options.subject,
-      text: options.textBody || options.htmlBody.replace(/<[^>]*>/g, ''),
       html: options.htmlBody,
-    });
+      text: options.textBody || options.htmlBody.replace(/<[^>]*>/g, ''),
+    };
 
-    console.log(`Email sent successfully to ${options.to} from ${fromAddress}`);
+    await sgMail.send(msg);
+    console.log(`Email sent successfully to ${options.to} from ${fromEmail}`);
     return true;
   } catch (error: any) {
     console.error('Failed to send email:', error?.message || error);
