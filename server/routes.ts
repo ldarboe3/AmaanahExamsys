@@ -740,42 +740,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(500).json({ message: error.message });
     }
   });
-  
-  // Resend verification email
-  app.post("/api/schools/:id/resend-verification", isAuthenticated, async (req, res) => {
-    try {
-      const school = await storage.getSchool(parseInt(req.params.id));
-      if (!school) {
-        return res.status(404).json({ message: "School not found" });
-      }
-      
-      if (school.isEmailVerified) {
-        return res.status(400).json({ message: "Email already verified" });
-      }
-      
-      // Generate new verification token with 2-hour expiry
-      const verificationToken = generateVerificationToken();
-      const verificationExpiry = getVerificationExpiry();
-      
-      await db.update(schools)
-        .set({ verificationToken, verificationExpiry })
-        .where(eq(schools.id, school.id));
-      
-      // Send verification email
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      await sendSchoolVerificationEmail(
-        school.email,
-        school.name,
-        school.registrarName,
-        verificationToken,
-        baseUrl
-      );
-      
-      res.json({ message: "Verification email sent" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
 
   // Get school info for verification page (validates token without consuming it)
   app.get("/api/schools/verify-info/:token", async (req, res) => {
