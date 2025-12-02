@@ -283,17 +283,19 @@ export default function Dashboard() {
           </>
         ) : (
           <>
+            {!isSchoolAdmin && (
+              <StatCard
+                title={t.dashboard.totalSchools}
+                value={stats?.totalSchools || 0}
+                subtitle={`${stats?.pendingSchools || 0} ${t.dashboard.pendingApproval}`}
+                icon={School}
+                color="bg-primary/10 text-primary"
+                trend="up"
+                trendValue={`+12% ${t.dashboard.thisMonth}`}
+              />
+            )}
             <StatCard
-              title={t.dashboard.totalSchools}
-              value={stats?.totalSchools || 0}
-              subtitle={`${stats?.pendingSchools || 0} ${t.dashboard.pendingApproval}`}
-              icon={School}
-              color="bg-primary/10 text-primary"
-              trend="up"
-              trendValue={`+12% ${t.dashboard.thisMonth}`}
-            />
-            <StatCard
-              title={t.dashboard.totalStudents}
+              title={isSchoolAdmin ? t.dashboard.yourStudents : t.dashboard.totalStudents}
               value={stats?.totalStudents || 0}
               subtitle={`${stats?.pendingStudents || 0} ${t.dashboard.pendingValidation}`}
               icon={Users}
