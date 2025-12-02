@@ -126,6 +126,7 @@ export const schools = pgTable("schools", {
   phone: varchar("phone", { length: 50 }),
   address: text("address"),
   schoolType: schoolTypeEnum("school_type").notNull(),
+  schoolTypes: text("school_types").array().default([]),
   regionId: integer("region_id").references(() => regions.id),
   clusterId: integer("cluster_id").references(() => clusters.id),
   preferredCenterId: integer("preferred_center_id").references(() => examCenters.id),
@@ -252,7 +253,7 @@ export const examiners = pgTable("examiners", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Examiner Assignments
+// Examiner Assignments (for marking scripts)
 export const examinerAssignments = pgTable("examiner_assignments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   examinerId: integer("examiner_id").notNull().references(() => examiners.id),
@@ -264,6 +265,56 @@ export const examinerAssignments = pgTable("examiner_assignments", {
   dueDate: timestamp("due_date"),
   isCompleted: boolean("is_completed").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Invigilator Assignments (for supervising exams at centers)
+export const invigilatorRoleEnum = pgEnum('invigilator_role', ['chief_invigilator', 'invigilator', 'assistant']);
+
+export const invigilatorAssignments = pgTable("invigilator_assignments", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  examinerId: integer("examiner_id").notNull().references(() => examiners.id),
+  examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
+  centerId: integer("center_id").notNull().references(() => examCenters.id),
+  subjectId: integer("subject_id").references(() => subjects.id),
+  timetableId: integer("timetable_id").references(() => examTimetable.id),
+  role: invigilatorRoleEnum("role").default('invigilator'),
+  assignedDate: timestamp("assigned_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Invoice items for detailed breakdown by grade
+export const invoiceItems = pgTable("invoice_items", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  invoiceId: integer("invoice_id").notNull().references(() => invoices.id),
+  grade: integer("grade").notNull(),
+  studentCount: integer("student_count").notNull(),
+  feePerStudent: decimal("fee_per_student", { precision: 10, scale: 2 }).notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Bulk upload tracking
+export const bulkUploadStatusEnum = pgEnum('bulk_upload_status', ['pending', 'processing', 'completed', 'failed']);
+
+export const bulkUploads = pgTable("bulk_uploads", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  uploadType: varchar("upload_type", { length: 50 }).notNull(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileUrl: varchar("file_url", { length: 500 }),
+  totalRows: integer("total_rows").default(0),
+  processedRows: integer("processed_rows").default(0),
+  successRows: integer("success_rows").default(0),
+  failedRows: integer("failed_rows").default(0),
+  errorLog: text("error_log"),
+  status: bulkUploadStatusEnum("status").default('pending'),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  examYearId: integer("exam_year_id").references(() => examYears.id),
+  regionId: integer("region_id").references(() => regions.id),
+  clusterId: integer("cluster_id").references(() => clusters.id),
+  schoolId: integer("school_id").references(() => schools.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
 });
 
 // Student Results
@@ -616,6 +667,7 @@ export const insertSchoolSchema = createInsertSchema(schools).pick({
   phone: true,
   address: true,
   schoolType: true,
+  schoolTypes: true,
   regionId: true,
   clusterId: true,
   preferredCenterId: true,
@@ -806,6 +858,42 @@ export const insertNotificationSchema = createInsertSchema(notifications).pick({
   type: true,
   isRead: true,
   link: true,
+});
+
+export const insertInvigilatorAssignmentSchema = createInsertSchema(invigilatorAssignments).pick({
+  examinerId: true,
+  examYearId: true,
+  centerId: true,
+  subjectId: true,
+  timetableId: true,
+  role: true,
+  assignedDate: true,
+  notes: true,
+});
+
+export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).pick({
+  invoiceId: true,
+  grade: true,
+  studentCount: true,
+  feePerStudent: true,
+  subtotal: true,
+});
+
+export const insertBulkUploadSchema = createInsertSchema(bulkUploads).pick({
+  uploadType: true,
+  fileName: true,
+  fileUrl: true,
+  totalRows: true,
+  processedRows: true,
+  successRows: true,
+  failedRows: true,
+  errorLog: true,
+  status: true,
+  uploadedBy: true,
+  examYearId: true,
+  regionId: true,
+  clusterId: true,
+  schoolId: true,
 });
 
 // ===== WEBSITE CONTENT MANAGEMENT =====
@@ -1020,6 +1108,12 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+export type InsertInvigilatorAssignment = z.infer<typeof insertInvigilatorAssignmentSchema>;
+export type InvigilatorAssignment = typeof invigilatorAssignments.$inferSelect;
+export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
+export type InvoiceItem = typeof invoiceItems.$inferSelect;
+export type InsertBulkUpload = z.infer<typeof insertBulkUploadSchema>;
+export type BulkUpload = typeof bulkUploads.$inferSelect;
 
 // Website Content Types
 export type InsertNewsCategory = z.infer<typeof insertNewsCategorySchema>;

@@ -3,8 +3,8 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users, sessions } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments } from "@shared/schema";
+import { eq, and, sql } from "drizzle-orm";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
 import {
@@ -13,9 +13,20 @@ import {
   insertInvoiceSchema, insertSubjectSchema, insertExamTimetableSchema,
   insertExaminerSchema, insertExaminerAssignmentSchema, insertStudentResultSchema,
   insertCertificateSchema, insertAttendanceRecordSchema, insertMalpracticeReportSchema,
+  insertInvigilatorAssignmentSchema, insertInvoiceItemSchema, insertBulkUploadSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import {
+  sendSchoolVerificationEmail,
+  sendPaymentConfirmationEmail,
+  sendResultsPublishedEmail,
+  sendCenterAllocationEmail,
+  generateVerificationToken,
+  getVerificationExpiry,
+  generateIndexNumber,
+  generateInvoiceNumber,
+} from "./emailService";
 
 declare module "express-session" {
   interface SessionData {
@@ -695,8 +706,70 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (existingSchool) {
         return res.status(400).json({ message: "School with this email already exists" });
       }
-      const school = await storage.createSchool(parsed.data);
+      
+      // Generate verification token with 2-hour expiry
+      const verificationToken = generateVerificationToken();
+      const verificationExpiry = getVerificationExpiry();
+      
+      const school = await storage.createSchool({
+        ...parsed.data,
+        verificationToken,
+        verificationExpiry,
+        status: 'pending',
+        isEmailVerified: false,
+      });
+      
+      // Send verification email
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      try {
+        await sendSchoolVerificationEmail(
+          school.email,
+          school.name,
+          school.registrarName,
+          verificationToken,
+          baseUrl
+        );
+      } catch (emailError) {
+        console.error('Failed to send verification email:', emailError);
+      }
+      
       res.status(201).json(school);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Resend verification email
+  app.post("/api/schools/:id/resend-verification", isAuthenticated, async (req, res) => {
+    try {
+      const school = await storage.getSchool(parseInt(req.params.id));
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      
+      if (school.isEmailVerified) {
+        return res.status(400).json({ message: "Email already verified" });
+      }
+      
+      // Generate new verification token with 2-hour expiry
+      const verificationToken = generateVerificationToken();
+      const verificationExpiry = getVerificationExpiry();
+      
+      await db.update(schools)
+        .set({ verificationToken, verificationExpiry })
+        .where(eq(schools.id, school.id));
+      
+      // Send verification email
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      await sendSchoolVerificationEmail(
+        school.email,
+        school.name,
+        school.registrarName,
+        verificationToken,
+        baseUrl
+      );
+      
+      res.json({ message: "Verification email sent" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -704,11 +777,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.get("/api/schools/verify/:token", async (req, res) => {
     try {
-      const school = await storage.verifySchoolEmail(req.params.token);
-      if (!school) {
-        return res.status(400).json({ message: "Invalid or expired verification token" });
+      // Find school by verification token
+      const result = await db.select().from(schools)
+        .where(eq(schools.verificationToken, req.params.token));
+      
+      if (result.length === 0) {
+        return res.status(400).json({ message: "Invalid verification token" });
       }
-      res.json({ message: "Email verified successfully", school });
+      
+      const school = result[0];
+      
+      // Check if token has expired (2-hour window)
+      if (school.verificationExpiry && new Date() > new Date(school.verificationExpiry)) {
+        return res.status(400).json({ message: "Verification link has expired. Please request a new one." });
+      }
+      
+      // Mark email as verified
+      const [updatedSchool] = await db.update(schools)
+        .set({ 
+          isEmailVerified: true, 
+          verificationToken: null,
+          status: 'verified',
+          updatedAt: new Date()
+        })
+        .where(eq(schools.id, school.id))
+        .returning();
+      
+      res.json({ message: "Email verified successfully", school: updatedSchool });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -760,7 +855,98 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!school) {
         return res.status(404).json({ message: "School not found" });
       }
+      
+      // Get center details and active exam year for email notification
+      const center = await storage.getExamCenter(centerId);
+      const activeExamYear = await storage.getActiveExamYear();
+      
+      if (center && activeExamYear) {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        try {
+          await sendCenterAllocationEmail(
+            school.email,
+            school.name,
+            center.name,
+            center.address || 'See dashboard for details',
+            activeExamYear.name,
+            baseUrl
+          );
+        } catch (emailError) {
+          console.error('Failed to send center allocation email:', emailError);
+        }
+      }
+      
       res.json(school);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Bulk school upload
+  app.post("/api/schools/bulk-upload", isAuthenticated, async (req, res) => {
+    try {
+      const { schools: schoolList } = req.body;
+      if (!Array.isArray(schoolList)) {
+        return res.status(400).json({ message: "schools must be an array" });
+      }
+      
+      const results = {
+        created: 0,
+        skipped: 0,
+        errors: [] as { row: number; email: string; error: string }[]
+      };
+      
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      
+      for (let i = 0; i < schoolList.length; i++) {
+        const schoolData = schoolList[i];
+        try {
+          // Check if school already exists
+          const existing = await storage.getSchoolByEmail(schoolData.email);
+          if (existing) {
+            results.skipped++;
+            continue;
+          }
+          
+          // Generate verification token with 2-hour expiry
+          const verificationToken = generateVerificationToken();
+          const verificationExpiry = getVerificationExpiry();
+          
+          const school = await storage.createSchool({
+            ...schoolData,
+            verificationToken,
+            verificationExpiry,
+            status: 'pending',
+            isEmailVerified: false,
+          });
+          
+          // Send verification email
+          try {
+            await sendSchoolVerificationEmail(
+              school.email,
+              school.name,
+              school.registrarName,
+              verificationToken,
+              baseUrl
+            );
+          } catch (emailError) {
+            console.error(`Failed to send verification email to ${school.email}:`, emailError);
+          }
+          
+          results.created++;
+        } catch (error: any) {
+          results.errors.push({
+            row: i + 1,
+            email: schoolData.email || 'unknown',
+            error: error.message
+          });
+        }
+      }
+      
+      res.json({
+        message: `Created ${results.created} schools, skipped ${results.skipped} duplicates`,
+        ...results
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1028,11 +1214,166 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!paymentMethod) {
         return res.status(400).json({ message: "paymentMethod is required" });
       }
-      const invoice = await storage.markInvoicePaid(parseInt(req.params.id), paymentMethod, bankSlipUrl);
+      
+      const invoice = await storage.getInvoice(parseInt(req.params.id));
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
-      res.json(invoice);
+      
+      // Mark invoice as paid
+      const paidInvoice = await storage.markInvoicePaid(parseInt(req.params.id), paymentMethod, bankSlipUrl);
+      if (!paidInvoice) {
+        return res.status(404).json({ message: "Failed to update invoice" });
+      }
+      
+      // Get school info for email
+      const school = await storage.getSchool(invoice.schoolId);
+      const activeExamYear = invoice.examYearId ? await storage.getExamYear(invoice.examYearId) : null;
+      
+      // Generate unique 6-digit index numbers for all approved students of this school and exam year
+      const allStudents = await storage.getStudentsBySchool(invoice.schoolId);
+      const studentsToIndex = allStudents.filter(s => 
+        s.examYearId === invoice.examYearId && 
+        s.status === 'approved' && 
+        !s.indexNumber
+      );
+      
+      const generatedStudents = [];
+      const usedIndexNumbers = new Set<string>();
+      
+      // Get existing index numbers to avoid duplicates
+      const existingStudents = await storage.getAllStudents();
+      existingStudents.forEach(s => {
+        if (s.indexNumber) usedIndexNumbers.add(s.indexNumber);
+      });
+      
+      for (const student of studentsToIndex) {
+        // Generate unique 6-digit index number
+        let indexNumber: string;
+        do {
+          indexNumber = generateIndexNumber();
+        } while (usedIndexNumbers.has(indexNumber));
+        
+        usedIndexNumbers.add(indexNumber);
+        
+        // Update student with index number
+        const updatedStudent = await db.update(students)
+          .set({ indexNumber, updatedAt: new Date() })
+          .where(eq(students.id, student.id))
+          .returning();
+        
+        if (updatedStudent.length > 0) {
+          generatedStudents.push(updatedStudent[0]);
+        }
+      }
+      
+      // Send payment confirmation email to school
+      if (school) {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        try {
+          await sendPaymentConfirmationEmail(
+            school.email,
+            school.name,
+            invoice.invoiceNumber,
+            invoice.totalAmount,
+            invoice.totalStudents,
+            baseUrl
+          );
+        } catch (emailError) {
+          console.error('Failed to send payment confirmation email:', emailError);
+        }
+      }
+      
+      res.json({
+        invoice: paidInvoice,
+        indexNumbersGenerated: generatedStudents.length,
+        message: `Payment confirmed. ${generatedStudents.length} index numbers generated.`
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Confirm payment by admin and generate index numbers
+  app.post("/api/invoices/:id/confirm-payment", isAuthenticated, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const invoice = await storage.getInvoice(invoiceId);
+      
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      if (invoice.status === 'paid') {
+        return res.status(400).json({ message: "Invoice already paid" });
+      }
+      
+      // Update invoice status to paid
+      const [paidInvoice] = await db.update(invoices)
+        .set({ 
+          status: 'paid', 
+          paymentDate: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(invoices.id, invoiceId))
+        .returning();
+      
+      // Generate index numbers for approved students
+      const allStudents = await storage.getStudentsBySchool(invoice.schoolId);
+      const studentsToIndex = allStudents.filter(s => 
+        s.examYearId === invoice.examYearId && 
+        s.status === 'approved' && 
+        !s.indexNumber
+      );
+      
+      const generatedStudents = [];
+      const usedIndexNumbers = new Set<string>();
+      
+      // Get existing index numbers to avoid duplicates
+      const existingStudents = await storage.getAllStudents();
+      existingStudents.forEach(s => {
+        if (s.indexNumber) usedIndexNumbers.add(s.indexNumber);
+      });
+      
+      for (const student of studentsToIndex) {
+        let indexNumber: string;
+        do {
+          indexNumber = generateIndexNumber();
+        } while (usedIndexNumbers.has(indexNumber));
+        
+        usedIndexNumbers.add(indexNumber);
+        
+        const [updatedStudent] = await db.update(students)
+          .set({ indexNumber, updatedAt: new Date() })
+          .where(eq(students.id, student.id))
+          .returning();
+        
+        generatedStudents.push(updatedStudent);
+      }
+      
+      // Send payment confirmation email
+      const school = await storage.getSchool(invoice.schoolId);
+      if (school) {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        try {
+          await sendPaymentConfirmationEmail(
+            school.email,
+            school.name,
+            invoice.invoiceNumber,
+            invoice.totalAmount,
+            invoice.totalStudents,
+            baseUrl
+          );
+        } catch (emailError) {
+          console.error('Failed to send payment confirmation email:', emailError);
+        }
+      }
+      
+      res.json({
+        invoice: paidInvoice,
+        indexNumbersGenerated: generatedStudents.length,
+        students: generatedStudents
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1331,6 +1672,88 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       await storage.deleteExaminerAssignment(parseInt(req.params.id));
       res.json({ message: "Deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Invigilator Assignments API (for exam supervision at centers)
+  app.get("/api/invigilator-assignments", async (req, res) => {
+    try {
+      const centerId = req.query.centerId ? parseInt(req.query.centerId as string) : undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      const subjectId = req.query.subjectId ? parseInt(req.query.subjectId as string) : undefined;
+      
+      let query = db.select().from(invigilatorAssignments);
+      
+      if (centerId) {
+        query = query.where(eq(invigilatorAssignments.centerId, centerId)) as any;
+      }
+      
+      const assignments = await query;
+      res.json(assignments);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/invigilator-assignments", isAuthenticated, async (req, res) => {
+    try {
+      const { examinerId, examYearId, centerId, subjectId, timetableId, role, notes } = req.body;
+      
+      if (!examinerId || !examYearId || !centerId) {
+        return res.status(400).json({ message: "examinerId, examYearId, and centerId are required" });
+      }
+      
+      const [assignment] = await db.insert(invigilatorAssignments).values({
+        examinerId,
+        examYearId,
+        centerId,
+        subjectId: subjectId || null,
+        timetableId: timetableId || null,
+        role: role || 'invigilator',
+        assignedDate: new Date(),
+        notes: notes || null,
+      }).returning();
+      
+      res.status(201).json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/invigilator-assignments/:id", isAuthenticated, async (req, res) => {
+    try {
+      await db.delete(invigilatorAssignments)
+        .where(eq(invigilatorAssignments.id, parseInt(req.params.id)));
+      res.json({ message: "Deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get invigilators for a specific center/exam
+  app.get("/api/centers/:id/invigilators", async (req, res) => {
+    try {
+      const centerId = parseInt(req.params.id);
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      
+      let query = db.select().from(invigilatorAssignments)
+        .where(eq(invigilatorAssignments.centerId, centerId));
+      
+      const assignments = await query;
+      
+      // Enrich with examiner details
+      const examiners = await storage.getAllExaminers();
+      const subjects = await storage.getAllSubjects();
+      
+      const enrichedAssignments = assignments.map(a => ({
+        ...a,
+        examiner: examiners.find(e => e.id === a.examinerId),
+        subject: subjects.find(s => s.id === a.subjectId),
+      }));
+      
+      res.json(enrichedAssignments);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
