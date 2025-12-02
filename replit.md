@@ -56,9 +56,17 @@ The MVP is complete with all core features implemented and verified. PDF generat
   - Object storage integration for document persistence
   - Backend API endpoints: `GET/POST /api/school/profile`, `POST /api/school/documents/upload`, `POST /api/school/documents/delete`
   - Bilingual UI (English/Arabic) with sidebar navigation link
+- **Past Exam Year Management**: Intelligent visibility and read-only mode for completed exam years
+  - Detection: Exam year is "past" when `examEndDate < current date`
+  - School admin visibility: Active years always shown; past years only shown if school has registered students
+  - Red "Past" badge displayed on past exam year cards
+  - Read-only mode enforced for school admins on past years with AlertCircle warning banner
+  - Unscoped `allSchoolStudents` query maintains accurate visibility during navigation
+  - Safe loading fallback prevents past years from disappearing during data fetches
 - **3-Tier Student Registration Navigation**: Complete hierarchical registration workflow for school admins
   - **Tier 1 - Exam Year Selection**: Shows all exam years as interactive cards with name, deadline, fee, and available grades
     - Active exam year highlighted with badge
+    - Past exam years with students show red "Past" badge (read-only)
     - Instructional Step 1 card explains the process
   - **Tier 2 - Grade Selection**: Shows grades filtered by school type (LBS: 3,6 | BCS: 3,6,9 | UBS: 9 | SSS: 12)
     - Each grade card displays student count, pending/approved indicators
