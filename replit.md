@@ -7,6 +7,13 @@ A comprehensive examination management system for managing countrywide Arabic & 
 The MVP is complete with all core features implemented and verified. PDF generation system for certificates and transcripts is fully functional with Arabic/English bilingual support, QR code verification, and gender-specific templates.
 
 ## Recent Changes (December 2024)
+- **Resend Verification Email Feature**: Admin tool to resend school verification emails
+  - Added "Resend Verification Email" button in Schools management dropdown
+  - Only appears for pending schools without verified emails
+  - Generates new 2-hour expiry verification tokens
+  - Sends from branded email address `info@amaanah.gm`
+  - Bilingual support (English/Arabic)
+  - API endpoint: `POST /api/schools/:id/resend-verification`
 - **School Verification Workflow Redesigned**: Streamlined self-service registration
   - Email verification now includes username/password creation in one step
   - Schools are auto-approved upon completing verification (no manual admin approval needed)
@@ -123,6 +130,12 @@ The application runs on port 5000 with:
 - Database: PostgreSQL (Neon)
 
 Start with: `npm run dev`
+
+## Email Configuration
+- **Service**: AgentMail for email delivery
+- **From Email**: `info@amaanah.gm` (configured via FROM_EMAIL env var)
+- **Features**: School verification, password reset, payment confirmation, results notification
+- **Expiry**: 2-hour links for all sensitive operations
 
 ## User Preferences
 - Material Design 3 adherence for all UI components
