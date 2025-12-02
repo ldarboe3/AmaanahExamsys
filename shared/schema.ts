@@ -92,6 +92,7 @@ export const examYears = pgTable("exam_years", {
   name: varchar("name", { length: 255 }).notNull(),
   hijriYear: varchar("hijri_year", { length: 50 }),
   isActive: boolean("is_active").default(false),
+  grades: integer("grades").array().default([]),
   registrationStartDate: timestamp("registration_start_date"),
   registrationEndDate: timestamp("registration_end_date"),
   examStartDate: timestamp("exam_start_date"),

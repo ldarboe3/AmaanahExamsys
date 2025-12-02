@@ -66,6 +66,7 @@ const examYearSchema = z.object({
   year: z.coerce.number().min(2020).max(2100),
   name: z.string().min(3, "Name must be at least 3 characters"),
   hijriYear: z.string().optional(),
+  grades: z.array(z.coerce.number()).default([]),
   registrationStartDate: z.string().optional(),
   registrationEndDate: z.string().optional(),
   examStartDate: z.string().optional(),
@@ -482,6 +483,35 @@ export default function ExamYears() {
                     <FormControl>
                       <Input placeholder="2024/2025 Academic Year" {...field} data-testid="input-name" />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="grades"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Examination Classes</FormLabel>
+                    <div className="flex flex-wrap gap-3 mt-2">
+                      {[3, 6, 9, 12].map(grade => (
+                        <label key={grade} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={field.value?.includes(grade) || false}
+                            onChange={(e) => {
+                              const newValue = e.target.checked
+                                ? [...(field.value || []), grade]
+                                : (field.value || []).filter(g => g !== grade);
+                              field.onChange(newValue);
+                            }}
+                            data-testid={`checkbox-grade-${grade}`}
+                          />
+                          <span className="text-sm">Class {grade}</span>
+                        </label>
+                      ))}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
