@@ -1111,16 +1111,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const verificationToken = generateVerificationToken();
       const verificationExpiry = getVerificationExpiry();
       
-      // Update school with new token
-      await db.update(schools)
-        .set({
-          verificationToken,
-          verificationExpiry,
-          updatedAt: new Date()
-        })
-        .where(eq(schools.id, school.id));
-      
-      // Send verification email
+      // Send verification email first before updating
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       const emailSent = await sendSchoolVerificationEmail(
         school.email,
@@ -1131,13 +1122,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       );
       
       if (!emailSent) {
-        return res.status(500).json({ message: "Failed to send verification email" });
+        return res.status(500).json({ message: "Failed to send verification email. Please try again later." });
       }
+      
+      // Only update token if email was sent successfully
+      await db.update(schools)
+        .set({
+          verificationToken,
+          verificationExpiry,
+          updatedAt: new Date()
+        })
+        .where(eq(schools.id, school.id));
       
       res.json({ message: "Verification email sent successfully" });
     } catch (error: any) {
       console.error('Resend verification error:', error);
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: error.message || "Failed to resend verification email" });
     }
   });
 

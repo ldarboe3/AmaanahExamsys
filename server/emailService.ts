@@ -84,49 +84,56 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
     const client = await getAgentMailClient();
     
-    // Create or get an inbox for sending
-    const inboxesPage = await client.inboxes.list();
-    let inbox: any = null;
-    
-    // Get first inbox from paginated response
-    // The response is an async iterable paginated object
-    const pageData = inboxesPage as any;
-    if (pageData.items && pageData.items.length > 0) {
-      inbox = pageData.items[0];
-    } else if (Symbol.asyncIterator in pageData) {
-      for await (const item of pageData) {
-        inbox = item;
-        break;
+    // Get or create an inbox
+    let inboxes: any[] = [];
+    try {
+      const inboxesResponse = await client.inboxes.list();
+      
+      // Handle different response formats
+      if (Array.isArray(inboxesResponse)) {
+        inboxes = inboxesResponse;
+      } else if (inboxesResponse?.items && Array.isArray(inboxesResponse.items)) {
+        inboxes = inboxesResponse.items;
+      } else if (inboxesResponse && typeof inboxesResponse[Symbol.asyncIterator] === 'function') {
+        // Handle async iterable
+        for await (const item of inboxesResponse) {
+          inboxes.push(item);
+        }
       }
+    } catch (listError: any) {
+      console.warn('Failed to list inboxes:', listError);
     }
+
+    let inbox = inboxes.length > 0 ? inboxes[0] : null;
     
     if (!inbox) {
-      // Try to create a new inbox if none exists, but handle if it already exists
+      // Try to create a new inbox
       try {
-        inbox = await client.inboxes.create({
-          username: 'amaanah-exams',
-          domain: 'agentmail.to'
-        });
+        inbox = await client.inboxes.create({ tag: 'amaanah-exams' });
       } catch (createError: any) {
-        // If inbox already exists, just list and use the first one
-        if (createError.statusCode === 403 && createError.body?.name === 'AlreadyExistsError') {
-          const retryPage = await client.inboxes.list();
-          if (retryPage.items && retryPage.items.length > 0) {
-            inbox = retryPage.items[0];
-          } else {
-            throw new Error('Unable to find or create inbox');
+        console.error('Failed to create inbox:', createError);
+        // Last resort: try to get inboxes again
+        try {
+          const retryResponse = await client.inboxes.list();
+          const retryInboxes = Array.isArray(retryResponse) ? retryResponse : retryResponse?.items || [];
+          if (retryInboxes.length > 0) {
+            inbox = retryInboxes[0];
           }
-        } else {
-          throw createError;
+        } catch (retryError) {
+          console.error('Failed to retry list inboxes:', retryError);
+        }
+
+        if (!inbox) {
+          throw new Error('Unable to find or create inbox for sending emails');
         }
       }
     }
 
-    // Construct the from address from the inbox
-    const fromAddress = `${inbox.username}@${inbox.domain}`;
+    // Construct the from address
+    const fromAddress = inbox.address || `${inbox.username}@${inbox.domain}` || 'noreply@agentmail.to';
 
-    // Send the email using inbox messages with correct API parameters
-    await client.inboxes.messages.send(inbox.inbox_id, {
+    // Send the email
+    await client.inboxes.messages.send(inbox.id || inbox.inbox_id, {
       to: [options.to],
       from: fromAddress,
       subject: options.subject,
@@ -136,8 +143,8 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     console.log(`Email sent successfully to ${options.to} from ${fromAddress}`);
     return true;
-  } catch (error) {
-    console.error('Failed to send email:', error);
+  } catch (error: any) {
+    console.error('Failed to send email:', error?.message || error);
     return false;
   }
 }
