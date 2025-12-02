@@ -24,6 +24,9 @@ import {
   sendCenterAllocationEmail,
   sendPasswordResetEmail,
   sendSchoolAdminInvitationEmail,
+  sendExamYearCreatedNotification,
+  sendWeeklyRegistrationReminder,
+  sendUrgentRegistrationReminder,
   generateVerificationToken,
   getVerificationExpiry,
   generateIndexNumber,
@@ -561,6 +564,37 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: fromZodError(parsed.error).message });
       }
       const examYear = await storage.createExamYear({ ...parsed.data, createdBy: req.session.userId });
+      
+      // Send notification emails to all approved schools if registration end date is set
+      if (examYear.registrationEndDate) {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const approvedSchools = await storage.getSchoolsByStatus('approved');
+        
+        // Send notifications in the background (don't block response)
+        (async () => {
+          let successCount = 0;
+          let failCount = 0;
+          
+          for (const school of approvedSchools) {
+            try {
+              await sendExamYearCreatedNotification(
+                school.email,
+                school.name,
+                school.registrarName || 'School Administrator',
+                examYear.name,
+                new Date(examYear.registrationEndDate!),
+                baseUrl
+              );
+              successCount++;
+            } catch (error) {
+              console.error(`Failed to send exam year notification to ${school.email}:`, error);
+              failCount++;
+            }
+          }
+          console.log(`Exam year notification emails: ${successCount} sent, ${failCount} failed`);
+        })();
+      }
+      
       res.status(201).json(examYear);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -595,6 +629,87 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       await storage.deleteExamYear(parseInt(req.params.id));
       res.json({ message: "Deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Send registration deadline reminders - can be called by cron job or manually
+  app.post("/api/exam-years/send-reminders", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const activeExamYear = await storage.getActiveExamYear();
+      if (!activeExamYear || !activeExamYear.registrationEndDate) {
+        return res.status(400).json({ message: "No active exam year with registration deadline" });
+      }
+      
+      const registrationEndDate = new Date(activeExamYear.registrationEndDate);
+      const now = new Date();
+      const timeDiff = registrationEndDate.getTime() - now.getTime();
+      const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+      const hoursRemaining = Math.ceil((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      
+      if (daysRemaining < 0) {
+        return res.status(400).json({ message: "Registration deadline has passed" });
+      }
+      
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const approvedSchools = await storage.getSchoolsByStatus('approved');
+      
+      let successCount = 0;
+      let failCount = 0;
+      const isUrgent = daysRemaining < 3;
+      
+      for (const school of approvedSchools) {
+        try {
+          // Get student count for this school
+          const schoolStudents = await storage.getStudentsBySchool(school.id, activeExamYear.id);
+          const registeredStudents = schoolStudents?.length || 0;
+          
+          if (isUrgent) {
+            // Send urgent daily reminder
+            await sendUrgentRegistrationReminder(
+              school.email,
+              school.name,
+              school.registrarName || 'School Administrator',
+              activeExamYear.name,
+              registrationEndDate,
+              daysRemaining,
+              hoursRemaining,
+              registeredStudents,
+              baseUrl
+            );
+          } else {
+            // Send weekly reminder
+            await sendWeeklyRegistrationReminder(
+              school.email,
+              school.name,
+              school.registrarName || 'School Administrator',
+              activeExamYear.name,
+              registrationEndDate,
+              daysRemaining,
+              registeredStudents,
+              baseUrl
+            );
+          }
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to send reminder to ${school.email}:`, error);
+          failCount++;
+        }
+      }
+      
+      res.json({ 
+        message: `${isUrgent ? 'Urgent' : 'Weekly'} reminders sent: ${successCount} successful, ${failCount} failed`,
+        isUrgent,
+        daysRemaining,
+        successCount,
+        failCount
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

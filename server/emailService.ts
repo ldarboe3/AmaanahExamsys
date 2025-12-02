@@ -527,3 +527,325 @@ export async function sendSchoolAdminInvitationEmail(
     htmlBody: htmlBody
   });
 }
+
+// Send initial exam year creation notification to all schools
+export async function sendExamYearCreatedNotification(
+  schoolEmail: string,
+  schoolName: string,
+  registrarName: string,
+  examYearName: string,
+  registrationEndDate: Date,
+  baseUrl: string
+): Promise<boolean> {
+  const formattedDeadline = registrationEndDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1E8F4D, #166534); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .btn { display: inline-block; background: #1E8F4D; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+        .highlight { background: #E7F9EE; border-left: 4px solid #1E8F4D; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .warning { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+        .arabic { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; }
+        .deadline-box { background: #1E8F4D; color: white; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; }
+        .deadline-date { font-size: 24px; font-weight: bold; margin-top: 10px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>New Examination Year Announced!</h1>
+          <p class="arabic">إعلان عن عام دراسي جديد!</p>
+        </div>
+        <div class="content">
+          <h2>Assalamu Alaikum ${registrarName},</h2>
+          <p>We are pleased to announce that <strong>${examYearName}</strong> is now open for student registration!</p>
+          
+          <div class="deadline-box">
+            <p style="margin: 0; font-size: 14px;">REGISTRATION DEADLINE</p>
+            <p class="deadline-date">${formattedDeadline}</p>
+          </div>
+          
+          <div class="highlight">
+            <p><strong>Important Information for ${schoolName}:</strong></p>
+            <ul>
+              <li>Student registration is now open</li>
+              <li>Register all eligible students before the deadline</li>
+              <li>Payment must be completed for registration to be valid</li>
+              <li>Late registration will incur additional penalties</li>
+            </ul>
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${baseUrl}/students" class="btn">Register Students Now</a>
+          </div>
+          
+          <div class="warning">
+            <strong>⚠️ Important Notice:</strong> Schools that fail to complete registration by the deadline will be subject to late registration penalties. Please ensure all students are registered on time.
+          </div>
+          
+          <p>If you have any questions, please contact the examination office.</p>
+          
+          <p>Best regards,<br>Amaanah Examination Team</p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <div class="arabic" style="margin-top: 20px;">
+            <h3>السلام عليكم ${registrarName}</h3>
+            <p>يسرنا أن نعلن أن التسجيل مفتوح الآن لـ <strong>${examYearName}</strong>!</p>
+            <p><strong>آخر موعد للتسجيل: ${formattedDeadline}</strong></p>
+            <p>يرجى تسجيل جميع الطلاب قبل الموعد النهائي لتجنب أي عقوبات.</p>
+          </div>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} Amaanah Islamic Education - The Gambia</p>
+          <p>This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: schoolEmail,
+    subject: `📢 ${examYearName} - Registration Now Open!`,
+    htmlBody: htmlBody
+  });
+}
+
+// Send weekly registration reminder email
+export async function sendWeeklyRegistrationReminder(
+  schoolEmail: string,
+  schoolName: string,
+  registrarName: string,
+  examYearName: string,
+  registrationEndDate: Date,
+  daysRemaining: number,
+  registeredStudents: number,
+  baseUrl: string
+): Promise<boolean> {
+  const formattedDeadline = registrationEndDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .btn { display: inline-block; background: #2563eb; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+        .highlight { background: #EFF6FF; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .warning { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+        .arabic { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; }
+        .countdown-box { background: #2563eb; color: white; padding: 25px; text-align: center; border-radius: 8px; margin: 20px 0; }
+        .countdown-number { font-size: 48px; font-weight: bold; }
+        .stats-box { background: white; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin: 15px 0; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>📅 Weekly Registration Reminder</h1>
+          <p>${examYearName}</p>
+        </div>
+        <div class="content">
+          <h2>Assalamu Alaikum ${registrarName},</h2>
+          <p>This is a friendly reminder that the registration deadline for <strong>${examYearName}</strong> is approaching.</p>
+          
+          <div class="countdown-box">
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase;">Days Remaining</p>
+            <p class="countdown-number">${daysRemaining}</p>
+            <p style="margin: 0; font-size: 14px;">Deadline: ${formattedDeadline}</p>
+          </div>
+          
+          <div class="stats-box">
+            <p style="margin: 0; color: #666;">Students Registered from ${schoolName}</p>
+            <p style="margin: 5px 0 0 0; font-size: 28px; font-weight: bold; color: #2563eb;">${registeredStudents}</p>
+          </div>
+          
+          <div class="highlight">
+            <p><strong>Checklist:</strong></p>
+            <ul>
+              <li>Ensure all eligible students are registered</li>
+              <li>Verify student information is accurate</li>
+              <li>Complete payment for all registered students</li>
+              <li>Download and keep index numbers for reference</li>
+            </ul>
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${baseUrl}/students" class="btn">Review & Register Students</a>
+          </div>
+          
+          <div class="warning">
+            <strong>⚠️ Reminder:</strong> Late registration will incur additional penalties. Please complete all registrations before ${formattedDeadline}.
+          </div>
+          
+          <p>Best regards,<br>Amaanah Examination Team</p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <div class="arabic" style="margin-top: 20px;">
+            <h3>تذكير أسبوعي</h3>
+            <p>متبقي <strong>${daysRemaining} يوم</strong> حتى انتهاء موعد التسجيل.</p>
+            <p>عدد الطلاب المسجلين: <strong>${registeredStudents}</strong></p>
+          </div>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} Amaanah Islamic Education - The Gambia</p>
+          <p>This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: schoolEmail,
+    subject: `⏰ ${daysRemaining} Days Left - ${examYearName} Registration Reminder`,
+    htmlBody: htmlBody
+  });
+}
+
+// Send urgent daily registration reminder (less than 3 days remaining)
+export async function sendUrgentRegistrationReminder(
+  schoolEmail: string,
+  schoolName: string,
+  registrarName: string,
+  examYearName: string,
+  registrationEndDate: Date,
+  daysRemaining: number,
+  hoursRemaining: number,
+  registeredStudents: number,
+  baseUrl: string
+): Promise<boolean> {
+  const formattedDeadline = registrationEndDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  const timeDisplay = daysRemaining > 0 
+    ? `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} ${hoursRemaining} hours`
+    : `${hoursRemaining} hours`;
+  
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #DC2626, #991B1B); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .btn { display: inline-block; background: #DC2626; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+        .urgent-box { background: #DC2626; color: white; padding: 25px; text-align: center; border-radius: 8px; margin: 20px 0; animation: pulse 2s infinite; }
+        .urgent-number { font-size: 48px; font-weight: bold; }
+        .warning { background: #FEE2E2; border-left: 4px solid #DC2626; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .penalty-box { background: #7F1D1D; color: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+        .arabic { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; }
+        .stats-box { background: white; border: 2px solid #DC2626; padding: 15px; border-radius: 8px; margin: 15px 0; text-align: center; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🚨 URGENT: Registration Deadline Approaching!</h1>
+          <p>${examYearName}</p>
+        </div>
+        <div class="content">
+          <h2>⚠️ URGENT ACTION REQUIRED</h2>
+          <p>Dear ${registrarName},</p>
+          <p>This is an <strong>urgent reminder</strong> that the registration deadline for ${schoolName} is <strong>almost here!</strong></p>
+          
+          <div class="urgent-box">
+            <p style="margin: 0; font-size: 16px; text-transform: uppercase; letter-spacing: 2px;">⏰ TIME REMAINING</p>
+            <p class="urgent-number">${timeDisplay}</p>
+            <p style="margin: 0; font-size: 14px;">Deadline: ${formattedDeadline}</p>
+          </div>
+          
+          <div class="stats-box">
+            <p style="margin: 0; color: #DC2626; font-weight: bold;">Current Registration Status</p>
+            <p style="margin: 5px 0 0 0; font-size: 28px; font-weight: bold; color: #DC2626;">${registeredStudents} Students</p>
+            <p style="margin: 5px 0 0 0; color: #666; font-size: 12px;">Registered from ${schoolName}</p>
+          </div>
+          
+          <div class="penalty-box">
+            <h3 style="margin: 0 0 10px 0;">⚠️ LATE REGISTRATION PENALTIES</h3>
+            <p style="margin: 0;">Schools that miss the deadline will be subject to:</p>
+            <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+              <li>Late registration fees</li>
+              <li>Possible exclusion from current examination session</li>
+              <li>Administrative processing delays</li>
+            </ul>
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${baseUrl}/students" class="btn">COMPLETE REGISTRATION NOW</a>
+          </div>
+          
+          <div class="warning">
+            <strong>Final Checklist:</strong>
+            <ul style="margin: 10px 0 0 0;">
+              <li>✅ All students registered?</li>
+              <li>✅ Student information verified?</li>
+              <li>✅ Payment completed?</li>
+              <li>✅ Index numbers downloaded?</li>
+            </ul>
+          </div>
+          
+          <p>If you need assistance, please contact the examination office immediately.</p>
+          
+          <p>Best regards,<br>Amaanah Examination Team</p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <div class="arabic" style="margin-top: 20px;">
+            <h3 style="color: #DC2626;">🚨 تنبيه عاجل!</h3>
+            <p>الوقت المتبقي للتسجيل: <strong>${timeDisplay}</strong></p>
+            <p>يرجى إكمال تسجيل جميع الطلاب فوراً لتجنب العقوبات!</p>
+            <p>عدد الطلاب المسجلين حالياً: <strong>${registeredStudents}</strong></p>
+          </div>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} Amaanah Islamic Education - The Gambia</p>
+          <p>This is an automated urgent notification.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: schoolEmail,
+    subject: `🚨 URGENT: Only ${timeDisplay} Left! - ${examYearName} Registration`,
+    htmlBody: htmlBody
+  });
+}
