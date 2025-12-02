@@ -4,7 +4,7 @@ import {
   users, regions, clusters, examYears, examCenters, schools, students,
   invoices, subjects, examTimetable, examiners, examinerAssignments,
   studentResults, certificates, transcripts, attendanceRecords, malpracticeReports,
-  auditLogs, notifications, examCards, systemSettings,
+  auditLogs, notifications, examCards, systemSettings, schoolInvitations,
   newsCategories, newsArticles, resourceCategories, resources, announcements,
   newsletterSubscribers, impactStats,
   type User, type UpsertUser, type Region, type InsertRegion,
@@ -18,6 +18,7 @@ import {
   type AttendanceRecord, type InsertAttendanceRecord, type MalpracticeReport, type InsertMalpracticeReport,
   type AuditLog, type InsertAuditLog, type Notification, type InsertNotification,
   type ExamCard, type InsertExamCard, type SystemSetting, type InsertSystemSetting,
+  type SchoolInvitation, type InsertSchoolInvitation,
   type NewsCategory, type InsertNewsCategory, type NewsArticle, type InsertNewsArticle,
   type ResourceCategory, type InsertResourceCategory, type Resource, type InsertResource,
   type Announcement, type InsertAnnouncement, type NewsletterSubscriber, type InsertNewsletterSubscriber,
@@ -81,6 +82,14 @@ export interface IStorage {
   rejectSchool(id: number): Promise<School | undefined>;
   assignSchoolToCenter(schoolId: number, centerId: number): Promise<School | undefined>;
   deleteSchool(id: number): Promise<boolean>;
+
+  // School Invitations
+  createSchoolInvitation(invitation: InsertSchoolInvitation): Promise<SchoolInvitation>;
+  getSchoolInvitation(id: number): Promise<SchoolInvitation | undefined>;
+  getSchoolInvitationByToken(token: string): Promise<SchoolInvitation | undefined>;
+  getSchoolInvitationsBySchool(schoolId: number): Promise<SchoolInvitation[]>;
+  updateSchoolInvitation(id: number, invitation: Partial<InsertSchoolInvitation>): Promise<SchoolInvitation | undefined>;
+  deleteSchoolInvitation(id: number): Promise<boolean>;
 
   // Students
   createStudent(student: InsertStudent): Promise<Student>;
@@ -543,6 +552,36 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSchool(id: number): Promise<boolean> {
     await db.delete(schools).where(eq(schools.id, id));
+    return true;
+  }
+
+  // School Invitations
+  async createSchoolInvitation(invitation: InsertSchoolInvitation): Promise<SchoolInvitation> {
+    const [created] = await db.insert(schoolInvitations).values(invitation).returning();
+    return created;
+  }
+
+  async getSchoolInvitation(id: number): Promise<SchoolInvitation | undefined> {
+    const [invitation] = await db.select().from(schoolInvitations).where(eq(schoolInvitations.id, id));
+    return invitation;
+  }
+
+  async getSchoolInvitationByToken(token: string): Promise<SchoolInvitation | undefined> {
+    const [invitation] = await db.select().from(schoolInvitations).where(eq(schoolInvitations.token, token));
+    return invitation;
+  }
+
+  async getSchoolInvitationsBySchool(schoolId: number): Promise<SchoolInvitation[]> {
+    return db.select().from(schoolInvitations).where(eq(schoolInvitations.schoolId, schoolId)).orderBy(desc(schoolInvitations.createdAt));
+  }
+
+  async updateSchoolInvitation(id: number, invitation: Partial<InsertSchoolInvitation>): Promise<SchoolInvitation | undefined> {
+    const [updated] = await db.update(schoolInvitations).set(invitation).where(eq(schoolInvitations.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSchoolInvitation(id: number): Promise<boolean> {
+    await db.delete(schoolInvitations).where(eq(schoolInvitations.id, id));
     return true;
   }
 
