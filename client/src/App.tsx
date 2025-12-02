@@ -38,6 +38,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import Home from "@/pages/home";
 import About from "@/pages/about";
+import OrganisationStructure from "@/pages/organisation-structure";
+import SeniorExecutives from "@/pages/senior-executives";
+import Statistics from "@/pages/statistics";
 import Programmes from "@/pages/programmes";
 import Membership from "@/pages/membership";
 import Contact from "@/pages/contact";
@@ -101,6 +104,9 @@ function PublicRoutes() {
       <Route path="/login" component={Login} />
       <Route path="/verify" component={Verify} />
       <Route path="/about" component={About} />
+      <Route path="/about/organisation-structure" component={OrganisationStructure} />
+      <Route path="/about/senior-executives" component={SeniorExecutives} />
+      <Route path="/statistics" component={Statistics} />
       <Route path="/programmes" component={Programmes} />
       <Route path="/membership" component={Membership} />
       <Route path="/contact" component={Contact} />
