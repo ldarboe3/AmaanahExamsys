@@ -540,6 +540,52 @@ export default function Payments() {
                   </div>
                 )}
 
+                {/* Payment Rejected Notice */}
+                {invoice.status === 'rejected' && (
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <XCircle className="w-5 h-5 text-destructive mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="font-medium text-destructive">{isRTL ? "تم رفض الدفع" : "Payment Rejected"}</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {isRTL 
+                            ? "تم رفض إيصال البنك الذي قمت برفعه. يرجى مراجعة السبب أدناه ورفع إيصال جديد."
+                            : "Your uploaded bank slip was rejected. Please review the reason below and upload a new receipt."}
+                        </p>
+                        {(invoice as any).rejectionReason && (
+                          <div className="mt-3 p-3 bg-background/50 rounded-md border">
+                            <p className="text-xs text-muted-foreground mb-1">{isRTL ? "سبب الرفض:" : "Rejection Reason:"}</p>
+                            <p className="text-sm font-medium">{(invoice as any).rejectionReason}</p>
+                          </div>
+                        )}
+                        <div className="mt-3 space-y-1 text-sm">
+                          <p><span className="text-muted-foreground">{isRTL ? "البنك:" : "Bank:"}</span> Guaranty Trust Bank (Gambia) Ltd</p>
+                          <p><span className="text-muted-foreground">{isRTL ? "اسم الحساب:" : "Account Name:"}</span> Amaanah Islamic Education Trust</p>
+                          <p><span className="text-muted-foreground">{isRTL ? "رقم الحساب:" : "Account Number:"}</span> 211-123456789-01</p>
+                          <p><span className="text-muted-foreground">{isRTL ? "المبلغ:" : "Amount:"}</span> <span className="font-semibold">{formatCurrency(invoice.totalAmount)}</span></p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Processing Notice */}
+                {invoice.status === 'processing' && (
+                  <div className="bg-chart-2/10 border border-chart-2/30 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-chart-2 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-chart-2">{isRTL ? "قيد المراجعة" : "Under Review"}</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {isRTL 
+                            ? "تم استلام إيصال البنك الخاص بك وهو قيد المراجعة من قبل فريق الإدارة."
+                            : "Your bank slip has been received and is being reviewed by the administration team."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-3">
                   <Button variant="outline" onClick={() => generateInvoiceMutation.mutate()} disabled={generateInvoiceMutation.isPending}>
@@ -559,10 +605,12 @@ export default function Payments() {
                     )}
                     {isRTL ? "تحميل الفاتورة" : "Download Invoice"}
                   </Button>
-                  {invoice.status === 'pending' && (
+                  {(invoice.status === 'pending' || invoice.status === 'rejected') && (
                     <Button onClick={() => setShowUploadDialog(true)} data-testid="button-upload-bank-slip">
                       <Upload className="w-4 h-4 me-2" />
-                      {isRTL ? "رفع إيصال البنك" : "Upload Bank Slip"}
+                      {invoice.status === 'rejected' 
+                        ? (isRTL ? "رفع إيصال جديد" : "Upload New Receipt")
+                        : (isRTL ? "رفع إيصال البنك" : "Upload Bank Slip")}
                     </Button>
                   )}
                   {invoice.status === 'paid' && (
