@@ -1834,6 +1834,132 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(500).json({ message: error.message });
     }
   });
+  
+  // Enhanced bulk results upload with index number lookup
+  app.post("/api/results/bulk-upload", isAuthenticated, async (req, res) => {
+    try {
+      const { results: resultList, examYearId, subjectId } = req.body;
+      
+      if (!Array.isArray(resultList)) {
+        return res.status(400).json({ message: "results must be an array" });
+      }
+      
+      if (!examYearId || !subjectId) {
+        return res.status(400).json({ message: "examYearId and subjectId are required" });
+      }
+      
+      const validResults: any[] = [];
+      const errors: any[] = [];
+      const createdResults: any[] = [];
+      
+      // Process each result entry
+      for (let index = 0; index < resultList.length; index++) {
+        const entry = resultList[index];
+        const rowNum = index + 1;
+        
+        // Look up student by index number
+        if (!entry.indexNumber) {
+          errors.push({ row: rowNum, error: "Index number is required" });
+          continue;
+        }
+        
+        const student = await storage.getStudentByIndexNumber(entry.indexNumber);
+        if (!student) {
+          errors.push({ row: rowNum, indexNumber: entry.indexNumber, error: "Student not found with this index number" });
+          continue;
+        }
+        
+        // Validate score
+        const score = parseFloat(entry.score || entry.marks || '0');
+        if (isNaN(score) || score < 0 || score > 100) {
+          errors.push({ row: rowNum, indexNumber: entry.indexNumber, error: "Invalid score (must be 0-100)" });
+          continue;
+        }
+        
+        // Calculate grade automatically
+        let grade = 'F';
+        if (score >= 90) grade = 'A+';
+        else if (score >= 80) grade = 'A';
+        else if (score >= 70) grade = 'B';
+        else if (score >= 60) grade = 'C';
+        else if (score >= 50) grade = 'D';
+        else if (score >= 40) grade = 'E';
+        
+        validResults.push({
+          studentId: student.id,
+          examYearId,
+          subjectId,
+          score: score.toFixed(2),
+          grade: entry.grade || grade,
+          remarks: entry.remarks || null,
+          status: 'pending', // Requires validation before publishing
+        });
+      }
+      
+      // Create all valid results
+      if (validResults.length > 0) {
+        const created = await storage.createStudentResultsBulk(validResults);
+        createdResults.push(...created);
+      }
+      
+      res.status(201).json({
+        uploaded: createdResults.length,
+        errors: errors.length,
+        errorDetails: errors.length > 0 ? errors : undefined,
+        results: createdResults
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Bulk validate results for publishing
+  app.post("/api/results/bulk-validate", isAuthenticated, async (req, res) => {
+    try {
+      const { resultIds, examYearId } = req.body;
+      const userId = req.session.userId;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      let resultsToValidate: number[] = [];
+      
+      if (resultIds && Array.isArray(resultIds)) {
+        resultsToValidate = resultIds;
+      } else if (examYearId) {
+        // Get all pending results for this exam year
+        const pendingResults = await storage.getPendingResults();
+        resultsToValidate = pendingResults
+          .filter(r => r.examYearId === examYearId)
+          .map(r => r.id);
+      } else {
+        return res.status(400).json({ message: "Either resultIds or examYearId is required" });
+      }
+      
+      const validated: any[] = [];
+      const errors: any[] = [];
+      
+      for (const resultId of resultsToValidate) {
+        try {
+          const result = await storage.validateResult(resultId, userId);
+          if (result) {
+            validated.push(result);
+          }
+        } catch (err: any) {
+          errors.push({ resultId, error: err.message });
+        }
+      }
+      
+      res.json({
+        validated: validated.length,
+        errors: errors.length,
+        errorDetails: errors.length > 0 ? errors : undefined
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   app.patch("/api/results/:id", isAuthenticated, async (req, res) => {
     try {
