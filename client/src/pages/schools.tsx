@@ -49,6 +49,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Search,
   MoreVertical,
@@ -75,8 +76,17 @@ const getSchoolTypeLabel = (type: string, isRTL: boolean) => {
     UBS: { en: "Upper Basic School", ar: "المدرسة الأساسية العليا" },
     BCS: { en: "Basic Cycle School", ar: "مدرسة الدورة الأساسية" },
     SSS: { en: "Senior Secondary School", ar: "المدرسة الثانوية العليا" },
+    Madrassa: { en: "Madrassa", ar: "مدرسة دينية" },
+    ECD: { en: "Early Childhood Development", ar: "تنمية الطفولة المبكرة" },
   };
   return isRTL ? labels[type]?.ar || type : labels[type]?.en || type;
+};
+
+const getSchoolTypesDisplay = (school: { schoolTypes?: string[] | null; schoolType?: string | null }, isRTL: boolean) => {
+  const types = school.schoolTypes && school.schoolTypes.length > 0 
+    ? school.schoolTypes 
+    : (school.schoolType ? [school.schoolType] : []);
+  return types.map(t => getSchoolTypeLabel(t, isRTL)).join(", ");
 };
 
 const statusColors: Record<string, string> = {
@@ -96,15 +106,15 @@ const getStatusLabel = (status: string, isRTL: boolean) => {
   return isRTL ? labels[status]?.ar || status : labels[status]?.en || status;
 };
 
+const SCHOOL_TYPES = ["LBS", "UBS", "BCS", "SSS", "Madrassa", "ECD"] as const;
+
 const addSchoolSchema = z.object({
   name: z.string().min(3, "School name must be at least 3 characters"),
   registrarName: z.string().min(2, "Registrar name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   phone: z.string().optional(),
   address: z.string().optional(),
-  schoolType: z.enum(["LBS", "UBS", "BCS", "SSS"], {
-    required_error: "Please select a school type",
-  }),
+  schoolTypes: z.array(z.string()).min(1, "Please select at least one school type"),
   regionId: z.string().optional(),
   clusterId: z.string().optional(),
 });
@@ -156,7 +166,7 @@ export default function Schools() {
       email: "",
       phone: "",
       address: "",
-      schoolType: undefined,
+      schoolTypes: [],
       regionId: "",
       clusterId: "",
     },
@@ -170,7 +180,7 @@ export default function Schools() {
       email: "",
       phone: "",
       address: "",
-      schoolType: undefined,
+      schoolTypes: [],
       regionId: "",
       clusterId: "",
     },
@@ -227,6 +237,8 @@ export default function Schools() {
     mutationFn: async (data: AddSchoolFormData) => {
       return apiRequest("POST", "/api/schools", {
         ...data,
+        schoolType: data.schoolTypes[0] || "LBS",
+        schoolTypes: data.schoolTypes,
         regionId: data.regionId ? parseInt(data.regionId) : null,
         clusterId: data.clusterId ? parseInt(data.clusterId) : null,
       });
@@ -294,6 +306,8 @@ export default function Schools() {
       const { id, ...updateData } = data;
       return apiRequest("PATCH", `/api/schools/${id}`, {
         ...updateData,
+        schoolType: updateData.schoolTypes[0] || "LBS",
+        schoolTypes: updateData.schoolTypes,
         regionId: updateData.regionId ? parseInt(updateData.regionId) : null,
         clusterId: updateData.clusterId ? parseInt(updateData.clusterId) : null,
       });
@@ -319,13 +333,16 @@ export default function Schools() {
 
   const openEditDialog = (school: SchoolWithRelations) => {
     setSelectedSchool(school);
+    const schoolTypes = school.schoolTypes && school.schoolTypes.length > 0 
+      ? school.schoolTypes 
+      : (school.schoolType ? [school.schoolType] : []);
     editForm.reset({
       name: school.name,
       registrarName: school.registrarName,
       email: school.email,
       phone: school.phone || "",
       address: school.address || "",
-      schoolType: school.schoolType as "LBS" | "UBS" | "BCS" | "SSS" | undefined,
+      schoolTypes: schoolTypes,
       regionId: school.regionId?.toString() || "",
       clusterId: school.clusterId?.toString() || "",
     });
@@ -486,7 +503,7 @@ export default function Schools() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="text-xs">
-                          {getSchoolTypeLabel(school.schoolType || '', isRTL)}
+                          {getSchoolTypesDisplay(school, isRTL)}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -582,48 +599,64 @@ export default function Schools() {
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isRTL ? "اسم المدرسة *" : "School Name *"}</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder={isRTL ? "أدخل اسم المدرسة" : "Enter school name"}
-                          {...field}
-                          data-testid="input-school-name"
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{isRTL ? "اسم المدرسة *" : "School Name *"}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={isRTL ? "أدخل اسم المدرسة" : "Enter school name"}
+                        {...field}
+                        data-testid="input-school-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="schoolTypes"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>{isRTL ? "أنواع المدرسة *" : "School Types *"}</FormLabel>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 border rounded-md">
+                      {SCHOOL_TYPES.map((type) => (
+                        <FormField
+                          key={type}
+                          control={form.control}
+                          name="schoolTypes"
+                          render={({ field }) => (
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(type)}
+                                  onCheckedChange={(checked) => {
+                                    const currentValue = field.value || [];
+                                    if (checked) {
+                                      field.onChange([...currentValue, type]);
+                                    } else {
+                                      field.onChange(currentValue.filter((v: string) => v !== type));
+                                    }
+                                  }}
+                                  data-testid={`checkbox-school-type-${type.toLowerCase()}`}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm font-normal cursor-pointer">
+                                {getSchoolTypeLabel(type, isRTL)}
+                              </FormLabel>
+                            </FormItem>
+                          )}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="schoolType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isRTL ? "نوع المدرسة *" : "School Type *"}</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-school-type">
-                            <SelectValue placeholder={isRTL ? "اختر النوع" : "Select type"} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="LBS">{isRTL ? "المدرسة الأساسية الدنيا (LBS)" : "Lower Basic School (LBS)"}</SelectItem>
-                          <SelectItem value="UBS">{isRTL ? "المدرسة الأساسية العليا (UBS)" : "Upper Basic School (UBS)"}</SelectItem>
-                          <SelectItem value="BCS">{isRTL ? "مدرسة الدورة الأساسية (BCS)" : "Basic Cycle School (BCS)"}</SelectItem>
-                          <SelectItem value="SSS">{isRTL ? "المدرسة الثانوية العليا (SSS)" : "Senior Secondary School (SSS)"}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="grid md:grid-cols-2 gap-4">
                 <FormField
@@ -806,48 +839,64 @@ export default function Schools() {
           </DialogHeader>
           <Form {...editForm}>
             <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <FormField
-                  control={editForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isRTL ? "اسم المدرسة *" : "School Name *"}</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder={isRTL ? "أدخل اسم المدرسة" : "Enter school name"}
-                          {...field}
-                          data-testid="input-edit-school-name"
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{isRTL ? "اسم المدرسة *" : "School Name *"}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={isRTL ? "أدخل اسم المدرسة" : "Enter school name"}
+                        {...field}
+                        data-testid="input-edit-school-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="schoolTypes"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>{isRTL ? "أنواع المدرسة *" : "School Types *"}</FormLabel>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 border rounded-md">
+                      {SCHOOL_TYPES.map((type) => (
+                        <FormField
+                          key={type}
+                          control={editForm.control}
+                          name="schoolTypes"
+                          render={({ field }) => (
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(type)}
+                                  onCheckedChange={(checked) => {
+                                    const currentValue = field.value || [];
+                                    if (checked) {
+                                      field.onChange([...currentValue, type]);
+                                    } else {
+                                      field.onChange(currentValue.filter((v: string) => v !== type));
+                                    }
+                                  }}
+                                  data-testid={`checkbox-edit-school-type-${type.toLowerCase()}`}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm font-normal cursor-pointer">
+                                {getSchoolTypeLabel(type, isRTL)}
+                              </FormLabel>
+                            </FormItem>
+                          )}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="schoolType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isRTL ? "نوع المدرسة *" : "School Type *"}</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-edit-school-type">
-                            <SelectValue placeholder={isRTL ? "اختر النوع" : "Select type"} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="LBS">{isRTL ? "المدرسة الأساسية الدنيا (LBS)" : "Lower Basic School (LBS)"}</SelectItem>
-                          <SelectItem value="UBS">{isRTL ? "المدرسة الأساسية العليا (UBS)" : "Upper Basic School (UBS)"}</SelectItem>
-                          <SelectItem value="BCS">{isRTL ? "مدرسة الدورة الأساسية (BCS)" : "Basic Cycle School (BCS)"}</SelectItem>
-                          <SelectItem value="SSS">{isRTL ? "المدرسة الثانوية العليا (SSS)" : "Senior Secondary School (SSS)"}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="grid md:grid-cols-2 gap-4">
                 <FormField
@@ -1032,7 +1081,7 @@ export default function Schools() {
                 <div>
                   <h3 className="text-lg font-semibold">{selectedSchool.name}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {getSchoolTypeLabel(selectedSchool.schoolType || '', isRTL)}
+                    {getSchoolTypesDisplay(selectedSchool, isRTL)}
                   </p>
                   <Badge className={`${statusColors[selectedSchool.status || 'pending']} mt-2`}>
                     {getStatusLabel(selectedSchool.status || 'pending', isRTL)}
