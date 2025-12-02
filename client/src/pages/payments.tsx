@@ -972,35 +972,20 @@ export default function Payments() {
                                   {isRTL ? "عرض إيصال البنك" : "View Bank Slip"}
                                 </DropdownMenuItem>
                               )}
-                              {canConfirmPayments && (
+                              {/* Show Approve All Students only for paid invoices */}
+                              {canConfirmPayments && invoice.status === 'paid' && (
                                 <>
                                   <DropdownMenuSeparator />
-                                  {/* Show Confirm Payment only for processing invoices with bank slip */}
-                                  {invoice.status === 'processing' && invoice.bankSlipUrl && (
-                                    <DropdownMenuItem
-                                      onClick={() => confirmPaymentMutation.mutate(invoice.id)}
-                                      className="text-chart-3"
-                                      disabled={confirmPaymentMutation.isPending}
-                                    >
-                                      <CheckCircle className="w-4 h-4 me-2" />
-                                      {confirmPaymentMutation.isPending 
-                                        ? (isRTL ? "جاري التأكيد..." : "Confirming...") 
-                                        : (isRTL ? "تأكيد الدفع" : "Confirm Payment")}
-                                    </DropdownMenuItem>
-                                  )}
-                                  {/* Show Approve All Students only for paid invoices */}
-                                  {invoice.status === 'paid' && (
-                                    <DropdownMenuItem
-                                      onClick={() => bulkApproveStudentsMutation.mutate(invoice.id)}
-                                      className="text-primary"
-                                      disabled={bulkApproveStudentsMutation.isPending}
-                                    >
-                                      <Users className="w-4 h-4 me-2" />
-                                      {bulkApproveStudentsMutation.isPending 
-                                        ? (isRTL ? "جاري الموافقة..." : "Approving...") 
-                                        : (isRTL ? "الموافقة على جميع الطلاب" : "Approve All Students")}
-                                    </DropdownMenuItem>
-                                  )}
+                                  <DropdownMenuItem
+                                    onClick={() => bulkApproveStudentsMutation.mutate(invoice.id)}
+                                    className="text-primary"
+                                    disabled={bulkApproveStudentsMutation.isPending}
+                                  >
+                                    <Users className="w-4 h-4 me-2" />
+                                    {bulkApproveStudentsMutation.isPending 
+                                      ? (isRTL ? "جاري الموافقة..." : "Approving...") 
+                                      : (isRTL ? "الموافقة على جميع الطلاب" : "Approve All Students")}
+                                  </DropdownMenuItem>
                                 </>
                               )}
                             </DropdownMenuContent>
@@ -1137,17 +1122,15 @@ export default function Payments() {
               )}
               {t.common.download}
             </Button>
-            {canConfirmPayments && selectedInvoice && selectedInvoice.status === 'processing' && selectedInvoice.bankSlipUrl && (
+            {selectedInvoice?.bankSlipUrl && selectedInvoice.status === 'processing' && (
               <Button
                 onClick={() => {
-                  confirmPaymentMutation.mutate(selectedInvoice.id);
                   setShowDetailsDialog(false);
+                  setShowBankSlipDialog(true);
                 }}
-                disabled={confirmPaymentMutation.isPending}
               >
-                {confirmPaymentMutation.isPending 
-                  ? (isRTL ? "جاري التأكيد..." : "Confirming...") 
-                  : (isRTL ? "تأكيد الدفع" : "Confirm Payment")}
+                <FileText className="w-4 h-4 me-2" />
+                {isRTL ? "عرض إيصال البنك" : "View Bank Slip"}
               </Button>
             )}
             {canConfirmPayments && selectedInvoice && selectedInvoice.status === 'paid' && (
