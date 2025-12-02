@@ -63,6 +63,8 @@ function LoadingScreen() {
 function AuthenticatedRoutes() {
   return (
     <Switch>
+      <Route path="/school-verify/:token" component={SchoolVerify} />
+      <Route path="/forgot-password/:token" component={ForgotPassword} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/schools" component={Schools} />
       <Route path="/students" component={Students} />
