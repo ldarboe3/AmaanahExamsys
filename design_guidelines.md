@@ -1,127 +1,189 @@
-# Amaanah Examination Management System - Design Guidelines
+# Amaanah Public Website - Design Guidelines
 
 ## Design Approach
 
-**Selected Approach:** Clean, Modern Minimalist with Amaanah Traditional Colors
-**Color Palette:** Green (Primary), White, Black
-**Justification:** A professional, trustworthy aesthetic that reflects Amaanah's identity while maintaining excellent usability for an administrative examination system.
+**Selected Approach:** Modern Educational SaaS with Islamic Heritage Touches  
+**Reference Inspiration:** Coursera, Khan Academy, Duolingo (friendly education UX) + Islamic geometric pattern subtlety  
+**Justification:** Public-facing examination platform needs approachable professionalism that builds trust while engaging prospective students and institutions. Balance contemporary web trends with cultural authenticity.
 
 ## Color System
 
-### Primary Colors
-| Color | HSL | Hex | Usage |
-|-------|-----|-----|-------|
-| Amaanah Green | 141 72% 32% | #1E8F4D | Primary actions, branding, key highlights |
-| Rich Black | 160 26% 7% | #0B1C16 | Text, dark backgrounds |
-| Pure White | 0 0% 100% | #FFFFFF | Backgrounds, cards |
+### Primary Palette
+- **Teal Primary:** `#0D9488` (HSL: 174, 84%, 32%) - Primary CTAs, links, accents
+- **Emerald Dark:** `#047857` (HSL: 160, 84%, 25%) - Headings, emphasis, hover states
+- **Teal Light:** `#5EEAD4` (HSL: 173, 80%, 65%) - Gradient accents, highlights
+- **Mint Wash:** `#F0FDFA` (HSL: 166, 76%, 97%) - Section backgrounds, cards
+- **Pure White:** `#FFFFFF` - Primary backgrounds
+- **Charcoal:** `#1F2937` (HSL: 220, 25%, 17%) - Body text, dark elements
 
 ### Supporting Colors
-| Color | HSL | Hex | Usage |
-|-------|-----|-----|-------|
-| Dark Green | 147 63% 18% | #0F5A2F | Emphasis, dark accents |
-| Mint Accent | 153 45% 92% | #E5F5EA | Soft backgrounds, highlights |
-| Neutral Gray | 150 10% 45% | #6B7A73 | Muted text, borders |
-| Destructive Red | 4 76% 50% | #D92B2B | Errors, warnings, delete actions |
-| Warning Amber | 36 90% 55% | #F5A623 | Caution states |
+- **Warm Gold:** `#F59E0B` (HSL: 38, 92%, 50%) - Achievement badges, Islamic accent
+- **Soft Coral:** `#FB7185` (HSL: 351, 95%, 71%) - Secondary CTAs, highlights
+- **Sage Green:** `#6EE7B7` (HSL: 156, 73%, 67%) - Success states
+- **Slate Gray:** `#64748B` (HSL: 215, 16%, 47%) - Secondary text, muted elements
+
+### Gradients
+- **Hero Gradient:** `linear-gradient(135deg, #0D9488 0%, #047857 100%)`
+- **Card Accent:** `linear-gradient(to right, #5EEAD4 0%, #0D9488 100%)`
+- **Section Overlay:** `linear-gradient(180deg, rgba(13,148,136,0.05) 0%, rgba(255,255,255,0) 100%)`
 
 ## Typography System
 
-**Primary Font:** Inter (clean, modern sans-serif)
-**Arabic Font:** Noto Naskh Arabic, Amiri
-**Monospace:** JetBrains Mono (for codes, index numbers)
+**Primary Font:** Inter (headings, UI)  
+**Body Font:** Inter (optimized for web reading)  
+**Arabic Font:** Amiri (elegant, traditional for Arabic content)  
+**Accent Font:** Playfair Display (optional decorative headers)
 
 **Hierarchy:**
-- Page Titles: 1.875rem (30px), Medium weight, tracking-tight
-- Section Headers: 1.5rem (24px), Medium weight
-- Card Headers: 1.125rem (18px), Medium weight
-- Body Text: 1rem (16px), Regular weight
-- Labels: 0.875rem (14px), Medium weight
-- Helper Text: 0.75rem (12px), Regular weight
-- Index Numbers/Codes: JetBrains Mono, 0.875rem
+- Hero Headline: 3.5rem (56px), Bold, tight tracking, teal gradient text effect
+- Page Title: 2.5rem (40px), Bold
+- Section Headers: 2rem (32px), Semibold
+- Subheadings: 1.5rem (24px), Medium
+- Body Large: 1.125rem (18px), Regular, slate gray
+- Body Text: 1rem (16px), Regular, line-height 1.7
+- Small Text: 0.875rem (14px), Medium
+- Captions: 0.75rem (12px), Regular
 
 ## Layout System
 
-**Spacing Scale:** 4, 8, 12, 16, 24, 32, 48, 64 (Tailwind: 1, 2, 3, 4, 6, 8, 12, 16)
+**Spacing Units:** 4, 8, 16, 24, 32, 48, 64, 96 (Tailwind: 1, 2, 4, 6, 8, 12, 16, 24)
 
-**Component Padding:**
-- Cards: p-4 to p-6
-- Buttons: Default sizing from shadcn
-- Form fields: Standard shadcn spacing
-- Section gaps: gap-6
+**Section Padding:** py-16 to py-24 (desktop), py-12 (mobile)  
+**Container Max-Width:** max-w-7xl for full sections, max-w-4xl for content  
+**Component Spacing:** gap-8 for card grids, gap-6 for feature lists
 
-**Grid System:**
-- Dashboard: 12-column responsive grid
-- Card grids: 1-4 columns depending on viewport
-- Form layouts: max-w-2xl for single column forms
-- Tables: Full width with horizontal scroll on mobile
+## Page Structure & Components
 
-## Core Components
+### Hero Section (Full Viewport Impact)
+- **Layout:** Two-column split on desktop (60/40 text/image)
+- **Height:** 85vh minimum with graceful overflow
+- **Background:** Large hero image (students in exam hall, diverse, professional, bright lighting) with teal gradient overlay (opacity 15%)
+- **Content:** 
+  - Headline with gradient text effect
+  - Supporting paragraph (18px)
+  - Dual CTA buttons (Primary teal solid + Secondary outline white with backdrop-blur-md)
+  - Trust indicators below (e.g., "10,000+ Students Registered")
+- **Image Placement:** Right side showing modern exam environment or student success moment
 
-### Navigation
-- **Sidebar:** Clean white/off-white with green accents, 16rem width
-- **Header:** Minimal with essential controls (notifications, language, theme, profile)
-- **Active State:** Green background with white text for active menu items
+### Features Section
+- **Grid:** 3-column desktop, 1-column mobile
+- **Cards:** White background, subtle shadow (shadow-lg), rounded-2xl (16px)
+- **Card Padding:** p-8
+- **Icons:** Teal circular backgrounds (64px diameter) with white icons inside
+- **Content:** Icon + Title (20px semibold) + Description (16px gray)
+- **Hover:** Lift effect (translate-y-1) + increased shadow
 
-### Cards & Containers
-- **Cards:** Slight off-white (#FAFBFA), subtle border, small shadow
-- **Border Radius:** 0.5rem (8px) - clean and modern
-- **Shadows:** Very subtle for clean look
+### About/Mission Section
+- **Layout:** Alternating two-column (image left/right alternates)
+- **Background:** Mint wash (#F0FDFA) with subtle geometric Islamic pattern overlay (10% opacity)
+- **Images:** Professional photos of facilities, exam centers, ceremonies
+- **Content:** Large headings + 2-3 paragraphs + bullet points highlighting values
+
+### How It Works / Process
+- **Layout:** Horizontal step flow with connecting lines
+- **Steps:** Numbered circles (teal gradient) with titles below
+- **Visual:** Step numbers 1-4 connected by teal dashed lines
+- **Background:** White with subtle radial gradient from center
+
+### Testimonials
+- **Grid:** 2-column desktop, 1-column mobile
+- **Cards:** Light mint background, rounded-xl, p-6
+- **Content:** Quote icon (gold), testimonial text (italic), student photo (circular 48px), name + institution (14px)
+- **Styling:** Subtle left border (4px teal)
+
+### Statistics/Impact Section
+- **Layout:** 4-column stat blocks, centered
+- **Background:** Teal gradient background with white text
+- **Stats:** Large numbers (48px bold white) + labels (18px white 80% opacity)
+- **Icons:** Subtle white outline icons above numbers
+
+### CTA Section (Pre-Footer)
+- **Background:** Card with teal-to-emerald gradient
+- **Content:** Centered headline (white) + CTA buttons (white background with teal text + white outline)
+- **Height:** py-20, generous padding
+- **Visual:** Subtle geometric pattern overlay
+
+### Footer
+- **Background:** Charcoal (#1F2937)
+- **Layout:** 4-column grid (About, Quick Links, Resources, Contact)
+- **Content:** Logo + description, navigation links, social icons (teal hover)
+- **Bottom Bar:** Copyright + language switcher + privacy links
+- **Text Color:** Light gray with white headings
+
+## Component Specifications
 
 ### Buttons
-- **Primary:** Green background, white text
-- **Secondary:** Light gray background, dark text
-- **Outline:** Transparent with border
-- **Ghost:** Transparent, subtle hover state
-- **Destructive:** Red background for dangerous actions
+- **Primary:** Teal background, white text, rounded-lg (8px), px-6 py-3, semibold, shadow-md, hover:shadow-lg + scale-105
+- **Secondary:** White background, teal text, teal border, same sizing
+- **Buttons on Images:** White background with backdrop-blur-md, teal text, shadow-xl for visibility
+- **Icon Buttons:** Circular, 40px diameter, teal background, white icon
 
-### Data Display
-- **Tables:** Clean with subtle row borders, sticky headers
-- **Badges:** Small, rounded-full, color-coded by status
-- **Stats Cards:** Grid layout with icon, number, label
+### Cards
+- **Border Radius:** rounded-2xl (16px) for feature cards, rounded-xl (12px) for smaller elements
+- **Shadows:** shadow-md default, shadow-lg on hover
+- **Borders:** 1px solid rgba(13,148,136,0.1) for subtle definition
+- **Backgrounds:** White or mint wash depending on section contrast
 
-### Forms
-- **Inputs:** Clean borders, focus ring in green
-- **Labels:** Medium weight, positioned above inputs
-- **Error States:** Red border, red helper text
+### Forms (Newsletter, Contact)
+- **Input Fields:** White background, border-2 teal on focus, rounded-lg, p-3
+- **Labels:** Above inputs, 14px medium weight, charcoal
+- **Spacing:** gap-4 between fields
+- **Submit Button:** Full-width primary button
 
-## Status Colors
+### Navigation
+- **Header:** Sticky, white background, subtle shadow on scroll
+- **Logo:** Left aligned, 40px height
+- **Menu Items:** Horizontal, hover:text-teal, active:font-semibold
+- **Mobile:** Hamburger menu, slide-in drawer with backdrop
+- **CTA in Nav:** Primary button for "Register Now" or "Login"
 
-| Status | Light Mode | Dark Mode | Usage |
-|--------|------------|-----------|-------|
-| Success/Approved | Green | Lighter Green | Approvals, completed |
-| Pending | Amber/Yellow | Amber | Waiting for action |
-| Rejected/Error | Red | Red | Errors, rejections |
-| Active | Green | Green | Currently active items |
-| Inactive | Gray | Gray | Disabled items |
+## Animations (Subtle & Purposeful)
 
-## Accessibility Guidelines
+- **Scroll Reveal:** Fade-up effect on section entry (subtle, 300ms)
+- **Hover States:** Lift effects on cards (translate-y-1, 200ms ease)
+- **Button Hovers:** Scale-105 + shadow increase (150ms)
+- **Hero Entry:** Gentle fade-in on headline + CTA (500ms stagger)
+- **Stat Counter:** Count-up animation on scroll into view
+- **NO:** Parallax, excessive motion, distracting effects
 
-- Minimum contrast ratio: 4.5:1 for body text
-- Focus indicators on all interactive elements
-- Color is never the sole indicator (use icons + text)
-- Minimum touch target: 44px x 44px
-- Proper ARIA labels on all interactive elements
-- Keyboard navigation fully supported
+## Images
 
-## RTL/Arabic Support
+### Hero Image
+- **Description:** Modern, bright exam hall or diverse students studying with confidence. Professional photography, natural lighting, inclusive representation
+- **Treatment:** Teal gradient overlay (15% opacity) blending from top-left
+- **Placement:** Right 40% of hero section, extends full height
 
-- Full RTL layout support when Arabic selected
-- Sidebar moves to right side
-- Text alignment switches appropriately
-- Arabic fonts loaded for proper rendering
-- All icons and layouts mirror correctly
+### Section Images
+- **About Section:** 2-3 images showing facilities, exam centers, graduation ceremonies
+- **Features:** Icon-based, no photography in feature cards
+- **Testimonials:** Circular student headshots (48px diameter)
+- **Process Section:** Illustrative icons or simple graphics (no photos)
+
+### Image Style Guidelines
+- **Tone:** Bright, optimistic, professional
+- **Colors:** Natural tones that complement teal palette
+- **Subjects:** Diverse students, modern facilities, technology integration
+- **Quality:** High-resolution, professionally composed
+
+## Accessibility & Bilingual Support
+
+- **Contrast:** Minimum 4.5:1 for body text, 7:1 for headings
+- **Focus States:** 2px teal outline on all interactive elements
+- **RTL Support:** Full layout mirroring for Arabic, Amiri font loaded
+- **Touch Targets:** 44px minimum for all interactive elements
+- **Screen Readers:** Proper ARIA labels, semantic HTML structure
 
 ## Responsive Breakpoints
 
-- **Mobile:** < 768px - Single column, stacked layouts
-- **Tablet:** 768px - 1024px - 2 column grids, collapsible sidebar
-- **Desktop:** > 1024px - Full multi-column layouts, fixed sidebar
+- **Mobile:** <768px - Single column, stacked hero, larger touch targets
+- **Tablet:** 768-1024px - 2-column grids, collapsible navigation
+- **Desktop:** >1024px - Full multi-column layouts, fixed navigation
 
 ## Design Principles
 
-1. **Cleanliness:** Generous whitespace, minimal visual clutter
-2. **Consistency:** Same patterns and spacing throughout
-3. **Hierarchy:** Clear visual hierarchy using typography and spacing
-4. **Professionalism:** Trustworthy, official appearance for examination system
-5. **Accessibility:** Inclusive design for all users
-6. **Bilingual:** Equal treatment for English and Arabic content
+1. **Warmth:** Welcoming teal tones create approachable yet professional atmosphere
+2. **Clarity:** Generous whitespace and clear typography hierarchy
+3. **Trust:** Official aesthetic through structured layouts and professional imagery
+4. **Heritage:** Subtle Islamic geometric patterns in backgrounds (never overwhelming)
+5. **Engagement:** Strategic use of gradients and animations to guide attention
+6. **Inclusivity:** Bilingual excellence, accessible design for all users

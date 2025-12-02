@@ -4,18 +4,32 @@
 Amaanah Examination Management System is a comprehensive platform for managing countrywide Arabic & Islamic education examinations. Its primary purpose is to streamline school registration, student enrollment, invoice generation, result processing, and the creation of bilingual PDF certificates and transcripts. The system aims to provide a robust, multi-role environment to efficiently manage the entire examination lifecycle from registration to result dissemination.
 
 ## User Preferences
-- Material Design 3 adherence for all UI components
-- Dark/light mode support
-- Bilingual support (English/Arabic planned)
+- Modern, clean, and attractive design with teal/emerald color scheme
+- Dark/light mode support with smooth transitions
+- Bilingual support (English/Arabic) with full RTL support
 
 ## System Architecture
 
 The system is built on a robust architecture featuring a React-based frontend, an Express.js and TypeScript backend, and a PostgreSQL database.
 
 ### UI/UX Decisions
-- Adherence to Material Design 3 for a consistent and modern user interface.
-- Support for both dark and light modes.
-- Full bilingual support (English/Arabic) with RTL rendering for Arabic, utilizing Amiri/Noto Naskh fonts for PDF generation.
+- **Modern Design System**: Fresh teal/emerald color palette with gradient accents, soft shadows, and rounded corners (design_guidelines.md)
+- **Typography**: Inter font family for clean, modern text rendering
+- **Animations**: Subtle fade-in, hover elevation, and smooth transitions for engaging user experience
+- **Card Designs**: Modern cards with gradient top borders, hover lift effects, and shadow depth
+- **Hero Sections**: Full-viewport heroes with gradient overlays and animated text
+- Support for both dark and light modes with automatic theme detection
+- Full bilingual support (English/Arabic) with RTL rendering for Arabic, utilizing Amiri/Noto Naskh fonts for PDF generation
+
+### Public Website Pages
+- **Home**: Modern hero with gradient background, quick access cards, impact statistics, news feed
+- **About**: Historical timeline, vision/mission cards, founding institutions, governance structure
+- **Organisation Structure**: Administrative units, sub-committees, governance hierarchy
+- **Senior Executives**: Leadership roles with responsibilities
+- **Statistics Query**: Interactive data filtering by region, cluster, school with visualizations
+- **Programmes**: Services and programmes offered
+- **Membership**: Registration information and benefits
+- **Contact/News/Resources**: Standard informational pages
 
 ### Technical Implementations
 - **Frontend**: Developed with React and TypeScript, leveraging `shadcn/ui` for reusable components.
