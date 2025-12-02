@@ -26,10 +26,14 @@ The MVP is complete with all core features implemented and verified. PDF generat
   - Object storage integration for document persistence
   - Backend API endpoints: `GET/POST /api/school/profile`, `POST /api/school/documents/upload`, `POST /api/school/documents/delete`
   - Bilingual UI (English/Arabic) with sidebar navigation link
-- **Student Dashboard Grade Tabs**: Dynamic grade-based tabs on Students page
-  - Tabs populated from exam year's selected grades (e.g., grades 3, 6 for LBS)
-  - School type structure: LBS (3,6), BCS (3,6,9), UBS (9), SSS (12), QM (3,6,9,12), ECD (none)
-  - Professional Tab component UI instead of buttons
+- **Student Dashboard Interactive Grade Cards**: Redesigned Students page with grade-based dashboard
+  - Interactive card grid replaces previous tabs UI
+  - Each card displays: grade label, student count, pending/approved indicators
+  - Cards have direct Upload CSV and Download Template buttons
+  - Clicking a card reveals detailed view with student list
+  - Back navigation to return to grade dashboard
+  - Fallback to all grades (3, 6, 9, 12) when no active exam year
+  - Responsive layout: 1 col mobile, 2 col tablet, 4 col desktop
 - **Resend Verification Email Feature**: Admin tool to resend school verification emails
   - Added "Resend Verification Email" button in Schools management dropdown
   - Only appears for pending schools without verified emails
