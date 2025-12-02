@@ -93,6 +93,7 @@ export const examYears = pgTable("exam_years", {
   hijriYear: varchar("hijri_year", { length: 50 }),
   isActive: boolean("is_active").default(false),
   grades: integer("grades").array().default([]),
+  feePerStudent: decimal("fee_per_student", { precision: 10, scale: 2 }).default('100.00'),
   registrationStartDate: timestamp("registration_start_date"),
   registrationEndDate: timestamp("registration_end_date"),
   examStartDate: timestamp("exam_start_date"),
@@ -661,6 +662,7 @@ export const insertExamYearSchema = createInsertSchema(examYears).pick({
   name: true,
   hijriYear: true,
   grades: true,
+  feePerStudent: true,
   isActive: true,
   createdBy: true,
 }).extend({
