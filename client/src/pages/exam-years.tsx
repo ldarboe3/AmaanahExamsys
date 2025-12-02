@@ -493,7 +493,7 @@ export default function ExamYears() {
                 name="grades"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Examination Classes</FormLabel>
+                    <FormLabel>Classes</FormLabel>
                     <div className="flex flex-wrap gap-3 mt-2">
                       {[3, 6, 9, 12].map(grade => (
                         <label key={grade} className="flex items-center gap-2 cursor-pointer">
