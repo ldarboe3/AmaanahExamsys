@@ -1,3 +1,8 @@
+// SendGrid Email Service for Amaanah Exam System (via Replit Connector)
+// Handles verification emails, notifications, and system communications
+
+import sgMail from '@sendgrid/mail';
+import crypto from 'crypto';
 
 let connectionSettings: any;
 
