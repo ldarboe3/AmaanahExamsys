@@ -463,7 +463,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {["Western Region", "Central Region", "Northern Region", "Eastern Region"].map((region, index) => (
+              {["Region 1", "Region 2", "Region 3", "Region 4", "Region 5", "Region 6"].map((region, index) => (
                 <div key={region} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium">{region}</span>
