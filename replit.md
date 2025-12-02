@@ -20,6 +20,15 @@ The MVP is complete with all core features implemented and verified. PDF generat
     - Processing status after slip upload pending admin verification
   - Admin view continues showing all invoices across schools
   - Bank slip upload endpoint: `/api/invoices/bank-slip`
+- **Payment Confirmation and Student Approval Workflow**: Two-step verification process
+  - School admin uploads bank slip → invoice status "processing"
+  - Examination admin reviews bank slip → confirms payment → invoice status "paid"
+  - After payment confirmed, examination admin can bulk approve all students
+  - Upon bulk approval, unique index numbers generated for each approved student
+  - Bank slip preview dialog for admins to review uploaded payment proof
+  - Role-based access: only `examination_admin` and `super_admin` can confirm payments and approve students
+  - API endpoints: `/api/invoices/:id/confirm-payment`, `/api/invoices/:id/bulk-approve-students`
+  - Index number format: unique 6-digit number per student
 - **Role-Based Notification System**: Comprehensive in-app notification system
   - Notification service (`server/notificationService.ts`) with role-based targeting
   - Helper functions: `notifyUser`, `notifyUsersByRole`, `notifyAllSchoolAdmins`
