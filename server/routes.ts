@@ -1390,11 +1390,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Validate docType from form data
       const docType = req.body.docType;
-      const validDocTypes = ['registrationCertificate', 'landOwnership', 'operationalLicense'];
+      const validDocTypes = ['registrationCertificate', 'landOwnership', 'operationalLicense', 'schoolBadge'];
       if (!docType || !validDocTypes.includes(docType)) {
         return res.status(400).json({ 
           message: `Invalid document type. Must be one of: ${validDocTypes.join(', ')}` 
         });
+      }
+
+      // For school badge, only allow image files (not PDFs)
+      if (docType === 'schoolBadge') {
+        const normalizedMime = file.mimetype === 'image/jpg' ? 'image/jpeg' : file.mimetype;
+        if (!['image/jpeg', 'image/png'].includes(normalizedMime)) {
+          return res.status(400).json({ 
+            message: "School badge must be an image file (JPG or PNG only)." 
+          });
+        }
       }
 
       const { ObjectStorageService } = await import("./objectStorage");
