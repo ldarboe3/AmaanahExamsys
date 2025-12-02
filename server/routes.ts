@@ -2828,7 +2828,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`);
-        res.send(pdfBuffer);
+        res.send(Buffer.from(pdfBuffer));
       } finally {
         await browser.close();
       }
