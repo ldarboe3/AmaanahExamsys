@@ -2348,7 +2348,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       const examYearId = activeExamYear.id;
-      const feePerStudent = parseFloat(activeExamYear.feePerStudent || '100.00');
+      // Get all three fee types
+      const registrationFee = parseFloat(activeExamYear.feePerStudent || '100.00');
+      const certificateFee = parseFloat((activeExamYear as any).certificateFee || '50.00');
+      const transcriptFee = parseFloat((activeExamYear as any).transcriptFee || '25.00');
+      // Total fee per student = registration + certificate + transcript
+      const totalFeePerStudent = registrationFee + certificateFee + transcriptFee;
       
       // Check if invoice already exists for this school and exam year
       const existingInvoices = await storage.getInvoicesBySchool(schoolId);
@@ -2370,13 +2375,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         });
         
         const totalStudents = examYearStudents.length;
-        const totalAmount = (totalStudents * feePerStudent).toFixed(2);
+        const totalAmount = (totalStudents * totalFeePerStudent).toFixed(2);
         
-        // Update invoice
+        // Update invoice with all fee types
         const updatedInvoice = await storage.updateInvoice(existingInvoice.id, {
           totalStudents,
           totalAmount,
-          feePerStudent: feePerStudent.toString(),
+          feePerStudent: registrationFee.toString(),
+          certificateFee: certificateFee.toString(),
+          transcriptFee: transcriptFee.toString(),
         });
         
         // Delete old items and create new ones
@@ -2386,8 +2393,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           invoiceId: existingInvoice.id,
           grade: parseInt(grade),
           studentCount: count,
-          feePerStudent: feePerStudent.toString(),
-          subtotal: (count * feePerStudent).toFixed(2),
+          feePerStudent: totalFeePerStudent.toString(),
+          subtotal: (count * totalFeePerStudent).toFixed(2),
         }));
         
         const items = await storage.createInvoiceItemsBulk(invoiceItemsData);
@@ -2415,28 +2422,30 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       });
       
       const totalStudents = examYearStudents.length;
-      const totalAmount = (totalStudents * feePerStudent).toFixed(2);
+      const totalAmount = (totalStudents * totalFeePerStudent).toFixed(2);
       
       // Generate invoice number
       const invoiceNumber = generateInvoiceNumber(schoolId, examYearId);
       
-      // Create the invoice
+      // Create the invoice with all fee types
       const invoice = await storage.createInvoice({
         invoiceNumber,
         schoolId,
         examYearId,
         totalStudents,
-        feePerStudent: feePerStudent.toString(),
+        feePerStudent: registrationFee.toString(),
+        certificateFee: certificateFee.toString(),
+        transcriptFee: transcriptFee.toString(),
         totalAmount,
       });
       
-      // Create invoice items per grade
+      // Create invoice items per grade (using total fee per student)
       const invoiceItemsData = Object.entries(studentsByGrade).map(([grade, count]) => ({
         invoiceId: invoice.id,
         grade: parseInt(grade),
         studentCount: count,
-        feePerStudent: feePerStudent.toString(),
-        subtotal: (count * feePerStudent).toFixed(2),
+        feePerStudent: totalFeePerStudent.toString(),
+        subtotal: (count * totalFeePerStudent).toFixed(2),
       }));
       
       const items = await storage.createInvoiceItemsBulk(invoiceItemsData);
