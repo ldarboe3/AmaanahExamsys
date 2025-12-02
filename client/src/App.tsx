@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { NotificationsDropdown } from "@/components/notifications-dropdown";
 import { UserProfileDropdown } from "@/components/user-profile-dropdown";
+import { ScrollToTop } from "@/components/scroll-to-top";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
@@ -100,8 +101,10 @@ function AuthenticatedRoutes() {
 
 function PublicRoutes() {
   return (
-    <Switch>
-      <Route path="/login" component={Login} />
+    <>
+      <ScrollToTop />
+      <Switch>
+        <Route path="/login" component={Login} />
       <Route path="/verify" component={Verify} />
       <Route path="/about" component={About} />
       <Route path="/about/organisation-structure" component={OrganisationStructure} />
@@ -120,7 +123,8 @@ function PublicRoutes() {
       <Route path="/forgot-password/:token" component={ForgotPassword} />
       <Route path="/" component={Home} />
       <Route component={Home} />
-    </Switch>
+      </Switch>
+    </>
   );
 }
 
