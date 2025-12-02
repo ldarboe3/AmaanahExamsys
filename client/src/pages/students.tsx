@@ -181,6 +181,7 @@ export default function Students() {
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
   const [showInvoiceSummary, setShowInvoiceSummary] = useState(false);
   const [generatedInvoice, setGeneratedInvoice] = useState<any>(null);
+  const [printingCards, setPrintingCards] = useState(false);
   
   const isSchoolAdmin = user?.role === 'school_admin';
   const canApproveStudents = user?.role === 'super_admin' || user?.role === 'examination_admin';
@@ -609,6 +610,50 @@ export default function Students() {
       title: isRTL ? "تم النسخ" : "Copied",
       description: isRTL ? "تم نسخ رقم الفهرس" : "Index number copied to clipboard",
     });
+  };
+
+  const handlePrintCards = async () => {
+    try {
+      setPrintingCards(true);
+      
+      // Build query params based on current filters
+      const params = new URLSearchParams();
+      if (selectedExamYear) params.append('examYearId', selectedExamYear.toString());
+      if (selectedGrade) params.append('grade', selectedGrade.toString());
+      if (schoolFilter && schoolFilter !== 'all') params.append('schoolId', schoolFilter);
+      
+      const response = await fetch(`/api/students/exam-cards/pdf?${params.toString()}`, {
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to generate exam cards');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `exam-cards.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: isRTL ? "تم التحميل" : "Downloaded",
+        description: isRTL ? "تم تحميل بطاقات الامتحان بنجاح" : "Exam cards downloaded successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل تحميل بطاقات الامتحان" : "Failed to download exam cards"),
+        variant: "destructive",
+      });
+    } finally {
+      setPrintingCards(false);
+    }
   };
 
   // TIER 1: Exam Year Dashboard View
@@ -1415,8 +1460,18 @@ export default function Students() {
                     </Button>
                   </>
                 )}
-                <Button variant="outline" size="sm">
-                  <Printer className="w-4 h-4 me-2" />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handlePrintCards}
+                  disabled={printingCards}
+                  data-testid="button-print-cards"
+                >
+                  {printingCards ? (
+                    <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                  ) : (
+                    <Printer className="w-4 h-4 me-2" />
+                  )}
                   {isRTL ? "طباعة البطاقات" : "Print Cards"}
                 </Button>
                 <Button variant="outline" size="sm">

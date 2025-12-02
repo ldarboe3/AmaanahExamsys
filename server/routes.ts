@@ -2032,7 +2032,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         students = students.filter(s => s.schoolId && schoolIdsInCluster.includes(s.schoolId));
       }
       
-      res.json(students);
+      // Enrich students with school and exam year information
+      const allExamYears = await storage.getAllExamYears();
+      const enrichedStudents = students.map(student => {
+        const school = allSchools.find(s => s.id === student.schoolId);
+        const examYear = allExamYears.find(ey => ey.id === student.examYearId);
+        return {
+          ...student,
+          school: school ? { id: school.id, name: school.name } : null,
+          examYear: examYear ? { id: examYear.id, name: examYear.name } : null
+        };
+      });
+      
+      res.json(enrichedStudents);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -2856,6 +2868,473 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
     } catch (error: any) {
       console.error("Invoice PDF generation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Generate and download exam cards PDF
+  app.get("/api/students/exam-cards/pdf", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Get filter parameters
+      const schoolId = req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      const grade = req.query.grade ? parseInt(req.query.grade as string) : undefined;
+      
+      // Get students based on role
+      let students = await storage.getAllStudents();
+      
+      // School admins can only print cards for their own school
+      if (user.role === 'school_admin') {
+        if (!user.schoolId) {
+          return res.status(403).json({ message: "School admin must be associated with a school" });
+        }
+        students = students.filter(s => s.schoolId === user.schoolId);
+      } else if (schoolId) {
+        students = students.filter(s => s.schoolId === schoolId);
+      }
+      
+      // Only approved students with index numbers can have exam cards
+      students = students.filter(s => s.status === 'approved' && s.indexNumber);
+      
+      if (examYearId) {
+        students = students.filter(s => s.examYearId === examYearId);
+      }
+      
+      if (grade) {
+        students = students.filter(s => s.grade === grade);
+      }
+      
+      if (students.length === 0) {
+        return res.status(400).json({ message: "No approved students with index numbers found" });
+      }
+      
+      // Get school and exam year info
+      const allSchools = await storage.getAllSchools();
+      const allExamYears = await storage.getAllExamYears();
+      
+      const puppeteer = (await import('puppeteer')).default;
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+      
+      // Read logo
+      let logoBase64 = '';
+      try {
+        const logoPath = path.join(process.cwd(), 'attached_assets/Amana_Logo_1764714323051.PNG');
+        const logoBuffer = fs.readFileSync(logoPath);
+        logoBase64 = logoBuffer.toString('base64');
+      } catch (e) {
+        console.log('Logo file not found for exam cards');
+      }
+      
+      // Generate exam cards HTML - 4 cards per page (2x2 grid)
+      const cardsHtml = students.map(student => {
+        const school = allSchools.find(s => s.id === student.schoolId);
+        const examYear = allExamYears.find(ey => ey.id === student.examYearId);
+        
+        return `
+          <div class="card">
+            <div class="card-header">
+              <div class="logo-section">
+                ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" class="logo" />` : '<div class="logo-placeholder">A</div>'}
+                <div>
+                  <div class="org-name">Amaanah Islamic Education Trust</div>
+                  <div class="card-title">EXAMINATION CARD</div>
+                </div>
+              </div>
+              <div class="exam-year">${examYear?.name || 'Exam Year'}</div>
+            </div>
+            <div class="card-body">
+              <div class="student-photo">
+                <div class="photo-placeholder">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                </div>
+              </div>
+              <div class="student-info">
+                <div class="info-row">
+                  <span class="label">Name:</span>
+                  <span class="value">${student.firstName} ${student.lastName}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Index No:</span>
+                  <span class="value index-number">${student.indexNumber}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">School:</span>
+                  <span class="value">${school?.name || 'Unknown'}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Grade:</span>
+                  <span class="value">${student.grade || 'N/A'}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Gender:</span>
+                  <span class="value">${student.gender === 'male' ? 'Male' : 'Female'}</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="signature-line">
+                <div class="line"></div>
+                <span>Candidate Signature</span>
+              </div>
+              <div class="signature-line">
+                <div class="line"></div>
+                <span>Invigilator Signature</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: 'Segoe UI', Arial, sans-serif;
+              font-size: 10pt;
+              background: #fff;
+              color: #1f2937;
+            }
+            .page {
+              width: 210mm;
+              min-height: 297mm;
+              padding: 10mm;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              grid-template-rows: 1fr 1fr;
+              gap: 8mm;
+              page-break-after: always;
+            }
+            .page:last-child {
+              page-break-after: auto;
+            }
+            .card {
+              border: 2px solid #1E8F4D;
+              border-radius: 8px;
+              padding: 12px;
+              display: flex;
+              flex-direction: column;
+              background: linear-gradient(to bottom right, #ffffff 0%, #f0fdf4 100%);
+            }
+            .card-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              border-bottom: 1px solid #e5e7eb;
+              padding-bottom: 8px;
+              margin-bottom: 10px;
+            }
+            .logo-section {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .logo {
+              width: 35px;
+              height: 35px;
+              object-fit: contain;
+            }
+            .logo-placeholder {
+              width: 35px;
+              height: 35px;
+              background: #1E8F4D;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              font-size: 18px;
+              font-weight: bold;
+            }
+            .org-name {
+              font-size: 9pt;
+              font-weight: bold;
+              color: #1E8F4D;
+            }
+            .card-title {
+              font-size: 8pt;
+              color: #6b7280;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+            .exam-year {
+              font-size: 9pt;
+              font-weight: 600;
+              color: #1E8F4D;
+              background: #dcfce7;
+              padding: 4px 8px;
+              border-radius: 4px;
+            }
+            .card-body {
+              flex: 1;
+              display: flex;
+              gap: 12px;
+            }
+            .student-photo {
+              width: 70px;
+              flex-shrink: 0;
+            }
+            .photo-placeholder {
+              width: 70px;
+              height: 85px;
+              border: 1px dashed #d1d5db;
+              border-radius: 4px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #9ca3af;
+              background: #f9fafb;
+            }
+            .student-info {
+              flex: 1;
+            }
+            .info-row {
+              display: flex;
+              margin-bottom: 4px;
+              font-size: 9pt;
+            }
+            .label {
+              width: 55px;
+              color: #6b7280;
+              flex-shrink: 0;
+            }
+            .value {
+              font-weight: 500;
+              word-break: break-word;
+            }
+            .index-number {
+              font-family: 'Courier New', monospace;
+              font-size: 11pt;
+              font-weight: bold;
+              color: #1E8F4D;
+              background: #dcfce7;
+              padding: 2px 6px;
+              border-radius: 3px;
+            }
+            .card-footer {
+              display: flex;
+              justify-content: space-between;
+              margin-top: 10px;
+              padding-top: 8px;
+              border-top: 1px solid #e5e7eb;
+            }
+            .signature-line {
+              text-align: center;
+              font-size: 7pt;
+              color: #6b7280;
+            }
+            .signature-line .line {
+              width: 80px;
+              border-bottom: 1px solid #9ca3af;
+              margin-bottom: 3px;
+            }
+          </style>
+        </head>
+        <body>
+          ${(() => {
+            // Group cards into pages of 4
+            const pages = [];
+            for (let i = 0; i < students.length; i += 4) {
+              const pageCards = cardsHtml.split('</div>\\n        ');
+              pages.push(`<div class="page">${students.slice(i, i + 4).map((_, idx) => {
+                const cardIndex = i + idx;
+                return students[cardIndex] ? cardsHtml.split('<div class="card">')[cardIndex + 1]?.split('</div>\\n          </div>')[0] : '';
+              }).join('')}</div>`);
+            }
+            return pages.join('');
+          })()}
+        </body>
+        </html>
+      `;
+      
+      // Simpler approach - just wrap all cards in pages
+      const finalHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: 'Segoe UI', Arial, sans-serif;
+              font-size: 10pt;
+              background: #fff;
+              color: #1f2937;
+            }
+            .cards-container {
+              width: 210mm;
+              padding: 10mm;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 8mm;
+            }
+            .card {
+              border: 2px solid #1E8F4D;
+              border-radius: 8px;
+              padding: 12px;
+              display: flex;
+              flex-direction: column;
+              background: linear-gradient(to bottom right, #ffffff 0%, #f0fdf4 100%);
+              height: 130mm;
+              page-break-inside: avoid;
+            }
+            .card-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              border-bottom: 1px solid #e5e7eb;
+              padding-bottom: 8px;
+              margin-bottom: 10px;
+            }
+            .logo-section {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .logo {
+              width: 35px;
+              height: 35px;
+              object-fit: contain;
+            }
+            .logo-placeholder {
+              width: 35px;
+              height: 35px;
+              background: #1E8F4D;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              font-size: 18px;
+              font-weight: bold;
+            }
+            .org-name {
+              font-size: 9pt;
+              font-weight: bold;
+              color: #1E8F4D;
+            }
+            .card-title {
+              font-size: 8pt;
+              color: #6b7280;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+            .exam-year {
+              font-size: 9pt;
+              font-weight: 600;
+              color: #1E8F4D;
+              background: #dcfce7;
+              padding: 4px 8px;
+              border-radius: 4px;
+            }
+            .card-body {
+              flex: 1;
+              display: flex;
+              gap: 12px;
+            }
+            .student-photo {
+              width: 70px;
+              flex-shrink: 0;
+            }
+            .photo-placeholder {
+              width: 70px;
+              height: 85px;
+              border: 1px dashed #d1d5db;
+              border-radius: 4px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #9ca3af;
+              background: #f9fafb;
+            }
+            .student-info {
+              flex: 1;
+            }
+            .info-row {
+              display: flex;
+              margin-bottom: 4px;
+              font-size: 9pt;
+            }
+            .label {
+              width: 55px;
+              color: #6b7280;
+              flex-shrink: 0;
+            }
+            .value {
+              font-weight: 500;
+              word-break: break-word;
+            }
+            .index-number {
+              font-family: 'Courier New', monospace;
+              font-size: 11pt;
+              font-weight: bold;
+              color: #1E8F4D;
+              background: #dcfce7;
+              padding: 2px 6px;
+              border-radius: 3px;
+            }
+            .card-footer {
+              display: flex;
+              justify-content: space-between;
+              margin-top: 10px;
+              padding-top: 8px;
+              border-top: 1px solid #e5e7eb;
+            }
+            .signature-line {
+              text-align: center;
+              font-size: 7pt;
+              color: #6b7280;
+            }
+            .signature-line .line {
+              width: 80px;
+              border-bottom: 1px solid #9ca3af;
+              margin-bottom: 3px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="cards-container">
+            ${cardsHtml}
+          </div>
+        </body>
+        </html>
+      `;
+      
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      });
+      
+      try {
+        const page = await browser.newPage();
+        await page.setContent(finalHtml, { waitUntil: 'networkidle0' });
+        
+        const pdfBuffer = await page.pdf({
+          format: 'A4',
+          printBackground: true,
+          margin: { top: '5mm', right: '5mm', bottom: '5mm', left: '5mm' }
+        });
+        
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="exam-cards.pdf"`);
+        res.send(Buffer.from(pdfBuffer));
+      } finally {
+        await browser.close();
+      }
+    } catch (error: any) {
+      console.error("Exam cards PDF generation error:", error);
       res.status(500).json({ message: error.message });
     }
   });
