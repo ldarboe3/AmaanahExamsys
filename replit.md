@@ -56,19 +56,25 @@ The MVP is complete with all core features implemented and verified. PDF generat
   - Object storage integration for document persistence
   - Backend API endpoints: `GET/POST /api/school/profile`, `POST /api/school/documents/upload`, `POST /api/school/documents/delete`
   - Bilingual UI (English/Arabic) with sidebar navigation link
-- **Student Dashboard Interactive Grade Cards**: Redesigned Students page with grade-based dashboard
-  - Interactive card grid replaces previous tabs UI
-  - Each card displays: grade label, student count, pending/approved indicators
-  - Cards have direct Upload CSV and Download Template buttons
-  - Clicking a card reveals detailed view with student list
-  - Back navigation to return to grade dashboard
-  - Fallback to all grades (3, 6, 9, 12) when no active exam year
+- **3-Tier Student Registration Navigation**: Complete hierarchical registration workflow for school admins
+  - **Tier 1 - Exam Year Selection**: Shows all exam years as interactive cards with name, deadline, fee, and available grades
+    - Active exam year highlighted with badge
+    - Instructional Step 1 card explains the process
+  - **Tier 2 - Grade Selection**: Shows grades filtered by school type (LBS: 3,6 | BCS: 3,6,9 | UBS: 9 | SSS: 12)
+    - Each grade card displays student count, pending/approved indicators
+    - Back button returns to Tier 1
+    - Selected exam year info banner displayed
+    - Instructional Step 2 card explains grade selection
+  - **Tier 3 - Student Upload**: Shows student list for selected grade/exam year
+    - CSV upload with validation and auto-invoice generation
+    - Template download button for CSV template
+    - Real-time countdown timer to registration deadline
+    - Back button returns to Tier 2
+    - Instructional Step 3 card explains upload process
+  - Student queries properly scoped to selected exam year (examYearId parameter)
+  - State resets: selectedGrade resets when changing exam year to prevent stale data
   - Responsive layout: 1 col mobile, 2 col tablet, 4 col desktop
-  - **Registration Deadline Countdown**: Bold countdown clock in grade detail view
-    - Displays days, hours, minutes, seconds until registration deadline
-    - Updates every second in real-time
-    - Only shows when active exam year has registrationEndDate set
-    - Bilingual support (English/Arabic)
+  - Bilingual support (English/Arabic) on all tiers
 - **Resend Verification Email Feature**: Admin tool to resend school verification emails
   - Added "Resend Verification Email" button in Schools management dropdown
   - Only appears for pending schools without verified emails
