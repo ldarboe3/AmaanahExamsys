@@ -60,11 +60,11 @@ export function getVerificationExpiry(): Date {
   return expiry;
 }
 
-// Generate a random 6-digit index number
+// Generate a cryptographically secure random 6-digit index number
 export function generateIndexNumber(): string {
   const min = 100000;
   const max = 999999;
-  return Math.floor(Math.random() * (max - min + 1) + min).toString();
+  return crypto.randomInt(min, max + 1).toString();
 }
 
 // Generate unique invoice number
