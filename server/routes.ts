@@ -1662,6 +1662,69 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Resend invitation email
+  app.post("/api/school/invitations/:id/resend", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'school_admin') {
+        return res.status(403).json({ message: "Only school admins can resend invitations" });
+      }
+      if (!user.schoolId) {
+        return res.status(404).json({ message: "No school associated with this account" });
+      }
+
+      const invitationId = parseInt(req.params.id);
+      const invitation = await storage.getSchoolInvitation(invitationId);
+      
+      if (!invitation) {
+        return res.status(404).json({ message: "Invitation not found" });
+      }
+
+      if (invitation.schoolId !== user.schoolId) {
+        return res.status(403).json({ message: "You can only resend invitations for your school" });
+      }
+
+      if (invitation.isUsed) {
+        return res.status(400).json({ message: "This invitation has already been used" });
+      }
+
+      // Generate new token and expiry
+      const newToken = randomBytes(32).toString('hex');
+      const newExpiry = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
+
+      // Update invitation with new token and expiry
+      await storage.updateSchoolInvitation(invitationId, {
+        token: newToken,
+        expiresAt: newExpiry,
+      });
+
+      // Get school info for email
+      const school = await storage.getSchool(invitation.schoolId);
+
+      // Send invitation email
+      const verificationUrl = `${req.protocol}://${req.get('host')}/school-invite/${newToken}`;
+      await sendSchoolAdminInvitationEmail(
+        invitation.email, 
+        school?.name || 'Your School', 
+        invitation.firstName || 'User', 
+        verificationUrl
+      );
+
+      // Log the action
+      await storage.createAuditLog({
+        action: 'school_invitation_resent',
+        entityType: 'school_invitation',
+        entityId: invitationId.toString(),
+        userId: user.id,
+        details: { email: invitation.email, schoolId: user.schoolId },
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Public endpoint to get invitation info
   app.get("/api/school/invitations/:token/info", async (req, res) => {
     try {

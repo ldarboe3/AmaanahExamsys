@@ -10,6 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -45,11 +55,15 @@ import {
   MapPin,
   Edit,
   X,
-  File,
   Trash2,
-  Eye
+  Eye,
+  UserPlus,
+  Users,
+  Clock,
+  Send,
+  Image as ImageIcon
 } from "lucide-react";
-import type { School as SchoolType, Region, Cluster } from "@shared/schema";
+import type { School as SchoolType, Region, Cluster, SchoolInvitation } from "@shared/schema";
 
 const schoolTypes = [
   { value: "LBS", label: "Lower Basic School", arabicLabel: "ابتدائي" },
@@ -73,18 +87,28 @@ const profileSchema = z.object({
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
+const invitationSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  name: z.string().min(2, "Name is required"),
+});
+
+type InvitationFormData = z.infer<typeof invitationSchema>;
+
 export default function SchoolProfile() {
   const { t, isRTL } = useLanguage();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
   const fileInputRefs = {
     registrationCertificate: useRef<HTMLInputElement>(null),
     landOwnership: useRef<HTMLInputElement>(null),
     operationalLicense: useRef<HTMLInputElement>(null),
   };
+  
+  const badgeInputRef = useRef<HTMLInputElement>(null);
 
   const { data: school, isLoading: schoolLoading } = useQuery<SchoolType>({
     queryKey: ["/api/school/profile"],
@@ -96,6 +120,18 @@ export default function SchoolProfile() {
 
   const { data: clusters } = useQuery<Cluster[]>({
     queryKey: ["/api/clusters"],
+  });
+
+  const { data: invitations, isLoading: invitationsLoading } = useQuery<SchoolInvitation[]>({
+    queryKey: ["/api/school/invitations"],
+  });
+
+  const inviteForm = useForm<InvitationFormData>({
+    resolver: zodResolver(invitationSchema),
+    defaultValues: {
+      email: "",
+      name: "",
+    },
   });
 
   const form = useForm<ProfileFormData>({
@@ -221,6 +257,103 @@ export default function SchoolProfile() {
     },
   });
 
+  const uploadBadgeMutation = useMutation({
+    mutationFn: async (file: File) => {
+      setUploadingDoc("schoolBadge");
+      setUploadProgress(0);
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("docType", "schoolBadge");
+
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 10, 90));
+      }, 200);
+
+      try {
+        const response = await fetch("/api/school/documents/upload", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Upload failed");
+        }
+
+        return response.json();
+      } finally {
+        clearInterval(progressInterval);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/school/profile"] });
+      toast({
+        title: isRTL ? "تم الرفع" : "Badge Uploaded",
+        description: isRTL ? "تم رفع شعار المدرسة بنجاح" : "Your school badge has been uploaded successfully.",
+      });
+      setTimeout(() => {
+        setUploadingDoc(null);
+        setUploadProgress(0);
+      }, 500);
+    },
+    onError: (error: any) => {
+      setUploadingDoc(null);
+      setUploadProgress(0);
+      toast({
+        title: isRTL ? "خطأ في الرفع" : "Upload Error",
+        description: error.message || (isRTL ? "فشل في رفع الشعار" : "Failed to upload badge"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createInvitationMutation = useMutation({
+    mutationFn: async (data: InvitationFormData) => {
+      return apiRequest("POST", "/api/school/invitations", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/school/invitations"] });
+      setInviteDialogOpen(false);
+      inviteForm.reset();
+      toast({
+        title: isRTL ? "تم إرسال الدعوة" : "Invitation Sent",
+        description: isRTL ? "تم إرسال دعوة المسؤول بنجاح" : "Admin invitation has been sent successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: isRTL ? "خطأ" : "Error",
+        description: error.message || (isRTL ? "فشل في إرسال الدعوة" : "Failed to send invitation"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resendInvitationMutation = useMutation({
+    mutationFn: async (invitationId: number) => {
+      return apiRequest("POST", `/api/school/invitations/${invitationId}/resend`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/school/invitations"] });
+      toast({
+        title: isRTL ? "تم إعادة الإرسال" : "Invitation Resent",
+        description: isRTL ? "تم إعادة إرسال الدعوة بنجاح" : "Invitation has been resent successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: isRTL ? "خطأ" : "Error",
+        description: error.message || (isRTL ? "فشل في إعادة الإرسال" : "Failed to resend invitation"),
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: ProfileFormData) => {
     updateProfileMutation.mutate(data);
   };
@@ -238,6 +371,58 @@ export default function SchoolProfile() {
       }
       uploadDocumentMutation.mutate({ docType, file });
     }
+  };
+
+  const handleBadgeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: isRTL ? "الملف كبير جداً" : "File Too Large",
+          description: isRTL ? "الحد الأقصى للملف 10 ميجابايت" : "Maximum file size is 10MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!file.type.startsWith("image/")) {
+        toast({
+          title: isRTL ? "نوع ملف غير صالح" : "Invalid File Type",
+          description: isRTL ? "يجب أن يكون الشعار صورة (JPEG أو PNG)" : "Badge must be an image (JPEG or PNG)",
+          variant: "destructive",
+        });
+        return;
+      }
+      uploadBadgeMutation.mutate(file);
+    }
+  };
+
+  const onInviteSubmit = (data: InvitationFormData) => {
+    createInvitationMutation.mutate(data);
+  };
+
+  const getInvitationStatusBadge = (invitation: SchoolInvitation) => {
+    if (invitation.status === "completed") {
+      return (
+        <Badge variant="default" className="bg-green-600">
+          <CheckCircle className="w-3 h-3 me-1" />
+          {isRTL ? "مكتمل" : "Completed"}
+        </Badge>
+      );
+    }
+    if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) {
+      return (
+        <Badge variant="destructive">
+          <AlertCircle className="w-3 h-3 me-1" />
+          {isRTL ? "منتهي الصلاحية" : "Expired"}
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="secondary">
+        <Clock className="w-3 h-3 me-1" />
+        {isRTL ? "قيد الانتظار" : "Pending"}
+      </Badge>
+    );
   };
 
   const getDocumentUrl = (docType: string) => {
@@ -337,9 +522,39 @@ export default function SchoolProfile() {
         {/* School Info Card */}
         <Card className="lg:col-span-1">
           <CardHeader className="text-center">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <School className="w-10 h-10 text-primary" />
+            <div className="relative w-24 h-24 mx-auto mb-4 group">
+              {school.schoolBadge ? (
+                <Avatar className="w-24 h-24">
+                  <AvatarImage src={school.schoolBadge} alt={school.name} className="object-cover" />
+                  <AvatarFallback className="bg-primary/10">
+                    <School className="w-10 h-10 text-primary" />
+                  </AvatarFallback>
+                </Avatar>
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
+                  <School className="w-10 h-10 text-primary" />
+                </div>
+              )}
+              <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                   onClick={() => badgeInputRef.current?.click()}>
+                {uploadingDoc === "schoolBadge" ? (
+                  <Loader2 className="w-6 h-6 text-white animate-spin" />
+                ) : (
+                  <ImageIcon className="w-6 h-6 text-white" />
+                )}
+              </div>
+              <input
+                type="file"
+                ref={badgeInputRef}
+                className="hidden"
+                accept="image/jpeg,image/png"
+                onChange={handleBadgeChange}
+                data-testid="input-school-badge"
+              />
             </div>
+            {uploadingDoc === "schoolBadge" && (
+              <Progress value={uploadProgress} className="h-1 w-24 mx-auto mb-2" />
+            )}
             <CardTitle>{school.name}</CardTitle>
             <CardDescription>{school.email}</CardDescription>
           </CardHeader>
@@ -730,6 +945,169 @@ export default function SchoolProfile() {
                   );
                 })}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* School Administrators */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    {isRTL ? "مسؤولي المدرسة" : "School Administrators"}
+                  </CardTitle>
+                  <CardDescription>
+                    {isRTL 
+                      ? "إدارة مسؤولي المدرسة ودعوة أعضاء جدد"
+                      : "Manage school administrators and invite new members"
+                    }
+                  </CardDescription>
+                </div>
+                <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-invite-admin">
+                      <UserPlus className="w-4 h-4 me-2" />
+                      {isRTL ? "دعوة مسؤول" : "Invite Admin"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{isRTL ? "دعوة مسؤول جديد" : "Invite New Administrator"}</DialogTitle>
+                      <DialogDescription>
+                        {isRTL 
+                          ? "سيتلقى المدعو بريدًا إلكترونيًا لإعداد حسابه"
+                          : "The invitee will receive an email to set up their account"
+                        }
+                      </DialogDescription>
+                    </DialogHeader>
+                    <Form {...inviteForm}>
+                      <form onSubmit={inviteForm.handleSubmit(onInviteSubmit)} className="space-y-4">
+                        <FormField
+                          control={inviteForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{isRTL ? "الاسم" : "Name"}</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder={isRTL ? "أدخل اسم المسؤول" : "Enter admin's name"} 
+                                  {...field} 
+                                  data-testid="input-invite-name"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={inviteForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{isRTL ? "البريد الإلكتروني" : "Email"}</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="email"
+                                  placeholder={isRTL ? "أدخل البريد الإلكتروني" : "Enter email address"} 
+                                  {...field} 
+                                  data-testid="input-invite-email"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <DialogFooter>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => setInviteDialogOpen(false)}
+                            data-testid="button-cancel-invite"
+                          >
+                            {isRTL ? "إلغاء" : "Cancel"}
+                          </Button>
+                          <Button 
+                            type="submit" 
+                            disabled={createInvitationMutation.isPending}
+                            data-testid="button-send-invite"
+                          >
+                            {createInvitationMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                            ) : (
+                              <Send className="w-4 h-4 me-2" />
+                            )}
+                            {isRTL ? "إرسال الدعوة" : "Send Invitation"}
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {invitationsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : invitations && invitations.length > 0 ? (
+                <div className="space-y-3">
+                  {invitations.map((invitation) => {
+                    const isExpired = invitation.expiresAt && new Date(invitation.expiresAt) < new Date();
+                    const canResend = invitation.status === "pending" && isExpired;
+                    
+                    return (
+                      <div 
+                        key={invitation.id} 
+                        className="flex items-center justify-between gap-4 p-3 border rounded-md"
+                        data-testid={`invitation-${invitation.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar className="w-10 h-10">
+                            <AvatarFallback className="bg-muted">
+                              <User className="w-5 h-5" />
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{invitation.invitedName}</p>
+                            <p className="text-sm text-muted-foreground">{invitation.invitedEmail}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {getInvitationStatusBadge(invitation)}
+                          {canResend && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => resendInvitationMutation.mutate(invitation.id)}
+                              disabled={resendInvitationMutation.isPending}
+                              data-testid={`button-resend-${invitation.id}`}
+                            >
+                              {resendInvitationMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Send className="w-4 h-4" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>{isRTL ? "لا توجد دعوات حتى الآن" : "No invitations yet"}</p>
+                  <p className="text-sm mt-1">
+                    {isRTL 
+                      ? "انقر على 'دعوة مسؤول' لإضافة مسؤولين آخرين"
+                      : "Click 'Invite Admin' to add other administrators"
+                    }
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

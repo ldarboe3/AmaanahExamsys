@@ -7,6 +7,18 @@ A comprehensive examination management system for managing countrywide Arabic & 
 The MVP is complete with all core features implemented and verified. PDF generation system for certificates and transcripts is fully functional with Arabic/English bilingual support, QR code verification, and gender-specific templates.
 
 ## Recent Changes (December 2024)
+- **School Admin Invitation System**: Invite additional administrators to manage school
+  - Token-based invitation workflow with 48-hour expiry
+  - School admins can invite other users via email
+  - Invited users complete credential setup via `/school-invite/:token` page
+  - New `schoolInvitations` table to track pending/completed invitations
+  - Bilingual email templates for invitations
+  - Status tracking: pending, completed, expired
+  - API endpoints: `GET/POST /api/school/invitations`, `POST /api/school/invitations/:id/resend`, `POST /api/school/invitations/:token/complete`
+- **School Badge Upload**: School logo/badge image support
+  - Image-only validation (JPEG/PNG, max 10MB)
+  - Displayed in school profile card with hover upload overlay
+  - Stored in `schoolBadge` field in schools table
 - **School Profile Management**: Full school profile editing for school admins
   - Editable fields: school name, registrar name, phone, address, primary school type, school types, region, cluster
   - Document upload system: registration certificate, land ownership, operational license
@@ -133,6 +145,7 @@ PostgreSQL with the following main tables:
 - notifications, auditLogs, regions, clusters
 - newsArticles, newsCategories, resources, resourceCategories
 - announcements, newsletterSubscribers, impactStats
+- schoolInvitations (for admin invitation workflow)
 
 ## Running the Application
 The application runs on port 5000 with:
