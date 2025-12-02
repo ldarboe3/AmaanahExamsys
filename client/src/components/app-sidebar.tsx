@@ -56,11 +56,11 @@ const adminMenuDefs: MenuItemDef[] = [
 
 const schoolAdminMenuDefs: MenuItemDef[] = [
   { key: "dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { key: "schoolProfile", url: "/school-profile", icon: School },
   { key: "students", url: "/students", icon: Users },
   { key: "payments", url: "/payments", icon: CreditCard },
   { key: "results", url: "/admin-results", icon: FileCheck },
   { key: "examCenter", url: "/center-info", icon: MapPin },
+  { key: "schoolProfile", url: "/school-profile", icon: School },
 ];
 
 const managementDefs: MenuItemDef[] = [
