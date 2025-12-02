@@ -1,17 +1,25 @@
 import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { createPortal } from "react-dom";
 
 export function BackToTop() {
   const [isVisible, setIsVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const toggleVisibility = () => {
-    if (window.scrollY > 300) {
-      setIsVisible(true);
-    } else {
-      setIsVisible(false);
-    }
-  };
+  useEffect(() => {
+    setMounted(true);
+    
+    const toggleVisibility = () => {
+      setIsVisible(window.scrollY > 300);
+    };
+
+    toggleVisibility();
+    window.addEventListener("scroll", toggleVisibility, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", toggleVisibility);
+    };
+  }, []);
 
   const scrollToTop = () => {
     window.scrollTo({
@@ -20,26 +28,18 @@ export function BackToTop() {
     });
   };
 
-  useEffect(() => {
-    window.addEventListener("scroll", toggleVisibility);
-    return () => {
-      window.removeEventListener("scroll", toggleVisibility);
-    };
-  }, []);
+  if (!mounted || !isVisible) return null;
 
-  return (
-    <>
-      {isVisible && (
-        <Button
-          onClick={scrollToTop}
-          size="icon"
-          className="fixed bottom-8 right-8 z-40 rounded-full shadow-lg hover-elevate"
-          data-testid="button-back-to-top"
-          aria-label="Back to top"
-        >
-          <ArrowUp className="h-5 w-5" />
-        </Button>
-      )}
-    </>
+  return createPortal(
+    <Button
+      onClick={scrollToTop}
+      size="icon"
+      className="fixed bottom-8 ltr:right-8 rtl:left-8 z-50 rounded-full shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground"
+      data-testid="button-back-to-top"
+      aria-label="Back to top"
+    >
+      <ArrowUp className="h-5 w-5" />
+    </Button>,
+    document.body
   );
 }
