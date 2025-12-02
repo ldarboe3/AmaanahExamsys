@@ -125,8 +125,9 @@ export async function sendSchoolVerificationEmail(
         .header { background: linear-gradient(135deg, #1E8F4D, #166534); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
         .header h1 { margin: 0; font-size: 24px; }
         .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-        .btn { display: inline-block; background: #1E8F4D; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+        .btn { display: inline-block; background: #1E8F4D; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
         .btn:hover { background: #166534; }
+        .btn a { color: white !important; text-decoration: none; }
         .warning { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px; }
         .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
         .arabic { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; }
@@ -400,8 +401,9 @@ export async function sendPasswordResetEmail(
         .header { background: linear-gradient(135deg, #1E8F4D, #166534); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
         .header h1 { margin: 0; font-size: 24px; }
         .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-        .btn { display: inline-block; background: #1E8F4D; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+        .btn { display: inline-block; background: #1E8F4D; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
         .btn:hover { background: #166534; }
+        .btn a { color: white !important; text-decoration: none; }
         .warning { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px; }
         .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
         .arabic { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; }
