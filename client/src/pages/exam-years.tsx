@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -226,9 +227,13 @@ export default function ExamYears() {
       year: new Date().getFullYear(),
       name: "",
       hijriYear: "",
+      grades: [],
       isActive: false,
     },
   });
+
+  // Available grades for exam years
+  const availableGrades = [3, 6, 9, 12];
 
   const formatDateForInput = (dateString: string | Date | null) => {
     if (!dateString) return "";
@@ -242,6 +247,7 @@ export default function ExamYears() {
       year: examYear.year,
       name: examYear.name,
       hijriYear: examYear.hijriYear || "",
+      grades: examYear.grades || [],
       registrationStartDate: formatDateForInput(examYear.registrationStartDate),
       registrationEndDate: formatDateForInput(examYear.registrationEndDate),
       examStartDate: formatDateForInput(examYear.examStartDate),
@@ -491,25 +497,40 @@ export default function ExamYears() {
               <FormField
                 control={form.control}
                 name="grades"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
                     <FormLabel>Classes</FormLabel>
-                    <div className="flex flex-wrap gap-3 mt-2">
-                      {[3, 6, 9, 12].map(grade => (
-                        <label key={grade} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={field.value?.includes(grade) || false}
-                            onChange={(e) => {
-                              const newValue = e.target.checked
-                                ? [...(field.value || []), grade]
-                                : (field.value || []).filter(g => g !== grade);
-                              field.onChange(newValue);
-                            }}
-                            data-testid={`checkbox-grade-${grade}`}
-                          />
-                          <span className="text-sm">Class {grade}</span>
-                        </label>
+                    <FormDescription>
+                      Select which classes are included in this exam year
+                    </FormDescription>
+                    <div className="grid grid-cols-4 gap-4 mt-2">
+                      {availableGrades.map((grade) => (
+                        <FormField
+                          key={grade}
+                          control={form.control}
+                          name="grades"
+                          render={({ field }) => (
+                            <FormItem className="flex items-center space-x-2">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(grade)}
+                                  onCheckedChange={(checked) => {
+                                    const currentGrades = field.value || [];
+                                    if (checked) {
+                                      field.onChange([...currentGrades, grade].sort((a, b) => a - b));
+                                    } else {
+                                      field.onChange(currentGrades.filter((g) => g !== grade));
+                                    }
+                                  }}
+                                  data-testid={`checkbox-create-grade-${grade}`}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm font-normal cursor-pointer">
+                                Class {grade}
+                              </FormLabel>
+                            </FormItem>
+                          )}
+                        />
                       ))}
                     </div>
                     <FormMessage />
@@ -665,6 +686,50 @@ export default function ExamYears() {
                     <FormControl>
                       <Input placeholder="2024/2025 Academic Year" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="grades"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>Classes</FormLabel>
+                    <FormDescription>
+                      Select which classes are included in this exam year
+                    </FormDescription>
+                    <div className="grid grid-cols-4 gap-4 mt-2">
+                      {availableGrades.map((grade) => (
+                        <FormField
+                          key={grade}
+                          control={form.control}
+                          name="grades"
+                          render={({ field }) => (
+                            <FormItem className="flex items-center space-x-2">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(grade)}
+                                  onCheckedChange={(checked) => {
+                                    const currentGrades = field.value || [];
+                                    if (checked) {
+                                      field.onChange([...currentGrades, grade].sort((a, b) => a - b));
+                                    } else {
+                                      field.onChange(currentGrades.filter((g) => g !== grade));
+                                    }
+                                  }}
+                                  data-testid={`checkbox-grade-${grade}`}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm font-normal cursor-pointer">
+                                Class {grade}
+                              </FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
