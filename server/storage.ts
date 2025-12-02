@@ -442,7 +442,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateExamYear(id: number, examYear: Partial<InsertExamYear>): Promise<ExamYear | undefined> {
-    const [updated] = await db.update(examYears).set(examYear).where(eq(examYears.id, id)).returning();
+    // Convert date strings to Date objects if they are strings
+    const processedData = {
+      ...examYear,
+      registrationStartDate: examYear.registrationStartDate 
+        ? (typeof examYear.registrationStartDate === 'string' ? new Date(examYear.registrationStartDate) : examYear.registrationStartDate)
+        : undefined,
+      registrationEndDate: examYear.registrationEndDate 
+        ? (typeof examYear.registrationEndDate === 'string' ? new Date(examYear.registrationEndDate) : examYear.registrationEndDate)
+        : undefined,
+      examStartDate: examYear.examStartDate 
+        ? (typeof examYear.examStartDate === 'string' ? new Date(examYear.examStartDate) : examYear.examStartDate)
+        : undefined,
+      examEndDate: examYear.examEndDate 
+        ? (typeof examYear.examEndDate === 'string' ? new Date(examYear.examEndDate) : examYear.examEndDate)
+        : undefined,
+      resultsPublishDate: examYear.resultsPublishDate 
+        ? (typeof examYear.resultsPublishDate === 'string' ? new Date(examYear.resultsPublishDate) : examYear.resultsPublishDate)
+        : undefined,
+    };
+    
+    // Remove undefined values
+    Object.keys(processedData).forEach(key => {
+      if (processedData[key as keyof typeof processedData] === undefined) {
+        delete processedData[key as keyof typeof processedData];
+      }
+    });
+    
+    const [updated] = await db.update(examYears).set(processedData).where(eq(examYears.id, id)).returning();
     return updated;
   }
 
