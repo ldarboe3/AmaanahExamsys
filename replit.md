@@ -7,6 +7,17 @@ A comprehensive examination management system for managing countrywide Arabic & 
 The MVP is complete with all core features implemented and verified. PDF generation system for certificates and transcripts is fully functional with Arabic/English bilingual support, QR code verification, and gender-specific templates.
 
 ## Recent Changes (December 2024)
+- **School Profile Management**: Full school profile editing for school admins
+  - Editable fields: school name, registrar name, phone, address, primary school type, school types, region, cluster
+  - Document upload system: registration certificate, land ownership, operational license
+  - Multer-based file handling with 10MB limit, PDF/JPG/PNG support
+  - Object storage integration for document persistence
+  - Backend API endpoints: `GET/POST /api/school/profile`, `POST /api/school/documents/upload`, `POST /api/school/documents/delete`
+  - Bilingual UI (English/Arabic) with sidebar navigation link
+- **Student Dashboard Grade Tabs**: Dynamic grade-based tabs on Students page
+  - Tabs populated from exam year's selected grades (e.g., grades 3, 6 for LBS)
+  - School type structure: LBS (3,6), BCS (3,6,9), UBS (9), SSS (12), QM (3,6,9,12), ECD (none)
+  - Professional Tab component UI instead of buttons
 - **Resend Verification Email Feature**: Admin tool to resend school verification emails
   - Added "Resend Verification Email" button in Schools management dropdown
   - Only appears for pending schools without verified emails

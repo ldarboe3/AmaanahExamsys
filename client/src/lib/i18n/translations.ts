@@ -28,6 +28,7 @@ export const translations = {
       settings: 'Settings',
       examCenter: 'Exam Center',
       websiteManagement: 'Website Management',
+      schoolProfile: 'School Profile',
     },
     user: {
       profileSettings: 'Profile Settings',
@@ -608,6 +609,7 @@ export const translations = {
       settings: 'الإعدادات',
       examCenter: 'مركز الامتحان',
       websiteManagement: 'إدارة الموقع',
+      schoolProfile: 'ملف المدرسة',
     },
     user: {
       profileSettings: 'إعدادات الملف الشخصي',

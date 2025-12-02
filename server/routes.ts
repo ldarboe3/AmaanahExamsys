@@ -29,6 +29,31 @@ import {
   generateInvoiceNumber,
 } from "./emailService";
 import bcrypt from "bcrypt";
+import multer from "multer";
+
+const schoolDocUploadConfig = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req: any, file, cb) => {
+    // Accept both image/jpeg and image/jpg (some browsers use image/jpg)
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    const normalizedMimetype = file.mimetype === 'image/jpg' ? 'image/jpeg' : file.mimetype;
+    if (allowedTypes.includes(normalizedMimetype)) {
+      cb(null, true);
+    } else {
+      // Mark file as rejected for custom error handling
+      req.fileRejected = true;
+      req.fileRejectedReason = 'Invalid file type. Only PDF, JPG, and PNG files are allowed.';
+      cb(null, false);
+    }
+  },
+});
+
+// Configure multer to handle both file and docType text field
+const schoolDocUpload = schoolDocUploadConfig.fields([
+  { name: 'file', maxCount: 1 },
+  { name: 'docType', maxCount: 1 }
+]);
 
 declare module "express-session" {
   interface SessionData {
@@ -1216,6 +1241,269 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       await storage.deleteSchool(parseInt(req.params.id));
       res.json({ message: "Deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // School Profile API (for school admins)
+  app.get("/api/school/profile", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'school_admin') {
+        return res.status(403).json({ message: "Only school admins can access this" });
+      }
+      if (!user.schoolId) {
+        return res.status(404).json({ message: "No school associated with this account" });
+      }
+      const school = await storage.getSchool(user.schoolId);
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      res.json(school);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/school/profile", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'school_admin') {
+        return res.status(403).json({ message: "Only school admins can access this" });
+      }
+      if (!user.schoolId) {
+        return res.status(404).json({ message: "No school associated with this account" });
+      }
+
+      // Define valid school types
+      const validSchoolTypes = ['LBS', 'UBS', 'BCS', 'SSS', 'ECD', 'QM'] as const;
+      
+      // Validate input using Zod with enum validation
+      const updateProfileSchema = z.object({
+        name: z.string().min(3, "School name must be at least 3 characters"),
+        registrarName: z.string().min(2, "Registrar name is required"),
+        phone: z.string().min(7, "Phone number is required"),
+        address: z.string().min(5, "Address is required"),
+        schoolType: z.enum(validSchoolTypes, { 
+          errorMap: () => ({ message: `School type must be one of: ${validSchoolTypes.join(', ')}` }) 
+        }),
+        schoolTypes: z.array(z.enum(validSchoolTypes)).optional().default([]),
+        regionId: z.number().int().positive().nullable().optional(),
+        clusterId: z.number().int().positive().nullable().optional(),
+      });
+
+      const validation = updateProfileSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: fromZodError(validation.error).message 
+        });
+      }
+
+      const { name, registrarName, phone, address, schoolType, schoolTypes, regionId, clusterId } = validation.data;
+      
+      // Validate cluster belongs to selected region if both are provided
+      if (clusterId && regionId) {
+        const cluster = await storage.getCluster(clusterId);
+        if (!cluster) {
+          return res.status(400).json({ message: "Selected cluster does not exist" });
+        }
+        if (cluster.regionId !== regionId) {
+          return res.status(400).json({ message: "Selected cluster does not belong to the selected region" });
+        }
+      }
+      
+      const school = await storage.updateSchool(user.schoolId, {
+        name,
+        registrarName,
+        phone,
+        address,
+        schoolType,
+        schoolTypes: schoolTypes || [],
+        regionId: regionId || null,
+        clusterId: clusterId || null,
+      });
+
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+
+      // Log the action
+      await storage.createAuditLog({
+        action: 'school_profile_updated',
+        entityType: 'school',
+        entityId: school.id.toString(),
+        userId: user.id,
+        details: { changes: req.body },
+      });
+
+      res.json(school);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Multer error handling wrapper for school document uploads
+  const handleSchoolDocUpload = (req: any, res: any, next: any) => {
+    schoolDocUpload(req, res, (err: any) => {
+      if (err) {
+        // Handle Multer errors (file size, etc.)
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ message: "File is too large. Maximum size is 10MB." });
+        }
+        if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+          return res.status(400).json({ message: "Unexpected file field. Use 'file' as the field name." });
+        }
+        return res.status(400).json({ message: err.message || "File upload failed." });
+      }
+      next();
+    });
+  };
+
+  // School Document Upload API - using multer for proper multipart parsing
+  app.post("/api/school/documents/upload", isAuthenticated, handleSchoolDocUpload, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'school_admin') {
+        return res.status(403).json({ message: "Only school admins can upload documents" });
+      }
+      if (!user.schoolId) {
+        return res.status(404).json({ message: "No school associated with this account" });
+      }
+
+      // Check if file was rejected by fileFilter (invalid type)
+      if (req.fileRejected) {
+        return res.status(400).json({ 
+          message: req.fileRejectedReason || "Invalid file type. Only PDF, JPG, and PNG files are allowed."
+        });
+      }
+
+      // Get file from multer.fields() result
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const file = files?.file?.[0];
+      if (!file) {
+        return res.status(400).json({ 
+          message: "No file uploaded. Please select a PDF, JPG, or PNG file under 10MB." 
+        });
+      }
+
+      // Validate docType from form data
+      const docType = req.body.docType;
+      const validDocTypes = ['registrationCertificate', 'landOwnership', 'operationalLicense'];
+      if (!docType || !validDocTypes.includes(docType)) {
+        return res.status(400).json({ 
+          message: `Invalid document type. Must be one of: ${validDocTypes.join(', ')}` 
+        });
+      }
+
+      const { ObjectStorageService } = await import("./objectStorage");
+      const objectStorageService = new ObjectStorageService();
+
+      // Get upload URL from object storage
+      let uploadURL: string;
+      let objectPath: string;
+      try {
+        const result = await objectStorageService.getObjectEntityUploadURL(file.originalname);
+        uploadURL = result.uploadURL;
+        objectPath = result.objectPath;
+      } catch (urlError: any) {
+        console.error("Failed to get upload URL:", urlError);
+        return res.status(500).json({ message: "Failed to prepare file upload. Please try again." });
+      }
+
+      // Upload file buffer to object storage
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: file.buffer,
+        headers: {
+          'Content-Type': file.mimetype,
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        console.error("Object storage upload failed:", uploadResponse.status, uploadResponse.statusText);
+        return res.status(500).json({ message: "Failed to upload file to storage. Please try again." });
+      }
+
+      // Set ACL policy to make file publicly accessible
+      let publicPath: string;
+      try {
+        publicPath = await objectStorageService.trySetObjectEntityAclPolicy(
+          uploadURL,
+          { owner: user.id, visibility: 'public' }
+        );
+        if (!publicPath) {
+          throw new Error("ACL policy returned empty path");
+        }
+      } catch (aclError: any) {
+        console.error("Failed to set ACL policy:", aclError);
+        return res.status(500).json({ message: "File uploaded but failed to make it accessible. Please try again." });
+      }
+
+      // Update school with document URL
+      const updateData: Record<string, string | null> = {};
+      updateData[docType] = publicPath;
+      
+      const school = await storage.updateSchool(user.schoolId, updateData);
+      if (!school) {
+        return res.status(500).json({ message: "Failed to update school record with document URL" });
+      }
+
+      // Log the action
+      await storage.createAuditLog({
+        action: 'school_document_uploaded',
+        entityType: 'school',
+        entityId: user.schoolId.toString(),
+        userId: user.id,
+        details: { docType, fileName: file.originalname, fileSize: file.size },
+      });
+
+      res.json({ success: true, path: publicPath, school });
+    } catch (error: any) {
+      console.error("Document upload error:", error);
+      res.status(500).json({ message: error.message || "An unexpected error occurred during upload" });
+    }
+  });
+
+  app.post("/api/school/documents/delete", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'school_admin') {
+        return res.status(403).json({ message: "Only school admins can delete documents" });
+      }
+      if (!user.schoolId) {
+        return res.status(404).json({ message: "No school associated with this account" });
+      }
+
+      // Validate docType using Zod
+      const deleteDocSchema = z.object({
+        docType: z.enum(['registrationCertificate', 'landOwnership', 'operationalLicense']),
+      });
+
+      const validation = deleteDocSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid document type. Must be registrationCertificate, landOwnership, or operationalLicense" });
+      }
+
+      const { docType } = validation.data;
+
+      // Update school to remove document URL
+      const updateData: Record<string, string | null> = {};
+      updateData[docType] = null;
+      
+      const school = await storage.updateSchool(user.schoolId, updateData);
+
+      // Log the action
+      await storage.createAuditLog({
+        action: 'school_document_deleted',
+        entityType: 'school',
+        entityId: user.schoolId.toString(),
+        userId: user.id,
+        details: { docType },
+      });
+
+      res.json({ success: true, school });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
