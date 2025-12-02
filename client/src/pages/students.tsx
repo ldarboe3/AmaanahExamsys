@@ -60,6 +60,8 @@ import {
   BookOpen,
   ClipboardList,
   Clock,
+  FileText,
+  CreditCard,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -175,6 +177,8 @@ export default function Students() {
   const [selectedGrade, setSelectedGrade] = useState<number | null>(null);
   const [countdown, setCountdown] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
+  const [showInvoiceSummary, setShowInvoiceSummary] = useState(false);
+  const [generatedInvoice, setGeneratedInvoice] = useState<any>(null);
   
   const isSchoolAdmin = user?.role === 'school_admin';
   const canApproveStudents = user?.role === 'super_admin' || user?.role === 'examination_admin';
@@ -228,7 +232,7 @@ export default function Students() {
       setUploadProgress(100);
       return response;
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
       toast({
         title: isRTL ? "تم الرفع بنجاح" : "Upload Successful",
         description: isRTL 
@@ -239,6 +243,19 @@ export default function Students() {
       setUploadFile(null);
       setUploadProgress(0);
       invalidateStudentQueries();
+      
+      // Auto-generate/update invoice for school admin after upload
+      if (isSchoolAdmin) {
+        try {
+          const invoiceResult = await apiRequest('POST', '/api/invoices/auto-generate', {});
+          if (invoiceResult?.invoice) {
+            setShowInvoiceSummary(true);
+            setGeneratedInvoice(invoiceResult);
+          }
+        } catch (error) {
+          console.log('Invoice generation info:', error);
+        }
+      }
     },
     onError: (error: any) => {
       toast({
@@ -1327,6 +1344,86 @@ export default function Students() {
               ) : (
                 isRTL ? "رفع والتحقق" : "Upload & Validate"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invoice Summary Dialog */}
+      <Dialog open={showInvoiceSummary} onOpenChange={setShowInvoiceSummary}>
+        <DialogContent dir={isRTL ? "rtl" : "ltr"} className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              {isRTL ? "ملخص الفاتورة" : "Invoice Summary"}
+            </DialogTitle>
+            <DialogDescription>
+              {isRTL 
+                ? "تم حساب الفاتورة تلقائياً بناءً على عدد الطلاب المسجلين"
+                : "Invoice has been automatically calculated based on registered students"}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {generatedInvoice?.invoice && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{isRTL ? "رقم الفاتورة" : "Invoice Number"}</span>
+                  <span className="font-mono">{generatedInvoice.invoice.invoiceNumber}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{isRTL ? "إجمالي الطلاب" : "Total Students"}</span>
+                  <span className="font-semibold">{generatedInvoice.invoice.totalStudents}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{isRTL ? "الرسوم لكل طالب" : "Fee per Student"}</span>
+                  <span>GMD {parseFloat(generatedInvoice.invoice.feePerStudent || 0).toFixed(2)}</span>
+                </div>
+              </div>
+
+              {generatedInvoice.items?.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">{isRTL ? "تفاصيل حسب الصف" : "Breakdown by Grade"}</h4>
+                  <div className="bg-muted/30 rounded-lg divide-y">
+                    {generatedInvoice.items.map((item: any) => (
+                      <div key={item.grade} className="flex items-center justify-between p-3 text-sm">
+                        <span>{getGradeLabel(item.grade, isRTL)}</span>
+                        <span className="text-muted-foreground">
+                          {item.studentCount} × GMD {parseFloat(item.feePerStudent).toFixed(2)} = 
+                          <span className="font-medium text-foreground ms-1">GMD {parseFloat(item.subtotal).toFixed(2)}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-lg">{isRTL ? "المبلغ الإجمالي" : "Total Amount"}</span>
+                  <span className="font-bold text-2xl text-primary">
+                    GMD {parseFloat(generatedInvoice.invoice.totalAmount || 0).toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {isRTL 
+                    ? "يرجى الانتقال إلى صفحة المدفوعات لإتمام عملية الدفع"
+                    : "Please proceed to the Payments page to complete your payment"}
+                </p>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowInvoiceSummary(false)}>
+              {isRTL ? "إغلاق" : "Close"}
+            </Button>
+            <Button onClick={() => {
+              setShowInvoiceSummary(false);
+              window.location.href = '/payments';
+            }} data-testid="button-go-to-payments">
+              <CreditCard className="w-4 h-4 me-2" />
+              {isRTL ? "الانتقال إلى المدفوعات" : "Go to Payments"}
             </Button>
           </DialogFooter>
         </DialogContent>
