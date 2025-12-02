@@ -1,7 +1,7 @@
 // AgentMail Email Service for Amaanah Exam System
 // Handles verification emails, notifications, and system communications
 
-import { AgentMail } from 'agentmail';
+import { AgentMailClient } from 'agentmail';
 import crypto from 'crypto';
 
 let connectionSettings: any;
@@ -37,8 +37,7 @@ async function getCredentials() {
 // WARNING: Never cache this client - tokens expire
 export async function getAgentMailClient() {
   const { apiKey } = await getCredentials();
-  return new AgentMail({
-    baseUrl: "https://api.agentmail.to",
+  return new AgentMailClient({
     apiKey: apiKey
   });
 }
@@ -86,8 +85,14 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     const client = await getAgentMailClient();
     
     // Create or get an inbox for sending
-    const inboxes = await client.inboxes.list();
-    let inbox = inboxes.inboxes?.[0];
+    const inboxesResponse = await client.inboxes.list();
+    let inbox: any = null;
+    
+    // Iterate through paginated results
+    for await (const item of inboxesResponse) {
+      inbox = item;
+      break;
+    }
     
     if (!inbox) {
       // Create a new inbox if none exists
@@ -97,8 +102,8 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       });
     }
 
-    // Send the email
-    await client.messages.send(inbox.id!, {
+    // Send the email using inbox messages
+    await client.inboxes.messages.send(inbox.inbox_id, {
       to: [options.to],
       subject: options.subject,
       body: options.htmlBody,
