@@ -85,12 +85,12 @@ const getGradeLabel = (grade: number, isRTL: boolean) => {
 // School type to grade range mapping
 // Note: ECD students typically don't have numeric grades, so we use a special marker
 const SCHOOL_TYPE_GRADES: Record<string, { min: number | null; max: number | null; label: { en: string; ar: string } }> = {
-  LBS: { min: 1, max: 6, label: { en: "Lower Basic (1-6)", ar: "الأساسي الأدنى (1-6)" } },
-  UBS: { min: 7, max: 9, label: { en: "Upper Basic (7-9)", ar: "الأساسي الأعلى (7-9)" } },
-  BCS: { min: 1, max: 9, label: { en: "Basic Cycle (1-9)", ar: "الدورة الأساسية (1-9)" } },
-  SSS: { min: 10, max: 12, label: { en: "Senior Secondary (10-12)", ar: "الثانوية العليا (10-12)" } },
-  Madrassa: { min: 1, max: 12, label: { en: "Madrassa (All Grades)", ar: "المدرسة (جميع الصفوف)" } },
-  ECD: { min: null, max: null, label: { en: "Early Childhood (Pre-K)", ar: "الطفولة المبكرة" } },
+  LBS: { min: 1, max: 6, label: { en: "Lower Basic School (1-6)", ar: "ابتدائي (1-6)" } },
+  UBS: { min: 7, max: 9, label: { en: "Upper Basic School (7-9)", ar: "إعدادي (7-9)" } },
+  BCS: { min: 1, max: 9, label: { en: "Basic Cycle School (1-9)", ar: "ابتدائي وإعدادي (1-9)" } },
+  SSS: { min: 10, max: 12, label: { en: "Senior Secondary School (10-12)", ar: "ثانوي (10-12)" } },
+  QM: { min: 1, max: 12, label: { en: "Quranic Memorization (All Grades)", ar: "تحفيظ القرآن الكريم (جميع الصفوف)" } },
+  ECD: { min: null, max: null, label: { en: "Early Childhood Development (Pre-K)", ar: "روضة" } },
 };
 
 // Get grades for a school type tab filter
@@ -415,11 +415,11 @@ export default function Students() {
                 {isRTL ? SCHOOL_TYPE_GRADES.SSS.label.ar : SCHOOL_TYPE_GRADES.SSS.label.en}
               </TabsTrigger>
               <TabsTrigger 
-                value="Madrassa" 
+                value="QM" 
                 className="text-xs sm:text-sm px-3 py-1.5"
-                data-testid="tab-madrassa"
+                data-testid="tab-qm"
               >
-                {isRTL ? SCHOOL_TYPE_GRADES.Madrassa.label.ar : SCHOOL_TYPE_GRADES.Madrassa.label.en}
+                {isRTL ? SCHOOL_TYPE_GRADES.QM.label.ar : SCHOOL_TYPE_GRADES.QM.label.en}
               </TabsTrigger>
               <TabsTrigger 
                 value="ECD" 
