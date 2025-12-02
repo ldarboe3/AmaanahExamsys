@@ -54,6 +54,7 @@ import {
   Calendar,
   Hash,
   GraduationCap,
+  Loader2,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -152,6 +153,49 @@ export default function Students() {
   const [selectedStudent, setSelectedStudent] = useState<StudentWithRelations | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+
+  // Bulk upload mutation
+  const bulkUploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      
+      const students = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        return {
+          firstName: values[headers.indexOf('firstname')] || '',
+          lastName: values[headers.indexOf('lastname')] || '',
+          middleName: values[headers.indexOf('middlename')] || '',
+          dateOfBirth: values[headers.indexOf('dateofbirth')] || undefined,
+          placeOfBirth: values[headers.indexOf('placeofbirth')] || undefined,
+          gender: values[headers.indexOf('gender')] || '',
+          grade: parseInt(values[headers.indexOf('grade')] || '0') || 0,
+        };
+      });
+
+      return apiRequest('POST', '/api/students/bulk', { students });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: isRTL ? "تم الرفع بنجاح" : "Upload Successful",
+        description: isRTL 
+          ? `تم إضافة ${data.created} طالب`
+          : `Added ${data.created} students`,
+      });
+      setShowUploadDialog(false);
+      setUploadFile(null);
+      invalidateStudentQueries();
+    },
+    onError: (error: any) => {
+      toast({
+        title: isRTL ? "خطأ في الرفع" : "Upload Failed",
+        description: error.message || (isRTL ? "فشل رفع الملف" : "Failed to upload file"),
+        variant: "destructive",
+      });
+    },
+  });
 
   // Compute effective grade filter - ignore gradeFilter when a tab is active
   const effectiveGradeFilter = schoolTypeTab === "all" ? gradeFilter : "all";
@@ -789,29 +833,43 @@ export default function Students() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
+            <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+              onClick={() => document.getElementById('file-input')?.click()}>
               <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
               <p className="text-sm text-muted-foreground mb-2">
-                {isRTL ? "اسحب وأفلت ملف CSV هنا، أو انقر للتصفح" : "Drag and drop your CSV file here, or click to browse"}
+                {uploadFile ? uploadFile.name : (isRTL ? "اسحب وأفلت ملف CSV هنا، أو انقر للتصفح" : "Drag and drop your CSV file here, or click to browse")}
               </p>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" type="button">
                 {isRTL ? "اختر ملف" : "Choose File"}
               </Button>
+              <input
+                id="file-input"
+                type="file"
+                accept=".csv"
+                hidden
+                onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+              />
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">{isRTL ? "هل تحتاج إلى القالب؟" : "Need the template?"}</span>
-              <Button variant="ghost" size="sm" className="h-auto p-0 text-primary underline-offset-4 hover:underline">
+              <Button variant="ghost" size="sm" className="h-auto p-0 text-primary underline-offset-4 hover:underline"
+                onClick={() => window.open('/api/templates/students')}>
                 <Download className="w-4 h-4 me-1" />
                 {isRTL ? "تحميل قالب CSV" : "Download CSV Template"}
               </Button>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>
+            <Button variant="outline" onClick={() => { setShowUploadDialog(false); setUploadFile(null); }}>
               {t.common.cancel}
             </Button>
-            <Button disabled>
-              {isRTL ? "رفع والتحقق" : "Upload & Validate"}
+            <Button disabled={!uploadFile || bulkUploadMutation.isPending}
+              onClick={() => uploadFile && bulkUploadMutation.mutate(uploadFile)}>
+              {bulkUploadMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 me-2 animate-spin" />{isRTL ? "جاري الرفع..." : "Uploading..."}</>
+              ) : (
+                isRTL ? "رفع والتحقق" : "Upload & Validate"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
