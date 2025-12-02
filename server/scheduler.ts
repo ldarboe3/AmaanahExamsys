@@ -3,10 +3,12 @@ import {
   sendWeeklyRegistrationReminder,
   sendUrgentRegistrationReminder,
 } from "./emailService";
+import { notifyRegistrationDeadlineApproaching } from "./notificationService";
 
 let schedulerInterval: NodeJS.Timeout | null = null;
 let lastWeeklyRun: Date | null = null;
 let lastDailyRun: Date | null = null;
+let lastInAppNotificationDate: string | null = null;
 
 async function sendScheduledReminders(baseUrl: string) {
   try {
@@ -46,6 +48,18 @@ async function sendScheduledReminders(baseUrl: string) {
 
     console.log(`[Scheduler] Sending ${isUrgent ? 'urgent daily' : 'weekly'} registration reminders...`);
 
+    // Send in-app notifications (once per day max)
+    if (lastInAppNotificationDate !== today) {
+      await notifyRegistrationDeadlineApproaching(
+        activeExamYear.id,
+        activeExamYear.name,
+        daysRemaining,
+        registrationEndDate
+      );
+      lastInAppNotificationDate = today;
+    }
+
+    // Send email notifications
     const approvedSchools = await storage.getSchoolsByStatus('approved');
     let successCount = 0;
     let failCount = 0;

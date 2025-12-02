@@ -448,6 +448,8 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'school_approved',
   'student_approved',
   'exam_reminder',
+  'exam_year_created',
+  'action_required',
   'system_alert'
 ]);
 
