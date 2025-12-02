@@ -341,7 +341,7 @@ export default function Payments() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Invoice Summary */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-muted/50 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <Users className="w-4 h-4 text-muted-foreground" />
@@ -349,19 +349,41 @@ export default function Payments() {
                     </div>
                     <p className="text-2xl font-semibold">{invoice.totalStudents}</p>
                   </div>
-                  <div className="bg-muted/50 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <GraduationCap className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">{isRTL ? "الرسوم لكل طالب" : "Fee per Student"}</span>
-                    </div>
-                    <p className="text-2xl font-semibold">{formatCurrency(invoice.feePerStudent)}</p>
-                  </div>
                   <div className="bg-primary/10 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <DollarSign className="w-4 h-4 text-primary" />
                       <span className="text-sm text-muted-foreground">{isRTL ? "المبلغ الإجمالي" : "Total Amount"}</span>
                     </div>
                     <p className="text-2xl font-bold text-primary">{formatCurrency(invoice.totalAmount)}</p>
+                  </div>
+                </div>
+
+                {/* Fee Breakdown - Three Fee Types */}
+                <div className="border rounded-lg p-4">
+                  <h4 className="font-medium mb-3">{isRTL ? "تفاصيل الرسوم لكل طالب" : "Fee Breakdown per Student"}</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{isRTL ? "رسوم التسجيل" : "Registration Fee"}</span>
+                      <span className="font-medium">{formatCurrency(invoice.feePerStudent)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{isRTL ? "رسوم الشهادة" : "Certificate Fee"}</span>
+                      <span className="font-medium">{formatCurrency((invoice as any).certificateFee || '50.00')}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{isRTL ? "رسوم كشف الدرجات" : "Transcript Fee"}</span>
+                      <span className="font-medium">{formatCurrency((invoice as any).transcriptFee || '25.00')}</span>
+                    </div>
+                    <div className="border-t pt-2 mt-2 flex items-center justify-between">
+                      <span className="font-medium">{isRTL ? "إجمالي لكل طالب" : "Total per Student"}</span>
+                      <span className="font-semibold text-primary">
+                        {formatCurrency(
+                          (parseFloat(invoice.feePerStudent || '0') + 
+                           parseFloat((invoice as any).certificateFee || '50') + 
+                           parseFloat((invoice as any).transcriptFee || '25')).toString()
+                        )}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -790,14 +812,37 @@ export default function Payments() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground">{isRTL ? "إجمالي الطلاب" : "Total Students"}</p>
-                    <p className="font-medium">{selectedInvoice.totalStudents}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">{isRTL ? "الرسوم لكل طالب" : "Fee per Student"}</p>
-                    <p className="font-medium">{formatCurrency(selectedInvoice.feePerStudent)}</p>
+                <div>
+                  <p className="text-xs text-muted-foreground">{isRTL ? "إجمالي الطلاب" : "Total Students"}</p>
+                  <p className="font-medium">{selectedInvoice.totalStudents}</p>
+                </div>
+
+                {/* Fee Breakdown per Student */}
+                <div className="p-3 border rounded-md bg-muted/30">
+                  <p className="text-xs text-muted-foreground mb-2">{isRTL ? "تفاصيل الرسوم لكل طالب" : "Fee Breakdown per Student"}</p>
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{isRTL ? "رسوم التسجيل" : "Registration"}</span>
+                      <span>{formatCurrency(selectedInvoice.feePerStudent)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{isRTL ? "الشهادة" : "Certificate"}</span>
+                      <span>{formatCurrency((selectedInvoice as any).certificateFee || '50.00')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{isRTL ? "كشف الدرجات" : "Transcript"}</span>
+                      <span>{formatCurrency((selectedInvoice as any).transcriptFee || '25.00')}</span>
+                    </div>
+                    <div className="border-t pt-1.5 mt-1.5 flex justify-between font-medium">
+                      <span>{isRTL ? "المجموع" : "Total"}</span>
+                      <span className="text-primary">
+                        {formatCurrency(
+                          (parseFloat(selectedInvoice.feePerStudent || '0') + 
+                           parseFloat((selectedInvoice as any).certificateFee || '50') + 
+                           parseFloat((selectedInvoice as any).transcriptFee || '25')).toString()
+                        )}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
