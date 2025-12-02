@@ -108,15 +108,19 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       });
     }
 
+    // Construct the from address from the inbox
+    const fromAddress = `${inbox.username}@${inbox.domain}`;
+
     // Send the email using inbox messages with correct API parameters
     await client.inboxes.messages.send(inbox.inbox_id, {
       to: [options.to],
+      from: fromAddress,
       subject: options.subject,
       text: options.textBody || options.htmlBody.replace(/<[^>]*>/g, ''),
       html: options.htmlBody,
     });
 
-    console.log(`Email sent successfully to ${options.to}`);
+    console.log(`Email sent successfully to ${options.to} from ${fromAddress}`);
     return true;
   } catch (error) {
     console.error('Failed to send email:', error);
