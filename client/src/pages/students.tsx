@@ -61,6 +61,7 @@ import {
   Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Student, Region, Cluster, School as SchoolType } from "@shared/schema";
 
@@ -159,6 +160,7 @@ function GradeCardSkeleton() {
 export default function Students() {
   const { toast } = useToast();
   const { t, isRTL } = useLanguage();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [regionFilter, setRegionFilter] = useState<string>("all");
@@ -171,10 +173,29 @@ export default function Students() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedGrade, setSelectedGrade] = useState<number | null>(null);
   const [countdown, setCountdown] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
+  
+  const isSchoolAdmin = user?.role === 'school_admin';
+  
+  // Fetch school profile for school admins
+  const { data: schoolProfile } = useQuery<SchoolType>({
+    queryKey: ["/api/school/profile"],
+    enabled: isSchoolAdmin && !!user?.schoolId,
+  });
 
   // Bulk upload mutation
   const bulkUploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      // Validate required IDs before proceeding
+      const schoolId = isSchoolAdmin ? schoolProfile?.id : (schoolFilter !== "all" ? parseInt(schoolFilter) : null);
+      const examYearId = activeExamYear?.id;
+      
+      if (!schoolId) {
+        throw new Error(isRTL ? "يجب تحديد المدرسة" : "School must be selected");
+      }
+      if (!examYearId) {
+        throw new Error(isRTL ? "لا يوجد عام امتحاني نشط" : "No active exam year found");
+      }
+      
       setUploadProgress(10);
       const text = await file.text();
       
@@ -194,6 +215,8 @@ export default function Students() {
           placeOfBirth: values[headers.indexOf('placeofbirth')] || undefined,
           gender: values[headers.indexOf('gender')] || '',
           grade: selectedGrade || parseInt(values[headers.indexOf('grade')] || '0') || 0,
+          schoolId,
+          examYearId,
         };
       });
 
