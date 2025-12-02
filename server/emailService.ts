@@ -84,7 +84,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
     const client = await getAgentMailClient();
     
-    // Get or create an inbox
+    // Get existing inboxes
     let inboxes: any[] = [];
     try {
       const inboxesResponse = await client.inboxes.list();
@@ -101,39 +101,39 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
         }
       }
     } catch (listError: any) {
-      console.warn('Failed to list inboxes:', listError);
+      console.error('Failed to list inboxes:', listError?.message);
+      throw new Error('Unable to access email inboxes');
     }
 
-    let inbox = inboxes.length > 0 ? inboxes[0] : null;
+    if (!inboxes || inboxes.length === 0) {
+      throw new Error('No email inboxes available for sending');
+    }
+
+    const inbox = inboxes[0];
     
-    if (!inbox) {
-      // Try to create a new inbox
-      try {
-        inbox = await client.inboxes.create({ tag: 'amaanah-exams' });
-      } catch (createError: any) {
-        console.error('Failed to create inbox:', createError);
-        // Last resort: try to get inboxes again
-        try {
-          const retryResponse = await client.inboxes.list();
-          const retryInboxes = Array.isArray(retryResponse) ? retryResponse : retryResponse?.items || [];
-          if (retryInboxes.length > 0) {
-            inbox = retryInboxes[0];
-          }
-        } catch (retryError) {
-          console.error('Failed to retry list inboxes:', retryError);
-        }
-
-        if (!inbox) {
-          throw new Error('Unable to find or create inbox for sending emails');
-        }
-      }
+    // Construct a valid from address
+    let fromAddress = 'noreply@agentmail.to';
+    if (inbox.address) {
+      fromAddress = inbox.address;
+    } else if (inbox.username && inbox.domain) {
+      fromAddress = `${inbox.username}@${inbox.domain}`;
+    } else if (inbox.email) {
+      fromAddress = inbox.email;
     }
 
-    // Construct the from address
-    const fromAddress = inbox.address || `${inbox.username}@${inbox.domain}` || 'noreply@agentmail.to';
+    // Validate from address
+    if (!fromAddress || typeof fromAddress !== 'string' || !fromAddress.includes('@')) {
+      console.error('Invalid from address:', fromAddress);
+      throw new Error('Invalid email address for sending');
+    }
 
     // Send the email
-    await client.inboxes.messages.send(inbox.id || inbox.inbox_id, {
+    const inboxId = inbox.id || inbox.inbox_id;
+    if (!inboxId) {
+      throw new Error('Invalid inbox ID');
+    }
+
+    await client.inboxes.messages.send(inboxId, {
       to: [options.to],
       from: fromAddress,
       subject: options.subject,
