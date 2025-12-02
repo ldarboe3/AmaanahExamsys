@@ -2509,6 +2509,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       const puppeteer = (await import('puppeteer')).default;
+      const fs = (await import('fs')).default;
+      const path = (await import('path')).default;
+      
+      // Read logo and convert to base64
+      let logoBase64 = '';
+      try {
+        const logoPath = path.join(process.cwd(), 'attached_assets/Amana_Logo_1764714323051.PNG');
+        const logoBuffer = fs.readFileSync(logoPath);
+        logoBase64 = logoBuffer.toString('base64');
+      } catch (e) {
+        console.log('Logo file not found, using placeholder');
+      }
+      
+      // Get banking info from environment variables (with defaults)
+      const bankName = process.env.BANK_NAME || 'Guaranty Trust Bank (Gambia) Ltd';
+      const accountName = process.env.BANK_ACCOUNT_NAME || 'Amaanah Islamic Education Trust';
+      const accountNumber = process.env.BANK_ACCOUNT_NUMBER || '211-123456789-01';
       
       // Parse fee values
       const registrationFee = parseFloat(invoice.feePerStudent || '0');
@@ -2569,15 +2586,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               gap: 15px;
             }
             .logo {
-              width: 60px;
-              height: 60px;
+              width: 70px;
+              height: 70px;
+              object-fit: contain;
+            }
+            .logo-placeholder {
+              width: 70px;
+              height: 70px;
               background: #1E8F4D;
               border-radius: 50%;
               display: flex;
               align-items: center;
               justify-content: center;
               color: white;
-              font-size: 24px;
+              font-size: 28px;
               font-weight: bold;
             }
             .company-name {
@@ -2717,7 +2739,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           <div class="container">
             <div class="header">
               <div class="logo-section">
-                <div class="logo">A</div>
+                ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" class="logo" alt="Amaanah Logo" />` : '<div class="logo-placeholder">A</div>'}
                 <div>
                   <div class="company-name">Amaanah</div>
                   <div class="company-subtitle">Islamic Education Trust - The Gambia</div>
@@ -2741,7 +2763,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               <div class="info-block" style="text-align: right;">
                 <h3>Invoice Details</h3>
                 <p><strong>Invoice Date:</strong> ${issueDate}</p>
-                <p><strong>Exam Year:</strong> ${examYear?.name || 'N/A'}</p>
+                <p style="font-size: 16px; font-weight: bold; color: #1E8F4D;"><strong>Exam Year:</strong> ${examYear?.name || 'N/A'}</p>
                 <p><strong>Total Students:</strong> ${invoice.totalStudents}</p>
               </div>
             </div>
@@ -2795,9 +2817,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             ${invoice.status !== 'paid' ? `
             <div class="payment-info">
               <h3>Payment Instructions</h3>
-              <p><strong>Bank:</strong> Guaranty Trust Bank (Gambia) Ltd</p>
-              <p><strong>Account Name:</strong> Amaanah Islamic Education Trust</p>
-              <p><strong>Account Number:</strong> 211-123456789-01</p>
+              <p><strong>Bank:</strong> ${bankName}</p>
+              <p><strong>Account Name:</strong> ${accountName}</p>
+              <p><strong>Account Number:</strong> ${accountNumber}</p>
               <p style="margin-top: 10px;">Please upload your bank slip after payment for verification.</p>
             </div>
             ` : ''}

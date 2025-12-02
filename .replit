@@ -33,6 +33,10 @@ localPort = 39609
 externalPort = 4200
 
 [[ports]]
+localPort = 41285
+externalPort = 5000
+
+[[ports]]
 localPort = 45469
 externalPort = 3001
 
@@ -67,3 +71,6 @@ integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:1.0.
 
 [userenv.shared]
 FROM_EMAIL = "ceo@skynetinco.com"
+BANK_NAME = "Guaranty Trust Bank (Gambia) Ltd"
+BANK_ACCOUNT_NAME = "Amaanah Islamic Education Trust"
+BANK_ACCOUNT_NUMBER = "211-123456789-01"
