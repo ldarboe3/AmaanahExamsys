@@ -94,8 +94,17 @@ interface InvoiceWithRelations extends Invoice {
 interface SchoolInvoiceData {
   invoice: Invoice | null;
   items: InvoiceItem[];
-  examYear?: { name: string };
+  examYear?: { name: string; id?: number };
   message?: string;
+}
+
+interface SchoolInvoiceWithExamYear extends Invoice {
+  examYear?: {
+    id: number;
+    name: string;
+    isActive: boolean;
+  } | null;
+  isCurrentYear: boolean;
 }
 
 const getGradeLabel = (grade: number, isRTL: boolean) => {
@@ -161,11 +170,23 @@ export default function Payments() {
     enabled: !isSchoolAdmin,
   });
 
-  // For school admins: fetch only their invoice
+  // For school admins: fetch only their current invoice
   const { data: schoolInvoiceData, isLoading: isSchoolInvoiceLoading, refetch: refetchSchoolInvoice } = useQuery<SchoolInvoiceData>({
     queryKey: ["/api/school/invoice"],
     enabled: isSchoolAdmin,
   });
+
+  // For school admins: fetch all invoices including past ones
+  const { data: allSchoolInvoices, isLoading: isAllInvoicesLoading } = useQuery<SchoolInvoiceWithExamYear[]>({
+    queryKey: ["/api/school/invoices/all"],
+    enabled: isSchoolAdmin,
+  });
+
+  // Filter past invoices (not current year, excluding current invoice if it exists)
+  const currentInvoiceId = schoolInvoiceData?.invoice?.id;
+  const pastInvoices = allSchoolInvoices?.filter(inv => 
+    !inv.isCurrentYear && inv.id !== currentInvoiceId
+  ) || [];
 
   // Generate invoice mutation for school admins
   const generateInvoiceMutation = useMutation({
@@ -375,13 +396,21 @@ export default function Payments() {
             {/* Invoice Status Card */}
             <Card className={invoice.status === 'paid' ? 'border-chart-3' : invoice.status === 'pending' ? 'border-chart-5' : ''}>
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <Receipt className="w-5 h-5 text-primary" />
                       {isRTL ? "فاتورة رسوم التسجيل" : "Registration Fee Invoice"}
                     </CardTitle>
                     <CardDescription className="font-mono">{invoice.invoiceNumber}</CardDescription>
+                    {schoolInvoiceData?.examYear && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="outline" className="text-xs">
+                          <GraduationCap className="w-3 h-3 me-1" />
+                          {schoolInvoiceData.examYear.name}
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                   <Badge className={`${statusColors[invoice.status || 'pending']} text-sm`}>
                     <StatusIcon className="w-4 h-4 me-1" />
@@ -576,6 +605,85 @@ export default function Payments() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Past Invoices Section */}
+        {pastInvoices.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <FileText className="w-5 h-5 text-muted-foreground" />
+                {isRTL ? "الفواتير السابقة" : "Past Invoices"}
+              </CardTitle>
+              <CardDescription>
+                {isRTL ? "سجل الفواتير من سنوات الامتحانات السابقة" : "Invoice history from previous examination years"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{isRTL ? "رقم الفاتورة" : "Invoice Number"}</TableHead>
+                      <TableHead>{isRTL ? "سنة الامتحان" : "Examination Year"}</TableHead>
+                      <TableHead className="text-right">{isRTL ? "المبلغ" : "Amount"}</TableHead>
+                      <TableHead>{isRTL ? "الحالة" : "Status"}</TableHead>
+                      <TableHead className="text-right">{isRTL ? "الإجراءات" : "Actions"}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isAllInvoicesLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8">
+                          <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      pastInvoices.map((pastInvoice) => {
+                        const PastStatusIcon = statusIcons[pastInvoice.status || 'pending'];
+                        return (
+                          <TableRow key={pastInvoice.id} data-testid={`past-invoice-row-${pastInvoice.id}`}>
+                            <TableCell className="font-mono text-sm">{pastInvoice.invoiceNumber}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                <GraduationCap className="w-3 h-3 me-1" />
+                                {pastInvoice.examYear?.name || (isRTL ? "غير معروف" : "Unknown")}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(pastInvoice.totalAmount)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={`${statusColors[pastInvoice.status || 'pending']} text-xs`}>
+                                <PastStatusIcon className="w-3 h-3 me-1" />
+                                {getPaymentStatusLabel(pastInvoice.status || 'pending', isRTL)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDownloadInvoice(pastInvoice.id)}
+                                disabled={downloadingInvoice}
+                                data-testid={`button-download-past-invoice-${pastInvoice.id}`}
+                              >
+                                {downloadingInvoice ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Download className="w-4 h-4" />
+                                )}
+                                <span className="ms-1 hidden sm:inline">{isRTL ? "تحميل" : "Download"}</span>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }

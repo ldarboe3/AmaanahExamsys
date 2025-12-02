@@ -31,7 +31,7 @@ The system is built on a robust architecture featuring a React-based frontend, a
 ### Feature Specifications
 - **School Management**: Registration with email verification, profile management, school badge upload, and an invitation system for additional school administrators.
 - **Student Management**: CSV import, index number generation, and a 3-tier registration navigation workflow.
-- **Financial Management**: Three-tier fee structure (`feePerStudent`, `certificateFee`, `transcriptFee`), auto-invoice generation, bank slip upload, payment confirmation, and professional PDF invoice downloads.
+- **Financial Management**: Three-tier fee structure (`feePerStudent`, `certificateFee`, `transcriptFee`), auto-invoice generation, bank slip upload, payment confirmation, and professional PDF invoice downloads. School admin payments page shows current invoice with examination year badge and past invoices table with columns for invoice number, examination year, payment amount, status, and download button.
 - **Results & Certificates**: CSV upload for results, public result checker, PDF certificate and transcript generation with gender-specific templates and QR verification.
 - **Administrative Tools**: Comprehensive audit logging, advanced export functionalities (CSV), and role-based access control.
 - **Exam Management**: Examiner, subject, timetable, and exam center management.
