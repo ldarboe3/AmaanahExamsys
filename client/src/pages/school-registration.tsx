@@ -72,11 +72,12 @@ const regions = [
 ];
 
 const schoolTypes = [
-  "Madrassah",
-  "Tahfiz School",
-  "Islamic Secondary School",
-  "Islamic Primary School",
-  "Mixed (Islamic/Arabic)",
+  { value: "LBS", label: "Lower Basic School – ابتدائي" },
+  { value: "UBS", label: "Upper Basic School – إعدادي" },
+  { value: "BCS", label: "Basic Cycle School – ابتدائي وإعدادي" },
+  { value: "SSS", label: "Senior Secondary School – ثانوي" },
+  { value: "ECD", label: "Early Childhood Development – روضة" },
+  { value: "QM", label: "Quranic Memorization – تحفيظ القرآن الكريم" },
 ];
 
 const steps = [
@@ -270,7 +271,7 @@ export default function SchoolRegistration() {
                               </FormControl>
                               <SelectContent>
                                 {schoolTypes.map((type) => (
-                                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                                  <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>

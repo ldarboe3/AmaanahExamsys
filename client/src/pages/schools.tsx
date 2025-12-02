@@ -72,12 +72,12 @@ import type { School, Region, Cluster } from "@shared/schema";
 
 const getSchoolTypeLabel = (type: string, isRTL: boolean) => {
   const labels: Record<string, { en: string; ar: string }> = {
-    LBS: { en: "Lower Basic School", ar: "المدرسة الأساسية الدنيا" },
-    UBS: { en: "Upper Basic School", ar: "المدرسة الأساسية العليا" },
-    BCS: { en: "Basic Cycle School", ar: "مدرسة الدورة الأساسية" },
-    SSS: { en: "Senior Secondary School", ar: "المدرسة الثانوية العليا" },
-    Madrassa: { en: "Madrassa", ar: "مدرسة دينية" },
-    ECD: { en: "Early Childhood Development", ar: "تنمية الطفولة المبكرة" },
+    LBS: { en: "Lower Basic School", ar: "ابتدائي" },
+    UBS: { en: "Upper Basic School", ar: "إعدادي" },
+    BCS: { en: "Basic Cycle School", ar: "ابتدائي وإعدادي" },
+    SSS: { en: "Senior Secondary School", ar: "ثانوي" },
+    QM: { en: "Quranic Memorization", ar: "تحفيظ القرآن الكريم" },
+    ECD: { en: "Early Childhood Development", ar: "روضة" },
   };
   return isRTL ? labels[type]?.ar || type : labels[type]?.en || type;
 };
@@ -106,7 +106,7 @@ const getStatusLabel = (status: string, isRTL: boolean) => {
   return isRTL ? labels[status]?.ar || status : labels[status]?.en || status;
 };
 
-const SCHOOL_TYPES = ["LBS", "UBS", "BCS", "SSS", "Madrassa", "ECD"] as const;
+const SCHOOL_TYPES = ["LBS", "UBS", "BCS", "SSS", "QM", "ECD"] as const;
 
 const addSchoolSchema = z.object({
   name: z.string().min(3, "School name must be at least 3 characters"),
