@@ -195,13 +195,14 @@ export default function Students() {
     mutationFn: async (file: File) => {
       // Validate required IDs before proceeding
       const schoolId = isSchoolAdmin ? schoolProfile?.id : (schoolFilter !== "all" ? parseInt(schoolFilter) : null);
-      const examYearId = activeExamYear?.id;
+      // Use selected exam year or fallback to active exam year
+      const examYearId = selectedExamYear || activeExamYear?.id;
       
       if (!schoolId) {
         throw new Error(isRTL ? "يجب تحديد المدرسة" : "School must be selected");
       }
       if (!examYearId) {
-        throw new Error(isRTL ? "لا يوجد عام امتحاني نشط" : "No active exam year found");
+        throw new Error(isRTL ? "يجب اختيار السنة الامتحانية" : "Please select an examination year first");
       }
       
       setUploadProgress(10);
@@ -248,7 +249,7 @@ export default function Students() {
       // Auto-generate/update invoice for school admin after upload
       if (isSchoolAdmin) {
         try {
-          const invoiceResult = await apiRequest('POST', '/api/invoices/auto-generate', {});
+          const invoiceResult = await apiRequest('POST', '/api/invoices/auto-generate', {}) as any;
           if (invoiceResult?.invoice) {
             setShowInvoiceSummary(true);
             setGeneratedInvoice(invoiceResult);
@@ -268,12 +269,16 @@ export default function Students() {
     },
   });
 
-  // Memoize student query URL
+  // Memoize student query URL - scoped to selected exam year
   const studentsUrl = useMemo(() => {
     const queryParams = new URLSearchParams();
     
     if (statusFilter !== "all") {
       queryParams.set("status", statusFilter);
+    }
+    // Filter by selected exam year
+    if (selectedExamYear) {
+      queryParams.set("examYearId", selectedExamYear.toString());
     }
     // For school admins, always filter by their school
     if (isSchoolAdmin && schoolProfile?.id) {
@@ -295,12 +300,16 @@ export default function Students() {
     
     const queryString = queryParams.toString();
     return queryString ? `/api/students?${queryString}` : "/api/students";
-  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedGrade, isSchoolAdmin, schoolProfile?.id]);
+  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedGrade, selectedExamYear, isSchoolAdmin, schoolProfile?.id]);
 
-  // Fetch all students for counting (without grade filter)
+  // Fetch all students for counting (without grade filter) - scoped to selected exam year
   const allStudentsUrl = useMemo(() => {
     const queryParams = new URLSearchParams();
     if (statusFilter !== "all") queryParams.set("status", statusFilter);
+    // Filter by selected exam year
+    if (selectedExamYear) {
+      queryParams.set("examYearId", selectedExamYear.toString());
+    }
     // For school admins, always filter by their school
     if (isSchoolAdmin && schoolProfile?.id) {
       queryParams.set("schoolId", schoolProfile.id.toString());
@@ -311,7 +320,7 @@ export default function Students() {
     }
     const queryString = queryParams.toString();
     return queryString ? `/api/students?${queryString}` : "/api/students";
-  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, isSchoolAdmin, schoolProfile?.id]);
+  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedExamYear, isSchoolAdmin, schoolProfile?.id]);
 
   const { data: allStudents } = useQuery<StudentWithRelations[]>({
     queryKey: [allStudentsUrl],
@@ -330,12 +339,17 @@ export default function Students() {
     queryKey: ["/api/clusters"],
   });
 
-  // Fetch active exam year to get available grades
+  // Fetch all exam years
   const { data: examYears, isLoading: examYearsLoading } = useQuery({
     queryKey: ["/api/exam-years"],
   });
 
   const activeExamYear = (examYears as any[])?.find(ey => ey.isActive);
+  
+  // Get the currently selected exam year object
+  const selectedExamYearObj = selectedExamYear 
+    ? (examYears as any[])?.find(ey => ey.id === selectedExamYear)
+    : null;
   
   // Get all unique grades from school types as fallback
   const getAllGradesFromSchoolTypes = (): number[] => {
@@ -346,20 +360,50 @@ export default function Students() {
     return Array.from(allGrades).sort((a, b) => a - b);
   };
   
-  // Use active exam year grades if available, otherwise fallback to all school type grades
-  const availableGrades: number[] = activeExamYear?.grades?.length > 0 
-    ? activeExamYear.grades 
-    : getAllGradesFromSchoolTypes();
+  // Get grades based on school profile types (for school admins)
+  const getSchoolTypeGrades = (): number[] => {
+    if (!schoolProfile?.schoolTypes || schoolProfile.schoolTypes.length === 0) {
+      return getAllGradesFromSchoolTypes();
+    }
+    const gradeSet = new Set<number>();
+    schoolProfile.schoolTypes.forEach((type: string) => {
+      const config = SCHOOL_TYPE_GRADES[type];
+      if (config) {
+        config.grades.forEach(grade => gradeSet.add(grade));
+      }
+    });
+    return Array.from(gradeSet).sort((a, b) => a - b);
+  };
+  
+  // Use selected exam year grades, then school types, then all grades as fallback
+  const availableGrades: number[] = useMemo(() => {
+    // If we have a selected exam year, use its grades
+    if (selectedExamYearObj?.grades?.length > 0) {
+      // For school admins, filter by school type
+      const schoolTypes = schoolProfile?.schoolTypes;
+      if (isSchoolAdmin && schoolTypes && schoolTypes.length > 0) {
+        const schoolGrades = getSchoolTypeGrades();
+        return selectedExamYearObj.grades.filter((g: number) => schoolGrades.includes(g));
+      }
+      return selectedExamYearObj.grades;
+    }
+    // Fallback to school type grades for school admins
+    if (isSchoolAdmin) {
+      return getSchoolTypeGrades();
+    }
+    return getAllGradesFromSchoolTypes();
+  }, [selectedExamYearObj, isSchoolAdmin, schoolProfile?.schoolTypes]);
 
-  // Countdown timer for registration deadline
+  // Countdown timer for registration deadline (uses selected exam year)
   useEffect(() => {
-    if (!activeExamYear?.registrationEndDate) {
+    const examYear = selectedExamYearObj || activeExamYear;
+    if (!examYear?.registrationEndDate) {
       setCountdown(null);
       return;
     }
 
     const calculateCountdown = () => {
-      const endDate = new Date(activeExamYear.registrationEndDate);
+      const endDate = new Date(examYear.registrationEndDate);
       const now = new Date();
       const diff = endDate.getTime() - now.getTime();
 
@@ -380,7 +424,7 @@ export default function Students() {
     const interval = setInterval(calculateCountdown, 1000);
 
     return () => clearInterval(interval);
-  }, [activeExamYear?.registrationEndDate]);
+  }, [selectedExamYearObj?.registrationEndDate, activeExamYear?.registrationEndDate]);
 
   // Build school query URL based on region/cluster filters
   const schoolQueryParams = new URLSearchParams();
@@ -553,32 +597,203 @@ export default function Students() {
     });
   };
 
-  // Grade Dashboard View
-  const renderGradeDashboard = () => (
+  // TIER 1: Exam Year Dashboard View
+  const renderExamYearDashboard = () => (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{t.students.title}</h1>
           <p className="text-muted-foreground mt-1">
-            {isRTL ? "اختر الصف لإدارة تسجيلات الطلاب" : "Select a grade to manage student registrations"}
+            {isRTL ? "لوحة تسجيل الطلاب" : "Student Registration Dashboard"}
           </p>
         </div>
       </div>
 
-      {/* Active Exam Year Banner */}
-      {activeExamYear && (
-        <div className="bg-primary/10 border border-primary/20 rounded-md p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-primary" />
+      {/* Step 1 Instructions */}
+      <Card className="border-2 border-primary/20 bg-primary/5">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">
+              1
             </div>
             <div>
-              <p className="font-medium text-primary">
-                {isRTL ? "السنة الامتحانية النشطة" : "Active Exam Year"}
+              <h3 className="font-semibold text-primary">
+                {isRTL ? "الخطوة 1: اختر السنة الامتحانية" : "Step 1: Select Examination Year"}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {isRTL 
+                  ? "اختر السنة الامتحانية التي تريد تسجيل الطلاب فيها. كل سنة لها مواعيد تسجيل ورسوم مختلفة."
+                  : "Choose the examination year you want to register students for. Each year has different registration deadlines and fees."}
               </p>
-              <p className="text-sm text-primary/80">{activeExamYear.name}</p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Exam Year Cards */}
+      {examYearsLoading ? (
+        <GradeCardSkeleton />
+      ) : (examYears as any[])?.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {(examYears as any[]).map((examYear) => {
+            const isActive = examYear.isActive;
+            const hasDeadlinePassed = examYear.registrationEndDate && new Date(examYear.registrationEndDate) < new Date();
+            
+            return (
+              <Card 
+                key={examYear.id}
+                className={`hover-elevate active-elevate-2 cursor-pointer transition-all border-2 ${
+                  isActive ? 'border-primary/50 bg-primary/5' : 'border-muted'
+                } hover:shadow-lg`}
+                onClick={() => {
+                  setSelectedExamYear(examYear.id);
+                  setSelectedGrade(null); // Reset grade when changing exam year
+                }}
+                data-testid={`card-exam-year-${examYear.id}`}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`w-14 h-14 rounded-xl ${isActive ? 'bg-primary/20' : 'bg-muted'} flex items-center justify-center`}>
+                      <Calendar className={`w-7 h-7 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                    </div>
+                    {isActive && (
+                      <Badge className="bg-primary/10 text-primary">
+                        {isRTL ? "نشطة" : "Active"}
+                      </Badge>
+                    )}
+                    {hasDeadlinePassed && !isActive && (
+                      <Badge variant="secondary" className="bg-muted text-muted-foreground">
+                        {isRTL ? "مغلق" : "Closed"}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <h3 className="text-xl font-bold mb-2">{examYear.name}</h3>
+                  
+                  {examYear.registrationEndDate && (
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {isRTL ? "آخر موعد للتسجيل: " : "Registration Deadline: "}
+                      <span className={hasDeadlinePassed ? 'text-destructive' : 'text-foreground font-medium'}>
+                        {new Date(examYear.registrationEndDate).toLocaleDateString()}
+                      </span>
+                    </p>
+                  )}
+                  
+                  {examYear.feePerStudent && (
+                    <p className="text-sm text-muted-foreground">
+                      {isRTL ? "الرسوم لكل طالب: " : "Fee per Student: "}
+                      <span className="text-foreground font-medium">GMD {parseFloat(examYear.feePerStudent).toFixed(2)}</span>
+                    </p>
+                  )}
+                  
+                  {examYear.grades?.length > 0 && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        {isRTL ? "الصفوف المتاحة:" : "Available Grades:"}
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {examYear.grades.map((grade: number) => (
+                          <Badge key={grade} variant="outline" className="text-xs">
+                            {getGradeLabel(grade, isRTL)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">
+              {isRTL ? "لا توجد سنوات امتحانية" : "No Examination Years Available"}
+            </h3>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              {isRTL 
+                ? "يرجى الانتظار حتى يتم إنشاء سنة امتحانية جديدة من قبل إدارة الامتحانات"
+                : "Please wait until a new examination year is created by the examination administration"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+
+  // TIER 2: Grade Dashboard View (after exam year is selected)
+  const renderGradeDashboard = () => (
+    <div className="space-y-6">
+      {/* Header with Back Button */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => {
+              setSelectedExamYear(null);
+              setSelectedGrade(null); // Also reset grade when going back
+            }}
+            data-testid="button-back-to-exam-years"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
+              {selectedExamYearObj?.name || (isRTL ? "اختر الصف" : "Select Grade")}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {isRTL ? "الخطوة 2: اختر الصف لتسجيل الطلاب" : "Step 2: Select a grade to register students"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Step 2 Instructions */}
+      <Card className="border-2 border-chart-2/20 bg-chart-2/5">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-chart-2 text-white flex items-center justify-center font-bold text-sm shrink-0">
+              2
+            </div>
+            <div>
+              <h3 className="font-semibold text-chart-2">
+                {isRTL ? "الخطوة 2: اختر الصف الدراسي" : "Step 2: Select Grade Level"}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {isRTL 
+                  ? "اختر الصف الذي تريد تسجيل الطلاب فيه. الصفوف المعروضة تعتمد على نوع مدرستك والسنة الامتحانية المختارة."
+                  : "Choose the grade level you want to register students for. Grades shown depend on your school type and the selected exam year."}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Selected Exam Year Info */}
+      {selectedExamYearObj && (
+        <div className="bg-primary/10 border border-primary/20 rounded-md p-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium text-primary">
+                  {isRTL ? "السنة الامتحانية المختارة" : "Selected Exam Year"}
+                </p>
+                <p className="text-sm text-primary/80">{selectedExamYearObj.name}</p>
+              </div>
+            </div>
+            {selectedExamYearObj.registrationEndDate && (
+              <div className="text-sm">
+                <span className="text-muted-foreground">{isRTL ? "آخر موعد: " : "Deadline: "}</span>
+                <span className="font-medium">{new Date(selectedExamYearObj.registrationEndDate).toLocaleDateString()}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -672,8 +887,8 @@ export default function Students() {
             </h3>
             <p className="text-muted-foreground max-w-md mx-auto">
               {isRTL 
-                ? "يرجى التأكد من وجود سنة امتحانية نشطة مع صفوف محددة"
-                : "Please ensure there is an active exam year with grades configured"}
+                ? "لا توجد صفوف متاحة لنوع مدرستك في هذه السنة الامتحانية"
+                : "No grades are available for your school type in this exam year"}
             </p>
           </CardContent>
         </Card>
@@ -681,9 +896,10 @@ export default function Students() {
     </div>
   );
 
-  // Grade Detail View (with student list)
+  // TIER 3: Grade Detail View (with student list and upload)
   const renderGradeDetail = () => {
     const colors = getGradeColors(selectedGrade!);
+    const currentExamYear = selectedExamYearObj || activeExamYear;
     
     return (
       <div className="space-y-6">
@@ -703,11 +919,11 @@ export default function Students() {
                 {getGradeLabel(selectedGrade!, isRTL)}
               </h1>
               <p className="text-muted-foreground mt-1">
-                {isRTL ? "إدارة تسجيلات الطلاب والتحقق منها" : "Manage student registrations and validations"}
+                {currentExamYear?.name} - {isRTL ? "الخطوة 3: تسجيل الطلاب" : "Step 3: Register Students"}
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setShowUploadDialog(true)} data-testid="button-upload-csv">
               <Upload className="w-4 h-4 me-2" />
               {t.common.uploadCSV}
@@ -737,12 +953,45 @@ export default function Students() {
           </div>
         </div>
 
-        {/* Active Exam Year Banner */}
-        {activeExamYear && (
+        {/* Step 3 Instructions */}
+        <Card className="border-2 border-chart-3/20 bg-chart-3/5">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-chart-3 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                3
+              </div>
+              <div>
+                <h3 className="font-semibold text-chart-3">
+                  {isRTL ? "الخطوة 3: رفع قائمة الطلاب" : "Step 3: Upload Student List"}
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {isRTL 
+                    ? "قم بتحميل قالب CSV، أدخل بيانات الطلاب، ثم ارفع الملف. بعد الرفع سيتم احتساب الفاتورة تلقائياً."
+                    : "Download the CSV template, fill in student data, then upload the file. Your invoice will be calculated automatically after upload."}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Selected Exam Year Info */}
+        {currentExamYear && (
           <div className="bg-primary/10 border border-primary/20 rounded-md p-3">
-            <p className="text-sm font-medium text-primary">
-              {isRTL ? `السنة الامتحانية النشطة: ${activeExamYear.name}` : `Active Exam Year: ${activeExamYear.name}`}
-            </p>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-sm font-medium text-primary">
+                {isRTL ? `السنة الامتحانية: ${currentExamYear.name}` : `Exam Year: ${currentExamYear.name}`}
+              </p>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-muted-foreground">
+                  {getGradeLabel(selectedGrade!, isRTL)}
+                </span>
+                {currentExamYear.feePerStudent && (
+                  <span className="font-medium">
+                    GMD {parseFloat(currentExamYear.feePerStudent).toFixed(2)} / {isRTL ? "طالب" : "student"}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1178,7 +1427,11 @@ export default function Students() {
 
   return (
     <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
-      {selectedGrade === null ? renderGradeDashboard() : renderGradeDetail()}
+      {selectedExamYear === null 
+        ? renderExamYearDashboard() 
+        : selectedGrade === null 
+          ? renderGradeDashboard() 
+          : renderGradeDetail()}
 
       {/* Student Details Dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
