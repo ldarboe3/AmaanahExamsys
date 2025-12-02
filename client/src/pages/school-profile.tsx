@@ -351,6 +351,26 @@ export default function SchoolProfile() {
     },
   });
 
+  const cancelInvitationMutation = useMutation({
+    mutationFn: async (invitationId: number) => {
+      return apiRequest("DELETE", `/api/school/invitations/${invitationId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/school/invitations"] });
+      toast({
+        title: isRTL ? "تم إلغاء الدعوة" : "Invitation Cancelled",
+        description: isRTL ? "تم إلغاء الدعوة بنجاح" : "Invitation has been cancelled successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: isRTL ? "خطأ" : "Error",
+        description: error.message || (isRTL ? "فشل في إلغاء الدعوة" : "Failed to cancel invitation"),
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: ProfileFormData) => {
     updateProfileMutation.mutate(data);
   };
@@ -398,7 +418,7 @@ export default function SchoolProfile() {
   };
 
   const getInvitationStatusBadge = (invitation: SchoolInvitation) => {
-    if (invitation.status === "completed") {
+    if (invitation.isUsed) {
       return (
         <Badge variant="default" className="bg-green-600">
           <CheckCircle className="w-3 h-3 me-1" />
@@ -1022,7 +1042,11 @@ export default function SchoolProfile() {
                 <div className="space-y-3">
                   {invitations.map((invitation) => {
                     const isExpired = invitation.expiresAt && new Date(invitation.expiresAt) < new Date();
-                    const canResend = invitation.status === "pending" && isExpired;
+                    const canResend = !invitation.isUsed && isExpired;
+                    const canCancel = !invitation.isUsed;
+                    const displayName = invitation.firstName && invitation.lastName 
+                      ? `${invitation.firstName} ${invitation.lastName}` 
+                      : invitation.email;
                     
                     return (
                       <div 
@@ -1037,8 +1061,8 @@ export default function SchoolProfile() {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-medium">{invitation.invitedName}</p>
-                            <p className="text-sm text-muted-foreground">{invitation.invitedEmail}</p>
+                            <p className="font-medium">{displayName}</p>
+                            <p className="text-sm text-muted-foreground">{invitation.email}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1055,6 +1079,22 @@ export default function SchoolProfile() {
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
                                 <Send className="w-4 h-4" />
+                              )}
+                            </Button>
+                          )}
+                          {canCancel && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => cancelInvitationMutation.mutate(invitation.id)}
+                              disabled={cancelInvitationMutation.isPending}
+                              data-testid={`button-cancel-invitation-${invitation.id}`}
+                            >
+                              {cancelInvitationMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
                               )}
                             </Button>
                           )}
