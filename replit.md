@@ -7,6 +7,19 @@ A comprehensive examination management system for managing countrywide Arabic & 
 The MVP is complete with all core features implemented and verified. PDF generation system for certificates and transcripts is fully functional with Arabic/English bilingual support, QR code verification, and gender-specific templates.
 
 ## Recent Changes (December 2024)
+- **Auto-Invoice Generation System**: Automatic invoice calculation based on registered students
+  - `feePerStudent` field added to exam years for configurable registration fees
+  - Invoice items table stores per-grade breakdown (grade, count, fee, subtotal)
+  - Auto-generation triggered after CSV student upload for school admins
+  - Invoice summary dialog shows breakdown by grade after upload
+  - API endpoints: `/api/invoices/generate`, `/api/invoices/auto-generate`, `/api/invoices/:id/details`, `/api/school/invoice`
+  - Enhanced Payments page for school admins:
+    - View invoice with grade-by-grade breakdown
+    - Bank account details for payment
+    - Bank slip upload functionality with status tracking
+    - Processing status after slip upload pending admin verification
+  - Admin view continues showing all invoices across schools
+  - Bank slip upload endpoint: `/api/invoices/bank-slip`
 - **Role-Based Notification System**: Comprehensive in-app notification system
   - Notification service (`server/notificationService.ts`) with role-based targeting
   - Helper functions: `notifyUser`, `notifyUsersByRole`, `notifyAllSchoolAdmins`

@@ -64,6 +64,20 @@ const schoolDocUpload = schoolDocUploadConfig.fields([
   { name: 'docType', maxCount: 1 }
 ]);
 
+// Bank slip upload config
+const bankSlipUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit for bank slips
+  fileFilter: (req: any, file, cb) => {
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF, JPG, and PNG files are allowed.'));
+    }
+  },
+});
+
 declare module "express-session" {
   interface SessionData {
     userId?: string;
@@ -2488,6 +2502,67 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(404).json({ message: "Invoice not found" });
       }
       res.json(invoice);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Bank slip upload endpoint for school admins
+  app.post("/api/invoices/bank-slip", isAuthenticated, bankSlipUpload.single('file'), async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Only school admins and super admins can upload bank slips
+      if (user.role !== 'school_admin' && user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only school admins can upload bank slips" });
+      }
+      
+      const invoiceId = parseInt(req.body.invoiceId);
+      if (!invoiceId || isNaN(invoiceId)) {
+        return res.status(400).json({ message: "Valid invoiceId is required" });
+      }
+      
+      const invoice = await storage.getInvoice(invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      // Verify school admin owns this invoice
+      if (user.role === 'school_admin' && user.schoolId !== invoice.schoolId) {
+        return res.status(403).json({ message: "Not authorized to update this invoice" });
+      }
+      
+      // Prevent uploading slips for already paid invoices
+      if (invoice.status === 'paid') {
+        return res.status(400).json({ message: "Invoice is already paid" });
+      }
+      
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      
+      // Validate file type
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+      if (!allowedTypes.includes(req.file.mimetype)) {
+        return res.status(400).json({ message: "Invalid file type. Please upload PDF, JPG, or PNG." });
+      }
+      
+      // Store the file as base64 data URL (for production would use object storage)
+      const bankSlipUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+      
+      // Update invoice with bank slip and set to processing status
+      const updatedInvoice = await storage.updateInvoice(invoiceId, {
+        bankSlipUrl,
+        status: 'processing' as any,
+      });
+      
+      res.json({ 
+        message: "Bank slip uploaded successfully. Payment is pending verification.",
+        invoice: updatedInvoice 
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
