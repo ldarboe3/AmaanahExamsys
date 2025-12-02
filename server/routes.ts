@@ -3046,6 +3046,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         status: 'processing' as any,
       });
       
+      // Notify examination admins about the bank slip upload
+      const school = await storage.getSchool(invoice.schoolId);
+      if (school) {
+        const { notifyBankSlipUploaded } = await import("./notificationService");
+        await notifyBankSlipUploaded(
+          invoice.schoolId,
+          school.name,
+          invoice.invoiceNumber,
+          parseFloat(invoice.totalAmount || '0')
+        );
+      }
+      
       res.json({ 
         message: "Bank slip uploaded successfully. Payment is pending verification.",
         invoice: updatedInvoice 
@@ -3295,6 +3307,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       // Get school info for notification
       const school = await storage.getSchool(invoice.schoolId);
+      
+      // Notify school admin that their students have been approved and index numbers generated
+      if (school && approvedStudents.length > 0) {
+        const { notifyPaymentConfirmed } = await import("./notificationService");
+        await notifyPaymentConfirmed(
+          invoice.schoolId,
+          school.name,
+          invoice.invoiceNumber,
+          parseFloat(invoice.totalAmount || '0'),
+          approvedStudents.length
+        );
+      }
       
       res.json({
         message: `Successfully approved ${approvedStudents.length} students and generated index numbers`,

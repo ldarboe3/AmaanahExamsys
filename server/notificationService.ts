@@ -284,3 +284,48 @@ export async function notifyPaymentRequired(
     },
   }, { schoolId });
 }
+
+export async function notifyBankSlipUploaded(
+  schoolId: number,
+  schoolName: string,
+  invoiceNumber: string,
+  invoiceAmount: number
+): Promise<void> {
+  await notifyUsersByRole(['super_admin', 'examination_admin'], {
+    type: 'action_required',
+    title: `Payment Slip Uploaded: ${schoolName}`,
+    message: `${schoolName} has uploaded a payment slip for invoice #${invoiceNumber} (GMD ${invoiceAmount.toLocaleString()}). Please review and confirm the payment.`,
+    data: {
+      actionUrl: '/payments',
+      schoolId,
+      invoiceNumber,
+      amount: invoiceAmount,
+      priority: 'high',
+    },
+  });
+  
+  console.log(`[NotificationService] Bank slip upload notification sent for school: ${schoolName}`);
+}
+
+export async function notifyPaymentConfirmed(
+  schoolId: number,
+  schoolName: string,
+  invoiceNumber: string,
+  invoiceAmount: number,
+  studentCount: number
+): Promise<void> {
+  await notifyUsersByRole(['school_admin'], {
+    type: 'payment_reminder',
+    title: 'Payment Confirmed - Index Numbers Generated!',
+    message: `Your payment for invoice #${invoiceNumber} (GMD ${invoiceAmount.toLocaleString()}) has been confirmed. Index numbers have been generated for ${studentCount} student(s). You can now view and print examination cards from your dashboard.`,
+    data: {
+      actionUrl: '/students',
+      schoolId,
+      invoiceNumber,
+      studentCount,
+      priority: 'high',
+    },
+  }, { schoolId });
+  
+  console.log(`[NotificationService] Payment confirmed notification sent to school: ${schoolName}`);
+}
