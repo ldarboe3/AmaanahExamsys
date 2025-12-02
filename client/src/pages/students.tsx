@@ -254,14 +254,19 @@ export default function Students() {
     if (statusFilter !== "all") {
       queryParams.set("status", statusFilter);
     }
-    if (regionFilter !== "all") {
-      queryParams.set("regionId", regionFilter);
-    }
-    if (clusterFilter !== "all") {
-      queryParams.set("clusterId", clusterFilter);
-    }
-    if (schoolFilter !== "all") {
-      queryParams.set("schoolId", schoolFilter);
+    // For school admins, always filter by their school
+    if (isSchoolAdmin && schoolProfile?.id) {
+      queryParams.set("schoolId", schoolProfile.id.toString());
+    } else {
+      if (regionFilter !== "all") {
+        queryParams.set("regionId", regionFilter);
+      }
+      if (clusterFilter !== "all") {
+        queryParams.set("clusterId", clusterFilter);
+      }
+      if (schoolFilter !== "all") {
+        queryParams.set("schoolId", schoolFilter);
+      }
     }
     if (selectedGrade !== null) {
       queryParams.set("grade", selectedGrade.toString());
@@ -269,18 +274,23 @@ export default function Students() {
     
     const queryString = queryParams.toString();
     return queryString ? `/api/students?${queryString}` : "/api/students";
-  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedGrade]);
+  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedGrade, isSchoolAdmin, schoolProfile?.id]);
 
   // Fetch all students for counting (without grade filter)
   const allStudentsUrl = useMemo(() => {
     const queryParams = new URLSearchParams();
     if (statusFilter !== "all") queryParams.set("status", statusFilter);
-    if (regionFilter !== "all") queryParams.set("regionId", regionFilter);
-    if (clusterFilter !== "all") queryParams.set("clusterId", clusterFilter);
-    if (schoolFilter !== "all") queryParams.set("schoolId", schoolFilter);
+    // For school admins, always filter by their school
+    if (isSchoolAdmin && schoolProfile?.id) {
+      queryParams.set("schoolId", schoolProfile.id.toString());
+    } else {
+      if (regionFilter !== "all") queryParams.set("regionId", regionFilter);
+      if (clusterFilter !== "all") queryParams.set("clusterId", clusterFilter);
+      if (schoolFilter !== "all") queryParams.set("schoolId", schoolFilter);
+    }
     const queryString = queryParams.toString();
     return queryString ? `/api/students?${queryString}` : "/api/students";
-  }, [statusFilter, regionFilter, clusterFilter, schoolFilter]);
+  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, isSchoolAdmin, schoolProfile?.id]);
 
   const { data: allStudents } = useQuery<StudentWithRelations[]>({
     queryKey: [allStudentsUrl],
@@ -764,52 +774,57 @@ export default function Students() {
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                <Select value={regionFilter} onValueChange={(value) => {
-                  setRegionFilter(value);
-                  setClusterFilter("all");
-                  setSchoolFilter("all");
-                }}>
-                  <SelectTrigger className="w-[160px]" data-testid="select-region-filter">
-                    <SelectValue placeholder={t.schools.region} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t.common.allRegions}</SelectItem>
-                    {regions?.map((region) => (
-                      <SelectItem key={region.id} value={region.id.toString()}>
-                        {region.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={clusterFilter} onValueChange={(value) => {
-                  setClusterFilter(value);
-                  setSchoolFilter("all");
-                }} disabled={regionFilter === "all"}>
-                  <SelectTrigger className="w-[160px]" data-testid="select-cluster-filter">
-                    <SelectValue placeholder={regionFilter === "all" ? t.common.selectRegionFirst : t.schools.cluster} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t.common.allClusters}</SelectItem>
-                    {clustersForFilter?.map((cluster) => (
-                      <SelectItem key={cluster.id} value={cluster.id.toString()}>
-                        {cluster.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={schoolFilter} onValueChange={setSchoolFilter}>
-                  <SelectTrigger className="w-[180px]" data-testid="select-school-filter">
-                    <SelectValue placeholder={t.students.school} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{isRTL ? "جميع المدارس" : "All Schools"}</SelectItem>
-                    {schoolsForFilter?.map((school) => (
-                      <SelectItem key={school.id} value={school.id.toString()}>
-                        {school.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Region/Cluster/School filters - only shown for admin roles, not school admins */}
+                {!isSchoolAdmin && (
+                  <>
+                    <Select value={regionFilter} onValueChange={(value) => {
+                      setRegionFilter(value);
+                      setClusterFilter("all");
+                      setSchoolFilter("all");
+                    }}>
+                      <SelectTrigger className="w-[160px]" data-testid="select-region-filter">
+                        <SelectValue placeholder={t.schools.region} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t.common.allRegions}</SelectItem>
+                        {regions?.map((region) => (
+                          <SelectItem key={region.id} value={region.id.toString()}>
+                            {region.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={clusterFilter} onValueChange={(value) => {
+                      setClusterFilter(value);
+                      setSchoolFilter("all");
+                    }} disabled={regionFilter === "all"}>
+                      <SelectTrigger className="w-[160px]" data-testid="select-cluster-filter">
+                        <SelectValue placeholder={regionFilter === "all" ? t.common.selectRegionFirst : t.schools.cluster} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t.common.allClusters}</SelectItem>
+                        {clustersForFilter?.map((cluster) => (
+                          <SelectItem key={cluster.id} value={cluster.id.toString()}>
+                            {cluster.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-school-filter">
+                        <SelectValue placeholder={t.students.school} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{isRTL ? "جميع المدارس" : "All Schools"}</SelectItem>
+                        {schoolsForFilter?.map((school) => (
+                          <SelectItem key={school.id} value={school.id.toString()}>
+                            {school.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-[130px]" data-testid="select-status-filter">
                     <SelectValue placeholder={t.common.status} />
