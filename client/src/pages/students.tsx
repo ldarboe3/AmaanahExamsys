@@ -83,32 +83,25 @@ const getGradeLabel = (grade: number, isRTL: boolean) => {
   return `Grade ${grade}`;
 };
 
-// School type to grade range mapping
-// Note: ECD students typically don't have numeric grades, so we use a special marker
-const SCHOOL_TYPE_GRADES: Record<string, { min: number | null; max: number | null; label: { en: string; ar: string } }> = {
-  LBS: { min: 1, max: 6, label: { en: "Lower Basic School (1-6)", ar: "ابتدائي (1-6)" } },
-  UBS: { min: 7, max: 9, label: { en: "Upper Basic School (7-9)", ar: "إعدادي (7-9)" } },
-  BCS: { min: 1, max: 9, label: { en: "Basic Cycle School (1-9)", ar: "ابتدائي وإعدادي (1-9)" } },
-  SSS: { min: 10, max: 12, label: { en: "Senior Secondary School (10-12)", ar: "ثانوي (10-12)" } },
-  QM: { min: 1, max: 12, label: { en: "Quranic Memorization (All Grades)", ar: "تحفيظ القرآن الكريم (جميع الصفوف)" } },
-  ECD: { min: null, max: null, label: { en: "Early Childhood Development (Pre-K)", ar: "روضة" } },
+// School type to examination classes (grades) mapping
+// Only specific classes for examination, not continuous ranges
+const SCHOOL_TYPE_GRADES: Record<string, { grades: number[]; label: { en: string; ar: string } }> = {
+  LBS: { grades: [3, 6], label: { en: "Lower Basic School", ar: "المدرسة الابتدائية الدنيا" } },
+  BCS: { grades: [3, 6, 9], label: { en: "Basic Cycle School", ar: "مدرسة الحلقة الأساسية" } },
+  UBS: { grades: [9], label: { en: "Upper Basic School", ar: "المدرسة الابتدائية العليا" } },
+  SSS: { grades: [12], label: { en: "Senior Secondary School", ar: "الثانوية" } },
+  QM: { grades: [3, 6, 9, 12], label: { en: "Quranic Memorization", ar: "تحفيظ القرآن الكريم" } },
+  ECD: { grades: [], label: { en: "Early Childhood Development", ar: "روضة" } },
 };
 
-// Get grades for a school type tab filter
+// Get grades for a school type
 const getGradesForSchoolType = (schoolType: string): number[] => {
-  const config = SCHOOL_TYPE_GRADES[schoolType];
-  if (!config || config.min === null || config.max === null) return [];
-  const grades: number[] = [];
-  for (let g = config.min; g <= config.max; g++) {
-    grades.push(g);
-  }
-  return grades;
+  return SCHOOL_TYPE_GRADES[schoolType]?.grades || [];
 };
 
-// Check if school type tab filters by "no grade" (like ECD)
-const isNoGradeFilter = (schoolType: string): boolean => {
-  const config = SCHOOL_TYPE_GRADES[schoolType];
-  return config?.min === null && config?.max === null;
+// Get school type label
+const getSchoolTypeLabel = (schoolType: string, isRTL: boolean): string => {
+  return isRTL ? SCHOOL_TYPE_GRADES[schoolType]?.label.ar || schoolType : SCHOOL_TYPE_GRADES[schoolType]?.label.en || schoolType;
 };
 
 interface StudentWithRelations extends Student {
@@ -145,16 +138,16 @@ export default function Students() {
   const { t, isRTL } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [gradeFilter, setGradeFilter] = useState<string>("all");
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [clusterFilter, setClusterFilter] = useState<string>("all");
   const [schoolFilter, setSchoolFilter] = useState<string>("all");
-  const [schoolTypeTab, setSchoolTypeTab] = useState<string>("all");
   const [selectedStudent, setSelectedStudent] = useState<StudentWithRelations | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedSchoolType, setSelectedSchoolType] = useState<string>("LBS");
+  const [selectedGrade, setSelectedGrade] = useState<string>("3");
 
   // Bulk upload mutation
   const bulkUploadMutation = useMutation({
@@ -209,9 +202,6 @@ export default function Students() {
     },
   });
 
-  // Compute effective grade filter - ignore gradeFilter when a tab is active
-  const effectiveGradeFilter = schoolTypeTab === "all" ? gradeFilter : "all";
-  
   // Memoize student query URL to ensure deterministic cache keys
   const studentsUrl = useMemo(() => {
     const queryParams = new URLSearchParams();
@@ -232,25 +222,14 @@ export default function Students() {
       queryParams.set("schoolId", schoolFilter);
     }
     
-    // Grade filtering - mutually exclusive options (tab takes precedence)
-    if (schoolTypeTab === "ECD") {
-      // ECD tab filters for students without grades
-      queryParams.set("noGrade", "true");
-    } else if (schoolTypeTab !== "all") {
-      // School type tab - use grade range
-      const grades = getGradesForSchoolType(schoolTypeTab);
-      if (grades.length > 0) {
-        queryParams.set("gradeMin", grades[0].toString());
-        queryParams.set("gradeMax", grades[grades.length - 1].toString());
-      }
-    } else if (effectiveGradeFilter !== "all") {
-      // Explicit grade filter only when "All" tab is selected
-      queryParams.set("grade", effectiveGradeFilter);
+    // Grade filtering - use selected grade from tabs
+    if (selectedGrade && selectedGrade !== "all") {
+      queryParams.set("grade", selectedGrade);
     }
     
     const queryString = queryParams.toString();
     return queryString ? `/api/students?${queryString}` : "/api/students";
-  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, schoolTypeTab, effectiveGradeFilter]);
+  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedGrade]);
 
   const { data: students, isLoading } = useQuery<StudentWithRelations[]>({
     queryKey: [studentsUrl],
@@ -367,6 +346,53 @@ export default function Students() {
         </div>
       </div>
 
+      {/* School Type Selector and Grade Tabs */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">{isRTL ? "نوع المدرسة" : "School Type"}</label>
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {Object.keys(SCHOOL_TYPE_GRADES).map(type => (
+                  <Button
+                    key={type}
+                    variant={selectedSchoolType === type ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setSelectedSchoolType(type);
+                      const grades = getGradesForSchoolType(type);
+                      setSelectedGrade(grades.length > 0 ? grades[0].toString() : "all");
+                    }}
+                    data-testid={`button-school-type-${type}`}
+                  >
+                    {getSchoolTypeLabel(type, isRTL)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {getGradesForSchoolType(selectedSchoolType).length > 0 && (
+              <div>
+                <label className="text-sm font-medium">{isRTL ? "الفصل" : "Class/Grade"}</label>
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {getGradesForSchoolType(selectedSchoolType).map(grade => (
+                    <Button
+                      key={grade}
+                      variant={selectedGrade === grade.toString() ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedGrade(grade.toString())}
+                      data-testid={`button-grade-${grade}`}
+                    >
+                      {getGradeLabel(grade, isRTL)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
@@ -427,67 +453,6 @@ export default function Students() {
         </Card>
       </div>
 
-      {/* School Type / Grade Tabs */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <GraduationCap className="w-5 h-5 text-muted-foreground" />
-            <span className="text-sm font-medium">
-              {isRTL ? "تصفية حسب نوع المدرسة / الصفوف" : "Filter by School Type / Grades"}
-            </span>
-          </div>
-          <Tabs value={schoolTypeTab} onValueChange={(value) => {
-            setSchoolTypeTab(value);
-            // Always reset explicit grade filter when switching tabs to avoid conflicts
-            setGradeFilter("all");
-          }} className="w-full">
-            <TabsList className="flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
-              <TabsTrigger 
-                value="all" 
-                className="text-xs sm:text-sm px-3 py-1.5"
-                data-testid="tab-all-grades"
-              >
-                {isRTL ? "الكل" : "All"}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="LBS" 
-                className="text-xs sm:text-sm px-3 py-1.5"
-                data-testid="tab-lbs"
-              >
-                {isRTL ? SCHOOL_TYPE_GRADES.LBS.label.ar : SCHOOL_TYPE_GRADES.LBS.label.en}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="UBS" 
-                className="text-xs sm:text-sm px-3 py-1.5"
-                data-testid="tab-ubs"
-              >
-                {isRTL ? SCHOOL_TYPE_GRADES.UBS.label.ar : SCHOOL_TYPE_GRADES.UBS.label.en}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="SSS" 
-                className="text-xs sm:text-sm px-3 py-1.5"
-                data-testid="tab-sss"
-              >
-                {isRTL ? SCHOOL_TYPE_GRADES.SSS.label.ar : SCHOOL_TYPE_GRADES.SSS.label.en}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="QM" 
-                className="text-xs sm:text-sm px-3 py-1.5"
-                data-testid="tab-qm"
-              >
-                {isRTL ? SCHOOL_TYPE_GRADES.QM.label.ar : SCHOOL_TYPE_GRADES.QM.label.en}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="ECD" 
-                className="text-xs sm:text-sm px-3 py-1.5"
-                data-testid="tab-ecd"
-              >
-                {isRTL ? SCHOOL_TYPE_GRADES.ECD.label.ar : SCHOOL_TYPE_GRADES.ECD.label.en}
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </CardContent>
-      </Card>
 
       {/* Filters */}
       <Card>
@@ -548,22 +513,6 @@ export default function Students() {
                       {school.name}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-              <Select 
-                value={gradeFilter} 
-                onValueChange={setGradeFilter}
-                disabled={schoolTypeTab !== "all"}
-              >
-                <SelectTrigger className="w-[130px]" data-testid="select-grade-filter">
-                  <SelectValue placeholder={schoolTypeTab !== "all" ? (isRTL ? "محدد بالتبويب" : "Set by Tab") : t.common.grade} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{isRTL ? "جميع الصفوف" : "All Grades"}</SelectItem>
-                  <SelectItem value="3">{isRTL ? "الصف 3" : "Grade 3"}</SelectItem>
-                  <SelectItem value="6">{isRTL ? "الصف 6" : "Grade 6"}</SelectItem>
-                  <SelectItem value="9">{isRTL ? "الصف 9" : "Grade 9"}</SelectItem>
-                  <SelectItem value="12">{isRTL ? "الصف 12" : "Grade 12"}</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
