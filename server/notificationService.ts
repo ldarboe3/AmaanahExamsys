@@ -329,3 +329,26 @@ export async function notifyPaymentConfirmed(
   
   console.log(`[NotificationService] Payment confirmed notification sent to school: ${schoolName}`);
 }
+
+export async function notifyPaymentProcessed(
+  schoolId: number,
+  schoolName: string,
+  invoiceNumber: string,
+  invoiceAmount: number,
+  pendingStudentsCount: number
+): Promise<void> {
+  await notifyUsersByRole(['school_admin'], {
+    type: 'payment_reminder',
+    title: 'Payment Verified Successfully!',
+    message: `Great news! Your payment for invoice #${invoiceNumber} (GMD ${invoiceAmount.toLocaleString()}) has been verified and confirmed. ${pendingStudentsCount} student(s) are pending approval. Index numbers will be generated once students are approved.`,
+    data: {
+      actionUrl: '/payments',
+      schoolId,
+      invoiceNumber,
+      pendingStudentsCount,
+      priority: 'high',
+    },
+  }, { schoolId });
+  
+  console.log(`[NotificationService] Payment processed notification sent to school: ${schoolName}`);
+}
