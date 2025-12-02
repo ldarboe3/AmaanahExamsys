@@ -243,6 +243,14 @@ export default function Students() {
     queryKey: ["/api/clusters"],
   });
 
+  // Fetch active exam year to get available grades
+  const { data: examYears } = useQuery({
+    queryKey: ["/api/exam-years"],
+  });
+
+  const activeExamYear = (examYears as any[])?.find(ey => ey.isActive);
+  const availableGrades = activeExamYear?.grades || [];
+
   // Build school query URL based on region/cluster filters
   const schoolQueryParams = new URLSearchParams();
   if (regionFilter !== "all") schoolQueryParams.set("regionId", regionFilter);
@@ -346,10 +354,18 @@ export default function Students() {
         </div>
       </div>
 
-      {/* School Type Selector and Grade Tabs */}
+      {/* School Type Selector and Dynamic Grade Tabs */}
       <Card>
         <CardContent className="p-6">
           <div className="space-y-4">
+            {activeExamYear && (
+              <div className="bg-primary/10 border border-primary/20 rounded-md p-3 mb-4">
+                <p className="text-sm font-medium text-primary">
+                  {isRTL ? `السنة الامتحانية النشطة: ${activeExamYear.name}` : `Active Exam Year: ${activeExamYear.name}`}
+                </p>
+              </div>
+            )}
+
             <div>
               <label className="text-sm font-medium">{isRTL ? "نوع المدرسة" : "School Type"}</label>
               <div className="flex gap-2 mt-2 flex-wrap">
@@ -360,8 +376,9 @@ export default function Students() {
                     size="sm"
                     onClick={() => {
                       setSelectedSchoolType(type);
-                      const grades = getGradesForSchoolType(type);
-                      setSelectedGrade(grades.length > 0 ? grades[0].toString() : "all");
+                      // Use exam year grades if available, otherwise use school type grades
+                      const gradesToUse = availableGrades.length > 0 ? availableGrades : getGradesForSchoolType(type);
+                      setSelectedGrade(gradesToUse.length > 0 ? gradesToUse[0].toString() : "all");
                     }}
                     data-testid={`button-school-type-${type}`}
                   >
@@ -371,11 +388,11 @@ export default function Students() {
               </div>
             </div>
 
-            {getGradesForSchoolType(selectedSchoolType).length > 0 && (
+            {(availableGrades.length > 0 || getGradesForSchoolType(selectedSchoolType).length > 0) && (
               <div>
                 <label className="text-sm font-medium">{isRTL ? "الفصل" : "Class/Grade"}</label>
                 <div className="flex gap-2 mt-2 flex-wrap">
-                  {getGradesForSchoolType(selectedSchoolType).map(grade => (
+                  {(availableGrades.length > 0 ? availableGrades : getGradesForSchoolType(selectedSchoolType)).map(grade => (
                     <Button
                       key={grade}
                       variant={selectedGrade === grade.toString() ? "default" : "outline"}
