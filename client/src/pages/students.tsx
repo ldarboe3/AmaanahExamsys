@@ -154,16 +154,23 @@ export default function Students() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Bulk upload mutation
   const bulkUploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      setUploadProgress(10);
       const text = await file.text();
+      
+      setUploadProgress(30);
       const lines = text.split('\n').filter(line => line.trim());
       const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
       
-      const students = lines.slice(1).map(line => {
+      setUploadProgress(50);
+      const students = lines.slice(1).map((line, index) => {
         const values = line.split(',').map(v => v.trim());
+        // Update progress as we parse
+        setUploadProgress(Math.min(50 + (index / lines.length) * 30, 80));
         return {
           firstName: values[headers.indexOf('firstname')] || '',
           lastName: values[headers.indexOf('lastname')] || '',
@@ -175,7 +182,10 @@ export default function Students() {
         };
       });
 
-      return apiRequest('POST', '/api/students/bulk', { students });
+      setUploadProgress(85);
+      const response = await apiRequest('POST', '/api/students/bulk', { students });
+      setUploadProgress(100);
+      return response;
     },
     onSuccess: (data: any) => {
       toast({
@@ -186,6 +196,7 @@ export default function Students() {
       });
       setShowUploadDialog(false);
       setUploadFile(null);
+      setUploadProgress(0);
       invalidateStudentQueries();
     },
     onError: (error: any) => {
@@ -194,6 +205,7 @@ export default function Students() {
         description: error.message || (isRTL ? "فشل رفع الملف" : "Failed to upload file"),
         variant: "destructive",
       });
+      setUploadProgress(0);
     },
   });
 
@@ -850,14 +862,25 @@ export default function Students() {
                 onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
               />
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">{isRTL ? "هل تحتاج إلى القالب؟" : "Need the template?"}</span>
-              <Button variant="ghost" size="sm" className="h-auto p-0 text-primary underline-offset-4 hover:underline"
-                onClick={() => window.open('/api/templates/students')}>
-                <Download className="w-4 h-4 me-1" />
-                {isRTL ? "تحميل قالب CSV" : "Download CSV Template"}
-              </Button>
-            </div>
+            {bulkUploadMutation.isPending && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{isRTL ? "جاري الرفع" : "Uploading"}</span>
+                  <span className="font-semibold">{uploadProgress}%</span>
+                </div>
+                <Progress value={uploadProgress} className="w-full" />
+              </div>
+            )}
+            {!bulkUploadMutation.isPending && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{isRTL ? "هل تحتاج إلى القالب؟" : "Need the template?"}</span>
+                <Button variant="ghost" size="sm" className="h-auto p-0 text-primary underline-offset-4 hover:underline"
+                  onClick={() => window.open('/api/templates/students')}>
+                  <Download className="w-4 h-4 me-1" />
+                  {isRTL ? "تحميل قالب CSV" : "Download CSV Template"}
+                </Button>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowUploadDialog(false); setUploadFile(null); }}>
