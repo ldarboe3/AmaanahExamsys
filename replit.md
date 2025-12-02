@@ -7,6 +7,14 @@ A comprehensive examination management system for managing countrywide Arabic & 
 The MVP is complete with all core features implemented and verified. PDF generation system for certificates and transcripts is fully functional with Arabic/English bilingual support, QR code verification, and gender-specific templates.
 
 ## Recent Changes (December 2024)
+- **Role-Based Notification System**: Comprehensive in-app notification system
+  - Notification service (`server/notificationService.ts`) with role-based targeting
+  - Helper functions: `notifyUser`, `notifyUsersByRole`, `notifyAllSchoolAdmins`
+  - Triggers on exam year creation, registration deadlines, school approvals, result publishing
+  - Scheduler integration for automated deadline reminders (daily when <3 days, weekly otherwise)
+  - Priority styling in dropdown: urgent notifications show red border/background
+  - Action links: clicking notification navigates to relevant page (e.g., /students for registration)
+  - Notification types: exam_year_created, registration_deadline, payment_reminder, result_published, school_approved, student_approved, action_required, system_alert
 - **School Admin Invitation System**: Invite additional administrators to manage school
   - Token-based invitation workflow with 48-hour expiry
   - School admins can invite other users via email

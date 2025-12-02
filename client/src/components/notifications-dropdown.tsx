@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,16 +12,25 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bell, Check, CheckCheck, Clock, CreditCard, FileCheck, School, AlertCircle } from "lucide-react";
+import { Bell, Check, CheckCheck, Clock, CreditCard, FileCheck, School, AlertCircle, CalendarPlus, ExternalLink, AlertTriangle } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
+
+interface NotificationData {
+  actionUrl?: string;
+  examYearId?: number;
+  daysRemaining?: number;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  isUrgent?: boolean;
+  [key: string]: any;
+}
 
 interface Notification {
   id: number;
   type: string;
   title: string;
   message: string;
-  data: any;
+  data: NotificationData;
   isRead: boolean;
   createdAt: string;
 }
@@ -32,11 +42,27 @@ const notificationIcons: Record<string, React.ElementType> = {
   school_approved: School,
   student_approved: Check,
   exam_reminder: AlertCircle,
+  exam_year_created: CalendarPlus,
+  action_required: AlertTriangle,
   system_alert: AlertCircle,
 };
 
+function getPriorityStyles(notification: Notification): string {
+  const priority = notification.data?.priority;
+  const isUrgent = notification.data?.isUrgent;
+  
+  if (isUrgent || priority === 'urgent') {
+    return "border-l-4 border-destructive bg-destructive/5";
+  }
+  if (priority === 'high') {
+    return "border-l-4 border-yellow-500 bg-yellow-500/5";
+  }
+  return "";
+}
+
 export function NotificationsDropdown() {
   const [open, setOpen] = useState(false);
+  const [, navigate] = useLocation();
 
   const { data: notifications, isLoading } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
@@ -71,6 +97,12 @@ export function NotificationsDropdown() {
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.isRead) {
       markReadMutation.mutate(notification.id);
+    }
+    
+    // Navigate to action URL if present
+    if (notification.data?.actionUrl) {
+      setOpen(false);
+      navigate(notification.data.actionUrl);
     }
   };
 
@@ -119,10 +151,13 @@ export function NotificationsDropdown() {
           ) : (
             notifications.slice(0, 10).map((notification) => {
               const Icon = notificationIcons[notification.type] || Bell;
+              const hasActionUrl = !!notification.data?.actionUrl;
+              const priorityStyles = getPriorityStyles(notification);
+              
               return (
                 <DropdownMenuItem
                   key={notification.id}
-                  className={`flex gap-3 p-3 cursor-pointer ${!notification.isRead ? "bg-muted/50" : ""}`}
+                  className={`flex gap-3 p-3 cursor-pointer ${!notification.isRead ? "bg-muted/50" : ""} ${priorityStyles}`}
                   onClick={() => handleNotificationClick(notification)}
                   data-testid={`notification-item-${notification.id}`}
                 >
@@ -132,9 +167,14 @@ export function NotificationsDropdown() {
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${!notification.isRead ? "text-foreground" : "text-muted-foreground"}`}>
-                      {notification.title}
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <p className={`text-sm font-medium truncate ${!notification.isRead ? "text-foreground" : "text-muted-foreground"}`}>
+                        {notification.title}
+                      </p>
+                      {hasActionUrl && (
+                        <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       {notification.message}
                     </p>

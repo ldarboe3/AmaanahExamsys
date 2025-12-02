@@ -32,6 +32,10 @@ import {
   generateIndexNumber,
   generateInvoiceNumber,
 } from "./emailService";
+import {
+  notifyExamYearCreated,
+  notifyRegistrationDeadlineApproaching,
+} from "./notificationService";
 import bcrypt from "bcrypt";
 import multer from "multer";
 import { randomBytes } from "crypto";
@@ -565,12 +569,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       const examYear = await storage.createExamYear({ ...parsed.data, createdBy: req.session.userId });
       
-      // Send notification emails to all approved schools if registration end date is set
+      // Send in-app notifications to all users based on their roles
+      notifyExamYearCreated(
+        examYear.name,
+        examYear.id,
+        examYear.registrationEndDate ? new Date(examYear.registrationEndDate) : null,
+        req.session.userId!
+      ).catch(err => console.error('Failed to send in-app notifications:', err));
+      
+      // Send email notifications to all approved schools if registration end date is set
       if (examYear.registrationEndDate) {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const approvedSchools = await storage.getSchoolsByStatus('approved');
         
-        // Send notifications in the background (don't block response)
+        // Send email notifications in the background (don't block response)
         (async () => {
           let successCount = 0;
           let failCount = 0;
