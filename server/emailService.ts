@@ -450,3 +450,80 @@ export async function sendPasswordResetEmail(
     htmlBody: htmlBody
   });
 }
+
+// Send school admin invitation email
+export async function sendSchoolAdminInvitationEmail(
+  email: string,
+  schoolName: string,
+  recipientName: string,
+  verificationUrl: string
+): Promise<boolean> {
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1E8F4D, #166534); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .btn { display: inline-block; background: #1E8F4D; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+        .btn:hover { background: #166534; }
+        .highlight { background: #E7F9EE; border-left: 4px solid #1E8F4D; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .warning { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+        .arabic { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>School Admin Invitation</h1>
+          <p class="arabic">دعوة مسؤول المدرسة</p>
+        </div>
+        <div class="content">
+          <h2>You've Been Invited!</h2>
+          <p>Dear ${recipientName},</p>
+          <p>You have been invited to join the Amaanah Examination Management System as an administrator for <strong>${schoolName}</strong>.</p>
+          
+          <div class="highlight">
+            <p>As a school administrator, you will be able to:</p>
+            <ul>
+              <li>Manage student registrations for examinations</li>
+              <li>View and download examination results</li>
+              <li>Access school profile and payment information</li>
+              <li>Generate certificates and transcripts</li>
+            </ul>
+          </div>
+          
+          <p>Click the button below to create your account:</p>
+          
+          <div style="text-align: center;">
+            <a href="${verificationUrl}" class="btn">Create Your Account</a>
+          </div>
+          
+          <div class="warning">
+            <strong>Important:</strong> This invitation link will expire in <strong>48 hours</strong>. Please complete your account setup before then.
+          </div>
+          
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #1E8F4D;">${verificationUrl}</p>
+          
+          <p>Best regards,<br>Amaanah Examination Team</p>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} Amaanah Islamic Education - The Gambia</p>
+          <p>This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: email,
+    subject: `You're Invited to ${schoolName} - Amaanah Exam System`,
+    htmlBody: htmlBody
+  });
+}

@@ -23,6 +23,7 @@ import {
   sendResultsPublishedEmail,
   sendCenterAllocationEmail,
   sendPasswordResetEmail,
+  sendSchoolAdminInvitationEmail,
   generateVerificationToken,
   getVerificationExpiry,
   generateIndexNumber,
@@ -30,6 +31,7 @@ import {
 } from "./emailService";
 import bcrypt from "bcrypt";
 import multer from "multer";
+import { randomBytes } from "crypto";
 
 const schoolDocUploadConfig = multer({
   storage: multer.memoryStorage(),
@@ -1488,12 +1490,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Validate docType using Zod
       const deleteDocSchema = z.object({
-        docType: z.enum(['registrationCertificate', 'landOwnership', 'operationalLicense']),
+        docType: z.enum(['registrationCertificate', 'landOwnership', 'operationalLicense', 'schoolBadge']),
       });
 
       const validation = deleteDocSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ message: "Invalid document type. Must be registrationCertificate, landOwnership, or operationalLicense" });
+        return res.status(400).json({ message: "Invalid document type. Must be registrationCertificate, landOwnership, operationalLicense, or schoolBadge" });
       }
 
       const { docType } = validation.data;
@@ -1515,6 +1517,259 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       res.json({ success: true, school });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // School Admin Invitations API
+  app.get("/api/school/invitations", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'school_admin') {
+        return res.status(403).json({ message: "Only school admins can view invitations" });
+      }
+      if (!user.schoolId) {
+        return res.status(404).json({ message: "No school associated with this account" });
+      }
+
+      const invitations = await storage.getSchoolInvitationsBySchool(user.schoolId);
+      res.json(invitations);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/school/invitations", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'school_admin') {
+        return res.status(403).json({ message: "Only school admins can invite users" });
+      }
+      if (!user.schoolId) {
+        return res.status(404).json({ message: "No school associated with this account" });
+      }
+
+      // Validate input
+      const inviteSchema = z.object({
+        email: z.string().email("Please enter a valid email address"),
+        firstName: z.string().min(1, "First name is required").optional(),
+        lastName: z.string().min(1, "Last name is required").optional(),
+      });
+
+      const validation = inviteSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: fromZodError(validation.error).message 
+        });
+      }
+
+      const { email, firstName, lastName } = validation.data;
+
+      // Check if email is already in use by another user
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "This email is already registered in the system" });
+      }
+
+      // Check for pending invitation with same email for this school
+      const existingInvitations = await storage.getSchoolInvitationsBySchool(user.schoolId);
+      const pendingInvite = existingInvitations.find(i => i.email === email && !i.isUsed && new Date(i.expiresAt) > new Date());
+      if (pendingInvite) {
+        return res.status(400).json({ message: "An invitation has already been sent to this email" });
+      }
+
+      // Get school info
+      const school = await storage.getSchool(user.schoolId);
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+
+      // Generate token and expiry (48 hours)
+      const token = randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+      // Create invitation
+      const invitation = await storage.createSchoolInvitation({
+        schoolId: user.schoolId,
+        email,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        token,
+        expiresAt,
+        invitedById: user.id,
+      });
+
+      // Send invitation email
+      const verificationUrl = `${req.protocol}://${req.get('host')}/school-invite/${token}`;
+      await sendSchoolAdminInvitationEmail(email, school.name, firstName || 'User', verificationUrl);
+
+      // Log the action
+      await storage.createAuditLog({
+        action: 'school_admin_invited',
+        entityType: 'school_invitation',
+        entityId: invitation.id.toString(),
+        userId: user.id,
+        details: { email, schoolId: user.schoolId },
+      });
+
+      res.json({ success: true, invitation });
+    } catch (error: any) {
+      console.error("Invitation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/school/invitations/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'school_admin') {
+        return res.status(403).json({ message: "Only school admins can delete invitations" });
+      }
+      if (!user.schoolId) {
+        return res.status(404).json({ message: "No school associated with this account" });
+      }
+
+      const invitationId = parseInt(req.params.id);
+      const invitation = await storage.getSchoolInvitation(invitationId);
+      
+      if (!invitation) {
+        return res.status(404).json({ message: "Invitation not found" });
+      }
+
+      if (invitation.schoolId !== user.schoolId) {
+        return res.status(403).json({ message: "You can only delete invitations for your school" });
+      }
+
+      if (invitation.isUsed) {
+        return res.status(400).json({ message: "Cannot delete an already used invitation" });
+      }
+
+      await storage.deleteSchoolInvitation(invitationId);
+
+      // Log the action
+      await storage.createAuditLog({
+        action: 'school_invitation_deleted',
+        entityType: 'school_invitation',
+        entityId: invitationId.toString(),
+        userId: user.id,
+        details: { email: invitation.email },
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public endpoint to get invitation info
+  app.get("/api/school/invitations/:token/info", async (req, res) => {
+    try {
+      const invitation = await storage.getSchoolInvitationByToken(req.params.token);
+      
+      if (!invitation) {
+        return res.status(404).json({ message: "Invalid invitation link" });
+      }
+
+      if (invitation.isUsed) {
+        return res.status(400).json({ message: "This invitation has already been used" });
+      }
+
+      if (new Date(invitation.expiresAt) < new Date()) {
+        return res.status(400).json({ message: "This invitation has expired" });
+      }
+
+      // Get school info
+      const school = await storage.getSchool(invitation.schoolId);
+
+      res.json({
+        email: invitation.email,
+        firstName: invitation.firstName,
+        lastName: invitation.lastName,
+        schoolName: school?.name || 'Unknown School',
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Complete invitation - create user account
+  app.post("/api/school/invitations/:token/complete", async (req, res) => {
+    try {
+      const invitation = await storage.getSchoolInvitationByToken(req.params.token);
+      
+      if (!invitation) {
+        return res.status(404).json({ message: "Invalid invitation link" });
+      }
+
+      if (invitation.isUsed) {
+        return res.status(400).json({ message: "This invitation has already been used" });
+      }
+
+      if (new Date(invitation.expiresAt) < new Date()) {
+        return res.status(400).json({ message: "This invitation has expired" });
+      }
+
+      // Validate input
+      const completeSchema = z.object({
+        username: z.string().min(3, "Username must be at least 3 characters").max(50),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+        firstName: z.string().min(1, "First name is required"),
+        lastName: z.string().min(1, "Last name is required"),
+      });
+
+      const validation = completeSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: fromZodError(validation.error).message 
+        });
+      }
+
+      const { username, password, firstName, lastName } = validation.data;
+
+      // Check if username is already taken
+      const existingUsers = await storage.getAllUsers();
+      const usernameTaken = existingUsers.some(u => u.username === username);
+      if (usernameTaken) {
+        return res.status(400).json({ message: "This username is already taken" });
+      }
+
+      // Hash password
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Create user
+      const newUser = await storage.upsertUser({
+        id: randomBytes(16).toString('hex'),
+        email: invitation.email,
+        username,
+        passwordHash,
+        firstName,
+        lastName,
+        role: 'school_admin',
+        status: 'active',
+        schoolId: invitation.schoolId,
+      });
+
+      // Mark invitation as used
+      await storage.updateSchoolInvitation(invitation.id, {
+        isUsed: true,
+        usedAt: new Date(),
+        createdUserId: newUser.id,
+      });
+
+      // Log the action
+      await storage.createAuditLog({
+        action: 'school_admin_account_created',
+        entityType: 'user',
+        entityId: newUser.id,
+        userId: newUser.id,
+        details: { schoolId: invitation.schoolId, invitationId: invitation.id },
+      });
+
+      res.json({ success: true, message: "Account created successfully. You can now log in." });
+    } catch (error: any) {
+      console.error("Complete invitation error:", error);
       res.status(500).json({ message: error.message });
     }
   });
