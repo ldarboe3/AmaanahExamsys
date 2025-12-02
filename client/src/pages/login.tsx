@@ -21,6 +21,7 @@ import { Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { LanguageToggle } from "@/components/language-toggle";
+import { Link } from "wouter";
 import amaanahLogo from "@assets/amaanah-logo-BXDbf4ee_1764613882774.png";
 import studentsBg from "@assets/generated_images/african_islamic_students_in_classroom.png";
 
@@ -210,24 +211,31 @@ export default function Login() {
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="rememberMe"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              data-testid="checkbox-remember-me"
-                            />
-                          </FormControl>
-                          <FormLabel className="text-sm font-normal cursor-pointer">
-                            {t.auth.rememberMe}
-                          </FormLabel>
-                        </FormItem>
-                      )}
-                    />
+                    <div className="flex items-center justify-between">
+                      <FormField
+                        control={form.control}
+                        name="rememberMe"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-remember-me"
+                              />
+                            </FormControl>
+                            <FormLabel className="text-sm font-normal cursor-pointer">
+                              {t.auth.rememberMe}
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      <Link href="/forgot-password">
+                        <span className="text-sm text-primary hover:underline cursor-pointer" data-testid="link-forgot-password">
+                          Forgot password?
+                        </span>
+                      </Link>
+                    </div>
 
                     <Button
                       type="submit"

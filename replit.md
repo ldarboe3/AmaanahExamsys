@@ -7,6 +7,13 @@ A comprehensive examination management system for managing countrywide Arabic & 
 The MVP is complete with all core features implemented and verified. PDF generation system for certificates and transcripts is fully functional with Arabic/English bilingual support, QR code verification, and gender-specific templates.
 
 ## Recent Changes (December 2024)
+- **School Verification Workflow Redesigned**: Streamlined self-service registration
+  - Email verification now includes username/password creation in one step
+  - Schools are auto-approved upon completing verification (no manual admin approval needed)
+  - New `/school-verify/:token` page with secure credential setup
+  - Password reset functionality via `/forgot-password` with 2-hour expiry links
+  - Added "Forgot password?" link on login page
+  - API endpoints: `/api/schools/verify-info/:token`, `/api/schools/verify/:token/complete`, `/api/schools/forgot-password`, `/api/schools/reset-password`
 - **Public Result Checker**: Full bilingual (English/Arabic) result lookup system
   - Access via `/results` page on public website
   - Search by student index number
@@ -52,7 +59,7 @@ The MVP is complete with all core features implemented and verified. PDF generat
 ## Features Implemented
 
 ### Core Features
-1. School Registration with document upload and admin approval
+1. School Registration with email verification and auto-approval after credential setup
 2. Student Management with CSV import and index number generation
 3. Invoice Generation with payment tracking
 4. Results Management with CSV upload and validation

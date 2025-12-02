@@ -44,6 +44,8 @@ import Resources from "@/pages/resources";
 import News from "@/pages/news";
 import ResultChecker from "@/pages/result-checker";
 import SchoolRegistration from "@/pages/school-registration";
+import SchoolVerify from "@/pages/school-verify";
+import ForgotPassword from "@/pages/forgot-password";
 import WebsiteManagement from "@/pages/website-management";
 
 function LoadingScreen() {
@@ -100,6 +102,9 @@ function PublicRoutes() {
       <Route path="/news" component={News} />
       <Route path="/results" component={ResultChecker} />
       <Route path="/school-registration" component={SchoolRegistration} />
+      <Route path="/school-verify/:token" component={SchoolVerify} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/forgot-password/:token" component={ForgotPassword} />
       <Route path="/" component={Home} />
       <Route component={Home} />
     </Switch>
