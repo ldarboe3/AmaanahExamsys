@@ -2099,8 +2099,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Only super_admin and examination_admin can approve students
   app.post("/api/students/:id/approve", isAuthenticated, async (req, res) => {
     try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only super admin and examination admin can approve students" });
+      }
       const student = await storage.approveStudent(parseInt(req.params.id));
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
@@ -2111,13 +2116,62 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Only super_admin and examination_admin can reject students
   app.post("/api/students/:id/reject", isAuthenticated, async (req, res) => {
     try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only super admin and examination admin can reject students" });
+      }
       const student = await storage.rejectStudent(parseInt(req.params.id));
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
       }
       res.json(student);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Bulk approve students - only super_admin and examination_admin
+  app.post("/api/students/bulk-approve", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only super admin and examination admin can approve students" });
+      }
+      const { studentIds } = req.body;
+      if (!Array.isArray(studentIds) || studentIds.length === 0) {
+        return res.status(400).json({ message: "studentIds array is required" });
+      }
+      const approvedStudents = [];
+      for (const id of studentIds) {
+        const student = await storage.approveStudent(id);
+        if (student) approvedStudents.push(student);
+      }
+      res.json({ approved: approvedStudents.length, students: approvedStudents });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Bulk reject students - only super_admin and examination_admin
+  app.post("/api/students/bulk-reject", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only super admin and examination admin can reject students" });
+      }
+      const { studentIds } = req.body;
+      if (!Array.isArray(studentIds) || studentIds.length === 0) {
+        return res.status(400).json({ message: "studentIds array is required" });
+      }
+      const rejectedStudents = [];
+      for (const id of studentIds) {
+        const student = await storage.rejectStudent(id);
+        if (student) rejectedStudents.push(student);
+      }
+      res.json({ rejected: rejectedStudents.length, students: rejectedStudents });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

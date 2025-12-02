@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
@@ -173,8 +174,10 @@ export default function Students() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedGrade, setSelectedGrade] = useState<number | null>(null);
   const [countdown, setCountdown] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
   
   const isSchoolAdmin = user?.role === 'school_admin';
+  const canApproveStudents = user?.role === 'super_admin' || user?.role === 'examination_admin';
   
   // Fetch school profile for school admins
   const { data: schoolProfile } = useQuery<SchoolType>({
@@ -400,20 +403,93 @@ export default function Students() {
         description: isRTL ? "تم اعتماد الطالب بنجاح" : "The student has been approved successfully.",
       });
     },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل اعتماد الطالب" : "Failed to approve student"),
+        variant: "destructive",
+      });
+    },
   });
 
-  const approveAllMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", `/api/students/approve-all`);
+  const rejectStudentMutation = useMutation({
+    mutationFn: async (studentId: number) => {
+      return apiRequest("POST", `/api/students/${studentId}/reject`);
     },
     onSuccess: () => {
       invalidateStudentQueries();
       toast({
         title: t.common.success,
-        description: isRTL ? "تم اعتماد جميع الطلاب المعلقين" : "All pending students have been approved.",
+        description: isRTL ? "تم رفض الطالب" : "The student has been rejected.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل رفض الطالب" : "Failed to reject student"),
+        variant: "destructive",
       });
     },
   });
+
+  const bulkApproveMutation = useMutation({
+    mutationFn: async (studentIds: number[]) => {
+      return apiRequest("POST", `/api/students/bulk-approve`, { studentIds });
+    },
+    onSuccess: (data: any) => {
+      invalidateStudentQueries();
+      setSelectedStudentIds(new Set());
+      toast({
+        title: t.common.success,
+        description: isRTL 
+          ? `تم اعتماد ${data.approved} طالب بنجاح` 
+          : `Successfully approved ${data.approved} students.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل اعتماد الطلاب" : "Failed to approve students"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bulkRejectMutation = useMutation({
+    mutationFn: async (studentIds: number[]) => {
+      return apiRequest("POST", `/api/students/bulk-reject`, { studentIds });
+    },
+    onSuccess: (data: any) => {
+      invalidateStudentQueries();
+      setSelectedStudentIds(new Set());
+      toast({
+        title: t.common.success,
+        description: isRTL 
+          ? `تم رفض ${data.rejected} طالب` 
+          : `Rejected ${data.rejected} students.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل رفض الطلاب" : "Failed to reject students"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Selection helpers
+  const toggleStudentSelection = (studentId: number) => {
+    setSelectedStudentIds(prev => {
+      const next = new Set(prev);
+      if (next.has(studentId)) {
+        next.delete(studentId);
+      } else {
+        next.add(studentId);
+      }
+      return next;
+    });
+  };
 
   // Get student count per grade
   const getStudentCountForGrade = (grade: number) => {
@@ -439,6 +515,17 @@ export default function Students() {
   });
 
   const pendingCount = students?.filter(s => s.status === 'pending').length || 0;
+
+  // Toggle select all pending students (must be after filteredStudents is defined)
+  const toggleSelectAll = () => {
+    if (!filteredStudents) return;
+    const pendingStudents = filteredStudents.filter(s => s.status === 'pending');
+    if (selectedStudentIds.size === pendingStudents.length && pendingStudents.length > 0) {
+      setSelectedStudentIds(new Set());
+    } else {
+      setSelectedStudentIds(new Set(pendingStudents.map(s => s.id)));
+    }
+  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -611,9 +698,21 @@ export default function Students() {
               <FileSpreadsheet className="w-4 h-4 me-2" />
               {isRTL ? "القالب" : "Template"}
             </Button>
-            {pendingCount > 0 && (
-              <Button onClick={() => approveAllMutation.mutate()} data-testid="button-approve-all">
-                <CheckCircle className="w-4 h-4 me-2" />
+            {/* Approve All button - only for super_admin and examination_admin */}
+            {canApproveStudents && pendingCount > 0 && (
+              <Button 
+                onClick={() => {
+                  const pendingIds = students?.filter(s => s.status === 'pending').map(s => s.id) || [];
+                  bulkApproveMutation.mutate(pendingIds);
+                }}
+                disabled={bulkApproveMutation.isPending}
+                data-testid="button-approve-all"
+              >
+                {bulkApproveMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-4 h-4 me-2" />
+                )}
                 {isRTL ? `موافقة الكل (${pendingCount})` : `Approve All (${pendingCount})`}
               </Button>
             )}
@@ -849,9 +948,46 @@ export default function Students() {
                 <CardTitle className="text-lg">{isRTL ? "قائمة الطلاب" : "Student List"}</CardTitle>
                 <CardDescription>
                   {filteredStudents?.length || 0} {t.students.title.toLowerCase()} {t.common.found}
+                  {canApproveStudents && selectedStudentIds.size > 0 && (
+                    <span className="ms-2 text-primary font-medium">
+                      ({selectedStudentIds.size} {isRTL ? "محدد" : "selected"})
+                    </span>
+                  )}
                 </CardDescription>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                {/* Bulk actions for admins */}
+                {canApproveStudents && selectedStudentIds.size > 0 && (
+                  <>
+                    <Button 
+                      size="sm" 
+                      onClick={() => bulkApproveMutation.mutate(Array.from(selectedStudentIds))}
+                      disabled={bulkApproveMutation.isPending}
+                      data-testid="button-bulk-approve"
+                    >
+                      {bulkApproveMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4 me-2" />
+                      )}
+                      {isRTL ? `اعتماد (${selectedStudentIds.size})` : `Approve (${selectedStudentIds.size})`}
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => bulkRejectMutation.mutate(Array.from(selectedStudentIds))}
+                      disabled={bulkRejectMutation.isPending}
+                      data-testid="button-bulk-reject"
+                    >
+                      {bulkRejectMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                      ) : (
+                        <XCircle className="w-4 h-4 me-2" />
+                      )}
+                      {isRTL ? `رفض (${selectedStudentIds.size})` : `Reject (${selectedStudentIds.size})`}
+                    </Button>
+                  </>
+                )}
                 <Button variant="outline" size="sm">
                   <Printer className="w-4 h-4 me-2" />
                   {isRTL ? "طباعة البطاقات" : "Print Cards"}
@@ -871,6 +1007,17 @@ export default function Students() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      {/* Checkbox column for bulk selection - only for admins */}
+                      {canApproveStudents && (
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={filteredStudents.filter(s => s.status === 'pending').length > 0 && 
+                              selectedStudentIds.size === filteredStudents.filter(s => s.status === 'pending').length}
+                            onCheckedChange={toggleSelectAll}
+                            data-testid="checkbox-select-all"
+                          />
+                        </TableHead>
+                      )}
                       <TableHead>{t.students.title}</TableHead>
                       <TableHead>{t.students.indexNumber}</TableHead>
                       <TableHead>{t.students.school}</TableHead>
@@ -881,6 +1028,20 @@ export default function Students() {
                   <TableBody>
                     {filteredStudents.map((student) => (
                       <TableRow key={student.id} data-testid={`row-student-${student.id}`}>
+                        {/* Checkbox for bulk selection - only for admins and pending students */}
+                        {canApproveStudents && (
+                          <TableCell className="w-10">
+                            {student.status === 'pending' ? (
+                              <Checkbox
+                                checked={selectedStudentIds.has(student.id)}
+                                onCheckedChange={() => toggleStudentSelection(student.id)}
+                                data-testid={`checkbox-student-${student.id}`}
+                              />
+                            ) : (
+                              <div className="w-4" />
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
@@ -946,17 +1107,23 @@ export default function Students() {
                                 <Printer className="w-4 h-4 me-2" />
                                 {isRTL ? "طباعة البطاقة" : "Print Card"}
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              {student.status === 'pending' && (
+                              {/* Approve/Reject actions - only for super_admin and examination_admin */}
+                              {canApproveStudents && student.status === 'pending' && (
                                 <>
+                                  <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     onClick={() => approveStudentMutation.mutate(student.id)}
                                     className="text-chart-3"
+                                    data-testid={`button-approve-${student.id}`}
                                   >
                                     <CheckCircle className="w-4 h-4 me-2" />
                                     {t.common.approve}
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem className="text-destructive">
+                                  <DropdownMenuItem 
+                                    onClick={() => rejectStudentMutation.mutate(student.id)}
+                                    className="text-destructive"
+                                    data-testid={`button-reject-${student.id}`}
+                                  >
                                     <XCircle className="w-4 h-4 me-2" />
                                     {t.common.reject}
                                   </DropdownMenuItem>
