@@ -47,7 +47,7 @@ export default function Login() {
   const loginMutation = useMutation({
     mutationFn: async (data: LoginFormData) => {
       const response = await apiRequest("POST", "/api/auth/login", data);
-      return response as { mustChangePassword?: boolean };
+      return await response.json() as { mustChangePassword?: boolean };
     },
     onSuccess: (user) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
