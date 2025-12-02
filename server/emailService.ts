@@ -1,17 +1,50 @@
-// SendGrid Email Service for Amaanah Exam System
+// SendGrid Email Service for Amaanah Exam System (via Replit Connector)
 // Handles verification emails, notifications, and system communications
 
 import sgMail from '@sendgrid/mail';
 import crypto from 'crypto';
 
-// Initialize SendGrid with API key
-const initializeSendGrid = () => {
-  const apiKey = process.env.SENDGRID_API_KEY;
-  if (!apiKey) {
-    throw new Error('SENDGRID_API_KEY not configured');
+let connectionSettings: any;
+
+// Get credentials from Replit SendGrid connector
+async function getCredentials() {
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  const xReplitToken = process.env.REPL_IDENTITY 
+    ? 'repl ' + process.env.REPL_IDENTITY 
+    : process.env.WEB_REPL_RENEWAL 
+    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+    : null;
+
+  if (!xReplitToken) {
+    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
   }
+
+  connectionSettings = await fetch(
+    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=sendgrid',
+    {
+      headers: {
+        'Accept': 'application/json',
+        'X_REPLIT_TOKEN': xReplitToken
+      }
+    }
+  ).then(res => res.json()).then(data => data.items?.[0]);
+
+  if (!connectionSettings || (!connectionSettings.settings.api_key || !connectionSettings.settings.from_email)) {
+    throw new Error('SendGrid not connected');
+  }
+  return { apiKey: connectionSettings.settings.api_key, email: connectionSettings.settings.from_email };
+}
+
+// WARNING: Never cache this client - tokens expire
+// Always call this function to get a fresh client
+export async function getUncachableSendGridClient() {
+  const { apiKey, email } = await getCredentials();
   sgMail.setApiKey(apiKey);
-};
+  return {
+    client: sgMail,
+    fromEmail: email
+  };
+}
 
 // Generate a cryptographically secure verification token
 export function generateVerificationToken(): string {
@@ -53,9 +86,7 @@ interface EmailOptions {
 // Send email using SendGrid
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
-    initializeSendGrid();
-
-    const fromEmail = process.env.FROM_EMAIL || 'info@amaanah.gm';
+    const { client, fromEmail } = await getUncachableSendGridClient();
 
     const msg = {
       to: options.to,
@@ -65,7 +96,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       text: options.textBody || options.htmlBody.replace(/<[^>]*>/g, ''),
     };
 
-    await sgMail.send(msg);
+    await client.send(msg);
     console.log(`Email sent successfully to ${options.to} from ${fromEmail}`);
     return true;
   } catch (error: any) {
