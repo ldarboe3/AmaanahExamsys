@@ -34,6 +34,11 @@ The MVP is complete with all core features implemented and verified. PDF generat
   - Back navigation to return to grade dashboard
   - Fallback to all grades (3, 6, 9, 12) when no active exam year
   - Responsive layout: 1 col mobile, 2 col tablet, 4 col desktop
+  - **Registration Deadline Countdown**: Bold countdown clock in grade detail view
+    - Displays days, hours, minutes, seconds until registration deadline
+    - Updates every second in real-time
+    - Only shows when active exam year has registrationEndDate set
+    - Bilingual support (English/Arabic)
 - **Resend Verification Email Feature**: Admin tool to resend school verification emails
   - Added "Resend Verification Email" button in Schools management dropdown
   - Only appears for pending schools without verified emails
