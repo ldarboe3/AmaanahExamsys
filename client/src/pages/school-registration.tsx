@@ -62,13 +62,12 @@ const registrationSchema = z.object({
 type RegistrationFormData = z.infer<typeof registrationSchema>;
 
 const regions = [
-  "Banjul",
-  "Kanifing",
-  "West Coast Region",
-  "North Bank Region",
-  "Lower River Region",
-  "Central River Region",
-  "Upper River Region",
+  "Region 1",
+  "Region 2",
+  "Region 3",
+  "Region 4",
+  "Region 5",
+  "Region 6",
 ];
 
 const schoolTypes = [
