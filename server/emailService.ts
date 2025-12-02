@@ -101,11 +101,25 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     }
     
     if (!inbox) {
-      // Create a new inbox if none exists
-      inbox = await client.inboxes.create({
-        username: 'amaanah-exams',
-        domain: 'agentmail.to'
-      });
+      // Try to create a new inbox if none exists, but handle if it already exists
+      try {
+        inbox = await client.inboxes.create({
+          username: 'amaanah-exams',
+          domain: 'agentmail.to'
+        });
+      } catch (createError: any) {
+        // If inbox already exists, just list and use the first one
+        if (createError.statusCode === 403 && createError.body?.name === 'AlreadyExistsError') {
+          const retryPage = await client.inboxes.list();
+          if (retryPage.items && retryPage.items.length > 0) {
+            inbox = retryPage.items[0];
+          } else {
+            throw new Error('Unable to find or create inbox');
+          }
+        } else {
+          throw createError;
+        }
+      }
     }
 
     // Construct the from address from the inbox
