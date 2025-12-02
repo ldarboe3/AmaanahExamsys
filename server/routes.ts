@@ -974,13 +974,30 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
       const status = req.query.status as string | undefined;
       const grade = req.query.grade ? parseInt(req.query.grade as string) : undefined;
+      const gradeMin = req.query.gradeMin ? parseInt(req.query.gradeMin as string) : undefined;
+      const gradeMax = req.query.gradeMax ? parseInt(req.query.gradeMax as string) : undefined;
       const regionId = req.query.regionId ? parseInt(req.query.regionId as string) : undefined;
       const clusterId = req.query.clusterId ? parseInt(req.query.clusterId as string) : undefined;
       
       if (status && status !== 'all') {
         students = students.filter(s => s.status === status);
       }
-      if (grade) {
+      
+      // Filter for students without grades (ECD tab) - takes precedence
+      const noGrade = req.query.noGrade === "true";
+      if (noGrade) {
+        students = students.filter(s => s.grade === null || s.grade === undefined);
+      }
+      // Filter by grade range (for school type tabs) - takes precedence over exact grade
+      else if (gradeMin !== undefined && gradeMax !== undefined) {
+        students = students.filter(s => {
+          const studentGrade = s.grade;
+          if (studentGrade === null || studentGrade === undefined) return false;
+          return studentGrade >= gradeMin && studentGrade <= gradeMax;
+        });
+      }
+      // Only apply exact grade filter when no tab-based filters are active
+      else if (grade) {
         students = students.filter(s => s.grade === grade);
       }
       if (schoolId) {
