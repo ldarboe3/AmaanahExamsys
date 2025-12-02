@@ -1,231 +1,54 @@
 # Amaanah Examination Management System
 
 ## Overview
-A comprehensive examination management system for managing countrywide Arabic & Islamic education examinations. The system supports multi-role authentication and provides features for school registration, student enrollment, invoice generation, result processing, and bilingual PDF certificate/transcript generation with Arabic RTL support.
-
-## Current State
-The MVP is complete with all core features implemented and verified. PDF generation system for certificates and transcripts is fully functional with Arabic/English bilingual support, QR code verification, and gender-specific templates.
-
-## Recent Changes (December 2024)
-- **Three-Tier Fee Structure**: Comprehensive fee breakdown for student registration
-  - Three separate fee fields in exam_years table: `feePerStudent` (registration), `certificateFee`, `transcriptFee`
-  - Default values: Registration D100.00, Certificate D50.00, Transcript D25.00
-  - All fees paid together at registration time as a combined total
-  - Invoice calculation: Total = (registrationFee + certificateFee + transcriptFee) × studentCount
-  - Individual fee amounts stored in invoice for detailed breakdown display
-  - Exam year cards display fee badges (Reg, Cert, Trans) with total sum
-  - Create/Edit Exam Year dialogs include all three fee input fields
-  - School admin payment view shows itemized fee breakdown
-  - Admin invoice details dialog displays per-fee and total calculations
-- **Auto-Invoice Generation System**: Automatic invoice calculation based on registered students
-  - `feePerStudent`, `certificateFee`, `transcriptFee` fields in exam years for configurable fees
-  - Invoice items table stores per-grade breakdown (grade, count, fee, subtotal)
-  - Auto-generation triggered after CSV student upload for school admins
-  - Invoice summary dialog shows breakdown by grade after upload
-  - API endpoints: `/api/invoices/generate`, `/api/invoices/auto-generate`, `/api/invoices/:id/details`, `/api/school/invoice`
-  - Enhanced Payments page for school admins:
-    - View invoice with grade-by-grade breakdown
-    - Bank account details for payment
-    - Bank slip upload functionality with status tracking
-    - Processing status after slip upload pending admin verification
-  - Admin view continues showing all invoices across schools
-  - Bank slip upload endpoint: `/api/invoices/bank-slip`
-- **Payment Confirmation and Student Approval Workflow**: Two-step verification process
-  - School admin uploads bank slip → invoice status "processing"
-  - Examination admin reviews bank slip → confirms payment → invoice status "paid"
-  - After payment confirmed, examination admin can bulk approve all students
-  - Upon bulk approval, unique index numbers generated for each approved student
-  - Bank slip preview dialog for admins to review uploaded payment proof
-  - Role-based access: only `examination_admin` and `super_admin` can confirm payments and approve students
-  - API endpoints: `/api/invoices/:id/confirm-payment`, `/api/invoices/:id/bulk-approve-students`
-  - Index number format: unique 6-digit number per student
-- **Role-Based Notification System**: Comprehensive in-app notification system
-  - Notification service (`server/notificationService.ts`) with role-based targeting
-  - Helper functions: `notifyUser`, `notifyUsersByRole`, `notifyAllSchoolAdmins`
-  - Triggers on exam year creation, registration deadlines, school approvals, result publishing
-  - Scheduler integration for automated deadline reminders (daily when <3 days, weekly otherwise)
-  - Priority styling in dropdown: urgent notifications show red border/background
-  - Action links: clicking notification navigates to relevant page (e.g., /students for registration)
-  - Notification types: exam_year_created, registration_deadline, payment_reminder, result_published, school_approved, student_approved, action_required, system_alert
-- **School Admin Invitation System**: Invite additional administrators to manage school
-  - Token-based invitation workflow with 48-hour expiry
-  - School admins can invite other users via email
-  - Invited users complete credential setup via `/school-invite/:token` page
-  - New `schoolInvitations` table to track pending/completed invitations
-  - Bilingual email templates for invitations
-  - Status tracking: pending, completed, expired
-  - API endpoints: `GET/POST /api/school/invitations`, `POST /api/school/invitations/:id/resend`, `POST /api/school/invitations/:token/complete`
-- **School Badge Upload**: School logo/badge image support
-  - Image-only validation (JPEG/PNG, max 10MB)
-  - Displayed in school profile card with hover upload overlay
-  - Stored in `schoolBadge` field in schools table
-- **School Profile Management**: Full school profile editing for school admins
-  - Editable fields: school name, registrar name, phone, address, primary school type, school types, region, cluster
-  - Document upload system: registration certificate, land ownership, operational license
-  - Multer-based file handling with 10MB limit, PDF/JPG/PNG support
-  - Object storage integration for document persistence
-  - Backend API endpoints: `GET/POST /api/school/profile`, `POST /api/school/documents/upload`, `POST /api/school/documents/delete`
-  - Bilingual UI (English/Arabic) with sidebar navigation link
-- **Past Exam Year Management**: Intelligent visibility and read-only mode for completed exam years
-  - Detection: Exam year is "past" when `examEndDate < current date`
-  - School admin visibility: Active years always shown; past years only shown if school has registered students
-  - Red "Past" badge displayed on past exam year cards
-  - Read-only mode enforced for school admins on past years with AlertCircle warning banner
-  - Unscoped `allSchoolStudents` query maintains accurate visibility during navigation
-  - Safe loading fallback prevents past years from disappearing during data fetches
-- **3-Tier Student Registration Navigation**: Complete hierarchical registration workflow for school admins
-  - **Tier 1 - Exam Year Selection**: Shows all exam years as interactive cards with name, deadline, fee, and available grades
-    - Active exam year highlighted with badge
-    - Past exam years with students show red "Past" badge (read-only)
-    - Instructional Step 1 card explains the process
-  - **Tier 2 - Grade Selection**: Shows grades filtered by school type (LBS: 3,6 | BCS: 3,6,9 | UBS: 9 | SSS: 12)
-    - Each grade card displays student count, pending/approved indicators
-    - Back button returns to Tier 1
-    - Selected exam year info banner displayed
-    - Instructional Step 2 card explains grade selection
-  - **Tier 3 - Student Upload**: Shows student list for selected grade/exam year
-    - CSV upload with validation and auto-invoice generation
-    - Template download button for CSV template
-    - Real-time countdown timer to registration deadline
-    - Back button returns to Tier 2
-    - Instructional Step 3 card explains upload process
-  - Student queries properly scoped to selected exam year (examYearId parameter)
-  - State resets: selectedGrade resets when changing exam year to prevent stale data
-  - Responsive layout: 1 col mobile, 2 col tablet, 4 col desktop
-  - Bilingual support (English/Arabic) on all tiers
-- **Resend Verification Email Feature**: Admin tool to resend school verification emails
-  - Added "Resend Verification Email" button in Schools management dropdown
-  - Only appears for pending schools without verified emails
-  - Generates new 2-hour expiry verification tokens
-  - Sends from branded email address `info@amaanah.gm`
-  - Bilingual support (English/Arabic)
-  - API endpoint: `POST /api/schools/:id/resend-verification`
-- **School Verification Workflow Redesigned**: Streamlined self-service registration
-  - Email verification now includes username/password creation in one step
-  - Schools are auto-approved upon completing verification (no manual admin approval needed)
-  - New `/school-verify/:token` page with secure credential setup
-  - Password reset functionality via `/forgot-password` with 2-hour expiry links
-  - Added "Forgot password?" link on login page
-  - API endpoints: `/api/schools/verify-info/:token`, `/api/schools/verify/:token/complete`, `/api/schools/forgot-password`, `/api/schools/reset-password`
-- **Public Result Checker**: Full bilingual (English/Arabic) result lookup system
-  - Access via `/results` page on public website
-  - Search by student index number
-  - Displays student info, subject results, summary statistics
-  - PDF result slip download with Amaanah branding
-  - RTL support for Arabic language mode
-  - API endpoints: `/api/public/results/:indexNumber` and `/api/public/results/:indexNumber/pdf`
-- **Website Content Management System (CMS)**: Full CMS for managing website content
-  - News Articles with categories, featured articles, and publishing workflow
-  - Resources (downloadable files) management
-  - Announcements management
-  - Newsletter subscriber management
-  - Impact stats management for homepage
-  - Admin access via `/website-management` route (super_admin and examination_admin only)
-- **Public Website Integration**: News and Home pages now fetch content from CMS with graceful fallbacks
-- **PDF Generation System**: Implemented Puppeteer-based HTML-to-PDF rendering for certificates and transcripts
-- **Bilingual Support**: Arabic/English templates with RTL rendering using Amiri/Noto Naskh fonts
-- **QR Verification**: Unique QR tokens for each certificate/transcript with verification endpoints
-- **Gender-Specific Templates**: Male/female Arabic grammatical variations in certificate templates
-- **Hierarchical Selection**: Region → Cluster → School → Students filtering for bulk document generation
-- Fixed frontend-backend API endpoint consistency (all mutations use POST)
-- Implemented notification system with in-app dropdown
-- Added audit logging with comprehensive activity tracking
-- Created advanced export functionality (CSV for schools, students, results, invoices, examiners)
-- Added Reports page with download capabilities
-
-## Project Architecture
-
-### Backend (Express + TypeScript)
-- **server/routes.ts**: API endpoints for all resources
-- **server/storage.ts**: Database access layer using Drizzle ORM
-- **server/db.ts**: PostgreSQL connection with Neon
-- **server/auth.ts**: Replit Auth integration
-
-### Frontend (React + TypeScript)
-- **client/src/pages/**: All application pages
-- **client/src/components/**: Reusable UI components (shadcn/ui)
-- **client/src/lib/**: Utility functions and API client
-
-### Shared
-- **shared/schema.ts**: Database schema and types (Drizzle ORM)
-
-## Features Implemented
-
-### Core Features
-1. School Registration with email verification and auto-approval after credential setup
-2. Student Management with CSV import and index number generation
-3. Invoice Generation with payment tracking
-4. Results Management with CSV upload and validation
-5. Certificate Generation with PDF templates
-6. Examiner Management with duty tracking
-7. Analytics Dashboard with performance metrics
-
-### Administrative Features
-8. Notification System with in-app alerts
-9. Audit Logging for all administrative actions
-10. Reports & Exports (CSV format)
-11. Region/Cluster Management
-12. Subject Management
-13. Timetable Management
-14. Exam Center Management
-
-## Authentication
-Uses password-based authentication with bcrypt hashing and session management. The system supports six user roles with different access levels.
-
-### Login Page
-Access the login page at `/login` to sign in with username and password.
-
-### User Roles
-| Role | Description | Access Level |
-|------|-------------|--------------|
-| super_admin | Full system access | All features, user management, system settings |
-| examination_admin | Exam management | Results, certificates, students, subjects |
-| logistics_admin | Center & logistics management | Exam centers, timetables, examiners |
-| school_admin | School-level access | Own school students, payments, results |
-| examiner | Examination duties | Assigned center duties, attendance |
-| candidate | Student access | Own results, certificates |
-
-### Test Credentials
-All six user roles have test accounts with the following credentials:
-
-| Role | Username | Password |
-|------|----------|----------|
-| Super Admin | superadmin | Admin@123 |
-| Examination Admin | examinationadmin | Admin@123 |
-| Logistics Admin | logisticsadmin | Admin@123 |
-| School Admin | schooladmin | Admin@123 |
-| Examiner | examiner | Admin@123 |
-| Candidate | candidate | Admin@123 |
-
-### Logout
-Click the user profile in the sidebar and select "Sign Out" to log out.
-
-## Database
-PostgreSQL with the following main tables:
-- users, schools, students, invoices, payments
-- subjects, results, certificates, examiners
-- examCenters, examinerAssignments, timetableEntries
-- notifications, auditLogs, regions, clusters
-- newsArticles, newsCategories, resources, resourceCategories
-- announcements, newsletterSubscribers, impactStats
-- schoolInvitations (for admin invitation workflow)
-
-## Running the Application
-The application runs on port 5000 with:
-- Frontend: Vite dev server
-- Backend: Express server
-- Database: PostgreSQL (Neon)
-
-Start with: `npm run dev`
-
-## Email Configuration
-- **Service**: SendGrid via Replit Connector for reliable email delivery
-- **From Email**: Configured via SendGrid sender authentication
-- **Features**: School verification, password reset, payment confirmation, results notification
-- **Expiry**: 2-hour links for all sensitive operations
-- **Status**: ✅ Fully functional - verified email delivery working
+Amaanah Examination Management System is a comprehensive platform for managing countrywide Arabic & Islamic education examinations. Its primary purpose is to streamline school registration, student enrollment, invoice generation, result processing, and the creation of bilingual PDF certificates and transcripts. The system aims to provide a robust, multi-role environment to efficiently manage the entire examination lifecycle from registration to result dissemination.
 
 ## User Preferences
 - Material Design 3 adherence for all UI components
 - Dark/light mode support
 - Bilingual support (English/Arabic planned)
+
+## System Architecture
+
+The system is built on a robust architecture featuring a React-based frontend, an Express.js and TypeScript backend, and a PostgreSQL database.
+
+### UI/UX Decisions
+- Adherence to Material Design 3 for a consistent and modern user interface.
+- Support for both dark and light modes.
+- Full bilingual support (English/Arabic) with RTL rendering for Arabic, utilizing Amiri/Noto Naskh fonts for PDF generation.
+
+### Technical Implementations
+- **Frontend**: Developed with React and TypeScript, leveraging `shadcn/ui` for reusable components.
+- **Backend**: Built with Express.js and TypeScript, handling API endpoints, authentication, and business logic.
+- **Database**: PostgreSQL, managed with Drizzle ORM for database interactions and hosted on Neon.
+- **PDF Generation**: Utilizes Puppeteer for high-quality HTML-to-PDF rendering of certificates, transcripts, and invoices, including QR code verification.
+- **Authentication**: Password-based authentication with bcrypt hashing and session management, supporting six distinct user roles: `super_admin`, `examination_admin`, `logistics_admin`, `school_admin`, `examiner`, and `candidate`.
+- **Email Services**: Integrated with SendGrid via Replit Connector for reliable email delivery for verification, password resets, and notifications.
+- **File Handling**: Multer-based file uploads for documents (e.g., school badges, registration certificates) with object storage integration for persistence.
+- **Notification System**: Role-based in-app notification system with scheduled reminders and priority styling.
+- **Website CMS**: Integrated content management system for news articles, resources, announcements, and impact statistics.
+
+### Feature Specifications
+- **School Management**: Registration with email verification, profile management, school badge upload, and an invitation system for additional school administrators.
+- **Student Management**: CSV import, index number generation, and a 3-tier registration navigation workflow.
+- **Financial Management**: Three-tier fee structure (`feePerStudent`, `certificateFee`, `transcriptFee`), auto-invoice generation, bank slip upload, payment confirmation, and professional PDF invoice downloads.
+- **Results & Certificates**: CSV upload for results, public result checker, PDF certificate and transcript generation with gender-specific templates and QR verification.
+- **Administrative Tools**: Comprehensive audit logging, advanced export functionalities (CSV), and role-based access control.
+- **Exam Management**: Examiner, subject, timetable, and exam center management.
+- **Website Management**: Public-facing website content management system for news, resources, and announcements.
+- **Past Exam Year Management**: Intelligent visibility and read-only mode for completed exam years.
+
+### System Design Choices
+- **Modularity**: Separation of concerns with dedicated folders for API routes, database access, authentication, and UI components.
+- **Scalability**: Designed to manage countrywide examinations with a multi-tenant architecture for schools.
+- **Security**: Token-based workflows for invitations and password resets, bcrypt for password hashing, and role-based access control.
+
+## External Dependencies
+- **Database**: PostgreSQL (hosted on Neon)
+- **ORM**: Drizzle ORM
+- **Email Service**: SendGrid (via Replit Connector)
+- **PDF Generation**: Puppeteer
+- **UI Framework**: shadcn/ui
+- **Frontend Development**: React, TypeScript, Vite
+- **Backend Framework**: Express.js, TypeScript
+- **Authentication**: Replit Auth (for initial integration, then custom password-based with bcrypt)
