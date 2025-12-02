@@ -2245,26 +2245,237 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.post("/api/invoices/generate", isAuthenticated, async (req, res) => {
     try {
-      const { schoolId, examYearId, feePerStudent } = req.body;
-      if (!schoolId || !examYearId || !feePerStudent) {
-        return res.status(400).json({ message: "schoolId, examYearId, and feePerStudent are required" });
+      const { schoolId, examYearId } = req.body;
+      if (!schoolId || !examYearId) {
+        return res.status(400).json({ message: "schoolId and examYearId are required" });
       }
-      const students = await storage.getStudentsBySchool(schoolId);
-      const approvedStudents = students.filter(s => s.status === 'approved');
-      if (approvedStudents.length === 0) {
-        return res.status(400).json({ message: "No approved students to invoice" });
+      
+      // Get exam year to get the fee per student
+      const examYear = await storage.getExamYear(examYearId);
+      if (!examYear) {
+        return res.status(404).json({ message: "Exam year not found" });
       }
-      const invoiceNumber = `INV-${examYearId}-${schoolId}-${Date.now()}`;
-      const totalAmount = (approvedStudents.length * feePerStudent).toFixed(2);
+      
+      const feePerStudent = parseFloat(examYear.feePerStudent || '100.00');
+      
+      // Get all students for this school and exam year
+      const allStudents = await storage.getStudentsBySchool(schoolId);
+      const examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
+      
+      if (examYearStudents.length === 0) {
+        return res.status(400).json({ message: "No students registered for this exam year" });
+      }
+      
+      // Group students by grade and count
+      const studentsByGrade: Record<number, number> = {};
+      examYearStudents.forEach(s => {
+        studentsByGrade[s.grade] = (studentsByGrade[s.grade] || 0) + 1;
+      });
+      
+      // Calculate total
+      const totalStudents = examYearStudents.length;
+      const totalAmount = (totalStudents * feePerStudent).toFixed(2);
+      
+      // Generate invoice number
+      const invoiceNumber = generateInvoiceNumber(schoolId, examYearId);
+      
+      // Create the invoice
       const invoice = await storage.createInvoice({
         invoiceNumber,
         schoolId,
         examYearId,
-        totalStudents: approvedStudents.length,
+        totalStudents,
         feePerStudent: feePerStudent.toString(),
         totalAmount,
       });
-      res.status(201).json(invoice);
+      
+      // Create invoice items per grade
+      const invoiceItemsData = Object.entries(studentsByGrade).map(([grade, count]) => ({
+        invoiceId: invoice.id,
+        grade: parseInt(grade),
+        studentCount: count,
+        feePerStudent: feePerStudent.toString(),
+        subtotal: (count * feePerStudent).toFixed(2),
+      }));
+      
+      const items = await storage.createInvoiceItemsBulk(invoiceItemsData);
+      
+      res.status(201).json({ invoice, items });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Auto-generate invoice for school admin after student registration
+  app.post("/api/invoices/auto-generate", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // School admins can only generate invoices for their own school
+      let schoolId = req.body.schoolId;
+      if (user.role === 'school_admin') {
+        if (!user.schoolId) {
+          return res.status(400).json({ message: "School admin not associated with a school" });
+        }
+        schoolId = user.schoolId;
+      }
+      
+      if (!schoolId) {
+        return res.status(400).json({ message: "schoolId is required" });
+      }
+      
+      // Get active exam year
+      const activeExamYear = await storage.getActiveExamYear();
+      if (!activeExamYear) {
+        return res.status(400).json({ message: "No active exam year found" });
+      }
+      
+      const examYearId = activeExamYear.id;
+      const feePerStudent = parseFloat(activeExamYear.feePerStudent || '100.00');
+      
+      // Check if invoice already exists for this school and exam year
+      const existingInvoices = await storage.getInvoicesBySchool(schoolId);
+      const existingInvoice = existingInvoices.find(inv => inv.examYearId === examYearId);
+      
+      if (existingInvoice) {
+        // Update existing invoice with new student counts
+        const allStudents = await storage.getStudentsBySchool(schoolId);
+        const examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
+        
+        if (examYearStudents.length === 0) {
+          return res.status(400).json({ message: "No students registered for this exam year" });
+        }
+        
+        // Group students by grade
+        const studentsByGrade: Record<number, number> = {};
+        examYearStudents.forEach(s => {
+          studentsByGrade[s.grade] = (studentsByGrade[s.grade] || 0) + 1;
+        });
+        
+        const totalStudents = examYearStudents.length;
+        const totalAmount = (totalStudents * feePerStudent).toFixed(2);
+        
+        // Update invoice
+        const updatedInvoice = await storage.updateInvoice(existingInvoice.id, {
+          totalStudents,
+          totalAmount,
+          feePerStudent: feePerStudent.toString(),
+        });
+        
+        // Delete old items and create new ones
+        await storage.deleteInvoiceItemsByInvoice(existingInvoice.id);
+        
+        const invoiceItemsData = Object.entries(studentsByGrade).map(([grade, count]) => ({
+          invoiceId: existingInvoice.id,
+          grade: parseInt(grade),
+          studentCount: count,
+          feePerStudent: feePerStudent.toString(),
+          subtotal: (count * feePerStudent).toFixed(2),
+        }));
+        
+        const items = await storage.createInvoiceItemsBulk(invoiceItemsData);
+        
+        return res.json({ 
+          invoice: updatedInvoice, 
+          items, 
+          updated: true,
+          message: "Invoice updated with current student count" 
+        });
+      }
+      
+      // Create new invoice
+      const allStudents = await storage.getStudentsBySchool(schoolId);
+      const examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
+      
+      if (examYearStudents.length === 0) {
+        return res.status(400).json({ message: "No students registered for this exam year" });
+      }
+      
+      // Group students by grade
+      const studentsByGrade: Record<number, number> = {};
+      examYearStudents.forEach(s => {
+        studentsByGrade[s.grade] = (studentsByGrade[s.grade] || 0) + 1;
+      });
+      
+      const totalStudents = examYearStudents.length;
+      const totalAmount = (totalStudents * feePerStudent).toFixed(2);
+      
+      // Generate invoice number
+      const invoiceNumber = generateInvoiceNumber(schoolId, examYearId);
+      
+      // Create the invoice
+      const invoice = await storage.createInvoice({
+        invoiceNumber,
+        schoolId,
+        examYearId,
+        totalStudents,
+        feePerStudent: feePerStudent.toString(),
+        totalAmount,
+      });
+      
+      // Create invoice items per grade
+      const invoiceItemsData = Object.entries(studentsByGrade).map(([grade, count]) => ({
+        invoiceId: invoice.id,
+        grade: parseInt(grade),
+        studentCount: count,
+        feePerStudent: feePerStudent.toString(),
+        subtotal: (count * feePerStudent).toFixed(2),
+      }));
+      
+      const items = await storage.createInvoiceItemsBulk(invoiceItemsData);
+      
+      res.status(201).json({ 
+        invoice, 
+        items, 
+        updated: false,
+        message: "Invoice generated successfully" 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get invoice with items
+  app.get("/api/invoices/:id/details", async (req, res) => {
+    try {
+      const invoice = await storage.getInvoice(parseInt(req.params.id));
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      const items = await storage.getInvoiceItems(invoice.id);
+      const school = await storage.getSchool(invoice.schoolId);
+      const examYear = invoice.examYearId ? await storage.getExamYear(invoice.examYearId) : null;
+      res.json({ invoice, items, school, examYear });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get school's invoice for active exam year
+  app.get("/api/school/invoice", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'school_admin' || !user.schoolId) {
+        return res.status(403).json({ message: "Only school admins can access this endpoint" });
+      }
+      
+      const activeExamYear = await storage.getActiveExamYear();
+      if (!activeExamYear) {
+        return res.json({ invoice: null, message: "No active exam year" });
+      }
+      
+      const invoices = await storage.getInvoicesBySchool(user.schoolId);
+      const invoice = invoices.find(inv => inv.examYearId === activeExamYear.id);
+      
+      if (!invoice) {
+        return res.json({ invoice: null, message: "No invoice found for current exam year" });
+      }
+      
+      const items = await storage.getInvoiceItems(invoice.id);
+      res.json({ invoice, items, examYear: activeExamYear });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
