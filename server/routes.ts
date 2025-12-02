@@ -2991,10 +2991,56 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "Invalid file type. Please upload PDF, JPG, or PNG." });
       }
       
-      // Store the file as base64 data URL (for production would use object storage)
-      const bankSlipUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+      // Upload file to object storage instead of storing base64
+      const { ObjectStorageService } = await import("./objectStorage");
+      const objectStorageService = new ObjectStorageService();
       
-      // Update invoice with bank slip and set to processing status
+      // Generate unique filename for the bank slip
+      const fileExt = req.file.originalname.split('.').pop() || 'png';
+      const uniqueFilename = `bank-slip-${invoiceId}-${Date.now()}.${fileExt}`;
+      
+      // Get upload URL from object storage
+      let uploadURL: string;
+      let objectPath: string;
+      try {
+        const result = await objectStorageService.getObjectEntityUploadURL(uniqueFilename);
+        uploadURL = result.uploadURL;
+        objectPath = result.objectPath;
+      } catch (urlError: any) {
+        console.error("Failed to get upload URL for bank slip:", urlError);
+        return res.status(500).json({ message: "Failed to prepare file upload. Please try again." });
+      }
+      
+      // Upload file buffer to object storage
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: req.file.buffer,
+        headers: {
+          'Content-Type': req.file.mimetype,
+        },
+      });
+      
+      if (!uploadResponse.ok) {
+        console.error("Bank slip upload failed:", uploadResponse.status, uploadResponse.statusText);
+        return res.status(500).json({ message: "Failed to upload file. Please try again." });
+      }
+      
+      // Set ACL policy to make file accessible
+      let bankSlipUrl: string;
+      try {
+        bankSlipUrl = await objectStorageService.trySetObjectEntityAclPolicy(
+          uploadURL,
+          { owner: user.id, visibility: 'public' }
+        );
+        if (!bankSlipUrl) {
+          throw new Error("ACL policy returned empty path");
+        }
+      } catch (aclError: any) {
+        console.error("Failed to set ACL policy for bank slip:", aclError);
+        return res.status(500).json({ message: "File uploaded but failed to make it accessible. Please try again." });
+      }
+      
+      // Update invoice with bank slip URL and set to processing status
       const updatedInvoice = await storage.updateInvoice(invoiceId, {
         bankSlipUrl,
         status: 'processing' as any,
@@ -3005,6 +3051,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         invoice: updatedInvoice 
       });
     } catch (error: any) {
+      console.error("Bank slip upload error:", error);
       res.status(500).json({ message: error.message });
     }
   });
