@@ -62,6 +62,7 @@ import {
   Clock,
   FileText,
   CreditCard,
+  AlertCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -322,8 +323,21 @@ export default function Students() {
     return queryString ? `/api/students?${queryString}` : "/api/students";
   }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedExamYear, isSchoolAdmin, schoolProfile?.id]);
 
+  // Fetch all students for school across ALL exam years (for past year visibility check)
+  // This is NOT scoped by selectedExamYear so we can always check which years have students
+  const allSchoolStudentsUrl = useMemo(() => {
+    if (!isSchoolAdmin || !schoolProfile?.id) return null;
+    return `/api/students?schoolId=${schoolProfile.id}`;
+  }, [isSchoolAdmin, schoolProfile?.id]);
+
   const { data: allStudents } = useQuery<StudentWithRelations[]>({
     queryKey: [allStudentsUrl],
+  });
+
+  // Unscoped student list for visibility checks (all years)
+  const { data: allSchoolStudents, isLoading: allSchoolStudentsLoading } = useQuery<StudentWithRelations[]>({
+    queryKey: [allSchoolStudentsUrl],
+    enabled: !!allSchoolStudentsUrl,
   });
 
   const { data: students, isLoading } = useQuery<StudentWithRelations[]>({
@@ -634,16 +648,51 @@ export default function Students() {
       {/* Exam Year Cards */}
       {examYearsLoading ? (
         <GradeCardSkeleton />
-      ) : (examYears as any[])?.length > 0 ? (
+      ) : (() => {
+        // Filter exam years for school admins
+        const filteredExamYears = (examYears as any[])?.filter((examYear) => {
+          // Check if exam is past (examEndDate < current date)
+          const isPast = examYear.examEndDate && new Date(examYear.examEndDate) < new Date();
+          
+          // For school admins, only show:
+          // 1. Active exam years (can register students)
+          // 2. Past exam years where school has registered students (view-only)
+          // Do NOT show: inactive future years
+          if (isSchoolAdmin) {
+            // Always show active exam years
+            if (examYear.isActive) return true;
+            // For past exam years, only show if school has registered students
+            if (isPast) {
+              // If unscoped query is still loading, show past years temporarily (safe fallback)
+              // This prevents past years from disappearing during load
+              if (allSchoolStudentsLoading || !allSchoolStudents) {
+                return true; // Show all past years while loading
+              }
+              // Once loaded, check if school has students for this past exam year
+              const studentsInThisYear = allSchoolStudents.filter(s => s.examYearId === examYear.id);
+              return studentsInThisYear.length > 0;
+            }
+            // Hide non-active, non-past (future) exam years from school admins
+            return false;
+          }
+          // Admins can see all exam years
+          return true;
+        }) || [];
+
+        return filteredExamYears.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(examYears as any[]).map((examYear) => {
+          {filteredExamYears.map((examYear) => {
             const isActive = examYear.isActive;
+            const isPast = examYear.examEndDate && new Date(examYear.examEndDate) < new Date();
             const hasDeadlinePassed = examYear.registrationEndDate && new Date(examYear.registrationEndDate) < new Date();
+            // Use unscoped query for school admins, scoped for admins
+            const studentsInThisYear = (isSchoolAdmin ? allSchoolStudents : allStudents)?.filter(s => s.examYearId === examYear.id)?.length || 0;
             
             return (
               <Card 
                 key={examYear.id}
                 className={`hover-elevate active-elevate-2 cursor-pointer transition-all border-2 ${
+                  isPast ? 'border-destructive/30 bg-destructive/5' :
                   isActive ? 'border-primary/50 bg-primary/5' : 'border-muted'
                 } hover:shadow-lg`}
                 onClick={() => {
@@ -653,23 +702,49 @@ export default function Students() {
                 data-testid={`card-exam-year-${examYear.id}`}
               >
                 <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`w-14 h-14 rounded-xl ${isActive ? 'bg-primary/20' : 'bg-muted'} flex items-center justify-center`}>
-                      <Calendar className={`w-7 h-7 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <div className="flex items-start justify-between mb-4 gap-2">
+                    <div className={`w-14 h-14 rounded-xl ${
+                      isPast ? 'bg-destructive/20' :
+                      isActive ? 'bg-primary/20' : 'bg-muted'
+                    } flex items-center justify-center`}>
+                      <Calendar className={`w-7 h-7 ${
+                        isPast ? 'text-destructive' :
+                        isActive ? 'text-primary' : 'text-muted-foreground'
+                      }`} />
                     </div>
-                    {isActive && (
-                      <Badge className="bg-primary/10 text-primary">
-                        {isRTL ? "نشطة" : "Active"}
-                      </Badge>
-                    )}
-                    {hasDeadlinePassed && !isActive && (
-                      <Badge variant="secondary" className="bg-muted text-muted-foreground">
-                        {isRTL ? "مغلق" : "Closed"}
-                      </Badge>
-                    )}
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      {isPast && (
+                        <Badge className="bg-destructive text-destructive-foreground">
+                          {isRTL ? "ماضي" : "Past"}
+                        </Badge>
+                      )}
+                      {isActive && !isPast && (
+                        <Badge className="bg-primary/10 text-primary">
+                          {isRTL ? "نشطة" : "Active"}
+                        </Badge>
+                      )}
+                      {hasDeadlinePassed && !isActive && !isPast && (
+                        <Badge variant="secondary" className="bg-muted text-muted-foreground">
+                          {isRTL ? "مغلق" : "Closed"}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   
                   <h3 className="text-xl font-bold mb-2">{examYear.name}</h3>
+                  
+                  {/* Show registered student count for this exam year */}
+                  {studentsInThisYear > 0 && (
+                    <p className="text-sm text-primary font-medium mb-2">
+                      {isRTL ? `${studentsInThisYear} طالب مسجل` : `${studentsInThisYear} students registered`}
+                    </p>
+                  )}
+                  
+                  {isPast && isSchoolAdmin && (
+                    <p className="text-xs text-muted-foreground mb-2 italic">
+                      {isRTL ? "للعرض فقط - لا يمكن التعديل" : "View only - no changes allowed"}
+                    </p>
+                  )}
                   
                   {examYear.registrationEndDate && (
                     <p className="text-sm text-muted-foreground mb-2">
@@ -720,13 +795,40 @@ export default function Students() {
             </p>
           </CardContent>
         </Card>
-      )}
+      );
+      })()}
     </div>
   );
 
   // TIER 2: Grade Dashboard View (after exam year is selected)
-  const renderGradeDashboard = () => (
+  const renderGradeDashboard = () => {
+    // Check if this is a past exam year
+    const isPastExamYear = selectedExamYearObj?.examEndDate && new Date(selectedExamYearObj.examEndDate) < new Date();
+    const isReadOnly = isSchoolAdmin && isPastExamYear;
+    
+    return (
     <div className="space-y-6">
+      {/* Read-only warning for past exam years */}
+      {isReadOnly && (
+        <Card className="border-2 border-destructive/30 bg-destructive/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-6 h-6 text-destructive shrink-0" />
+              <div>
+                <h3 className="font-semibold text-destructive">
+                  {isRTL ? "سنة امتحانية منتهية - للعرض فقط" : "Past Examination Year - View Only"}
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {isRTL 
+                    ? "هذه السنة الامتحانية قد انتهت. يمكنك فقط عرض الطلاب المسجلين."
+                    : "This examination year has ended. You can only view registered students."}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header with Back Button */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -742,50 +844,61 @@ export default function Students() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
-              {selectedExamYearObj?.name || (isRTL ? "اختر الصف" : "Select Grade")}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
+                {selectedExamYearObj?.name || (isRTL ? "اختر الصف" : "Select Grade")}
+              </h1>
+              {isPastExamYear && (
+                <Badge className="bg-destructive text-destructive-foreground">
+                  {isRTL ? "ماضي" : "Past"}
+                </Badge>
+              )}
+            </div>
             <p className="text-muted-foreground mt-1">
-              {isRTL ? "الخطوة 2: اختر الصف لتسجيل الطلاب" : "Step 2: Select a grade to register students"}
+              {isReadOnly 
+                ? (isRTL ? "عرض الطلاب المسجلين سابقاً" : "View previously registered students")
+                : (isRTL ? "الخطوة 2: اختر الصف لتسجيل الطلاب" : "Step 2: Select a grade to register students")}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Step 2 Instructions */}
-      <Card className="border-2 border-chart-2/20 bg-chart-2/5">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-chart-2 text-white flex items-center justify-center font-bold text-sm shrink-0">
-              2
+      {/* Step 2 Instructions - hide for read-only mode */}
+      {!isReadOnly && (
+        <Card className="border-2 border-chart-2/20 bg-chart-2/5">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-chart-2 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                2
+              </div>
+              <div>
+                <h3 className="font-semibold text-chart-2">
+                  {isRTL ? "الخطوة 2: اختر الصف الدراسي" : "Step 2: Select Grade Level"}
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {isRTL 
+                    ? "اختر الصف الذي تريد تسجيل الطلاب فيه. الصفوف المعروضة تعتمد على نوع مدرستك والسنة الامتحانية المختارة."
+                    : "Choose the grade level you want to register students for. Grades shown depend on your school type and the selected exam year."}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold text-chart-2">
-                {isRTL ? "الخطوة 2: اختر الصف الدراسي" : "Step 2: Select Grade Level"}
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {isRTL 
-                  ? "اختر الصف الذي تريد تسجيل الطلاب فيه. الصفوف المعروضة تعتمد على نوع مدرستك والسنة الامتحانية المختارة."
-                  : "Choose the grade level you want to register students for. Grades shown depend on your school type and the selected exam year."}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Selected Exam Year Info */}
       {selectedExamYearObj && (
-        <div className="bg-primary/10 border border-primary/20 rounded-md p-4">
+        <div className={`${isPastExamYear ? 'bg-destructive/10 border-destructive/20' : 'bg-primary/10 border-primary/20'} border rounded-md p-4`}>
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-primary" />
+              <div className={`w-10 h-10 rounded-lg ${isPastExamYear ? 'bg-destructive/20' : 'bg-primary/20'} flex items-center justify-center`}>
+                <Calendar className={`w-5 h-5 ${isPastExamYear ? 'text-destructive' : 'text-primary'}`} />
               </div>
               <div>
-                <p className="font-medium text-primary">
+                <p className={`font-medium ${isPastExamYear ? 'text-destructive' : 'text-primary'}`}>
                   {isRTL ? "السنة الامتحانية المختارة" : "Selected Exam Year"}
                 </p>
-                <p className="text-sm text-primary/80">{selectedExamYearObj.name}</p>
+                <p className={`text-sm ${isPastExamYear ? 'text-destructive/80' : 'text-primary/80'}`}>{selectedExamYearObj.name}</p>
               </div>
             </div>
             {selectedExamYearObj.registrationEndDate && (
@@ -844,35 +957,44 @@ export default function Students() {
                     </div>
                   </div>
                   
-                  <div className="mt-4 pt-4 border-t flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedGrade(grade);
-                        setShowUploadDialog(true);
-                      }}
-                      data-testid={`button-upload-grade-${grade}`}
-                    >
-                      <Upload className="w-4 h-4 me-1" />
-                      {isRTL ? "رفع" : "Upload"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open('/api/templates/students');
-                      }}
-                      data-testid={`button-template-grade-${grade}`}
-                    >
-                      <Download className="w-4 h-4 me-1" />
-                      {isRTL ? "القالب" : "Template"}
-                    </Button>
-                  </div>
+                  {/* Hide upload buttons for read-only mode (past exam years) */}
+                  {!isReadOnly ? (
+                    <div className="mt-4 pt-4 border-t flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedGrade(grade);
+                          setShowUploadDialog(true);
+                        }}
+                        data-testid={`button-upload-grade-${grade}`}
+                      >
+                        <Upload className="w-4 h-4 me-1" />
+                        {isRTL ? "رفع" : "Upload"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open('/api/templates/students');
+                        }}
+                        data-testid={`button-template-grade-${grade}`}
+                      >
+                        <Download className="w-4 h-4 me-1" />
+                        {isRTL ? "القالب" : "Template"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="mt-4 pt-4 border-t">
+                      <p className="text-xs text-muted-foreground text-center">
+                        {isRTL ? "انقر للعرض" : "Click to view"}
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -895,14 +1017,40 @@ export default function Students() {
       )}
     </div>
   );
+  };
 
   // TIER 3: Grade Detail View (with student list and upload)
   const renderGradeDetail = () => {
     const colors = getGradeColors(selectedGrade!);
     const currentExamYear = selectedExamYearObj || activeExamYear;
+    // Check if this is a past exam year (exam has ended)
+    const isPastExamYear = currentExamYear?.examEndDate && new Date(currentExamYear.examEndDate) < new Date();
+    // School admins can only view past exam years, not edit
+    const isReadOnly = isSchoolAdmin && isPastExamYear;
     
     return (
       <div className="space-y-6">
+        {/* Read-only warning for past exam years */}
+        {isReadOnly && (
+          <Card className="border-2 border-destructive/30 bg-destructive/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-6 h-6 text-destructive shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-destructive">
+                    {isRTL ? "سنة امتحانية منتهية - للعرض فقط" : "Past Examination Year - View Only"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {isRTL 
+                      ? "لا يمكن تعديل سجلات هذه السنة الامتحانية لأنها قد انتهت. يمكنك فقط عرض الطلاب المسجلين."
+                      : "Records for this examination year cannot be modified as it has ended. You can only view registered students."}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Header with Back Button */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -915,42 +1063,54 @@ export default function Students() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
-                {getGradeLabel(selectedGrade!, isRTL)}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
+                  {getGradeLabel(selectedGrade!, isRTL)}
+                </h1>
+                {isPastExamYear && (
+                  <Badge className="bg-destructive text-destructive-foreground">
+                    {isRTL ? "ماضي" : "Past"}
+                  </Badge>
+                )}
+              </div>
               <p className="text-muted-foreground mt-1">
-                {currentExamYear?.name} - {isRTL ? "الخطوة 3: تسجيل الطلاب" : "Step 3: Register Students"}
+                {currentExamYear?.name} - {isReadOnly 
+                  ? (isRTL ? "عرض الطلاب المسجلين" : "Viewing Registered Students")
+                  : (isRTL ? "الخطوة 3: تسجيل الطلاب" : "Step 3: Register Students")}
               </p>
             </div>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => setShowUploadDialog(true)} data-testid="button-upload-csv">
-              <Upload className="w-4 h-4 me-2" />
-              {t.common.uploadCSV}
-            </Button>
-            <Button variant="outline" onClick={() => window.open('/api/templates/students')} data-testid="button-download-template">
-              <FileSpreadsheet className="w-4 h-4 me-2" />
-              {isRTL ? "القالب" : "Template"}
-            </Button>
-            {/* Approve All button - only for super_admin and examination_admin */}
-            {canApproveStudents && pendingCount > 0 && (
-              <Button 
-                onClick={() => {
-                  const pendingIds = students?.filter(s => s.status === 'pending').map(s => s.id) || [];
-                  bulkApproveMutation.mutate(pendingIds);
-                }}
-                disabled={bulkApproveMutation.isPending}
-                data-testid="button-approve-all"
-              >
-                {bulkApproveMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
-                ) : (
-                  <CheckCircle className="w-4 h-4 me-2" />
-                )}
-                {isRTL ? `موافقة الكل (${pendingCount})` : `Approve All (${pendingCount})`}
+          {/* Hide action buttons for read-only mode */}
+          {!isReadOnly && (
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" onClick={() => setShowUploadDialog(true)} data-testid="button-upload-csv">
+                <Upload className="w-4 h-4 me-2" />
+                {t.common.uploadCSV}
               </Button>
-            )}
-          </div>
+              <Button variant="outline" onClick={() => window.open('/api/templates/students')} data-testid="button-download-template">
+                <FileSpreadsheet className="w-4 h-4 me-2" />
+                {isRTL ? "القالب" : "Template"}
+              </Button>
+              {/* Approve All button - only for super_admin and examination_admin */}
+              {canApproveStudents && pendingCount > 0 && (
+                <Button 
+                  onClick={() => {
+                    const pendingIds = students?.filter(s => s.status === 'pending').map(s => s.id) || [];
+                    bulkApproveMutation.mutate(pendingIds);
+                  }}
+                  disabled={bulkApproveMutation.isPending}
+                  data-testid="button-approve-all"
+                >
+                  {bulkApproveMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4 me-2" />
+                  )}
+                  {isRTL ? `موافقة الكل (${pendingCount})` : `Approve All (${pendingCount})`}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Step 3 Instructions */}
