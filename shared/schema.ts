@@ -29,7 +29,7 @@ export const userStatusEnum = pgEnum('user_status', ['pending', 'active', 'suspe
 
 export const schoolTypeEnum = pgEnum('school_type', ['LBS', 'UBS', 'BCS', 'SSS']);
 export const schoolStatusEnum = pgEnum('school_status', ['pending', 'verified', 'approved', 'rejected']);
-export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'processing', 'paid', 'failed']);
+export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'processing', 'paid', 'failed', 'rejected']);
 export const studentStatusEnum = pgEnum('student_status', ['pending', 'approved', 'rejected']);
 export const resultStatusEnum = pgEnum('result_status', ['pending', 'validated', 'published']);
 export const examinerStatusEnum = pgEnum('examiner_status', ['pending', 'verified', 'active', 'inactive']);
@@ -230,6 +230,9 @@ export const invoices = pgTable("invoices", {
   paymentDate: timestamp("payment_date"),
   paymentMethod: varchar("payment_method", { length: 50 }),
   notes: text("notes"),
+  rejectionReason: text("rejection_reason"),
+  rejectedAt: timestamp("rejected_at"),
+  rejectedBy: varchar("rejected_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
