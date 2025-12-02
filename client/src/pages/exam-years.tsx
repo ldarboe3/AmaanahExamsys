@@ -68,6 +68,9 @@ const examYearSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
   hijriYear: z.string().optional(),
   grades: z.array(z.coerce.number()).default([]),
+  feePerStudent: z.string().optional(),
+  certificateFee: z.string().optional(),
+  transcriptFee: z.string().optional(),
   registrationStartDate: z.string().optional(),
   registrationEndDate: z.string().optional(),
   examStartDate: z.string().optional(),
@@ -228,6 +231,9 @@ export default function ExamYears() {
       name: "",
       hijriYear: "",
       grades: [],
+      feePerStudent: "100.00",
+      certificateFee: "50.00",
+      transcriptFee: "25.00",
       isActive: false,
     },
   });
@@ -248,6 +254,9 @@ export default function ExamYears() {
       name: examYear.name,
       hijriYear: examYear.hijriYear || "",
       grades: examYear.grades || [],
+      feePerStudent: examYear.feePerStudent?.toString() || "100.00",
+      certificateFee: (examYear as any).certificateFee?.toString() || "50.00",
+      transcriptFee: (examYear as any).transcriptFee?.toString() || "25.00",
       registrationStartDate: formatDateForInput(examYear.registrationStartDate),
       registrationEndDate: formatDateForInput(examYear.registrationEndDate),
       examStartDate: formatDateForInput(examYear.examStartDate),
@@ -538,6 +547,55 @@ export default function ExamYears() {
                 )}
               />
 
+              {/* Fee Structure Section */}
+              <div className="space-y-3">
+                <FormLabel className="text-base font-medium">Fee Structure (GMD)</FormLabel>
+                <FormDescription>
+                  Set the fees per student for this examination year
+                </FormDescription>
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="feePerStudent"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Registration Fee</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="100.00" {...field} data-testid="input-registration-fee" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="certificateFee"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Certificate Fee</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="50.00" {...field} data-testid="input-certificate-fee" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="transcriptFee"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Transcript Fee</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="25.00" {...field} data-testid="input-transcript-fee" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -734,6 +792,55 @@ export default function ExamYears() {
                   </FormItem>
                 )}
               />
+
+              {/* Fee Structure Section */}
+              <div className="space-y-3">
+                <FormLabel className="text-base font-medium">Fee Structure (GMD)</FormLabel>
+                <FormDescription>
+                  Set the fees per student for this examination year
+                </FormDescription>
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="feePerStudent"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Registration Fee</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="100.00" {...field} data-testid="input-edit-registration-fee" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="certificateFee"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Certificate Fee</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="50.00" {...field} data-testid="input-edit-certificate-fee" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="transcriptFee"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Transcript Fee</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="25.00" {...field} data-testid="input-edit-transcript-fee" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
