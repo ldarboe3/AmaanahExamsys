@@ -597,55 +597,74 @@ export default function Students() {
         )}
 
         {/* Registration Deadline Countdown */}
-        {countdown && (
-          <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="countdown-card">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <Clock className="w-6 h-6 text-primary" />
-                <h2 className="text-lg font-bold text-primary">
-                  {isRTL ? "الوقت المتبقي للتسجيل" : "Registration Deadline"}
-                </h2>
-              </div>
-              <div className="flex items-center justify-center gap-4 flex-wrap">
-                <div className="text-center min-w-[80px]">
-                  <p className="text-3xl md:text-4xl font-bold text-foreground" data-testid="countdown-days">
-                    {String(countdown.days).padStart(2, '0')}
-                  </p>
-                  <p className="text-sm font-bold text-muted-foreground uppercase tracking-wide">
-                    {isRTL ? "أيام" : "Days"}
-                  </p>
+        {countdown && (() => {
+          const isUrgent = countdown.days < 3;
+          const cardClass = isUrgent 
+            ? "border-2 border-destructive bg-destructive text-white" 
+            : "border-2 border-primary/30 bg-gradient-to-r from-primary/5 to-primary/10";
+          const iconClass = isUrgent ? "text-white" : "text-primary";
+          const titleClass = isUrgent ? "text-white" : "text-primary";
+          const numberClass = isUrgent ? "text-white" : "text-foreground";
+          const labelClass = isUrgent ? "text-white/80" : "text-muted-foreground";
+          const separatorClass = isUrgent ? "text-white/60" : "text-muted-foreground";
+          
+          return (
+            <Card className={cardClass} data-testid="countdown-card">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <Clock className={`w-6 h-6 ${iconClass}`} />
+                  <h2 className={`text-lg font-bold ${titleClass}`}>
+                    {isRTL ? "الوقت المتبقي للتسجيل" : "Registration Deadline"}
+                  </h2>
                 </div>
-                <span className="text-3xl md:text-4xl font-bold text-muted-foreground">:</span>
-                <div className="text-center min-w-[80px]">
-                  <p className="text-3xl md:text-4xl font-bold text-foreground" data-testid="countdown-hours">
-                    {String(countdown.hours).padStart(2, '0')}
+                {isUrgent && (
+                  <p className="text-center text-sm font-medium text-white/90 mb-4">
+                    {isRTL 
+                      ? "⚠️ تحذير: التأخير في التسجيل يترتب عليه غرامة!" 
+                      : "⚠️ Warning: Late registration will incur a penalty!"}
                   </p>
-                  <p className="text-sm font-bold text-muted-foreground uppercase tracking-wide">
-                    {isRTL ? "ساعات" : "Hours"}
-                  </p>
+                )}
+                <div className="flex items-center justify-center gap-4 flex-wrap">
+                  <div className="text-center min-w-[80px]">
+                    <p className={`text-3xl md:text-4xl font-bold ${numberClass}`} data-testid="countdown-days">
+                      {String(countdown.days).padStart(2, '0')}
+                    </p>
+                    <p className={`text-sm font-bold uppercase tracking-wide ${labelClass}`}>
+                      {isRTL ? "أيام" : "Days"}
+                    </p>
+                  </div>
+                  <span className={`text-3xl md:text-4xl font-bold ${separatorClass}`}>:</span>
+                  <div className="text-center min-w-[80px]">
+                    <p className={`text-3xl md:text-4xl font-bold ${numberClass}`} data-testid="countdown-hours">
+                      {String(countdown.hours).padStart(2, '0')}
+                    </p>
+                    <p className={`text-sm font-bold uppercase tracking-wide ${labelClass}`}>
+                      {isRTL ? "ساعات" : "Hours"}
+                    </p>
+                  </div>
+                  <span className={`text-3xl md:text-4xl font-bold ${separatorClass}`}>:</span>
+                  <div className="text-center min-w-[80px]">
+                    <p className={`text-3xl md:text-4xl font-bold ${numberClass}`} data-testid="countdown-minutes">
+                      {String(countdown.minutes).padStart(2, '0')}
+                    </p>
+                    <p className={`text-sm font-bold uppercase tracking-wide ${labelClass}`}>
+                      {isRTL ? "دقائق" : "Minutes"}
+                    </p>
+                  </div>
+                  <span className={`text-3xl md:text-4xl font-bold ${separatorClass}`}>:</span>
+                  <div className="text-center min-w-[80px]">
+                    <p className={`text-3xl md:text-4xl font-bold ${numberClass}`} data-testid="countdown-seconds">
+                      {String(countdown.seconds).padStart(2, '0')}
+                    </p>
+                    <p className={`text-sm font-bold uppercase tracking-wide ${labelClass}`}>
+                      {isRTL ? "ثواني" : "Seconds"}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-3xl md:text-4xl font-bold text-muted-foreground">:</span>
-                <div className="text-center min-w-[80px]">
-                  <p className="text-3xl md:text-4xl font-bold text-foreground" data-testid="countdown-minutes">
-                    {String(countdown.minutes).padStart(2, '0')}
-                  </p>
-                  <p className="text-sm font-bold text-muted-foreground uppercase tracking-wide">
-                    {isRTL ? "دقائق" : "Minutes"}
-                  </p>
-                </div>
-                <span className="text-3xl md:text-4xl font-bold text-muted-foreground">:</span>
-                <div className="text-center min-w-[80px]">
-                  <p className="text-3xl md:text-4xl font-bold text-foreground" data-testid="countdown-seconds">
-                    {String(countdown.seconds).padStart(2, '0')}
-                  </p>
-                  <p className="text-sm font-bold text-muted-foreground uppercase tracking-wide">
-                    {isRTL ? "ثواني" : "Seconds"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
