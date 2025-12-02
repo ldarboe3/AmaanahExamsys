@@ -111,14 +111,19 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     const inbox = inboxes[0];
     
-    // Construct a valid from address
-    let fromAddress = 'noreply@agentmail.to';
-    if (inbox.address) {
-      fromAddress = inbox.address;
-    } else if (inbox.username && inbox.domain) {
-      fromAddress = `${inbox.username}@${inbox.domain}`;
-    } else if (inbox.email) {
-      fromAddress = inbox.email;
+    // Use configured FROM_EMAIL or derive from inbox
+    let fromAddress = process.env.FROM_EMAIL || 'info@amaanah.gm';
+    if (!fromAddress || !fromAddress.includes('@')) {
+      // Fallback to inbox address if configured one is invalid
+      if (inbox.address) {
+        fromAddress = inbox.address;
+      } else if (inbox.username && inbox.domain) {
+        fromAddress = `${inbox.username}@${inbox.domain}`;
+      } else if (inbox.email) {
+        fromAddress = inbox.email;
+      } else {
+        fromAddress = 'noreply@agentmail.to';
+      }
     }
 
     // Validate from address
