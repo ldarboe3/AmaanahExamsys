@@ -6285,6 +6285,175 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Public statistics query endpoint
+  app.get("/api/public/statistics", async (req, res) => {
+    try {
+      const category = req.query.category as string || 'students';
+      const groupBy = req.query.groupBy as string || 'region';
+      const regionId = req.query.regionId as string;
+
+      interface StatResult {
+        label: string;
+        count: number;
+      }
+
+      let results: StatResult[] = [];
+      let total = 0;
+      let availableInEmis = true;
+
+      // Check if this is data that needs to come from EMIS
+      const emisRequiredData = ['ethnicity', 'shift', 'qualification'];
+      if (emisRequiredData.includes(groupBy)) {
+        availableInEmis = false;
+        return res.json({
+          results: [],
+          total: 0,
+          groupBy: groupBy,
+          category: category,
+          availableInEmis: false
+        });
+      }
+
+      if (category === 'students') {
+        const students = await storage.getAllStudents();
+        const approvedStudents = students.filter(s => s.status === 'approved');
+        total = approvedStudents.length;
+
+        if (groupBy === 'region') {
+          const regions = await storage.getAllRegions();
+          const schools = await storage.getAllSchools();
+          
+          const regionCounts: Record<number, number> = {};
+          approvedStudents.forEach(student => {
+            const school = schools.find(s => s.id === student.schoolId);
+            if (school?.regionId) {
+              regionCounts[school.regionId] = (regionCounts[school.regionId] || 0) + 1;
+            }
+          });
+
+          results = regions.map(region => ({
+            label: region.name,
+            count: regionCounts[region.id] || 0
+          })).filter(r => r.count > 0);
+        } else if (groupBy === 'cluster') {
+          const clusters = await storage.getAllClusters();
+          const schools = await storage.getAllSchools();
+          
+          let filteredClusters = clusters;
+          if (regionId && regionId !== 'all') {
+            filteredClusters = clusters.filter(c => c.regionId === parseInt(regionId));
+          }
+          
+          const clusterCounts: Record<number, number> = {};
+          approvedStudents.forEach(student => {
+            const school = schools.find(s => s.id === student.schoolId);
+            if (school?.clusterId) {
+              clusterCounts[school.clusterId] = (clusterCounts[school.clusterId] || 0) + 1;
+            }
+          });
+
+          results = filteredClusters.map(cluster => ({
+            label: cluster.name,
+            count: clusterCounts[cluster.id] || 0
+          })).filter(r => r.count > 0);
+        } else if (groupBy === 'school') {
+          const schools = await storage.getAllSchools();
+          
+          let filteredSchools = schools;
+          if (regionId && regionId !== 'all') {
+            filteredSchools = schools.filter(s => s.regionId === parseInt(regionId));
+          }
+          
+          const schoolCounts: Record<number, number> = {};
+          approvedStudents.forEach(student => {
+            schoolCounts[student.schoolId] = (schoolCounts[student.schoolId] || 0) + 1;
+          });
+
+          results = filteredSchools
+            .filter(school => schoolCounts[school.id])
+            .map(school => ({
+              label: school.name,
+              count: schoolCounts[school.id] || 0
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 20);
+        } else if (groupBy === 'gender') {
+          const genderCounts: Record<string, number> = { male: 0, female: 0 };
+          approvedStudents.forEach(student => {
+            if (student.gender) {
+              genderCounts[student.gender] = (genderCounts[student.gender] || 0) + 1;
+            }
+          });
+
+          results = [
+            { label: 'Male', count: genderCounts.male },
+            { label: 'Female', count: genderCounts.female }
+          ];
+        }
+      } else if (category === 'teachers') {
+        // Teachers data - will be fetched from EMIS later
+        availableInEmis = false;
+        return res.json({
+          results: [],
+          total: 0,
+          groupBy: groupBy,
+          category: category,
+          availableInEmis: false
+        });
+      } else if (category === 'schools') {
+        const schools = await storage.getAllSchools();
+        const approvedSchools = schools.filter(s => s.status === 'approved');
+        total = approvedSchools.length;
+
+        if (groupBy === 'region') {
+          const regions = await storage.getAllRegions();
+          
+          const regionCounts: Record<number, number> = {};
+          approvedSchools.forEach(school => {
+            if (school.regionId) {
+              regionCounts[school.regionId] = (regionCounts[school.regionId] || 0) + 1;
+            }
+          });
+
+          results = regions.map(region => ({
+            label: region.name,
+            count: regionCounts[region.id] || 0
+          })).filter(r => r.count > 0);
+        } else if (groupBy === 'cluster') {
+          const clusters = await storage.getAllClusters();
+          
+          let filteredClusters = clusters;
+          if (regionId && regionId !== 'all') {
+            filteredClusters = clusters.filter(c => c.regionId === parseInt(regionId));
+          }
+          
+          const clusterCounts: Record<number, number> = {};
+          approvedSchools.forEach(school => {
+            if (school.clusterId) {
+              clusterCounts[school.clusterId] = (clusterCounts[school.clusterId] || 0) + 1;
+            }
+          });
+
+          results = filteredClusters.map(cluster => ({
+            label: cluster.name,
+            count: clusterCounts[cluster.id] || 0
+          })).filter(r => r.count > 0);
+        }
+      }
+
+      res.json({
+        results,
+        total,
+        groupBy: `by ${groupBy}`,
+        category: category.charAt(0).toUpperCase() + category.slice(1),
+        availableInEmis
+      });
+    } catch (error: any) {
+      console.error("Statistics query error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ===== WEBSITE CONTENT MANAGEMENT (Admin endpoints) =====
   // Helper function to check CMS admin role
   async function checkCmsAdminRole(req: Request): Promise<{ authorized: boolean; user?: any }> {

@@ -17,7 +17,15 @@ import amaanahLogo from "@assets/amaanah-logo-BXDbf4ee_1764613882774.png";
 
 const navigation = [
   { name: "Home", href: "/" },
-  { name: "About", href: "/about" },
+  { 
+    name: "About Us", 
+    href: "/about",
+    children: [
+      { name: "About AMAANAH", href: "/about" },
+      { name: "Organisation Structure", href: "/about/organisation-structure" },
+      { name: "Senior Executives", href: "/about/senior-executives" },
+    ]
+  },
   { 
     name: "Programmes", 
     href: "/programmes",
@@ -29,6 +37,7 @@ const navigation = [
     ]
   },
   { name: "Membership", href: "/membership" },
+  { name: "Statistics", href: "/statistics" },
   { name: "Resources", href: "/resources" },
   { name: "News", href: "/news" },
   { name: "Contact", href: "/contact" },
@@ -187,9 +196,10 @@ export function PublicFooter() {
             <h4 className="font-semibold mb-4">{isRTL ? 'الروابط السريعة' : 'Quick Links'}</h4>
             <ul className="space-y-2 text-sm">
               <li><Link href="/about"><span className="hover:underline cursor-pointer">{isRTL ? 'عن الأمانة' : 'About Us'}</span></Link></li>
+              <li><Link href="/about/organisation-structure"><span className="hover:underline cursor-pointer">{isRTL ? 'الهيكل التنظيمي' : 'Organisation Structure'}</span></Link></li>
+              <li><Link href="/about/senior-executives"><span className="hover:underline cursor-pointer">{isRTL ? 'القيادة التنفيذية' : 'Senior Executives'}</span></Link></li>
               <li><Link href="/programmes"><span className="hover:underline cursor-pointer">{isRTL ? 'البرامج والخدمات' : 'Programmes & Services'}</span></Link></li>
-              <li><Link href="/membership"><span className="hover:underline cursor-pointer">{isRTL ? 'العضوية' : 'Membership'}</span></Link></li>
-              <li><Link href="/resources"><span className="hover:underline cursor-pointer">{isRTL ? 'المراجع' : 'Resources'}</span></Link></li>
+              <li><Link href="/statistics"><span className="hover:underline cursor-pointer">{isRTL ? 'الإحصائيات' : 'Statistics'}</span></Link></li>
             </ul>
           </div>
 
