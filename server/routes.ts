@@ -2981,6 +2981,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "Invoice is already paid" });
       }
       
+      // Allow re-upload if payment was rejected
+      const isReupload = invoice.status === 'rejected';
+      
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
@@ -3041,10 +3044,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       // Update invoice with bank slip URL and set to processing status
-      const updatedInvoice = await storage.updateInvoice(invoiceId, {
+      // Clear rejection fields if this is a re-upload after rejection
+      const updateData: any = {
         bankSlipUrl,
         status: 'processing' as any,
-      });
+      };
+      
+      if (isReupload) {
+        updateData.rejectionReason = null;
+        updateData.rejectedAt = null;
+        updateData.rejectedBy = null;
+      }
+      
+      const updatedInvoice = await storage.updateInvoice(invoiceId, updateData);
       
       // Notify examination admins about the bank slip upload
       const school = await storage.getSchool(invoice.schoolId);
@@ -3236,6 +3248,69 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         invoice: paidInvoice,
         message: "Payment confirmed successfully. You can now approve students.",
         pendingStudentsCount: pendingStudents.length
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Reject payment by admin (examination_admin or super_admin only)
+  app.post("/api/invoices/:id/reject-payment", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Only examination_admin and super_admin can reject payments
+      if (user.role !== 'examination_admin' && user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only examination admin or super admin can reject payments" });
+      }
+      
+      const { reason } = req.body;
+      if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+        return res.status(400).json({ message: "Rejection reason is required" });
+      }
+      
+      const invoiceId = parseInt(req.params.id);
+      const invoice = await storage.getInvoice(invoiceId);
+      
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      if (invoice.status !== 'processing') {
+        return res.status(400).json({ message: "Only invoices with uploaded bank slips can be rejected" });
+      }
+      
+      // Update invoice status to rejected
+      const [rejectedInvoice] = await db.update(invoices)
+        .set({ 
+          status: 'rejected' as any, 
+          rejectionReason: reason.trim(),
+          rejectedAt: new Date(),
+          rejectedBy: user.id,
+          updatedAt: new Date()
+        })
+        .where(eq(invoices.id, invoiceId))
+        .returning();
+      
+      // Notify school admin about the rejection
+      const school = await storage.getSchool(invoice.schoolId);
+      if (school) {
+        const { notifyPaymentRejected } = await import("./notificationService");
+        await notifyPaymentRejected(
+          invoice.schoolId,
+          school.name,
+          invoice.invoiceNumber,
+          parseFloat(invoice.totalAmount || '0'),
+          reason.trim()
+        );
+      }
+      
+      res.json({
+        invoice: rejectedInvoice,
+        message: "Payment rejected successfully. School has been notified."
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

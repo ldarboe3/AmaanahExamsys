@@ -352,3 +352,26 @@ export async function notifyPaymentProcessed(
   
   console.log(`[NotificationService] Payment processed notification sent to school: ${schoolName}`);
 }
+
+export async function notifyPaymentRejected(
+  schoolId: number,
+  schoolName: string,
+  invoiceNumber: string,
+  invoiceAmount: number,
+  rejectionReason: string
+): Promise<void> {
+  await notifyUsersByRole(['school_admin'], {
+    type: 'action_required',
+    title: 'Payment Rejected - Action Required',
+    message: `Your payment for invoice #${invoiceNumber} (GMD ${invoiceAmount.toLocaleString()}) has been rejected. Reason: ${rejectionReason}. Please upload a valid bank slip to proceed.`,
+    data: {
+      actionUrl: '/payments',
+      schoolId,
+      invoiceNumber,
+      rejectionReason,
+      priority: 'urgent',
+    },
+  }, { schoolId });
+  
+  console.log(`[NotificationService] Payment rejected notification sent to school: ${schoolName}`);
+}

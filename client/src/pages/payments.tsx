@@ -67,6 +67,7 @@ const statusColors: Record<string, string> = {
   processing: "bg-chart-2/10 text-chart-2",
   paid: "bg-chart-3/10 text-chart-3",
   failed: "bg-destructive/10 text-destructive",
+  rejected: "bg-destructive/10 text-destructive",
 };
 
 const statusIcons: Record<string, React.ElementType> = {
@@ -74,6 +75,7 @@ const statusIcons: Record<string, React.ElementType> = {
   processing: AlertCircle,
   paid: CheckCircle,
   failed: XCircle,
+  rejected: XCircle,
 };
 
 const getPaymentStatusLabel = (status: string, isRTL: boolean) => {
@@ -82,6 +84,7 @@ const getPaymentStatusLabel = (status: string, isRTL: boolean) => {
     processing: { en: "Processing", ar: "قيد المعالجة" },
     paid: { en: "Paid", ar: "مدفوع" },
     failed: { en: "Failed", ar: "فشل" },
+    rejected: { en: "Rejected", ar: "مرفوض" },
   };
   return isRTL ? labels[status]?.ar || status : labels[status]?.en || status;
 };
@@ -146,6 +149,8 @@ export default function Payments() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showBankSlipDialog, setShowBankSlipDialog] = useState(false);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
   const [bankSlipFile, setBankSlipFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -291,6 +296,30 @@ export default function Payments() {
       toast({
         title: t.common.error,
         description: error.message || (isRTL ? "فشلت الموافقة على الطلاب. يرجى المحاولة مرة أخرى." : "Failed to approve students. Please try again."),
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reject payment mutation
+  const rejectPaymentMutation = useMutation({
+    mutationFn: async ({ invoiceId, reason }: { invoiceId: number; reason: string }) => {
+      return apiRequest("POST", `/api/invoices/${invoiceId}/reject-payment`, { reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      setShowRejectDialog(false);
+      setShowBankSlipDialog(false);
+      setRejectionReason("");
+      toast({
+        title: isRTL ? "تم رفض الدفع" : "Payment Rejected",
+        description: isRTL ? "تم رفض الدفع وإخطار المدرسة" : "Payment rejected and school has been notified",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل رفض الدفع" : "Failed to reject payment"),
         variant: "destructive",
       });
     },
@@ -1102,29 +1131,55 @@ export default function Payments() {
           {selectedInvoice?.bankSlipUrl && (
             <div className="space-y-4">
               <div className="border rounded-lg overflow-hidden bg-muted/30">
-                {selectedInvoice.bankSlipUrl.startsWith('data:image') ? (
+                {/* Handle both data: URLs and object storage URLs */}
+                {(selectedInvoice.bankSlipUrl.startsWith('data:image') || 
+                  (selectedInvoice.bankSlipUrl.startsWith('http') && 
+                   (selectedInvoice.bankSlipUrl.includes('.png') || 
+                    selectedInvoice.bankSlipUrl.includes('.jpg') || 
+                    selectedInvoice.bankSlipUrl.includes('.jpeg')))) ? (
                   <img 
                     src={selectedInvoice.bankSlipUrl} 
                     alt="Bank Slip" 
                     className="w-full h-auto max-h-[500px] object-contain"
                   />
-                ) : selectedInvoice.bankSlipUrl.startsWith('data:application/pdf') ? (
+                ) : (selectedInvoice.bankSlipUrl.startsWith('data:application/pdf') ||
+                      (selectedInvoice.bankSlipUrl.startsWith('http') && 
+                       selectedInvoice.bankSlipUrl.includes('.pdf'))) ? (
                   <div className="flex flex-col items-center justify-center p-8 text-center">
                     <FileText className="w-16 h-16 text-muted-foreground mb-4" />
                     <p className="text-muted-foreground mb-4">
-                      {isRTL ? "ملف PDF - انقر لتحميله" : "PDF File - Click to download"}
+                      {isRTL ? "ملف PDF - انقر لفتحه أو تحميله" : "PDF File - Click to open or download"}
                     </p>
-                    <a 
-                      href={selectedInvoice.bankSlipUrl} 
-                      download={`bank-slip-${selectedInvoice.invoiceNumber}.pdf`}
-                      className="inline-flex items-center gap-2"
-                    >
-                      <Button variant="outline">
-                        <Download className="w-4 h-4 me-2" />
-                        {isRTL ? "تحميل PDF" : "Download PDF"}
-                      </Button>
-                    </a>
+                    <div className="flex gap-2">
+                      <a 
+                        href={selectedInvoice.bankSlipUrl} 
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2"
+                      >
+                        <Button variant="outline">
+                          <Eye className="w-4 h-4 me-2" />
+                          {isRTL ? "عرض PDF" : "View PDF"}
+                        </Button>
+                      </a>
+                      <a 
+                        href={selectedInvoice.bankSlipUrl} 
+                        download={`bank-slip-${selectedInvoice.invoiceNumber}.pdf`}
+                        className="inline-flex items-center gap-2"
+                      >
+                        <Button variant="outline">
+                          <Download className="w-4 h-4 me-2" />
+                          {isRTL ? "تحميل PDF" : "Download PDF"}
+                        </Button>
+                      </a>
+                    </div>
                   </div>
+                ) : selectedInvoice.bankSlipUrl.startsWith('http') ? (
+                  <img 
+                    src={selectedInvoice.bankSlipUrl} 
+                    alt="Bank Slip" 
+                    className="w-full h-auto max-h-[500px] object-contain"
+                  />
                 ) : (
                   <div className="flex items-center justify-center p-8 text-muted-foreground">
                     {isRTL ? "تنسيق الملف غير مدعوم" : "Unsupported file format"}
@@ -1145,24 +1200,34 @@ export default function Payments() {
               </div>
             </div>
           )}
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setShowBankSlipDialog(false)}>
               {t.common.close}
             </Button>
             {canConfirmPayments && selectedInvoice?.status === 'processing' && (
-              <Button
-                onClick={() => {
-                  confirmPaymentMutation.mutate(selectedInvoice.id);
-                  setShowBankSlipDialog(false);
-                }}
-                disabled={confirmPaymentMutation.isPending}
-                className="bg-chart-3 hover:bg-chart-3/90"
-              >
-                <CheckCircle className="w-4 h-4 me-2" />
-                {confirmPaymentMutation.isPending 
-                  ? (isRTL ? "جاري التأكيد..." : "Confirming...") 
-                  : (isRTL ? "تأكيد الدفع" : "Confirm Payment")}
-              </Button>
+              <>
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowRejectDialog(true)}
+                  disabled={rejectPaymentMutation.isPending}
+                >
+                  <XCircle className="w-4 h-4 me-2" />
+                  {isRTL ? "رفض الدفع" : "Reject Payment"}
+                </Button>
+                <Button
+                  onClick={() => {
+                    confirmPaymentMutation.mutate(selectedInvoice.id);
+                    setShowBankSlipDialog(false);
+                  }}
+                  disabled={confirmPaymentMutation.isPending}
+                  className="bg-chart-3 hover:bg-chart-3/90"
+                >
+                  <CheckCircle className="w-4 h-4 me-2" />
+                  {confirmPaymentMutation.isPending 
+                    ? (isRTL ? "جاري التأكيد..." : "Confirming...") 
+                    : (isRTL ? "تأكيد الدفع" : "Confirm Payment")}
+                </Button>
+              </>
             )}
             {canConfirmPayments && selectedInvoice?.status === 'paid' && (
               <Button
@@ -1178,6 +1243,70 @@ export default function Payments() {
                   : (isRTL ? "الموافقة على جميع الطلاب" : "Approve All Students")}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Payment Dialog */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              {isRTL ? "رفض الدفع" : "Reject Payment"}
+            </DialogTitle>
+            <DialogDescription>
+              {isRTL 
+                ? "يرجى تقديم سبب رفض هذا الإيصال البنكي. سيتم إخطار المدرسة ويمكنها تحميل إيصال جديد."
+                : "Please provide a reason for rejecting this bank slip. The school will be notified and can upload a new receipt."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {isRTL ? "سبب الرفض" : "Rejection Reason"}
+              </label>
+              <textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder={isRTL ? "أدخل سبب رفض هذا الإيصال..." : "Enter reason for rejecting this receipt..."}
+                className="w-full min-h-[100px] p-3 border rounded-md bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                data-testid="input-rejection-reason"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => {
+              setShowRejectDialog(false);
+              setRejectionReason("");
+            }}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (selectedInvoice && rejectionReason.trim()) {
+                  rejectPaymentMutation.mutate({
+                    invoiceId: selectedInvoice.id,
+                    reason: rejectionReason.trim()
+                  });
+                }
+              }}
+              disabled={!rejectionReason.trim() || rejectPaymentMutation.isPending}
+              data-testid="button-confirm-reject"
+            >
+              {rejectPaymentMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                  {isRTL ? "جاري الرفض..." : "Rejecting..."}
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-4 h-4 me-2" />
+                  {isRTL ? "تأكيد الرفض" : "Confirm Rejection"}
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
