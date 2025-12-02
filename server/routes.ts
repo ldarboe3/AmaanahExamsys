@@ -3220,6 +3220,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         s.status === 'pending'
       );
       
+      // Notify school admin that their payment has been confirmed
+      if (school) {
+        const { notifyPaymentProcessed } = await import("./notificationService");
+        await notifyPaymentProcessed(
+          invoice.schoolId,
+          school.name,
+          invoice.invoiceNumber,
+          parseFloat(invoice.totalAmount || '0'),
+          pendingStudents.length
+        );
+      }
+      
       res.json({
         invoice: paidInvoice,
         message: "Payment confirmed successfully. You can now approve students.",
