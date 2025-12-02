@@ -79,8 +79,7 @@ const profileSchema = z.object({
   registrarName: z.string().min(2, "Registrar name is required"),
   phone: z.string().min(7, "Phone number is required"),
   address: z.string().min(5, "Address is required"),
-  schoolType: z.string().min(1, "Please select a primary school type"),
-  schoolTypes: z.array(z.string()).optional(),
+  schoolTypes: z.array(z.string()).min(1, "Please select at least one school type"),
   regionId: z.number().optional().nullable(),
   clusterId: z.number().optional().nullable(),
 });
@@ -141,7 +140,6 @@ export default function SchoolProfile() {
       registrarName: "",
       phone: "",
       address: "",
-      schoolType: "",
       schoolTypes: [],
       regionId: null,
       clusterId: null,
@@ -151,8 +149,7 @@ export default function SchoolProfile() {
       registrarName: school.registrarName || "",
       phone: school.phone || "",
       address: school.address || "",
-      schoolType: school.schoolType || "",
-      schoolTypes: school.schoolTypes || [],
+      schoolTypes: school.schoolTypes?.length ? school.schoolTypes : (school.schoolType ? [school.schoolType] : []),
       regionId: school.regionId || null,
       clusterId: school.clusterId || null,
     } : undefined,
@@ -646,49 +643,64 @@ export default function SchoolProfile() {
                     />
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{isRTL ? "رقم الهاتف" : "Phone Number"}</FormLabel>
-                          <FormControl>
-                            <Input {...field} disabled={!isEditing} data-testid="input-phone" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="schoolType"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{isRTL ? "نوع المدرسة الرئيسي" : "Primary School Type"}</FormLabel>
-                          <Select
-                            disabled={!isEditing}
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-school-type">
-                                <SelectValue placeholder={isRTL ? "اختر نوع المدرسة" : "Select school type"} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {schoolTypes.map(type => (
-                                <SelectItem key={type.value} value={type.value}>
-                                  {isRTL ? type.arabicLabel : type.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{isRTL ? "رقم الهاتف" : "Phone Number"}</FormLabel>
+                        <FormControl>
+                          <Input {...field} disabled={!isEditing} data-testid="input-phone" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="schoolTypes"
+                    render={() => (
+                      <FormItem>
+                        <FormLabel>{isRTL ? "أنواع المدرسة" : "School Types"}</FormLabel>
+                        <FormDescription>
+                          {isRTL ? "اختر جميع الأنواع التي تنطبق على مدرستك" : "Select all types that apply to your school"}
+                        </FormDescription>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
+                          {schoolTypes.map((type) => (
+                            <FormField
+                              key={type.value}
+                              control={form.control}
+                              name="schoolTypes"
+                              render={({ field }) => (
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                  <FormControl>
+                                    <Checkbox
+                                      disabled={!isEditing}
+                                      checked={field.value?.includes(type.value)}
+                                      onCheckedChange={(checked) => {
+                                        const current = field.value || [];
+                                        if (checked) {
+                                          field.onChange([...current, type.value]);
+                                        } else {
+                                          field.onChange(current.filter(v => v !== type.value));
+                                        }
+                                      }}
+                                      data-testid={`checkbox-type-${type.value}`}
+                                    />
+                                  </FormControl>
+                                  <FormLabel className="font-normal cursor-pointer">
+                                    {isRTL ? type.arabicLabel : type.label}
+                                  </FormLabel>
+                                </FormItem>
+                              )}
+                            />
+                          ))}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
@@ -765,51 +777,6 @@ export default function SchoolProfile() {
                       )}
                     />
                   </div>
-
-                  {isEditing && (
-                    <FormField
-                      control={form.control}
-                      name="schoolTypes"
-                      render={() => (
-                        <FormItem>
-                          <FormLabel>{isRTL ? "أنواع المدرسة الإضافية" : "Additional School Types"}</FormLabel>
-                          <FormDescription>
-                            {isRTL ? "اختر جميع الأنواع التي تنطبق على مدرستك" : "Select all types that apply to your school"}
-                          </FormDescription>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
-                            {schoolTypes.map((type) => (
-                              <FormField
-                                key={type.value}
-                                control={form.control}
-                                name="schoolTypes"
-                                render={({ field }) => (
-                                  <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                      <Checkbox
-                                        checked={field.value?.includes(type.value)}
-                                        onCheckedChange={(checked) => {
-                                          const current = field.value || [];
-                                          if (checked) {
-                                            field.onChange([...current, type.value]);
-                                          } else {
-                                            field.onChange(current.filter(v => v !== type.value));
-                                          }
-                                        }}
-                                        data-testid={`checkbox-type-${type.value}`}
-                                      />
-                                    </FormControl>
-                                    <FormLabel className="font-normal cursor-pointer">
-                                      {isRTL ? type.arabicLabel : type.label}
-                                    </FormLabel>
-                                  </FormItem>
-                                )}
-                              />
-                            ))}
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                  )}
 
                   {isEditing && (
                     <div className="flex gap-2 justify-end pt-4">
