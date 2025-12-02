@@ -58,6 +58,7 @@ export const translations = {
       examinationSystem: 'Examination System',
       theGambia: 'The Gambia',
       invalidCredentials: 'Invalid username or password',
+      rememberMe: 'Remember me',
     },
     common: {
       add: 'Add',
@@ -637,6 +638,7 @@ export const translations = {
       examinationSystem: 'نظام الامتحانات',
       theGambia: 'غامبيا',
       invalidCredentials: 'اسم المستخدم أو كلمة المرور غير صحيحة',
+      rememberMe: 'تذكرني',
     },
     common: {
       add: 'إضافة',

@@ -126,7 +126,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Password-based login
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { username, password, rememberMe } = req.body;
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password are required" });
       }
@@ -151,6 +151,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       req.session.userId = user.id;
+      
+      // Set longer session duration if "Remember Me" is checked (30 days vs 24 hours)
+      if (rememberMe) {
+        req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+      }
       
       // Update last login
       await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
