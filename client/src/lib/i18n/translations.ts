@@ -7,7 +7,7 @@ export const translations = {
       tagline: 'Exam Management',
     },
     nav: {
-      mainMenu: 'Main Menu',
+      mainMenu: 'Amaanah Examination Management',
       management: 'Management',
       dashboard: 'Dashboard',
       examYears: 'Exam Years',
@@ -588,7 +588,7 @@ export const translations = {
       tagline: 'إدارة الامتحانات',
     },
     nav: {
-      mainMenu: 'القائمة الرئيسية',
+      mainMenu: 'إدارة امتحانات الأمانة',
       management: 'الإدارة',
       dashboard: 'لوحة التحكم',
       examYears: 'السنوات الدراسية',
