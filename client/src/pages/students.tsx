@@ -298,7 +298,7 @@ export default function Students() {
             <Upload className="w-4 h-4 me-2" />
             {t.common.uploadCSV}
           </Button>
-          <Button variant="outline" data-testid="button-download-template">
+          <Button variant="outline" onClick={() => window.open('/api/templates/students')} data-testid="button-download-template">
             <FileSpreadsheet className="w-4 h-4 me-2" />
             {isRTL ? "القالب" : "Template"}
           </Button>
