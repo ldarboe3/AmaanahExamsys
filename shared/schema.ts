@@ -142,10 +142,27 @@ export const schools = pgTable("schools", {
   registrationCertificate: varchar("registration_certificate", { length: 500 }),
   landOwnership: varchar("land_ownership", { length: 500 }),
   operationalLicense: varchar("operational_license", { length: 500 }),
+  schoolBadge: varchar("school_badge", { length: 500 }),
   registrationDeadline: timestamp("registration_deadline"),
   hasPenalty: boolean("has_penalty").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// School Admin Invitations
+export const schoolInvitations = pgTable("school_invitations", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  schoolId: integer("school_id").notNull().references(() => schools.id),
+  email: varchar("email", { length: 255 }).notNull(),
+  firstName: varchar("first_name", { length: 255 }),
+  lastName: varchar("last_name", { length: 255 }),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  invitedById: varchar("invited_by_id").notNull().references(() => users.id),
+  isUsed: boolean("is_used").default(false),
+  usedAt: timestamp("used_at"),
+  createdUserId: varchar("created_user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Students
@@ -684,8 +701,22 @@ export const insertSchoolSchema = createInsertSchema(schools).pick({
   registrationCertificate: true,
   landOwnership: true,
   operationalLicense: true,
+  schoolBadge: true,
   registrationDeadline: true,
   hasPenalty: true,
+});
+
+export const insertSchoolInvitationSchema = createInsertSchema(schoolInvitations).pick({
+  schoolId: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  token: true,
+  expiresAt: true,
+  invitedById: true,
+  isUsed: true,
+  usedAt: true,
+  createdUserId: true,
 });
 
 export const insertStudentSchema = createInsertSchema(students).pick({
@@ -1087,6 +1118,8 @@ export type InsertExamCenter = z.infer<typeof insertExamCenterSchema>;
 export type ExamCenter = typeof examCenters.$inferSelect;
 export type InsertSchool = z.infer<typeof insertSchoolSchema>;
 export type School = typeof schools.$inferSelect;
+export type InsertSchoolInvitation = z.infer<typeof insertSchoolInvitationSchema>;
+export type SchoolInvitation = typeof schoolInvitations.$inferSelect;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
 export type Student = typeof students.$inferSelect;
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
