@@ -7,8 +7,18 @@ A comprehensive examination management system for managing countrywide Arabic & 
 The MVP is complete with all core features implemented and verified. PDF generation system for certificates and transcripts is fully functional with Arabic/English bilingual support, QR code verification, and gender-specific templates.
 
 ## Recent Changes (December 2024)
+- **Three-Tier Fee Structure**: Comprehensive fee breakdown for student registration
+  - Three separate fee fields in exam_years table: `feePerStudent` (registration), `certificateFee`, `transcriptFee`
+  - Default values: Registration D100.00, Certificate D50.00, Transcript D25.00
+  - All fees paid together at registration time as a combined total
+  - Invoice calculation: Total = (registrationFee + certificateFee + transcriptFee) × studentCount
+  - Individual fee amounts stored in invoice for detailed breakdown display
+  - Exam year cards display fee badges (Reg, Cert, Trans) with total sum
+  - Create/Edit Exam Year dialogs include all three fee input fields
+  - School admin payment view shows itemized fee breakdown
+  - Admin invoice details dialog displays per-fee and total calculations
 - **Auto-Invoice Generation System**: Automatic invoice calculation based on registered students
-  - `feePerStudent` field added to exam years for configurable registration fees
+  - `feePerStudent`, `certificateFee`, `transcriptFee` fields in exam years for configurable fees
   - Invoice items table stores per-grade breakdown (grade, count, fee, subtotal)
   - Auto-generation triggered after CSV student upload for school admins
   - Invoice summary dialog shows breakdown by grade after upload
