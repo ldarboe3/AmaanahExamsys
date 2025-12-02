@@ -641,6 +641,7 @@ export const insertExamYearSchema = createInsertSchema(examYears).pick({
   year: true,
   name: true,
   hijriYear: true,
+  grades: true,
   isActive: true,
   createdBy: true,
 }).extend({
