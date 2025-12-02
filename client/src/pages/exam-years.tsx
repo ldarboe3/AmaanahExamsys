@@ -162,6 +162,29 @@ function ExamYearCard({
           </div>
         </div>
 
+        {/* Fee Structure */}
+        <div className="mt-4 pt-4 border-t">
+          <p className="text-xs text-muted-foreground mb-2">Fee per Student (GMD)</p>
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex flex-wrap gap-2">
+              <span className="bg-muted px-2 py-0.5 rounded text-xs">
+                Reg: {parseFloat(examYear.feePerStudent || '100').toFixed(0)}
+              </span>
+              <span className="bg-muted px-2 py-0.5 rounded text-xs">
+                Cert: {parseFloat((examYear as any).certificateFee || '50').toFixed(0)}
+              </span>
+              <span className="bg-muted px-2 py-0.5 rounded text-xs">
+                Trans: {parseFloat((examYear as any).transcriptFee || '25').toFixed(0)}
+              </span>
+            </div>
+            <span className="font-semibold text-primary">
+              = {(parseFloat(examYear.feePerStudent || '100') + 
+                 parseFloat((examYear as any).certificateFee || '50') + 
+                 parseFloat((examYear as any).transcriptFee || '25')).toFixed(0)}
+            </span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
           <div className="text-center">
             <p className="text-lg font-semibold text-foreground">0</p>
