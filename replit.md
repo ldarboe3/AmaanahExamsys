@@ -132,10 +132,11 @@ The application runs on port 5000 with:
 Start with: `npm run dev`
 
 ## Email Configuration
-- **Service**: AgentMail for email delivery
-- **From Email**: `info@amaanah.gm` (configured via FROM_EMAIL env var)
+- **Service**: SendGrid via Replit Connector for reliable email delivery
+- **From Email**: Configured via SendGrid sender authentication
 - **Features**: School verification, password reset, payment confirmation, results notification
 - **Expiry**: 2-hour links for all sensitive operations
+- **Status**: ✅ Fully functional - verified email delivery working
 
 ## User Preferences
 - Material Design 3 adherence for all UI components
