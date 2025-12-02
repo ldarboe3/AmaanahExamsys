@@ -223,6 +223,20 @@ export default function Schools() {
     (cluster) => regionFilter === "all" || cluster.regionId === parseInt(regionFilter)
   );
 
+  // Helper function to get region name by ID
+  const getRegionName = (regionId: number | null | undefined): string => {
+    if (!regionId || !regions) return t.common.notAssigned;
+    const region = regions.find(r => r.id === regionId);
+    return region?.name || t.common.notAssigned;
+  };
+
+  // Helper function to get cluster name by ID
+  const getClusterName = (clusterId: number | null | undefined): string => {
+    if (!clusterId || !clusters) return t.common.notAssigned;
+    const cluster = clusters.find(c => c.id === clusterId);
+    return cluster?.name || t.common.notAssigned;
+  };
+
   // Helper to invalidate all school queries (including filtered variants)
   const invalidateSchoolQueries = () => {
     queryClient.invalidateQueries({
@@ -508,7 +522,7 @@ export default function Schools() {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
-                          {school.region?.name || t.common.notAssigned}
+                          {getRegionName(school.regionId)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -1111,11 +1125,11 @@ export default function Schools() {
                 <div className="space-y-3">
                   <div className="text-sm">
                     <span className="text-muted-foreground">{t.schools.region}:</span>{" "}
-                    <span className="font-medium">{selectedSchool.region?.name || t.common.notAssigned}</span>
+                    <span className="font-medium">{getRegionName(selectedSchool.regionId)}</span>
                   </div>
                   <div className="text-sm">
                     <span className="text-muted-foreground">{isRTL ? "المجموعة" : "Cluster"}:</span>{" "}
-                    <span className="font-medium">{selectedSchool.cluster?.name || t.common.notAssigned}</span>
+                    <span className="font-medium">{getClusterName(selectedSchool.clusterId)}</span>
                   </div>
                   <div className="text-sm">
                     <span className="text-muted-foreground">{isRTL ? "المسجل" : "Registrar"}:</span>{" "}

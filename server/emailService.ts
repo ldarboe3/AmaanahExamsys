@@ -85,13 +85,19 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     const client = await getAgentMailClient();
     
     // Create or get an inbox for sending
-    const inboxesResponse = await client.inboxes.list();
+    const inboxesPage = await client.inboxes.list();
     let inbox: any = null;
     
-    // Iterate through paginated results
-    for await (const item of inboxesResponse) {
-      inbox = item;
-      break;
+    // Get first inbox from paginated response
+    // The response is an async iterable paginated object
+    const pageData = inboxesPage as any;
+    if (pageData.items && pageData.items.length > 0) {
+      inbox = pageData.items[0];
+    } else if (Symbol.asyncIterator in pageData) {
+      for await (const item of pageData) {
+        inbox = item;
+        break;
+      }
     }
     
     if (!inbox) {
@@ -102,11 +108,12 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       });
     }
 
-    // Send the email using inbox messages
+    // Send the email using inbox messages with correct API parameters
     await client.inboxes.messages.send(inbox.inbox_id, {
       to: [options.to],
       subject: options.subject,
-      body: options.htmlBody,
+      text: options.textBody || options.htmlBody.replace(/<[^>]*>/g, ''),
+      html: options.htmlBody,
     });
 
     console.log(`Email sent successfully to ${options.to}`);
