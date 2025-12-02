@@ -2,7 +2,7 @@ import { eq, and, desc, asc, sql, ilike, or, gte, lte, inArray, count } from "dr
 import { db } from "./db";
 import {
   users, regions, clusters, examYears, examCenters, schools, students,
-  invoices, subjects, examTimetable, examiners, examinerAssignments,
+  invoices, invoiceItems, subjects, examTimetable, examiners, examinerAssignments,
   studentResults, certificates, transcripts, attendanceRecords, malpracticeReports,
   auditLogs, notifications, examCards, systemSettings, schoolInvitations,
   newsCategories, newsArticles, resourceCategories, resources, announcements,
@@ -11,6 +11,7 @@ import {
   type Cluster, type InsertCluster, type ExamYear, type InsertExamYear,
   type ExamCenter, type InsertExamCenter, type School, type InsertSchool,
   type Student, type InsertStudent, type Invoice, type InsertInvoice,
+  type InvoiceItem, type InsertInvoiceItem,
   type Subject, type InsertSubject, type ExamTimetable, type InsertExamTimetable,
   type Examiner, type InsertExaminer, type ExaminerAssignment, type InsertExaminerAssignment,
   type StudentResult, type InsertStudentResult, type Certificate, type InsertCertificate,
@@ -119,6 +120,12 @@ export interface IStorage {
   updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice | undefined>;
   markInvoicePaid(id: number, paymentMethod: string, bankSlipUrl?: string): Promise<Invoice | undefined>;
   deleteInvoice(id: number): Promise<boolean>;
+  
+  // Invoice Items
+  createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem>;
+  createInvoiceItemsBulk(items: InsertInvoiceItem[]): Promise<InvoiceItem[]>;
+  getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]>;
+  deleteInvoiceItemsByInvoice(invoiceId: number): Promise<boolean>;
 
   // Subjects
   createSubject(subject: InsertSubject): Promise<Subject>;
@@ -726,6 +733,27 @@ export class DatabaseStorage implements IStorage {
 
   async deleteInvoice(id: number): Promise<boolean> {
     await db.delete(invoices).where(eq(invoices.id, id));
+    return true;
+  }
+
+  // Invoice Items
+  async createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem> {
+    const [created] = await db.insert(invoiceItems).values(item).returning();
+    return created;
+  }
+
+  async createInvoiceItemsBulk(items: InsertInvoiceItem[]): Promise<InvoiceItem[]> {
+    if (items.length === 0) return [];
+    const created = await db.insert(invoiceItems).values(items).returning();
+    return created;
+  }
+
+  async getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]> {
+    return await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+  }
+
+  async deleteInvoiceItemsByInvoice(invoiceId: number): Promise<boolean> {
+    await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
     return true;
   }
 
