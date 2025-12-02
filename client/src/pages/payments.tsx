@@ -285,11 +285,13 @@ export default function Payments() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+      const count = data?.approvedCount ?? 0;
+      const schoolName = data?.school?.name || '';
       toast({
         title: isRTL ? "تمت الموافقة على الطلاب" : "Students Approved",
-        description: data.message || (isRTL 
-          ? `تمت الموافقة على ${data.approvedCount} طالب وتم إنشاء أرقام الفهرس` 
-          : `Approved ${data.approvedCount} students and generated index numbers`),
+        description: isRTL 
+          ? `تمت الموافقة على ${count} طالب من ${schoolName} وتم إنشاء أرقام الفهرس` 
+          : `Approved ${count} students from ${schoolName} and generated index numbers`,
       });
     },
     onError: (error: any) => {
