@@ -207,7 +207,20 @@ export default function Dashboard() {
     queryKey: ["/api/dashboard/stats"],
   });
 
+  const { data: school } = useQuery<{ name: string }>({
+    queryKey: ["/api/school/profile"],
+    enabled: user?.role === 'school_admin' && !!user?.schoolId,
+  });
+
   const isAdmin = user?.role === 'super_admin' || user?.role === 'examination_admin';
+  const isSchoolAdmin = user?.role === 'school_admin';
+  
+  const getWelcomeName = () => {
+    if (isSchoolAdmin && school?.name) {
+      return school.name;
+    }
+    return user?.firstName || 'Admin';
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat(language === 'ar' ? 'ar-EG' : 'en-US', {
@@ -234,7 +247,7 @@ export default function Dashboard() {
       <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
         <div className={isRTL ? 'text-right' : ''}>
           <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
-            {t.dashboard.welcomeBack}, {user?.firstName || 'Admin'}
+            {t.dashboard.welcomeBack}, {getWelcomeName()}
           </h1>
           <p className="text-muted-foreground mt-1">
             {t.dashboard.whatsHappeningToday}
