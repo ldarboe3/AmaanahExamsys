@@ -63,6 +63,7 @@ import {
   Download,
   Plus,
   Loader2,
+  Pencil,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -145,6 +146,7 @@ export default function Schools() {
   const [selectedSchool, setSelectedSchool] = useState<SchoolWithRelations | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   const form = useForm<AddSchoolFormData>({
     resolver: zodResolver(addSchoolSchema),
@@ -160,7 +162,22 @@ export default function Schools() {
     },
   });
 
+  const editForm = useForm<AddSchoolFormData>({
+    resolver: zodResolver(addSchoolSchema),
+    defaultValues: {
+      name: "",
+      registrarName: "",
+      email: "",
+      phone: "",
+      address: "",
+      schoolType: undefined,
+      regionId: "",
+      clusterId: "",
+    },
+  });
+
   const selectedRegionId = form.watch("regionId");
+  const editSelectedRegionId = editForm.watch("regionId");
 
   // Build query string for API
   const queryParams = new URLSearchParams();
@@ -185,6 +202,10 @@ export default function Schools() {
 
   const filteredClusters = clusters?.filter(
     (cluster) => !selectedRegionId || cluster.regionId === parseInt(selectedRegionId)
+  );
+
+  const editFilteredClusters = clusters?.filter(
+    (cluster) => !editSelectedRegionId || cluster.regionId === parseInt(editSelectedRegionId)
   );
 
   // Clusters filtered by selected region filter (for the filter dropdown)
@@ -267,6 +288,55 @@ export default function Schools() {
       });
     },
   });
+
+  const updateSchoolMutation = useMutation({
+    mutationFn: async (data: AddSchoolFormData & { id: number }) => {
+      const { id, ...updateData } = data;
+      return apiRequest("PATCH", `/api/schools/${id}`, {
+        ...updateData,
+        regionId: updateData.regionId ? parseInt(updateData.regionId) : null,
+        clusterId: updateData.clusterId ? parseInt(updateData.clusterId) : null,
+      });
+    },
+    onSuccess: () => {
+      invalidateSchoolQueries();
+      toast({
+        title: t.common.success,
+        description: isRTL ? "تم تحديث المدرسة بنجاح" : "School updated successfully",
+      });
+      setShowEditDialog(false);
+      editForm.reset();
+      setSelectedSchool(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل في تحديث المدرسة" : "Failed to update school"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openEditDialog = (school: SchoolWithRelations) => {
+    setSelectedSchool(school);
+    editForm.reset({
+      name: school.name,
+      registrarName: school.registrarName,
+      email: school.email,
+      phone: school.phone || "",
+      address: school.address || "",
+      schoolType: school.schoolType as "LBS" | "UBS" | "BCS" | "SSS" | undefined,
+      regionId: school.regionId?.toString() || "",
+      clusterId: school.clusterId?.toString() || "",
+    });
+    setShowEditDialog(true);
+  };
+
+  const onEditSubmit = (data: AddSchoolFormData) => {
+    if (selectedSchool) {
+      updateSchoolMutation.mutate({ ...data, id: selectedSchool.id });
+    }
+  };
 
   const filteredSchools = schools?.filter((school) => {
     const matchesSearch =
@@ -448,6 +518,13 @@ export default function Schools() {
                             >
                               <Eye className="w-4 h-4 me-2" />
                               {t.common.viewDetails}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => openEditDialog(school)}
+                              data-testid={`button-edit-${school.id}`}
+                            >
+                              <Pencil className="w-4 h-4 me-2" />
+                              {isRTL ? "تعديل" : "Edit"}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {school.status === 'pending' || school.status === 'verified' ? (
@@ -705,6 +782,231 @@ export default function Schools() {
                     <Loader2 className="w-4 h-4 me-2 animate-spin" />
                   )}
                   {t.schools.addSchool}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit School Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={(open) => {
+        setShowEditDialog(open);
+        if (!open) {
+          editForm.reset();
+          setSelectedSchool(null);
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle>{isRTL ? "تعديل المدرسة" : "Edit School"}</DialogTitle>
+            <DialogDescription>
+              {isRTL ? "تحديث معلومات المدرسة" : "Update school information"}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{isRTL ? "اسم المدرسة *" : "School Name *"}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={isRTL ? "أدخل اسم المدرسة" : "Enter school name"}
+                          {...field}
+                          data-testid="input-edit-school-name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="schoolType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{isRTL ? "نوع المدرسة *" : "School Type *"}</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-school-type">
+                            <SelectValue placeholder={isRTL ? "اختر النوع" : "Select type"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="LBS">{isRTL ? "المدرسة الأساسية الدنيا (LBS)" : "Lower Basic School (LBS)"}</SelectItem>
+                          <SelectItem value="UBS">{isRTL ? "المدرسة الأساسية العليا (UBS)" : "Upper Basic School (UBS)"}</SelectItem>
+                          <SelectItem value="BCS">{isRTL ? "مدرسة الدورة الأساسية (BCS)" : "Basic Cycle School (BCS)"}</SelectItem>
+                          <SelectItem value="SSS">{isRTL ? "المدرسة الثانوية العليا (SSS)" : "Senior Secondary School (SSS)"}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="registrarName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{isRTL ? "اسم المسجل *" : "Registrar Name *"}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={isRTL ? "أدخل الاسم الكامل للمسجل" : "Enter registrar full name"}
+                          {...field}
+                          data-testid="input-edit-registrar-name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{isRTL ? "عنوان البريد الإلكتروني *" : "Email Address *"}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder={isRTL ? "school@example.com" : "school@example.com"}
+                          {...field}
+                          data-testid="input-edit-school-email"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{isRTL ? "رقم الهاتف" : "Phone Number"}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="+220 XXXXXXX"
+                          {...field}
+                          data-testid="input-edit-school-phone"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="regionId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t.schools.region}</FormLabel>
+                      <Select 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          editForm.setValue("clusterId", "");
+                        }} 
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-region">
+                            <SelectValue placeholder={isRTL ? "اختر المنطقة" : "Select region"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {regions?.map((region) => (
+                            <SelectItem key={region.id} value={region.id.toString()}>
+                              {region.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="clusterId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{isRTL ? "المجموعة" : "Cluster"}</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                        disabled={!editSelectedRegionId}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-cluster">
+                            <SelectValue placeholder={editSelectedRegionId ? (isRTL ? "اختر المجموعة" : "Select cluster") : (isRTL ? "اختر المنطقة أولاً" : "Select region first")} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {editFilteredClusters?.map((cluster) => (
+                            <SelectItem key={cluster.id} value={cluster.id.toString()}>
+                              {cluster.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={editForm.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{isRTL ? "العنوان" : "Address"}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder={isRTL ? "أدخل عنوان المدرسة" : "Enter school address"}
+                        {...field}
+                        data-testid="input-edit-school-address"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowEditDialog(false);
+                    editForm.reset();
+                    setSelectedSchool(null);
+                  }}
+                >
+                  {t.common.cancel}
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={updateSchoolMutation.isPending}
+                  data-testid="button-submit-edit-school"
+                >
+                  {updateSchoolMutation.isPending && (
+                    <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                  )}
+                  {isRTL ? "حفظ التغييرات" : "Save Changes"}
                 </Button>
               </DialogFooter>
             </form>
