@@ -2226,7 +2226,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       } else {
         invoices = await storage.getAllInvoices();
       }
-      res.json(invoices);
+      
+      // Enrich invoices with school and exam year information
+      const allSchools = await storage.getAllSchools();
+      const allExamYears = await storage.getAllExamYears();
+      
+      const enrichedInvoices = invoices.map(invoice => {
+        const school = allSchools.find(s => s.id === invoice.schoolId);
+        const examYear = allExamYears.find(ey => ey.id === invoice.examYearId);
+        return {
+          ...invoice,
+          school: school ? { name: school.name } : null,
+          examYear: examYear ? { name: examYear.name, id: examYear.id } : null,
+        };
+      });
+      
+      res.json(enrichedInvoices);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -2845,6 +2860,55 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const items = await storage.getInvoiceItems(invoice.id);
       res.json({ invoice, items, examYear: activeExamYear });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all school invoices (including past ones) with exam year info
+  app.get("/api/school/invoices/all", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'school_admin' || !user.schoolId) {
+        return res.status(403).json({ message: "Only school admins can access this endpoint" });
+      }
+      
+      const invoices = await storage.getInvoicesBySchool(user.schoolId);
+      const examYears = await storage.getAllExamYears();
+      const activeExamYear = await storage.getActiveExamYear();
+      
+      // Determine current exam year ID - use active exam year if exists, otherwise use most recent
+      let currentExamYearId: number | null = activeExamYear?.id ?? null;
+      if (!currentExamYearId && invoices.length > 0) {
+        // Fall back to the most recent invoice's exam year
+        const sortedByDate = [...invoices].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        currentExamYearId = sortedByDate[0].examYearId;
+      }
+      
+      // Enrich invoices with exam year info
+      const enrichedInvoices = invoices.map(invoice => {
+        const examYear = examYears.find(ey => ey.id === invoice.examYearId);
+        return {
+          ...invoice,
+          examYear: examYear ? {
+            id: examYear.id,
+            name: examYear.name,
+            isActive: examYear.isActive,
+          } : null,
+          isCurrentYear: invoice.examYearId === currentExamYearId,
+        };
+      });
+      
+      // Sort: current year first, then by creation date descending
+      enrichedInvoices.sort((a, b) => {
+        if (a.isCurrentYear && !b.isCurrentYear) return -1;
+        if (!a.isCurrentYear && b.isCurrentYear) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      
+      res.json(enrichedInvoices);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
