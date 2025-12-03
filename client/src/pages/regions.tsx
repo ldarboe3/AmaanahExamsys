@@ -1,5 +1,5 @@
 import { useLanguage } from "@/lib/i18n/LanguageContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,6 +17,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Form,
   FormControl,
@@ -94,14 +104,25 @@ function RegionCardSkeleton() {
 export default function Regions() {
   const { toast } = useToast();
   const { t, isRTL } = useLanguage();
+  
+  // Dialog states
   const [showRegionDialog, setShowRegionDialog] = useState(false);
   const [showClusterDialog, setShowClusterDialog] = useState(false);
+  const [showEditRegionDialog, setShowEditRegionDialog] = useState(false);
+  const [showEditClusterDialog, setShowEditClusterDialog] = useState(false);
+  const [showDeleteRegionDialog, setShowDeleteRegionDialog] = useState(false);
+  const [showDeleteClusterDialog, setShowDeleteClusterDialog] = useState(false);
+  
+  // Selected items for operations
   const [selectedRegionId, setSelectedRegionId] = useState<number | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
+  const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
 
   const { data: regions, isLoading } = useQuery<RegionWithClusters[]>({
     queryKey: ["/api/regions"],
   });
 
+  // Region form for create
   const regionForm = useForm<RegionFormData>({
     resolver: zodResolver(regionSchema),
     defaultValues: {
@@ -110,6 +131,16 @@ export default function Regions() {
     },
   });
 
+  // Region form for edit
+  const editRegionForm = useForm<RegionFormData>({
+    resolver: zodResolver(regionSchema),
+    defaultValues: {
+      name: "",
+      code: "",
+    },
+  });
+
+  // Cluster form for create
   const clusterForm = useForm<ClusterFormData>({
     resolver: zodResolver(clusterSchema),
     defaultValues: {
@@ -119,6 +150,35 @@ export default function Regions() {
     },
   });
 
+  // Cluster form for edit
+  const editClusterForm = useForm<RegionFormData>({
+    resolver: zodResolver(regionSchema),
+    defaultValues: {
+      name: "",
+      code: "",
+    },
+  });
+
+  // Update edit forms when selected items change
+  useEffect(() => {
+    if (selectedRegion) {
+      editRegionForm.reset({
+        name: selectedRegion.name,
+        code: selectedRegion.code,
+      });
+    }
+  }, [selectedRegion, editRegionForm]);
+
+  useEffect(() => {
+    if (selectedCluster) {
+      editClusterForm.reset({
+        name: selectedCluster.name,
+        code: selectedCluster.code,
+      });
+    }
+  }, [selectedCluster, editClusterForm]);
+
+  // Create Region Mutation
   const createRegionMutation = useMutation({
     mutationFn: async (data: RegionFormData) => {
       return apiRequest("POST", "/api/regions", data);
@@ -141,6 +201,53 @@ export default function Regions() {
     },
   });
 
+  // Update Region Mutation
+  const updateRegionMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: RegionFormData }) => {
+      return apiRequest("PATCH", `/api/regions/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/regions"] });
+      setShowEditRegionDialog(false);
+      setSelectedRegion(null);
+      toast({
+        title: t.regions.regionUpdated,
+        description: t.regions.regionUpdatedDesc,
+      });
+    },
+    onError: () => {
+      toast({
+        title: t.common.error,
+        description: t.regions.failedToUpdateRegion,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete Region Mutation
+  const deleteRegionMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/regions/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/regions"] });
+      setShowDeleteRegionDialog(false);
+      setSelectedRegion(null);
+      toast({
+        title: t.regions.regionDeleted,
+        description: t.regions.regionDeletedDesc,
+      });
+    },
+    onError: () => {
+      toast({
+        title: t.common.error,
+        description: t.regions.failedToDeleteRegion,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create Cluster Mutation
   const createClusterMutation = useMutation({
     mutationFn: async (data: ClusterFormData) => {
       return apiRequest("POST", "/api/clusters", data);
@@ -163,8 +270,61 @@ export default function Regions() {
     },
   });
 
+  // Update Cluster Mutation
+  const updateClusterMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { name: string; code: string } }) => {
+      return apiRequest("PATCH", `/api/clusters/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/regions"] });
+      setShowEditClusterDialog(false);
+      setSelectedCluster(null);
+      toast({
+        title: t.regions.clusterUpdated,
+        description: t.regions.clusterUpdatedDesc,
+      });
+    },
+    onError: () => {
+      toast({
+        title: t.common.error,
+        description: t.regions.failedToUpdateCluster,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete Cluster Mutation
+  const deleteClusterMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/clusters/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/regions"] });
+      setShowDeleteClusterDialog(false);
+      setSelectedCluster(null);
+      toast({
+        title: t.regions.clusterDeleted,
+        description: t.regions.clusterDeletedDesc,
+      });
+    },
+    onError: () => {
+      toast({
+        title: t.common.error,
+        description: t.regions.failedToDeleteCluster,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handlers
   const handleRegionSubmit = (data: RegionFormData) => {
     createRegionMutation.mutate(data);
+  };
+
+  const handleEditRegionSubmit = (data: RegionFormData) => {
+    if (selectedRegion) {
+      updateRegionMutation.mutate({ id: selectedRegion.id, data });
+    }
   };
 
   const handleClusterSubmit = (data: ClusterFormData) => {
@@ -173,9 +333,35 @@ export default function Regions() {
     }
   };
 
+  const handleEditClusterSubmit = (data: RegionFormData) => {
+    if (selectedCluster) {
+      updateClusterMutation.mutate({ id: selectedCluster.id, data });
+    }
+  };
+
   const openClusterDialog = (regionId: number) => {
     setSelectedRegionId(regionId);
     setShowClusterDialog(true);
+  };
+
+  const openEditRegionDialog = (region: Region) => {
+    setSelectedRegion(region);
+    setShowEditRegionDialog(true);
+  };
+
+  const openDeleteRegionDialog = (region: Region) => {
+    setSelectedRegion(region);
+    setShowDeleteRegionDialog(true);
+  };
+
+  const openEditClusterDialog = (cluster: Cluster) => {
+    setSelectedCluster(cluster);
+    setShowEditClusterDialog(true);
+  };
+
+  const openDeleteClusterDialog = (cluster: Cluster) => {
+    setSelectedCluster(cluster);
+    setShowDeleteClusterDialog(true);
   };
 
   return (
@@ -271,16 +457,20 @@ export default function Regions() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align={isRTL ? "start" : "end"}>
-                      <DropdownMenuItem onClick={() => openClusterDialog(region.id)}>
+                      <DropdownMenuItem onClick={() => openClusterDialog(region.id)} data-testid={`menu-add-cluster-${region.id}`}>
                         <Plus className="w-4 h-4 me-2" />
                         {t.regions.addCluster}
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openEditRegionDialog(region)} data-testid={`menu-edit-region-${region.id}`}>
                         <Edit className="w-4 h-4 me-2" />
                         {t.regions.editRegion}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem 
+                        className="text-destructive" 
+                        onClick={() => openDeleteRegionDialog(region)}
+                        data-testid={`menu-delete-region-${region.id}`}
+                      >
                         <Trash2 className="w-4 h-4 me-2" />
                         {t.common.delete}
                       </DropdownMenuItem>
@@ -324,9 +514,28 @@ export default function Regions() {
                                   {cluster.code}
                                 </Badge>
                               </div>
-                              <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <MoreVertical className="w-3 h-3" />
-                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-cluster-actions-${cluster.id}`}>
+                                    <MoreVertical className="w-3 h-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align={isRTL ? "start" : "end"}>
+                                  <DropdownMenuItem onClick={() => openEditClusterDialog(cluster)} data-testid={`menu-edit-cluster-${cluster.id}`}>
+                                    <Edit className="w-4 h-4 me-2" />
+                                    {t.regions.editCluster}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    className="text-destructive" 
+                                    onClick={() => openDeleteClusterDialog(cluster)}
+                                    data-testid={`menu-delete-cluster-${cluster.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4 me-2" />
+                                    {t.common.delete}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           ))}
                         </div>
@@ -397,7 +606,7 @@ export default function Regions() {
                 <Button type="button" variant="outline" onClick={() => setShowRegionDialog(false)}>
                   {t.common.cancel}
                 </Button>
-                <Button type="submit" disabled={createRegionMutation.isPending}>
+                <Button type="submit" disabled={createRegionMutation.isPending} data-testid="button-create-region">
                   {createRegionMutation.isPending ? t.regions.creating : t.regions.createRegion}
                 </Button>
               </DialogFooter>
@@ -405,6 +614,78 @@ export default function Regions() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Region Dialog */}
+      <Dialog open={showEditRegionDialog} onOpenChange={setShowEditRegionDialog}>
+        <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle>{t.regions.editRegion}</DialogTitle>
+            <DialogDescription>
+              {t.regions.editRegionDesc}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editRegionForm}>
+            <form onSubmit={editRegionForm.handleSubmit(handleEditRegionSubmit)} className="space-y-4">
+              <FormField
+                control={editRegionForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t.regions.regionName}</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Western Region" {...field} data-testid="input-edit-region-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editRegionForm.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t.regions.regionCode}</FormLabel>
+                    <FormControl>
+                      <Input placeholder="WR" {...field} data-testid="input-edit-region-code" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowEditRegionDialog(false)}>
+                  {t.common.cancel}
+                </Button>
+                <Button type="submit" disabled={updateRegionMutation.isPending} data-testid="button-update-region">
+                  {updateRegionMutation.isPending ? t.common.saving : t.common.save}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Region Confirmation */}
+      <AlertDialog open={showDeleteRegionDialog} onOpenChange={setShowDeleteRegionDialog}>
+        <AlertDialogContent dir={isRTL ? "rtl" : "ltr"}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t.regions.deleteRegion}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t.regions.deleteRegionConfirm}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => selectedRegion && deleteRegionMutation.mutate(selectedRegion.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-region"
+            >
+              {deleteRegionMutation.isPending ? t.common.deleting : t.common.delete}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Create Cluster Dialog */}
       <Dialog open={showClusterDialog} onOpenChange={setShowClusterDialog}>
@@ -447,7 +728,7 @@ export default function Regions() {
                 <Button type="button" variant="outline" onClick={() => setShowClusterDialog(false)}>
                   {t.common.cancel}
                 </Button>
-                <Button type="submit" disabled={createClusterMutation.isPending}>
+                <Button type="submit" disabled={createClusterMutation.isPending} data-testid="button-create-cluster">
                   {createClusterMutation.isPending ? t.regions.creating : t.regions.createCluster}
                 </Button>
               </DialogFooter>
@@ -455,6 +736,78 @@ export default function Regions() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Cluster Dialog */}
+      <Dialog open={showEditClusterDialog} onOpenChange={setShowEditClusterDialog}>
+        <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle>{t.regions.editCluster}</DialogTitle>
+            <DialogDescription>
+              {t.regions.editClusterDesc}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editClusterForm}>
+            <form onSubmit={editClusterForm.handleSubmit(handleEditClusterSubmit)} className="space-y-4">
+              <FormField
+                control={editClusterForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t.regions.clusterName}</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Brikama Cluster" {...field} data-testid="input-edit-cluster-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editClusterForm.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t.regions.clusterCode}</FormLabel>
+                    <FormControl>
+                      <Input placeholder="BRK" {...field} data-testid="input-edit-cluster-code" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowEditClusterDialog(false)}>
+                  {t.common.cancel}
+                </Button>
+                <Button type="submit" disabled={updateClusterMutation.isPending} data-testid="button-update-cluster">
+                  {updateClusterMutation.isPending ? t.common.saving : t.common.save}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Cluster Confirmation */}
+      <AlertDialog open={showDeleteClusterDialog} onOpenChange={setShowDeleteClusterDialog}>
+        <AlertDialogContent dir={isRTL ? "rtl" : "ltr"}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t.regions.deleteCluster}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t.regions.deleteClusterConfirm}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => selectedCluster && deleteClusterMutation.mutate(selectedCluster.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-cluster"
+            >
+              {deleteClusterMutation.isPending ? t.common.deleting : t.common.delete}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
