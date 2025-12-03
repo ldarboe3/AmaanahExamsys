@@ -2194,7 +2194,7 @@ export default function Students() {
                         <SelectValue placeholder={isRTL ? "اختر الصف" : "Select Grade"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((g) => (
+                        {[3, 6, 9, 12].map((g) => (
                           <SelectItem key={g} value={g.toString()}>
                             {isRTL ? `الصف ${g}` : `Grade ${g}`}
                           </SelectItem>
