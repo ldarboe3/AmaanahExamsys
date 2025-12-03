@@ -259,13 +259,25 @@ export default function Payments() {
   // Confirm payment mutation (only confirms payment, does not approve students)
   const confirmPaymentMutation = useMutation({
     mutationFn: async (invoiceId: number) => {
-      return apiRequest("POST", `/api/invoices/${invoiceId}/confirm-payment`, {});
+      const response = await apiRequest("POST", `/api/invoices/${invoiceId}/confirm-payment`, {});
+      return response.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/students');
+        }
+      });
+      const description = data.approvedCount > 0
+        ? (isRTL 
+            ? `تم تأكيد الدفع. تمت الموافقة على ${data.approvedCount} طالب وتم تعيين أرقام الفهرس.`
+            : `Payment confirmed. ${data.approvedCount} students approved and assigned index numbers.`)
+        : (isRTL ? "تم تأكيد الدفع بنجاح." : "Payment confirmed successfully.");
       toast({
         title: isRTL ? "تم تأكيد الدفع" : "Payment Confirmed",
-        description: data.message || (isRTL ? "تم تأكيد الدفع بنجاح. يمكنك الآن الموافقة على الطلاب." : "Payment confirmed successfully. You can now approve students."),
+        description,
       });
     },
     onError: (error: any) => {
