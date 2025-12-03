@@ -1164,60 +1164,61 @@ export default function Payments() {
           {selectedInvoice?.bankSlipUrl && (
             <div className="space-y-4">
               <div className="border rounded-lg overflow-hidden bg-muted/30">
-                {/* Handle both data: URLs and object storage URLs */}
-                {(selectedInvoice.bankSlipUrl.startsWith('data:image') || 
-                  (selectedInvoice.bankSlipUrl.startsWith('http') && 
-                   (selectedInvoice.bankSlipUrl.includes('.png') || 
-                    selectedInvoice.bankSlipUrl.includes('.jpg') || 
-                    selectedInvoice.bankSlipUrl.includes('.jpeg')))) ? (
-                  <img 
-                    src={selectedInvoice.bankSlipUrl} 
-                    alt="Bank Slip" 
-                    className="w-full h-auto max-h-[500px] object-contain"
-                  />
-                ) : (selectedInvoice.bankSlipUrl.startsWith('data:application/pdf') ||
-                      (selectedInvoice.bankSlipUrl.startsWith('http') && 
-                       selectedInvoice.bankSlipUrl.includes('.pdf'))) ? (
-                  <div className="flex flex-col items-center justify-center p-8 text-center">
-                    <FileText className="w-16 h-16 text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground mb-4">
-                      {isRTL ? "ملف PDF - انقر لفتحه أو تحميله" : "PDF File - Click to open or download"}
-                    </p>
-                    <div className="flex gap-2">
-                      <a 
-                        href={selectedInvoice.bankSlipUrl} 
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2"
-                      >
-                        <Button variant="outline">
-                          <Eye className="w-4 h-4 me-2" />
-                          {isRTL ? "عرض PDF" : "View PDF"}
-                        </Button>
-                      </a>
-                      <a 
-                        href={selectedInvoice.bankSlipUrl} 
-                        download={`bank-slip-${selectedInvoice.invoiceNumber}.pdf`}
-                        className="inline-flex items-center gap-2"
-                      >
-                        <Button variant="outline">
-                          <Download className="w-4 h-4 me-2" />
-                          {isRTL ? "تحميل PDF" : "Download PDF"}
-                        </Button>
-                      </a>
-                    </div>
-                  </div>
-                ) : selectedInvoice.bankSlipUrl.startsWith('http') ? (
-                  <img 
-                    src={selectedInvoice.bankSlipUrl} 
-                    alt="Bank Slip" 
-                    className="w-full h-auto max-h-[500px] object-contain"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center p-8 text-muted-foreground">
-                    {isRTL ? "تنسيق الملف غير مدعوم" : "Unsupported file format"}
-                  </div>
-                )}
+                {/* Handle data URLs, http URLs, and relative /objects/ paths */}
+                {(() => {
+                  const url = selectedInvoice.bankSlipUrl;
+                  const isImage = url.includes('.png') || url.includes('.jpg') || url.includes('.jpeg') || 
+                                  url.startsWith('data:image');
+                  const isPdf = url.includes('.pdf') || url.startsWith('data:application/pdf');
+                  
+                  if (isImage) {
+                    return (
+                      <img 
+                        src={url} 
+                        alt="Bank Slip" 
+                        className="w-full h-auto max-h-[500px] object-contain"
+                      />
+                    );
+                  } else if (isPdf) {
+                    return (
+                      <div className="flex flex-col items-center justify-center p-8 text-center">
+                        <FileText className="w-16 h-16 text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground mb-4">
+                          {isRTL ? "ملف PDF - انقر لفتحه أو تحميله" : "PDF File - Click to open or download"}
+                        </p>
+                        <div className="flex gap-2">
+                          <a 
+                            href={url} 
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2"
+                          >
+                            <Button variant="outline">
+                              <Eye className="w-4 h-4 me-2" />
+                              {isRTL ? "عرض PDF" : "View PDF"}
+                            </Button>
+                          </a>
+                          <a 
+                            href={url} 
+                            download={`bank-slip-${selectedInvoice.invoiceNumber}.pdf`}
+                            className="inline-flex items-center gap-2"
+                          >
+                            <Button variant="outline">
+                              <Download className="w-4 h-4 me-2" />
+                              {isRTL ? "تحميل PDF" : "Download PDF"}
+                            </Button>
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="flex items-center justify-center p-8 text-muted-foreground">
+                        {isRTL ? "تنسيق الملف غير مدعوم" : "Unsupported file format"}
+                      </div>
+                    );
+                  }
+                })()}
               </div>
 
               {/* Invoice Info Summary */}
