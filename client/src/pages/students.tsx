@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -316,7 +316,7 @@ export default function Students() {
     
     const queryString = queryParams.toString();
     return queryString ? `/api/students?${queryString}` : "/api/students";
-  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedGrade, selectedExamYear, isSchoolAdmin, schoolProfile?.id]);
+  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedGrade, selectedExamYear, isSchoolAdmin, schoolProfile?.id, pageSize, currentPage]);
 
   // Fetch all students for counting (without grade filter) - scoped to selected exam year
   const allStudentsUrl = useMemo(() => {
@@ -355,10 +355,14 @@ export default function Students() {
     enabled: !!allSchoolStudentsUrl,
   });
 
-  const { data: students, isLoading } = useQuery<StudentWithRelations[]>({
+  const { data: studentsResponse, isLoading } = useQuery<{ data: StudentWithRelations[]; total: number; limit: number; offset: number }>({
     queryKey: [studentsUrl],
     enabled: selectedGrade !== null,
   });
+  
+  const students = studentsResponse?.data || [];
+  const totalStudents = studentsResponse?.total || 0;
+  const totalPages = Math.ceil(totalStudents / pageSize);
 
   const { data: regions } = useQuery<Region[]>({
     queryKey: ["/api/regions"],
@@ -1770,6 +1774,51 @@ export default function Students() {
               </div>
             )}
           </CardContent>
+          {students.length > 0 && (
+            <CardFooter className="border-t p-4 flex items-center justify-between gap-4">
+              <div className="text-sm text-muted-foreground">
+                {isRTL 
+                  ? `عرض ${students.length > 0 ? (currentPage * pageSize + 1) : 0} - ${Math.min((currentPage + 1) * pageSize, totalStudents)} من ${totalStudents}` 
+                  : `Showing ${students.length > 0 ? (currentPage * pageSize + 1) : 0} to ${Math.min((currentPage + 1) * pageSize, totalStudents)} of ${totalStudents}`}
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={pageSize.toString()} onValueChange={(value) => {
+                  setPageSize(parseInt(value));
+                  setCurrentPage(0);
+                }} data-testid="select-student-page-size">
+                  <SelectTrigger className="w-[100px]" data-testid="select-student-page-size-trigger">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                  disabled={currentPage === 0}
+                  data-testid="button-student-prev-page"
+                >
+                  ←
+                </Button>
+                <span className="text-sm">
+                  {isRTL ? `صفحة ${currentPage + 1} من ${totalPages || 1}` : `Page ${currentPage + 1} of ${totalPages || 1}`}
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+                  disabled={currentPage >= totalPages - 1}
+                  data-testid="button-student-next-page"
+                >
+                  →
+                </Button>
+              </div>
+            </CardFooter>
+          )}
         </Card>
       </div>
     );
