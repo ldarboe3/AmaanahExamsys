@@ -345,15 +345,17 @@ export default function Students() {
     return `/api/students?schoolId=${schoolProfile.id}`;
   }, [isSchoolAdmin, schoolProfile?.id]);
 
-  const { data: allStudents } = useQuery<StudentWithRelations[]>({
+  const { data: allStudentsResponse } = useQuery<{ data: StudentWithRelations[]; total: number; limit: number; offset: number }>({
     queryKey: [allStudentsUrl],
   });
+  const allStudents = allStudentsResponse?.data || [];
 
   // Unscoped student list for visibility checks (all years)
-  const { data: allSchoolStudents, isLoading: allSchoolStudentsLoading } = useQuery<StudentWithRelations[]>({
+  const { data: allSchoolStudentsResponse, isLoading: allSchoolStudentsLoading } = useQuery<{ data: StudentWithRelations[]; total: number; limit: number; offset: number }>({
     queryKey: [allSchoolStudentsUrl],
     enabled: !!allSchoolStudentsUrl,
   });
+  const allSchoolStudents = allSchoolStudentsResponse?.data || [];
 
   const { data: studentsResponse, isLoading } = useQuery<{ data: StudentWithRelations[]; total: number; limit: number; offset: number }>({
     queryKey: [studentsUrl],
