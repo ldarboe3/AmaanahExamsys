@@ -1213,16 +1213,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const hashedPassword = await bcrypt.hash(password, 10);
 
           // Create user account first
-          const userId = randomBytes(16).toString('hex');
-          await db.insert(users).values({
-            id: userId,
+          const [user] = await db.insert(users).values({
             username,
-            password: hashedPassword,
+            passwordHash: hashedPassword,
             role: 'school_admin',
             firstName: schoolName,
             lastName: 'Admin',
             email: `${username.toLowerCase()}@placeholder.local`, // Placeholder email
-          });
+          }).returning();
 
           // Create school with minimal data
           const [createdSchool] = await db.insert(schools).values({
@@ -1235,11 +1233,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             clusterId,
             status: 'approved' as const, // Auto-approve bulk uploaded schools
             isEmailVerified: true, // Skip verification for bulk uploads
-            adminUserId: userId,
+            adminUserId: user.id,
           }).returning();
 
           // Update user with schoolId
-          await db.update(users).set({ schoolId: createdSchool.id }).where(eq(users.id, userId));
+          await db.update(users).set({ schoolId: createdSchool.id }).where(eq(users.id, user.id));
 
           results.success.push({
             schoolName,
