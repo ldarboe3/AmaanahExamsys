@@ -615,9 +615,11 @@ export default function Students() {
   const schoolQueryString = schoolQueryParams.toString();
   const schoolsUrl = schoolQueryString ? `/api/schools?${schoolQueryString}` : "/api/schools";
 
-  const { data: schools } = useQuery<SchoolWithRelations[]>({
+  const { data: schoolsResponse } = useQuery<{ data: SchoolWithRelations[]; total: number; limit: number; offset: number }>({
     queryKey: [schoolsUrl],
   });
+  
+  const schools = schoolsResponse?.data || [];
 
   // Fetch invoices to check payment status for the selected school
   const selectedSchoolId = isSchoolAdmin ? schoolProfile?.id : (schoolFilter !== "all" ? parseInt(schoolFilter) : null);
@@ -633,10 +635,12 @@ export default function Students() {
     return `/api/invoices?${params.toString()}`;
   }, [selectedSchoolId, currentExamYearId]);
 
-  const { data: schoolInvoices } = useQuery<any[]>({
+  const { data: invoicesResponse } = useQuery<any>({
     queryKey: [invoicesQueryUrl],
     enabled: canApproveStudents && !!invoicesQueryUrl,
   });
+  
+  const schoolInvoices = Array.isArray(invoicesResponse) ? invoicesResponse : (invoicesResponse?.data || []);
 
   // Check if the school has a paid invoice for the current exam year
   const schoolPaymentApproved = useMemo(() => {
