@@ -64,7 +64,10 @@ import {
   Mail,
   Building2,
   Loader2,
+  Wand2,
+  ExternalLink,
 } from "lucide-react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { ExamCenter, Region, Cluster } from "@shared/schema";
@@ -131,9 +134,11 @@ function CenterCard({
                 <Edit className="w-4 h-4 me-2" />
                 {t.common.edit}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onViewDetails}>
-                <Eye className="w-4 h-4 me-2" />
-                {t.centers.viewDetails}
+              <DropdownMenuItem asChild>
+                <Link href={`/centers/${center.id}`}>
+                  <Eye className="w-4 h-4 me-2" />
+                  {t.centers.viewDetails}
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onDelete} className="text-destructive">
@@ -229,6 +234,7 @@ export default function Centers() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showAutoAssignDialog, setShowAutoAssignDialog] = useState(false);
   const [selectedCenter, setSelectedCenter] = useState<CenterWithRelations | null>(null);
 
   // Build query string for API
@@ -347,6 +353,30 @@ export default function Centers() {
     },
   });
 
+  const autoAssignMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/center-assignments/auto-assign", { 
+        examYearId: (await fetch("/api/exam-years/active").then(r => r.json())).id 
+      });
+      return response;
+    },
+    onSuccess: (data: any) => {
+      invalidateCenterQueries();
+      setShowAutoAssignDialog(false);
+      toast({
+        title: "Schools Assigned",
+        description: `Successfully assigned ${data.assigned} schools. ${data.skipped > 0 ? `${data.skipped} schools could not be assigned.` : ''}`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: t.common.error,
+        description: "Failed to auto-assign schools",
+        variant: "destructive",
+      });
+    },
+  });
+
   const openEditDialog = (center: CenterWithRelations) => {
     setSelectedCenter(center);
     form.reset({
@@ -399,10 +429,16 @@ export default function Centers() {
             {t.centers.manageDescription}
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} data-testid="button-add-center">
-          <Plus className="w-4 h-4 me-2" />
-          {t.centers.addCenter}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowAutoAssignDialog(true)} data-testid="button-auto-assign">
+            <Wand2 className="w-4 h-4 me-2" />
+            Auto-Assign Schools
+          </Button>
+          <Button onClick={() => setShowCreateDialog(true)} data-testid="button-add-center">
+            <Plus className="w-4 h-4 me-2" />
+            {t.centers.addCenter}
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -1020,6 +1056,35 @@ export default function Centers() {
             >
               {deleteMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
               {t.common.delete}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Auto-Assign Schools Dialog */}
+      <AlertDialog open={showAutoAssignDialog} onOpenChange={setShowAutoAssignDialog}>
+        <AlertDialogContent dir={isRTL ? "rtl" : "ltr"}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Auto-Assign Schools to Centers</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will automatically assign unassigned schools to examination centers based on:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Same cluster priority</li>
+                <li>Same region as fallback</li>
+                <li>Center capacity limits</li>
+              </ul>
+              <p className="mt-2 font-medium">Schools already assigned will not be affected.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => autoAssignMutation.mutate()}
+              disabled={autoAssignMutation.isPending}
+            >
+              {autoAssignMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+              <Wand2 className="w-4 h-4 me-2" />
+              Run Auto-Assignment
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

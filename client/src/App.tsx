@@ -81,6 +81,7 @@ function AuthenticatedRoutes() {
       <Route path="/exam-years" component={ExamYears} />
       <Route path="/payments" component={Payments} />
       <Route path="/centers" component={Centers} />
+      <Route path="/centers/:id" component={CenterDashboard} />
       <Route path="/center-info" component={Centers} />
       <Route path="/admin-results" component={Results} />
       <Route path="/certificates" component={Certificates} />
