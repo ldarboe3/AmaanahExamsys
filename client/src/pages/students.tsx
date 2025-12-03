@@ -1674,7 +1674,7 @@ export default function Students() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">{isRTL ? "جميع المدارس" : "All Schools"}</SelectItem>
-                        {schoolsForFilter?.map((school) => (
+                        {Array.isArray(schoolsForFilter) && schoolsForFilter.map((school) => (
                           <SelectItem key={school.id} value={school.id.toString()}>
                             {school.name}
                           </SelectItem>
