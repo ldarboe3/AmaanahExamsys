@@ -1027,75 +1027,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         clustersCreated: [],
       };
 
-      // Helper to generate random username (school code style) with uniqueness check
-      const generateUsername = async (schoolName: string, existingUsernames: Set<string>): Promise<string> => {
-        // Create base from school name
-        const words = schoolName.trim().split(/\s+/).filter(w => w.length > 0);
-        let base = '';
-        if (words.length >= 2) {
-          // Take first letter of first two words
-          base = (words[0][0] + words[1][0]).toUpperCase();
-        } else if (words.length === 1) {
-          base = words[0].substring(0, 3).toUpperCase();
-        } else {
-          base = 'SCH';
-        }
-        
-        // Add random alphanumeric suffix (6 chars for more entropy)
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No confusing chars
-        let username = '';
-        let attempts = 0;
-        const maxAttempts = 100;
-        
-        do {
-          let suffix = '';
-          for (let i = 0; i < 6; i++) {
-            suffix += chars.charAt(Math.floor(Math.random() * chars.length));
-          }
-          username = `${base}${suffix}`;
-          attempts++;
-          
-          // Check local cache first
-          if (!existingUsernames.has(username.toLowerCase())) {
-            // Also verify against database
-            const existingUser = await storage.getUserByUsername(username);
-            if (!existingUser) {
-              break;
-            }
-          }
-        } while (attempts < maxAttempts);
-        
-        if (attempts >= maxAttempts) {
-          // Fallback: use timestamp-based suffix
-          username = `${base}${Date.now().toString(36).toUpperCase()}`;
-        }
-        
+      // Helper to generate simplified username (schooladmin0001, schooladmin0002, etc.)
+      const generateUsername = async (counter: number, existingUsernames: Set<string>): Promise<string> => {
+        const username = `schooladmin${String(counter).padStart(4, '0')}`;
         existingUsernames.add(username.toLowerCase());
         return username;
       };
 
-      // Helper to generate random password (12 chars for better security)
+      // Helper to generate simplified password (always School@123)
       const generatePassword = (): string => {
-        const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-        const lower = 'abcdefghjkmnpqrstuvwxyz';
-        const numbers = '23456789';
-        const special = '@#$%';
-        const allChars = upper + lower + numbers + special;
-        
-        // Ensure at least one of each type
-        let password = '';
-        password += upper.charAt(Math.floor(Math.random() * upper.length));
-        password += lower.charAt(Math.floor(Math.random() * lower.length));
-        password += numbers.charAt(Math.floor(Math.random() * numbers.length));
-        password += special.charAt(Math.floor(Math.random() * special.length));
-        
-        // Fill remaining 8 chars randomly
-        for (let i = 0; i < 8; i++) {
-          password += allChars.charAt(Math.floor(Math.random() * allChars.length));
-        }
-        
-        // Shuffle the password
-        return password.split('').sort(() => Math.random() - 0.5).join('');
+        return 'School@123';
       };
 
       // Helper to generate region code
@@ -1158,6 +1099,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       allRegions.forEach(r => regionCache.set(r.name.toLowerCase().trim(), r.id));
       allClusters.forEach(c => clusterCache.set(`${c.regionId}-${c.name.toLowerCase().trim()}`, c.id));
 
+      let successCounter = 0; // Counter for username generation
+
       for (let i = 0; i < schoolsData.length; i++) {
         const row = schoolsData[i];
         const rowNum = i + 1;
@@ -1216,7 +1159,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           }
 
           // Generate credentials
-          const username = await generateUsername(schoolName, existingUsernames);
+          successCounter++;
+          const username = await generateUsername(successCounter, existingUsernames);
           const password = generatePassword();
           const hashedPassword = await bcrypt.hash(password, 10);
 
