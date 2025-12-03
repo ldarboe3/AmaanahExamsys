@@ -1,0 +1,251 @@
+1. Functionalities of the Examination Center
+
+Based on the BRD, an Examination Center has multiple built-in functions. Here is a structured breakdown:
+
+A. Timetable Display & Management
+
+The center dashboard shows all subjects, dates, and times for the exams allocated to that particular center.
+→ "Center dashboards show timetable, timers, attendance, malpractice." 
+
+Amaanah_BRD_SDRD
+
+B. Attendance Tracking
+
+Center Admin uses the system to mark student attendance using:
+
+Index number
+
+Barcode on exam card
+
+Printed attendance sheets
+
+Attendance records are automatically logged into the central system.
+
+C. Malpractice Reporting
+
+Centers can submit realtime reports of exam malpractice:
+
+Cheating
+
+Smuggling of notes
+
+Misconduct
+
+Teacher interference
+
+These are timestamped and sent directly to System Admin for action.
+
+D. Logistics Management at Center Level
+
+Centers track:
+
+What question papers they received
+
+When they were received
+
+Storage logs
+
+Paper distribution to classrooms
+
+Return of scripts after exams
+
+→ "Track movement of exam papers: dispatched, received, stored, distributed. Timestamped events, staff accountability, security alerts." 
+
+Amaanah_BRD_SDRD
+
+E. Examiner Coordination (if applicable)
+
+Some centers also handle:
+
+Examiner attendance
+
+Script handover after exam
+
+Reporting allowances
+
+F. Student Information Access
+
+Students and parents can see:
+
+Assigned center
+
+Timetable
+
+Exam card
+
+→ "View center, timetable, exam card, results." 
+
+Amaanah_BRD_SDRD
+
+✅ 2. How Admin Should Assign Schools to Examination Centers
+
+This is an important workflow because Amaanah conducts exams for 400 schools nationwide.
+
+Below is a step-by-step plan based on the BRD plus professional examination-management best practices.
+
+A. Admin First Creates Exam Year & Centers
+
+From the system admin panel:
+
+Create new Exam Year
+
+Create or import Examination Centers
+
+Define capacity for each center (optional but recommended)
+
+→ "Create exam year, assign schools to centers." 
+
+Amaanah_BRD_SDRD
+
+B. What Data Helps the Admin in Assignment?
+
+Schools already have:
+
+Region
+
+Cluster
+
+School type (LBS/UBS/BCS/SSS)
+
+Student population
+
+→ "School completes profile: address, region, cluster, type..." 
+
+Amaanah_BRD_SDRD
+
+This allows the system to group schools by:
+
+Nearest center
+
+Region
+
+Education type (for timetable alignment)
+
+C. Assignment Methods (Two Options)
+1. Automatic Assignment (Recommended)
+
+The system checks all schools and assigns them to centers using rules:
+
+Rules for Auto-Assignment
+
+Schools within the same region/cluster should be placed in the same center.
+
+Prevent overloading of center capacity (if defined).
+
+If student population is large, split them across two adjacent centers (for fairness).
+
+Priority to nearest center based on address.
+
+Admin Workflow for Auto-Assignment:
+
+Admin clicks "Assign Schools to Centers"
+
+System runs allocation algorithm
+
+Admin reviews suggested assignments
+
+Admin approves or adjusts manually
+
+This reduces workload for 400+ schools.
+
+2. Manual Assignment (When Needed)
+
+Admin may manually place a school into a center if:
+
+The school is in a remote location
+
+Center is newly added
+
+Special cases (girls-only, boys-only, cluster exam)
+
+Avoid overcrowding
+
+Manual Workflow:
+
+Go to Examination Management → Centers
+
+Select a center
+
+Click “Add School to This Center”
+
+Choose a school from dropdown
+
+Save assignment
+
+✅ 3. Important Logic for Assignment
+
+To avoid operational problems, your system should apply the following logic:
+
+Logic 1: Distance-Based Allocation
+
+If possible, integrate Google Maps or region mapping.
+
+Logic 2: Capacity Check
+
+Example:
+
+A center with 300 seats cannot take a school with 450 students.
+The system should show a warning:
+"Center capacity exceeded."
+
+Logic 3: Grade-Level Separation
+
+Some centers may take only:
+
+Grades 3 & 6
+
+Or Grades 9 & 12
+
+Admin should choose grade availability per center.
+
+Logic 4: Cluster Priority
+
+A cluster should ideally share the same center.
+
+Logic 5: Special Requests
+
+Admin should have a feature to override rules for special circumstances.
+
+✅ 4. What Happens After Assignment?
+✔ Schools see their center immediately
+
+Via School Admin dashboard.
+
+✔ Students/Parents see center in their portal
+
+→ "View center... exam card" 
+
+Amaanah_BRD_SDRD
+
+✔ Exam Cards automatically display the assigned center
+
+With barcode and index number.
+
+✅ 5. Summary
+Examination Center Functions
+
+Timetable
+
+Attendance
+
+Malpractice reporting
+
+Logistics tracking
+
+Script handling
+
+Examiner coordination
+
+Dashboard with activity logs
+
+How Admin Assigns Schools to Centers
+
+Create exam year
+
+Add centers
+
+Assign schools (auto or manual)
+
+Validate capacity and region
+
+Publish assignments (visible to schools and students)
