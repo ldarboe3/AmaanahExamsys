@@ -161,6 +161,8 @@ export default function Schools() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [clusterFilter, setClusterFilter] = useState<string>("all");
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [currentPage, setCurrentPage] = useState<number>(0);
   const [selectedSchool, setSelectedSchool] = useState<SchoolWithRelations | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -213,12 +215,18 @@ export default function Schools() {
   if (typeFilter !== "all") queryParams.set("schoolType", typeFilter);
   if (regionFilter !== "all") queryParams.set("regionId", regionFilter);
   if (clusterFilter !== "all") queryParams.set("clusterId", clusterFilter);
+  queryParams.set("limit", pageSize.toString());
+  queryParams.set("offset", (currentPage * pageSize).toString());
   const queryString = queryParams.toString();
-  const schoolsUrl = queryString ? `/api/schools?${queryString}` : "/api/schools";
+  const schoolsUrl = `/api/schools?${queryString}`;
 
-  const { data: schools, isLoading } = useQuery<SchoolWithRelations[]>({
+  const { data: response, isLoading } = useQuery<{ data: SchoolWithRelations[]; total: number; limit: number; offset: number }>({
     queryKey: [schoolsUrl],
   });
+  
+  const schools = response?.data || [];
+  const totalSchools = response?.total || 0;
+  const totalPages = Math.ceil(totalSchools / pageSize);
 
   const { data: regions } = useQuery<Region[]>({
     queryKey: ["/api/regions"],
@@ -844,6 +852,49 @@ export default function Schools() {
             </div>
           )}
         </CardContent>
+        <CardFooter className="border-t p-4 flex items-center justify-between gap-4">
+          <div className="text-sm text-muted-foreground">
+            {isRTL 
+              ? `عرض ${schools.length > 0 ? (currentPage * pageSize + 1) : 0} - ${Math.min((currentPage + 1) * pageSize, totalSchools)} من ${totalSchools}` 
+              : `Showing ${schools.length > 0 ? (currentPage * pageSize + 1) : 0} to ${Math.min((currentPage + 1) * pageSize, totalSchools)} of ${totalSchools}`}
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={pageSize.toString()} onValueChange={(value) => {
+              setPageSize(parseInt(value));
+              setCurrentPage(0);
+            }} data-testid="select-page-size">
+              <SelectTrigger className="w-[100px]" data-testid="select-page-size-trigger">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+              disabled={currentPage === 0}
+              data-testid="button-prev-page"
+            >
+              ←
+            </Button>
+            <span className="text-sm">
+              {isRTL ? `صفحة ${currentPage + 1} من ${totalPages || 1}` : `Page ${currentPage + 1} of ${totalPages || 1}`}
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+              disabled={currentPage >= totalPages - 1}
+              data-testid="button-next-page"
+            >
+              →
+            </Button>
+          </div>
+        </CardFooter>
       </Card>
 
       {/* Add School Dialog */}

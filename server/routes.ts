@@ -902,6 +902,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const schoolType = req.query.schoolType as string | undefined;
       const regionId = req.query.regionId ? parseInt(req.query.regionId as string) : undefined;
       const clusterId = req.query.clusterId ? parseInt(req.query.clusterId as string) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
       
       if (status && status !== 'all') {
         schools = schools.filter(s => s.status === status);
@@ -916,7 +918,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         schools = schools.filter(s => s.clusterId === clusterId);
       }
       
-      res.json(schools);
+      const total = schools.length;
+      if (limit) {
+        schools = schools.slice(offset, offset + limit);
+      }
+      
+      res.json({ data: schools, total, limit: limit || total, offset });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -2374,6 +2381,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const gradeMax = req.query.gradeMax ? parseInt(req.query.gradeMax as string) : undefined;
       const regionId = req.query.regionId ? parseInt(req.query.regionId as string) : undefined;
       const clusterId = req.query.clusterId ? parseInt(req.query.clusterId as string) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
       
       if (status && status !== 'all') {
         students = students.filter(s => s.status === status);
@@ -2413,7 +2422,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       // Enrich students with school and exam year information
       const allExamYears = await storage.getAllExamYears();
-      const enrichedStudents = students.map(student => {
+      let enrichedStudents = students.map(student => {
         const school = allSchools.find(s => s.id === student.schoolId);
         const examYear = allExamYears.find(ey => ey.id === student.examYearId);
         return {
@@ -2423,7 +2432,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         };
       });
       
-      res.json(enrichedStudents);
+      const total = enrichedStudents.length;
+      if (limit) {
+        enrichedStudents = enrichedStudents.slice(offset, offset + limit);
+      }
+      
+      res.json({ data: enrichedStudents, total, limit: limit || total, offset });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
