@@ -180,7 +180,6 @@ export default function Results() {
   if (schoolFilter !== "all") studentsQueryParams.set("schoolId", schoolFilter);
   if (clusterFilter !== "all") studentsQueryParams.set("clusterId", clusterFilter);
   if (regionFilter !== "all") studentsQueryParams.set("regionId", regionFilter);
-  if (studentGradeFilter !== "all") studentsQueryParams.set("grade", studentGradeFilter);
   if (activeExamYear?.id) studentsQueryParams.set("examYearId", String(activeExamYear.id));
   
   const studentsQueryUrl = `/api/results/students-for-entry${studentsQueryParams.toString() ? `?${studentsQueryParams.toString()}` : ''}`;
@@ -190,8 +189,14 @@ export default function Results() {
     enabled: !!activeExamYear?.id,
   });
 
+  const resultsQueryParams = new URLSearchParams();
+  if (statusFilter !== "all") resultsQueryParams.set("status", statusFilter);
+  if (resultGradeFilter !== "all") resultsQueryParams.set("grade", resultGradeFilter);
+  
+  const resultsQueryUrl = `/api/results${resultsQueryParams.toString() ? `?${resultsQueryParams.toString()}` : ''}`;
+
   const { data: results, isLoading: resultsLoading } = useQuery<ResultWithRelations[]>({
-    queryKey: ["/api/results", statusFilter, resultGradeFilter],
+    queryKey: [resultsQueryUrl],
   });
 
   const validateResultMutation = useMutation({
