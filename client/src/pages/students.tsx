@@ -25,6 +25,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -179,6 +188,7 @@ export default function Students() {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showUploadCloseConfirmation, setShowUploadCloseConfirmation] = useState(false);
   const [selectedExamYear, setSelectedExamYear] = useState<number | null>(null);
   const [selectedGrade, setSelectedGrade] = useState<number | null>(null);
   const [countdown, setCountdown] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
@@ -2081,7 +2091,16 @@ export default function Students() {
       </Dialog>
 
       {/* Upload CSV Dialog */}
-      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+      <Dialog 
+        open={showUploadDialog} 
+        onOpenChange={(open) => {
+          if (!open && bulkUploadMutation.isPending) {
+            setShowUploadCloseConfirmation(true);
+            return;
+          }
+          setShowUploadDialog(open);
+        }}
+      >
         <DialogContent dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
             <DialogTitle>
@@ -2135,7 +2154,18 @@ export default function Students() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowUploadDialog(false); setUploadFile(null); }}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (bulkUploadMutation.isPending) {
+                  setShowUploadCloseConfirmation(true);
+                } else {
+                  setShowUploadDialog(false);
+                  setUploadFile(null);
+                }
+              }}
+              disabled={bulkUploadMutation.isPending && uploadProgress < 100}
+            >
               {t.common.cancel}
             </Button>
             <Button disabled={!uploadFile || bulkUploadMutation.isPending}
@@ -2152,6 +2182,10 @@ export default function Students() {
 
       {/* Admin Bulk Upload Dialog with School Matching */}
       <Dialog open={showAdminUploadDialog} onOpenChange={(open) => {
+        if (!open && adminUploadPhase !== 'idle') {
+          setShowUploadCloseConfirmation(true);
+          return;
+        }
         if (!open) resetAdminUpload();
         setShowAdminUploadDialog(open);
       }}>
@@ -2473,6 +2507,34 @@ export default function Students() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Upload Close Confirmation Dialog */}
+      <AlertDialog open={showUploadCloseConfirmation} onOpenChange={setShowUploadCloseConfirmation}>
+        <AlertDialogContent dir={isRTL ? "rtl" : "ltr"}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isRTL ? "تأكيد الإغلاق" : "Confirm Close"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRTL 
+                ? "جاري رفع الطلاب الآن. هل تريد حقاً إيقاف عملية الرفع؟" 
+                : "Student upload is in progress. Are you sure you want to close?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3 justify-end">
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowUploadCloseConfirmation(false);
+                setShowUploadDialog(false);
+                setShowAdminUploadDialog(false);
+                setUploadFile(null);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isRTL ? "إيقاف الرفع" : "Stop Upload"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

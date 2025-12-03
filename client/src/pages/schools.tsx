@@ -31,6 +31,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -178,6 +187,7 @@ export default function Schools() {
   } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<AddSchoolFormData>({
@@ -1502,7 +1512,13 @@ export default function Schools() {
 
       {/* Bulk Upload Dialog */}
       <Dialog open={showBulkUploadDialog} onOpenChange={(open) => {
-        if (!open) resetBulkUpload();
+        if (!open) {
+          if (isUploading) {
+            setShowCloseConfirmation(true);
+            return;
+          }
+          resetBulkUpload();
+        }
         setShowBulkUploadDialog(open);
       }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" dir={isRTL ? "rtl" : "ltr"}>
@@ -1682,7 +1698,17 @@ export default function Schools() {
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={resetBulkUpload}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (isUploading) {
+                  setShowCloseConfirmation(true);
+                } else {
+                  resetBulkUpload();
+                }
+              }}
+              disabled={isUploading && uploadProgress < 100}
+            >
               {bulkUploadResults ? t.common.close : t.common.cancel}
             </Button>
             {!bulkUploadResults && bulkUploadData.length > 0 && (
@@ -1694,6 +1720,32 @@ export default function Schools() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Close Confirmation Dialog */}
+      <AlertDialog open={showCloseConfirmation} onOpenChange={setShowCloseConfirmation}>
+        <AlertDialogContent dir={isRTL ? "rtl" : "ltr"}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isRTL ? "تأكيد الإغلاق" : "Confirm Close"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRTL 
+                ? "جاري الرفع الآن. هل تريد حقاً إيقاف عملية الرفع؟" 
+                : "Upload is in progress. Are you sure you want to close?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3 justify-end">
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowCloseConfirmation(false);
+                resetBulkUpload();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isRTL ? "إيقاف الرفع" : "Stop Upload"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
