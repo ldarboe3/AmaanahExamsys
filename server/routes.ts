@@ -5840,7 +5840,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // Multi-subject CSV upload - handles CSV format with multiple subject columns
+  // Multi-subject CSV upload - handles CSV format with School Name, Region, Cluster, Student Name, Subjects
   app.post("/api/results/multi-subject-upload", isAuthenticated, async (req, res) => {
     try {
       const { rows, examYearId, grade } = req.body;
@@ -5892,35 +5892,88 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const row = rows[rowIndex];
         const rowNum = rowIndex + 1;
         
-        // Get student index number from the row
-        const indexNumber = row['رقم الطالب'] || row['indexNumber'] || row['index_number'];
-        if (!indexNumber) {
-          results.errors.push({ row: rowNum, error: "Missing student index number" });
-          continue;
-        }
-        
-        // Find student
-        const student = await storage.getStudentByIndexNumber(indexNumber.trim());
-        if (!student) {
-          results.errors.push({ row: rowNum, indexNumber, error: "Student not found" });
-          continue;
-        }
-        
-        // Process each subject column in the row
-        for (const [columnName, scoreValue] of Object.entries(row)) {
-          // Skip non-subject columns
-          if (['رقم المدرسة', 'المدرسة', 'المكــــــان', 'إقليم', 'رقم الطالب', 'اسم المشارك', 
-               'schoolNumber', 'schoolName', 'location', 'region', 'indexNumber', 'studentName'].includes(columnName)) {
+        try {
+          // Extract key fields (disregard school code, student number)
+          const schoolName = (row['School Name'] || row['المدرسة'] || '').trim();
+          const regionName = (row['Region'] || row['إقليم'] || '').trim();
+          const clusterName = (row['Cluster'] || '').trim();
+          const studentName = (row['Student Name'] || row['اسم الطالب'] || '').trim();
+          
+          if (!schoolName || !regionName || !studentName) {
+            results.errors.push({ row: rowNum, error: "Missing School Name, Region, or Student Name" });
             continue;
           }
           
-          // Clean up column name for matching
-          const cleanColumnName = columnName.trim().replace(/\s+/g, ' ');
+          // Find or create region
+          let region = (await storage.getAllRegions()).find(r => r.name.toLowerCase() === regionName.toLowerCase());
+          if (!region) {
+            region = await storage.createRegion({ name: regionName });
+          }
           
-          // Get or create subject
-          const subjectInfo = subjectMappings[cleanColumnName] || { name: cleanColumnName, arabicName: cleanColumnName };
+          // Find or create cluster
+          let cluster = (await storage.getAllClusters()).find(c => c.name.toLowerCase() === clusterName.toLowerCase() && c.regionId === region.id);
+          if (!cluster && clusterName) {
+            cluster = await storage.createCluster({ name: clusterName, regionId: region.id });
+          }
           
-          try {
+          // Find or create school (match by name and region/cluster)
+          let school = (await storage.getAllSchools()).find(s => 
+            s.name.toLowerCase() === schoolName.toLowerCase() && 
+            s.regionId === region.id &&
+            (!cluster || s.clusterId === cluster.id)
+          );
+          
+          if (!school) {
+            // Auto-create school
+            school = await storage.createSchool({
+              name: schoolName,
+              regionId: region.id,
+              clusterId: cluster?.id || null,
+              registrationStatus: 'verified',
+              adminUserId: null
+            });
+          }
+          
+          // Find or create student (match by name and school)
+          let students = await storage.getStudentsBySchool(school.id);
+          let student = students.find(s => 
+            `${s.firstName} ${s.lastName}`.toLowerCase() === studentName.toLowerCase()
+          );
+          
+          if (!student) {
+            // Auto-create student
+            const [firstName, ...lastNameParts] = studentName.split(' ');
+            const lastName = lastNameParts.join(' ') || 'Student';
+            const indexNumber = await generateIndexNumber(gradeNumber, school.id);
+            
+            student = await storage.createStudent({
+              firstName,
+              lastName,
+              gender: 'unspecified',
+              dateOfBirth: null,
+              schoolId: school.id,
+              grade: gradeNumber,
+              examYearId,
+              indexNumber,
+              registrationStatus: 'registered'
+            });
+          }
+          
+          // Process each subject column in the row
+          for (const [columnName, scoreValue] of Object.entries(row)) {
+            // Skip non-subject columns
+            if (['School Name', 'Region', 'Cluster', 'Student Name', 
+                 'المدرسة', 'إقليم', 'اسم الطالب', 
+                 'رقم المدرسة', 'المكــــــان', 'رقم الطالب'].includes(columnName)) {
+              continue;
+            }
+            
+            // Clean up column name for matching
+            const cleanColumnName = columnName.trim().replace(/\s+/g, ' ');
+            
+            // Get or create subject
+            const subjectInfo = subjectMappings[cleanColumnName] || { name: cleanColumnName, arabicName: cleanColumnName };
+            
             const subject = await storage.getOrCreateSubject(subjectInfo.name, subjectInfo.arabicName, gradeNumber);
             
             // Parse score
@@ -5951,9 +6004,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             } else {
               results.created++;
             }
-          } catch (err: any) {
-            results.errors.push({ row: rowNum, indexNumber, subject: columnName, error: err.message });
           }
+        } catch (err: any) {
+          results.errors.push({ row: rowNum, error: err.message });
         }
       }
       
