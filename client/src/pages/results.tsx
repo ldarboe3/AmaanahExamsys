@@ -366,7 +366,51 @@ export default function Results() {
             <Upload className="w-4 h-4 me-2" />
             {isRTL ? "تحميل النتائج" : "Upload Results"}
           </Button>
-          <Button variant="outline" data-testid="button-download-template">
+          <Button 
+            variant="outline" 
+            data-testid="button-download-template"
+            onClick={() => {
+              if (studentGradeFilter === "all") {
+                toast({
+                  title: isRTL ? "خطأ" : "Error",
+                  description: isRTL ? "يرجى تحديد الصف أولاً" : "Please select a grade first",
+                  variant: "destructive"
+                });
+                return;
+              }
+              // Generate template with Arabic column names
+              const headers = ["رقم المدرسة", "المدرسة", "المكــــــان", "إقليم", "رقم الطالب", "اسم الطالب"];
+              
+              // Filter subjects by selected grade level, use Arabic names
+              const gradeSubjects = (subjects?.filter(s => s.grade === parseInt(studentGradeFilter)) || [])
+                .sort((a, b) => (a.arabicName || a.name).localeCompare(b.arabicName || b.name));
+              
+              if (gradeSubjects.length > 0) {
+                gradeSubjects.forEach(s => headers.push(s.arabicName || s.name));
+              } else if (subjects && subjects.length > 0) {
+                subjects.sort((a, b) => (a.arabicName || a.name).localeCompare(b.arabicName || b.name))
+                  .forEach(s => headers.push(s.arabicName || s.name));
+              } else {
+                headers.push("موضوع 1", "موضوع 2", "موضوع 3");
+              }
+              
+              // Generate CSV with sample data row
+              const headerLine = headers.join(",");
+              const numSubjects = gradeSubjects.length > 0 ? gradeSubjects.length : (headers.length - 6);
+              const sampleData = "001,اسم المدرسة,الموقع,المنطقة,001,اسم الطالب," + 
+                                 Array(numSubjects).fill("80").join(",");
+              const csv = headerLine + "\n" + sampleData;
+              
+              // Download with UTF-8 BOM for proper encoding
+              const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = "results_template.csv";
+              link.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
             <FileSpreadsheet className="w-4 h-4 me-2" />
             {isRTL ? "القالب" : "Template"}
           </Button>
