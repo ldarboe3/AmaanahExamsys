@@ -353,6 +353,7 @@ export interface IStorage {
   getCenterAssignmentsByExamYear(examYearId: number): Promise<CenterAssignment[]>;
   getCenterAssignmentsByCenter(centerId: number, examYearId: number): Promise<CenterAssignment[]>;
   getCenterAssignmentBySchool(schoolId: number, examYearId: number): Promise<CenterAssignment | undefined>;
+  getCenterAssignmentsBySchool(schoolId: number): Promise<CenterAssignment[]>;
   updateCenterAssignment(id: number, assignment: Partial<InsertCenterAssignment>): Promise<CenterAssignment | undefined>;
   deleteCenterAssignment(id: number): Promise<boolean>;
 
@@ -1814,6 +1815,12 @@ export class DatabaseStorage implements IStorage {
     const [assignment] = await db.select().from(centerAssignments)
       .where(and(eq(centerAssignments.schoolId, schoolId), eq(centerAssignments.examYearId, examYearId)));
     return assignment;
+  }
+
+  async getCenterAssignmentsBySchool(schoolId: number): Promise<CenterAssignment[]> {
+    return db.select().from(centerAssignments)
+      .where(eq(centerAssignments.schoolId, schoolId))
+      .orderBy(desc(centerAssignments.createdAt));
   }
 
   async updateCenterAssignment(id: number, assignment: Partial<InsertCenterAssignment>): Promise<CenterAssignment | undefined> {
