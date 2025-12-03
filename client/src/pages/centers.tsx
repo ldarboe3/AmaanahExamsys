@@ -385,6 +385,21 @@ export default function Centers() {
     },
   });
 
+  const openCreateDialog = () => {
+    form.reset({
+      name: "",
+      code: "",
+      address: "",
+      regionId: 0,
+      clusterId: 0,
+      capacity: 500,
+      contactPerson: "",
+      contactPhone: "",
+      contactEmail: "",
+    });
+    setShowCreateDialog(true);
+  };
+
   const openEditDialog = (center: CenterWithRelations) => {
     setSelectedCenter(center);
     form.reset({
@@ -442,7 +457,7 @@ export default function Centers() {
             <Wand2 className="w-4 h-4 me-2" />
             Auto-Assign Schools
           </Button>
-          <Button onClick={() => setShowCreateDialog(true)} data-testid="button-add-center">
+          <Button onClick={openCreateDialog} data-testid="button-add-center">
             <Plus className="w-4 h-4 me-2" />
             {t.centers.addCenter}
           </Button>
@@ -587,7 +602,7 @@ export default function Centers() {
                 <p className="text-muted-foreground mb-4">
                   {searchQuery ? t.centers.tryAdjustSearch : t.centers.addFirstCenter}
                 </p>
-                <Button onClick={() => setShowCreateDialog(true)}>
+                <Button onClick={openCreateDialog}>
                   <Plus className="w-4 h-4 me-2" />
                   {t.centers.addCenter}
                 </Button>
