@@ -381,7 +381,14 @@ export default function Students() {
           ? `تم إضافة ${data.created} طالب، فشل ${data.failed} طالب`
           : `Created ${data.created} students, ${data.failed} failed`,
       });
-      invalidateStudentQueries();
+      
+      // Invalidate all student queries and refetch
+      queryClient.refetchQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/students');
+        },
+      });
       
       // Close dialog after a short delay
       setTimeout(() => {
