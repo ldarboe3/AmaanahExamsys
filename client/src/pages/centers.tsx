@@ -261,20 +261,6 @@ export default function Centers() {
     (cluster) => regionFilter === "all" || cluster.regionId === parseInt(regionFilter)
   );
 
-  // Watch region selection in forms for cluster filtering
-  const selectedRegionIdCreate = form.watch("regionId");
-  const selectedRegionIdEdit = editForm.watch("regionId");
-  
-  // Filter clusters for create form
-  const filteredClustersCreate = selectedRegionIdCreate 
-    ? clusters?.filter(c => c.regionId === selectedRegionIdCreate)
-    : [];
-  
-  // Filter clusters for edit form
-  const filteredClustersEdit = selectedRegionIdEdit
-    ? clusters?.filter(c => c.regionId === selectedRegionIdEdit)
-    : [];
-
   const form = useForm<CenterFormData>({
     resolver: zodResolver(centerSchema),
     defaultValues: {
@@ -289,6 +275,14 @@ export default function Centers() {
       contactEmail: "",
     },
   });
+
+  // Watch region selection for cluster filtering
+  const selectedRegionId = form.watch("regionId");
+  
+  // Filter clusters based on selected region in form
+  const filteredClusters = selectedRegionId 
+    ? clusters?.filter(c => c.regionId === selectedRegionId)
+    : [];
 
   // Helper to invalidate all center queries (including filtered variants)
   const invalidateCenterQueries = () => {
@@ -701,14 +695,14 @@ export default function Centers() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t.schools.cluster}</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value?.toString()} disabled={!selectedRegionIdCreate}>
+                      <Select onValueChange={field.onChange} value={field.value?.toString()} disabled={!selectedRegionId}>
                         <FormControl>
                           <SelectTrigger data-testid="select-cluster">
-                            <SelectValue placeholder={selectedRegionIdCreate ? t.centers.selectCluster : (isRTL ? "اختر المنطقة أولاً" : "Select region first")} />
+                            <SelectValue placeholder={selectedRegionId ? t.centers.selectCluster : (isRTL ? "اختر المنطقة أولاً" : "Select region first")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {filteredClustersCreate?.map((cluster) => (
+                          {filteredClusters?.map((cluster) => (
                             <SelectItem key={cluster.id} value={cluster.id.toString()}>
                               {cluster.name}
                             </SelectItem>
@@ -832,7 +826,7 @@ export default function Centers() {
                   )}
                 />
                 <FormField
-                  control={editForm.control}
+                  control={form.control}
                   name="regionId"
                   render={({ field }) => (
                     <FormItem>
@@ -858,19 +852,19 @@ export default function Centers() {
               </div>
 
               <FormField
-                control={editForm.control}
+                control={form.control}
                 name="clusterId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t.schools.cluster}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value?.toString()} disabled={!selectedRegionIdEdit}>
+                    <Select onValueChange={field.onChange} value={field.value?.toString()} disabled={!selectedRegionId}>
                       <FormControl>
                         <SelectTrigger data-testid="select-edit-cluster">
-                          <SelectValue placeholder={selectedRegionIdEdit ? t.centers.selectCluster : (isRTL ? "اختر المنطقة أولاً" : "Select region first")} />
+                          <SelectValue placeholder={selectedRegionId ? t.centers.selectCluster : (isRTL ? "اختر المنطقة أولاً" : "Select region first")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {filteredClustersEdit?.map((cluster) => (
+                        {filteredClusters?.map((cluster) => (
                           <SelectItem key={cluster.id} value={cluster.id.toString()}>
                             {cluster.name}
                           </SelectItem>
@@ -883,7 +877,7 @@ export default function Centers() {
               />
 
               <FormField
-                control={editForm.control}
+                control={form.control}
                 name="address"
                 render={({ field }) => (
                   <FormItem>
@@ -898,7 +892,7 @@ export default function Centers() {
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
-                  control={editForm.control}
+                  control={form.control}
                   name="contactPerson"
                   render={({ field }) => (
                     <FormItem>
@@ -911,7 +905,7 @@ export default function Centers() {
                   )}
                 />
                 <FormField
-                  control={editForm.control}
+                  control={form.control}
                   name="contactPhone"
                   render={({ field }) => (
                     <FormItem>
@@ -926,7 +920,7 @@ export default function Centers() {
               </div>
 
               <FormField
-                control={editForm.control}
+                control={form.control}
                 name="contactEmail"
                 render={({ field }) => (
                   <FormItem>
