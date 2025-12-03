@@ -132,6 +132,9 @@ export default function Results() {
   const [activeTab, setActiveTab] = useState("students");
   const [uploadProgress, setUploadProgress] = useState<{ created: number; updated: number; errors: number } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadPercentage, setUploadPercentage] = useState(0);
+  const [showMatchingPreview, setShowMatchingPreview] = useState(false);
+  const [previewData, setPreviewData] = useState<{ rows: any[]; schoolsCount: number; studentsCount: number; subjectsCount: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: currentUser } = useQuery<any>({
@@ -277,9 +280,6 @@ export default function Results() {
       return;
     }
 
-    setIsUploading(true);
-    setUploadProgress(null);
-
     try {
       const text = await file.text();
       const lines = text.split('\n').filter(line => line.trim());
@@ -302,11 +302,23 @@ export default function Results() {
         rows.push(row);
       }
 
-      await uploadResultsMutation.mutateAsync({
-        rows,
-        examYearId: activeExamYear.id,
-        grade: parseInt(studentGradeFilter),
+      // Count unique schools and students in preview
+      const uniqueSchools = new Set();
+      const uniqueStudents = new Set();
+      rows.forEach(row => {
+        const schoolName = (row['المدرسة'] || '').trim();
+        const studentName = (row['اسم الطالب'] || '').trim();
+        if (schoolName) uniqueSchools.add(schoolName);
+        if (studentName) uniqueStudents.add(studentName);
       });
+
+      setPreviewData({
+        rows,
+        schoolsCount: uniqueSchools.size,
+        studentsCount: uniqueStudents.size,
+        subjectsCount: headers.length - 6, // Subtract: school code, school name, location, region, student number, student name
+      });
+      setShowMatchingPreview(true);
     } catch (error: any) {
       toast({
         title: t.common.error,
@@ -314,10 +326,49 @@ export default function Results() {
         variant: "destructive",
       });
     } finally {
-      setIsUploading(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!previewData || !activeExamYear?.id) return;
+    
+    setShowMatchingPreview(false);
+    setIsUploading(true);
+    setUploadProgress(null);
+    setUploadPercentage(0);
+
+    try {
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setUploadPercentage(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + Math.random() * 30;
+        });
+      }, 200);
+
+      await uploadResultsMutation.mutateAsync({
+        rows: previewData.rows,
+        examYearId: activeExamYear.id,
+        grade: parseInt(studentGradeFilter),
+      });
+
+      clearInterval(progressInterval);
+      setUploadPercentage(100);
+    } catch (error: any) {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل تحميل النتائج" : "Failed to upload results"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      setTimeout(() => setUploadPercentage(0), 2000);
     }
   };
 
@@ -952,7 +1003,13 @@ export default function Results() {
             >
               {isUploading ? (
                 <div className="space-y-4">
-                  <Loader2 className="w-10 h-10 text-primary mx-auto animate-spin" />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <p className="text-muted-foreground">{isRTL ? "جاري التحميل" : "Uploading"}</p>
+                      <span className="font-medium">{Math.round(uploadPercentage)}%</span>
+                    </div>
+                    <Progress value={uploadPercentage} className="h-2" />
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {isRTL ? "جاري تحميل النتائج..." : "Uploading results..."}
                   </p>
@@ -1046,6 +1103,103 @@ export default function Results() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowUploadDialog(false); setUploadProgress(null); }}>
               {t.common.close}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showMatchingPreview} onOpenChange={setShowMatchingPreview}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{isRTL ? "معاينة البيانات المتطابقة" : "Data Matching Preview"}</DialogTitle>
+            <DialogDescription>
+              {isRTL ? "تحقق من البيانات قبل التحميل" : "Review your data before uploading"}
+            </DialogDescription>
+          </DialogHeader>
+          {previewData && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">{isRTL ? "المدارس الفريدة" : "Unique Schools"}</p>
+                    <p className="text-3xl font-semibold text-primary">{previewData.schoolsCount}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">{isRTL ? "الطلاب الفريدين" : "Unique Students"}</p>
+                    <p className="text-3xl font-semibold text-primary">{previewData.studentsCount}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">{isRTL ? "الموضوعات" : "Subjects"}</p>
+                    <p className="text-3xl font-semibold text-primary">{previewData.subjectsCount}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">{isRTL ? "صفوف البيانات" : "Data Rows"}</p>
+                    <p className="text-3xl font-semibold text-primary">{previewData.rows.length}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className="bg-muted/50">
+                <CardHeader>
+                  <CardTitle className="text-base">{isRTL ? "معلومات المطابقة" : "Matching Information"}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm space-y-2 text-muted-foreground">
+                  <p>✓ {isRTL ? "ستتم مطابقة المدارس حسب: الاسم + المنطقة" : "Schools will match by: Name + Region"}</p>
+                  <p>✓ {isRTL ? "ستتم مطابقة الطلاب حسب: الاسم + المدرسة" : "Students will match by: Name + School"}</p>
+                  <p>✓ {isRTL ? "سيتم إنشاء المدارس والطلاب الجدد تلقائياً" : "New schools and students will be created automatically"}</p>
+                  <p>✓ {isRTL ? "ستتم إنشاء المواضيع من بيانات التحميل" : "Subjects will be created from upload data"}</p>
+                </CardContent>
+              </Card>
+
+              <div className="max-h-40 overflow-y-auto border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">{isRTL ? "المدرسة" : "School"}</TableHead>
+                      <TableHead className="text-xs">{isRTL ? "الطالب" : "Student"}</TableHead>
+                      <TableHead className="text-xs">{isRTL ? "المنطقة" : "Region"}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {previewData.rows.slice(0, 5).map((row, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="text-xs max-w-xs truncate">{row['المدرسة']}</TableCell>
+                        <TableCell className="text-xs max-w-xs truncate">{row['اسم الطالب']}</TableCell>
+                        <TableCell className="text-xs">{row['إقليم']}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {previewData.rows.length > 5 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  {isRTL ? `و${previewData.rows.length - 5} صفوف أخرى...` : `and ${previewData.rows.length - 5} more rows...`}
+                </p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMatchingPreview(false)}>
+              {isRTL ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button onClick={handleConfirmUpload} disabled={isUploading}>
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                  {isRTL ? "جاري..." : "Uploading..."}
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 me-2" />
+                  {isRTL ? "تأكيد والتحميل" : "Confirm & Upload"}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
