@@ -7382,6 +7382,17 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   app.get("/api/center-assignments/school/:schoolId", isAuthenticated, async (req, res) => {
     try {
       const schoolId = parseInt(req.params.schoolId);
+      
+      // Validate schoolId
+      if (isNaN(schoolId) || schoolId <= 0) {
+        return res.status(400).json({ message: "Invalid school ID" });
+      }
+
+      // For school admins, verify they can only access their own school's assignment
+      if (req.session.role === 'school_admin' && req.session.schoolId !== schoolId) {
+        return res.status(403).json({ message: "You can only view your own school's assignment" });
+      }
+
       const assignments = await storage.getCenterAssignmentsBySchool(schoolId);
       
       if (assignments.length === 0) {
