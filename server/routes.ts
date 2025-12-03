@@ -106,6 +106,26 @@ async function requireRole(roles: string[]) {
   };
 }
 
+// Helper function to get school ID for a school admin user
+// Checks user.schoolId first, then looks up by adminUserId
+async function getSchoolIdForUser(user: any): Promise<number | null> {
+  if (user.schoolId) {
+    return user.schoolId;
+  }
+  
+  // Try to find school by adminUserId (reverse lookup)
+  const schoolByAdmin = await storage.getSchoolByAdminUserId(user.id);
+  if (schoolByAdmin) {
+    // Update user's schoolId for future lookups
+    await db.update(users)
+      .set({ schoolId: schoolByAdmin.id, updatedAt: new Date() })
+      .where(eq(users.id, user.id));
+    return schoolByAdmin.id;
+  }
+  
+  return null;
+}
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   // Session setup
   app.use(
@@ -1396,10 +1416,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!user || user.role !== 'school_admin') {
         return res.status(403).json({ message: "Only school admins can access this" });
       }
-      if (!user.schoolId) {
+      
+      const schoolId = await getSchoolIdForUser(user);
+      if (!schoolId) {
         return res.status(404).json({ message: "No school associated with this account" });
       }
-      const school = await storage.getSchool(user.schoolId);
+      
+      const school = await storage.getSchool(schoolId);
       if (!school) {
         return res.status(404).json({ message: "School not found" });
       }
@@ -1415,7 +1438,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!user || user.role !== 'school_admin') {
         return res.status(403).json({ message: "Only school admins can access this" });
       }
-      if (!user.schoolId) {
+      
+      const schoolId = await getSchoolIdForUser(user);
+      if (!schoolId) {
         return res.status(404).json({ message: "No school associated with this account" });
       }
 
@@ -1457,7 +1482,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
       
-      const school = await storage.updateSchool(user.schoolId, {
+      const school = await storage.updateSchool(schoolId, {
         name,
         registrarName,
         phone,
@@ -1511,7 +1536,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!user || user.role !== 'school_admin') {
         return res.status(403).json({ message: "Only school admins can upload documents" });
       }
-      if (!user.schoolId) {
+      
+      const schoolId = await getSchoolIdForUser(user);
+      if (!schoolId) {
         return res.status(404).json({ message: "No school associated with this account" });
       }
 
@@ -1598,7 +1625,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const updateData: Record<string, string | null> = {};
       updateData[docType] = publicPath;
       
-      const school = await storage.updateSchool(user.schoolId, updateData);
+      const school = await storage.updateSchool(schoolId, updateData);
       if (!school) {
         return res.status(500).json({ message: "Failed to update school record with document URL" });
       }
@@ -1607,7 +1634,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       await storage.createAuditLog({
         action: 'school_document_uploaded',
         entityType: 'school',
-        entityId: user.schoolId.toString(),
+        entityId: schoolId.toString(),
         userId: user.id,
         details: { docType, fileName: file.originalname, fileSize: file.size },
       });
@@ -1625,7 +1652,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!user || user.role !== 'school_admin') {
         return res.status(403).json({ message: "Only school admins can delete documents" });
       }
-      if (!user.schoolId) {
+      
+      const schoolId = await getSchoolIdForUser(user);
+      if (!schoolId) {
         return res.status(404).json({ message: "No school associated with this account" });
       }
 
@@ -1645,13 +1674,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const updateData: Record<string, string | null> = {};
       updateData[docType] = null;
       
-      const school = await storage.updateSchool(user.schoolId, updateData);
+      const school = await storage.updateSchool(schoolId, updateData);
 
       // Log the action
       await storage.createAuditLog({
         action: 'school_document_deleted',
         entityType: 'school',
-        entityId: user.schoolId.toString(),
+        entityId: schoolId.toString(),
         userId: user.id,
         details: { docType },
       });
@@ -1669,11 +1698,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!user || user.role !== 'school_admin') {
         return res.status(403).json({ message: "Only school admins can view invitations" });
       }
-      if (!user.schoolId) {
+      
+      const schoolId = await getSchoolIdForUser(user);
+      if (!schoolId) {
         return res.status(404).json({ message: "No school associated with this account" });
       }
 
-      const invitations = await storage.getSchoolInvitationsBySchool(user.schoolId);
+      const invitations = await storage.getSchoolInvitationsBySchool(schoolId);
       res.json(invitations);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1686,7 +1717,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!user || user.role !== 'school_admin') {
         return res.status(403).json({ message: "Only school admins can invite users" });
       }
-      if (!user.schoolId) {
+      
+      const schoolId = await getSchoolIdForUser(user);
+      if (!schoolId) {
         return res.status(404).json({ message: "No school associated with this account" });
       }
 
@@ -1714,14 +1747,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       // Check for pending invitation with same email for this school
-      const existingInvitations = await storage.getSchoolInvitationsBySchool(user.schoolId);
+      const existingInvitations = await storage.getSchoolInvitationsBySchool(schoolId);
       const pendingInvite = existingInvitations.find(i => i.email === email && !i.isUsed && new Date(i.expiresAt) > new Date());
       if (pendingInvite) {
         return res.status(400).json({ message: "An invitation has already been sent to this email" });
       }
 
       // Get school info
-      const school = await storage.getSchool(user.schoolId);
+      const school = await storage.getSchool(schoolId);
       if (!school) {
         return res.status(404).json({ message: "School not found" });
       }
@@ -1732,7 +1765,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Create invitation
       const invitation = await storage.createSchoolInvitation({
-        schoolId: user.schoolId,
+        schoolId,
         email,
         firstName: firstName || null,
         lastName: lastName || null,
@@ -1751,7 +1784,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         entityType: 'school_invitation',
         entityId: invitation.id.toString(),
         userId: user.id,
-        details: { email, schoolId: user.schoolId },
+        details: { email, schoolId },
       });
 
       res.json({ success: true, invitation });
@@ -1767,7 +1800,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!user || user.role !== 'school_admin') {
         return res.status(403).json({ message: "Only school admins can delete invitations" });
       }
-      if (!user.schoolId) {
+      
+      const schoolId = await getSchoolIdForUser(user);
+      if (!schoolId) {
         return res.status(404).json({ message: "No school associated with this account" });
       }
 
@@ -1778,7 +1813,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(404).json({ message: "Invitation not found" });
       }
 
-      if (invitation.schoolId !== user.schoolId) {
+      if (invitation.schoolId !== schoolId) {
         return res.status(403).json({ message: "You can only delete invitations for your school" });
       }
 
@@ -1810,7 +1845,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!user || user.role !== 'school_admin') {
         return res.status(403).json({ message: "Only school admins can resend invitations" });
       }
-      if (!user.schoolId) {
+      
+      const schoolId = await getSchoolIdForUser(user);
+      if (!schoolId) {
         return res.status(404).json({ message: "No school associated with this account" });
       }
 
@@ -1821,7 +1858,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(404).json({ message: "Invitation not found" });
       }
 
-      if (invitation.schoolId !== user.schoolId) {
+      if (invitation.schoolId !== schoolId) {
         return res.status(403).json({ message: "You can only resend invitations for your school" });
       }
 
@@ -1857,7 +1894,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         entityType: 'school_invitation',
         entityId: invitationId.toString(),
         userId: user.id,
-        details: { email: invitation.email, schoolId: user.schoolId },
+        details: { email: invitation.email, schoolId },
       });
 
       res.json({ success: true });
@@ -2358,10 +2395,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // School admins can only generate invoices for their own school
       let schoolId = req.body.schoolId;
       if (user.role === 'school_admin') {
-        if (!user.schoolId) {
+        const userSchoolId = await getSchoolIdForUser(user);
+        if (!userSchoolId) {
           return res.status(400).json({ message: "School admin not associated with a school" });
         }
-        schoolId = user.schoolId;
+        schoolId = userSchoolId;
       }
       
       if (!schoolId) {
@@ -2890,10 +2928,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       // School admins can only print cards for their own school
       if (user.role === 'school_admin') {
-        if (!user.schoolId) {
+        const userSchoolId = await getSchoolIdForUser(user);
+        if (!userSchoolId) {
           return res.status(403).json({ message: "School admin must be associated with a school" });
         }
-        students = students.filter(s => s.schoolId === user.schoolId);
+        students = students.filter(s => s.schoolId === userSchoolId);
       } else if (schoolId) {
         students = students.filter(s => s.schoolId === schoolId);
       }
@@ -3343,8 +3382,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/school/invoice", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
-      if (!user || user.role !== 'school_admin' || !user.schoolId) {
+      if (!user || user.role !== 'school_admin') {
         return res.status(403).json({ message: "Only school admins can access this endpoint" });
+      }
+      
+      const schoolId = await getSchoolIdForUser(user);
+      if (!schoolId) {
+        return res.status(403).json({ message: "No school associated with this account" });
       }
       
       const activeExamYear = await storage.getActiveExamYear();
@@ -3352,7 +3396,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.json({ invoice: null, message: "No active exam year" });
       }
       
-      const invoices = await storage.getInvoicesBySchool(user.schoolId);
+      const invoices = await storage.getInvoicesBySchool(schoolId);
       const invoice = invoices.find(inv => inv.examYearId === activeExamYear.id);
       
       if (!invoice) {
@@ -3370,11 +3414,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/school/invoices/all", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
-      if (!user || user.role !== 'school_admin' || !user.schoolId) {
+      if (!user || user.role !== 'school_admin') {
         return res.status(403).json({ message: "Only school admins can access this endpoint" });
       }
       
-      const invoices = await storage.getInvoicesBySchool(user.schoolId);
+      const schoolId = await getSchoolIdForUser(user);
+      if (!schoolId) {
+        return res.status(403).json({ message: "No school associated with this account" });
+      }
+      
+      const invoices = await storage.getInvoicesBySchool(schoolId);
       const examYears = await storage.getAllExamYears();
       const activeExamYear = await storage.getActiveExamYear();
       
@@ -3451,8 +3500,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       // Verify school admin owns this invoice
-      if (user.role === 'school_admin' && user.schoolId !== invoice.schoolId) {
-        return res.status(403).json({ message: "Not authorized to update this invoice" });
+      if (user.role === 'school_admin') {
+        const userSchoolId = await getSchoolIdForUser(user);
+        if (!userSchoolId || userSchoolId !== invoice.schoolId) {
+          return res.status(403).json({ message: "Not authorized to update this invoice" });
+        }
       }
       
       // Prevent uploading slips for already paid invoices
