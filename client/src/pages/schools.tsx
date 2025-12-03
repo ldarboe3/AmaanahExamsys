@@ -447,6 +447,8 @@ export default function Schools() {
           }
 
           const data = [];
+          const validationErrors: string[] = [];
+          
           for (let i = 1; i < lines.length; i++) {
             const values = lines[i].split(delimiter).map(v => v.trim().replace(/['"]/g, ''));
             if (values.length >= Math.max(schoolNameIdx, regionIdx, clusterIdx) + 1) {
@@ -454,15 +456,32 @@ export default function Schools() {
               const region = values[regionIdx]?.trim();
               const cluster = values[clusterIdx]?.trim();
               
-              if (schoolName && region && cluster) {
-                data.push({
-                  schoolName,
-                  address: addressIdx !== -1 ? values[addressIdx]?.trim() || '' : '',
-                  region,
-                  cluster,
-                });
+              // Validate required fields
+              if (!schoolName) {
+                validationErrors.push(`Row ${i}: Missing school name`);
+                continue;
               }
+              if (!region) {
+                validationErrors.push(`Row ${i}: Missing region for "${schoolName}"`);
+                continue;
+              }
+              if (!cluster) {
+                validationErrors.push(`Row ${i}: Missing cluster for "${schoolName}"`);
+                continue;
+              }
+              
+              data.push({
+                schoolName,
+                address: addressIdx !== -1 ? values[addressIdx]?.trim() || '' : '',
+                region,
+                cluster,
+              });
             }
+          }
+          
+          if (validationErrors.length > 0 && data.length === 0) {
+            reject(new Error(validationErrors.join('; ')));
+            return;
           }
 
           resolve(data);
