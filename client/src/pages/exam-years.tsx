@@ -80,6 +80,12 @@ const examYearSchema = z.object({
 
 type ExamYearFormData = z.infer<typeof examYearSchema>;
 
+interface ExamYearStats {
+  registeredSchools: number;
+  totalStudents: number;
+  publishedPercentage: number;
+}
+
 function ExamYearCard({ 
   examYear, 
   onEdit, 
@@ -99,6 +105,10 @@ function ExamYearCard({
       year: 'numeric'
     });
   };
+
+  const { data: stats, isLoading } = useQuery<ExamYearStats>({
+    queryKey: [`/api/exam-years/${examYear.id}/statistics`],
+  });
 
   return (
     <Card className={examYear.isActive ? "border-primary/50 bg-primary/5" : ""}>
@@ -187,15 +197,21 @@ function ExamYearCard({
 
         <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
           <div className="text-center">
-            <p className="text-lg font-semibold text-foreground">0</p>
+            <p className="text-lg font-semibold text-foreground">
+              {isLoading ? <Skeleton className="h-6 w-8 mx-auto" /> : stats?.registeredSchools || 0}
+            </p>
             <p className="text-xs text-muted-foreground">Schools</p>
           </div>
           <div className="text-center">
-            <p className="text-lg font-semibold text-foreground">0</p>
+            <p className="text-lg font-semibold text-foreground">
+              {isLoading ? <Skeleton className="h-6 w-8 mx-auto" /> : stats?.totalStudents || 0}
+            </p>
             <p className="text-xs text-muted-foreground">Students</p>
           </div>
           <div className="text-center">
-            <p className="text-lg font-semibold text-foreground">0%</p>
+            <p className="text-lg font-semibold text-foreground">
+              {isLoading ? <Skeleton className="h-6 w-8 mx-auto" /> : `${stats?.publishedPercentage || 0}%`}
+            </p>
             <p className="text-xs text-muted-foreground">Published</p>
           </div>
         </div>
@@ -389,6 +405,10 @@ export default function ExamYears() {
   };
 
   const activeYear = examYears?.find(ey => ey.isActive);
+  const { data: activeYearStats } = useQuery<ExamYearStats>({
+    queryKey: activeYear ? [`/api/exam-years/${activeYear.id}/statistics`] : [],
+    enabled: !!activeYear,
+  });
 
   return (
     <div className="space-y-6">
@@ -422,11 +442,11 @@ export default function ExamYears() {
               </div>
               <div className="flex items-center gap-6">
                 <div className="text-center">
-                  <p className="text-2xl font-semibold text-primary">0</p>
+                  <p className="text-2xl font-semibold text-primary">{activeYearStats?.registeredSchools || 0}</p>
                   <p className="text-xs text-muted-foreground">Registered Schools</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-semibold text-chart-2">0</p>
+                  <p className="text-2xl font-semibold text-chart-2">{activeYearStats?.totalStudents || 0}</p>
                   <p className="text-xs text-muted-foreground">Total Students</p>
                 </div>
               </div>
