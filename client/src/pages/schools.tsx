@@ -571,7 +571,8 @@ export default function Schools() {
         clustersCreated: result.clustersCreated || [],
       });
       
-      // Refresh data
+      // Refresh data and reset pagination
+      setCurrentPage(0);
       invalidateSchoolQueries();
       queryClient.invalidateQueries({ queryKey: ["/api/regions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clusters"] });
