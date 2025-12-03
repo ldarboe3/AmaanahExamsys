@@ -646,7 +646,7 @@ export default function Students() {
     (cluster) => regionFilter === "all" || cluster.regionId === parseInt(regionFilter)
   );
 
-  const schoolsForFilter = schools;
+  const schoolsForFilter = schools || [];
 
   // Helper to invalidate all student queries
   const invalidateStudentQueries = () => {
