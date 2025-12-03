@@ -977,6 +977,254 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Bulk school upload API
+  app.post("/api/schools/bulk-upload", isAuthenticated, async (req, res) => {
+    try {
+      const { schools: schoolsData } = req.body;
+      
+      if (!Array.isArray(schoolsData) || schoolsData.length === 0) {
+        return res.status(400).json({ message: "No schools data provided" });
+      }
+
+      const results: {
+        success: Array<{
+          schoolName: string;
+          region: string;
+          cluster: string;
+          username: string;
+          password: string;
+          schoolId: number;
+        }>;
+        errors: Array<{ row: number; error: string; schoolName?: string }>;
+        regionsCreated: string[];
+        clustersCreated: string[];
+      } = {
+        success: [],
+        errors: [],
+        regionsCreated: [],
+        clustersCreated: [],
+      };
+
+      // Helper to generate random username (school code style)
+      const generateUsername = (schoolName: string, existingUsernames: Set<string>): string => {
+        // Create base from school name
+        const words = schoolName.trim().split(/\s+/).filter(w => w.length > 0);
+        let base = '';
+        if (words.length >= 2) {
+          // Take first letter of first two words
+          base = (words[0][0] + words[1][0]).toUpperCase();
+        } else if (words.length === 1) {
+          base = words[0].substring(0, 3).toUpperCase();
+        } else {
+          base = 'SCH';
+        }
+        
+        // Add random number suffix
+        let username = '';
+        let attempts = 0;
+        do {
+          const random = Math.floor(1000 + Math.random() * 9000); // 4-digit number
+          username = `${base}${random}`;
+          attempts++;
+        } while (existingUsernames.has(username.toLowerCase()) && attempts < 100);
+        
+        existingUsernames.add(username.toLowerCase());
+        return username;
+      };
+
+      // Helper to generate random password
+      const generatePassword = (): string => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        let password = '';
+        for (let i = 0; i < 10; i++) {
+          password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return password;
+      };
+
+      // Helper to generate region code
+      const generateRegionCode = (name: string, existingCodes: Set<string>): string => {
+        const words = name.trim().split(/\s+/);
+        let code = '';
+        if (words.length >= 2) {
+          code = (words[0][0] + words[1][0]).toUpperCase();
+        } else {
+          code = name.substring(0, 3).toUpperCase();
+        }
+        
+        let finalCode = code;
+        let counter = 1;
+        while (existingCodes.has(finalCode)) {
+          finalCode = `${code}${counter}`;
+          counter++;
+        }
+        existingCodes.add(finalCode);
+        return finalCode;
+      };
+
+      // Helper to generate cluster code
+      const generateClusterCode = (name: string, regionCode: string, existingCodes: Set<string>): string => {
+        const words = name.trim().split(/\s+/);
+        let suffix = '';
+        if (words.length >= 2) {
+          suffix = (words[0][0] + words[1][0]).toUpperCase();
+        } else {
+          suffix = name.substring(0, 2).toUpperCase();
+        }
+        
+        let code = `${regionCode}-${suffix}`;
+        let counter = 1;
+        while (existingCodes.has(code)) {
+          code = `${regionCode}-${suffix}${counter}`;
+          counter++;
+        }
+        existingCodes.add(code);
+        return code;
+      };
+
+      // Get existing codes for deduplication
+      const allRegions = await storage.getAllRegions();
+      const allClusters = await storage.getAllClusters();
+      const existingRegionCodes = new Set(allRegions.map(r => r.code));
+      const existingClusterCodes = new Set(allClusters.map(c => c.code));
+      const existingUsernames = new Set<string>();
+      
+      // Get all existing usernames
+      const allUsers = await storage.getAllUsers();
+      allUsers.forEach(u => {
+        if (u.username) existingUsernames.add(u.username.toLowerCase());
+      });
+
+      // Cache for regions and clusters to avoid duplicate DB queries
+      const regionCache = new Map<string, number>();
+      const clusterCache = new Map<string, number>();
+      
+      allRegions.forEach(r => regionCache.set(r.name.toLowerCase().trim(), r.id));
+      allClusters.forEach(c => clusterCache.set(`${c.regionId}-${c.name.toLowerCase().trim()}`, c.id));
+
+      for (let i = 0; i < schoolsData.length; i++) {
+        const row = schoolsData[i];
+        const rowNum = i + 1;
+
+        try {
+          // Validate required fields
+          if (!row.schoolName?.trim()) {
+            results.errors.push({ row: rowNum, error: "School name is required" });
+            continue;
+          }
+          if (!row.region?.trim()) {
+            results.errors.push({ row: rowNum, error: "Region is required", schoolName: row.schoolName });
+            continue;
+          }
+          if (!row.cluster?.trim()) {
+            results.errors.push({ row: rowNum, error: "Cluster is required", schoolName: row.schoolName });
+            continue;
+          }
+
+          const schoolName = row.schoolName.trim();
+          const regionName = row.region.trim();
+          const clusterName = row.cluster.trim();
+          const address = row.address?.trim() || '';
+
+          // Find or create region
+          let regionId = regionCache.get(regionName.toLowerCase());
+          if (!regionId) {
+            const regionCode = generateRegionCode(regionName, existingRegionCodes);
+            const newRegion = await storage.createRegion({ name: regionName, code: regionCode });
+            regionId = newRegion.id;
+            regionCache.set(regionName.toLowerCase(), regionId);
+            results.regionsCreated.push(regionName);
+          }
+
+          // Find or create cluster
+          const clusterKey = `${regionId}-${clusterName.toLowerCase()}`;
+          let clusterId = clusterCache.get(clusterKey);
+          if (!clusterId) {
+            const region = await storage.getRegion(regionId);
+            const clusterCode = generateClusterCode(clusterName, region?.code || 'XX', existingClusterCodes);
+            const newCluster = await storage.createCluster({ name: clusterName, code: clusterCode, regionId });
+            clusterId = newCluster.id;
+            clusterCache.set(clusterKey, clusterId);
+            results.clustersCreated.push(`${clusterName} (${regionName})`);
+          }
+
+          // Check for duplicate school
+          const existingSchool = await storage.getSchoolByNameAndLocation(schoolName, regionId, clusterId);
+          if (existingSchool) {
+            results.errors.push({ 
+              row: rowNum, 
+              error: `School "${schoolName}" already exists in ${clusterName}, ${regionName}`,
+              schoolName 
+            });
+            continue;
+          }
+
+          // Generate credentials
+          const username = generateUsername(schoolName, existingUsernames);
+          const password = generatePassword();
+          const hashedPassword = await bcrypt.hash(password, 10);
+
+          // Create user account first
+          const userId = randomBytes(16).toString('hex');
+          await db.insert(users).values({
+            id: userId,
+            username,
+            password: hashedPassword,
+            role: 'school_admin',
+            firstName: schoolName,
+            lastName: 'Admin',
+            email: `${username.toLowerCase()}@placeholder.local`, // Placeholder email
+          });
+
+          // Create school with minimal data
+          const [createdSchool] = await db.insert(schools).values({
+            name: schoolName,
+            registrarName: 'School Admin', // Default value
+            email: `${username.toLowerCase()}@school.local`, // Placeholder, can be updated
+            address,
+            schoolType: 'LBS' as const, // Default, can be updated
+            regionId,
+            clusterId,
+            status: 'approved' as const, // Auto-approve bulk uploaded schools
+            isEmailVerified: true, // Skip verification for bulk uploads
+            adminUserId: userId,
+          }).returning();
+
+          // Update user with schoolId
+          await db.update(users).set({ schoolId: createdSchool.id }).where(eq(users.id, userId));
+
+          results.success.push({
+            schoolName,
+            region: regionName,
+            cluster: clusterName,
+            username,
+            password, // Plain text password for export
+            schoolId: createdSchool.id,
+          });
+        } catch (error: any) {
+          results.errors.push({ 
+            row: rowNum, 
+            error: error.message || "Unknown error",
+            schoolName: row.schoolName 
+          });
+        }
+      }
+
+      res.json({
+        message: `Processed ${schoolsData.length} schools`,
+        totalProcessed: schoolsData.length,
+        successCount: results.success.length,
+        errorCount: results.errors.length,
+        regionsCreated: results.regionsCreated,
+        clustersCreated: results.clustersCreated,
+        schools: results.success,
+        errors: results.errors,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get school info for verification page (validates token without consuming it)
   app.get("/api/schools/verify-info/:token", async (req, res) => {
     try {
