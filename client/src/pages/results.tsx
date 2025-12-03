@@ -910,6 +910,25 @@ export default function Results() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">
+                {isRTL ? "اختر الصف" : "Select Grade"}
+              </label>
+              <Select value={studentGradeFilter} onValueChange={setStudentGradeFilter}>
+                <SelectTrigger data-testid="select-grade-upload">
+                  <SelectValue placeholder={isRTL ? "اختر الصف" : "Select a grade"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">{isRTL ? "الصف الأول" : "Grade 1"}</SelectItem>
+                  <SelectItem value="2">{isRTL ? "الصف الثاني" : "Grade 2"}</SelectItem>
+                  <SelectItem value="3">{isRTL ? "الصف الثالث" : "Grade 3"}</SelectItem>
+                  <SelectItem value="4">{isRTL ? "الصف الرابع" : "Grade 4"}</SelectItem>
+                  <SelectItem value="5">{isRTL ? "الصف الخامس" : "Grade 5"}</SelectItem>
+                  <SelectItem value="6">{isRTL ? "الصف السادس" : "Grade 6"}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {studentGradeFilter === "all" && (
               <div className="flex items-center gap-2 p-3 bg-chart-5/10 rounded-md">
                 <AlertCircle className="w-5 h-5 text-chart-5" />
