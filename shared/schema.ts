@@ -114,9 +114,11 @@ export const examCenters = pgTable("exam_centers", {
   regionId: integer("region_id").notNull().references(() => regions.id),
   clusterId: integer("cluster_id").notNull().references(() => clusters.id),
   capacity: integer("capacity").default(500),
+  grades: integer("grades").array().default([]), // Which grades this center can host
   contactPerson: varchar("contact_person", { length: 255 }),
   contactPhone: varchar("contact_phone", { length: 50 }),
   contactEmail: varchar("contact_email", { length: 255 }),
+  centerAdminId: varchar("center_admin_id").references(() => users.id),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -419,6 +421,25 @@ export const attendanceRecords = pgTable("attendance_records", {
 });
 
 // Malpractice Reports
+export const malpracticeStatusEnum = pgEnum('malpractice_status', [
+  'reported',
+  'under_review',
+  'confirmed',
+  'dismissed',
+  'action_taken'
+]);
+
+export const malpracticeTypeEnum = pgEnum('malpractice_type', [
+  'cheating',
+  'smuggling_notes',
+  'misconduct',
+  'teacher_interference',
+  'impersonation',
+  'collusion',
+  'unauthorized_materials',
+  'other'
+]);
+
 export const malpracticeReports = pgTable("malpractice_reports", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   studentId: integer("student_id").references(() => students.id),
@@ -427,10 +448,116 @@ export const malpracticeReports = pgTable("malpractice_reports", {
   centerId: integer("center_id").notNull().references(() => examCenters.id),
   subjectId: integer("subject_id").references(() => subjects.id),
   incidentType: varchar("incident_type", { length: 100 }).notNull(),
+  malpracticeType: malpracticeTypeEnum("malpractice_type"),
   description: text("description").notNull(),
   evidence: varchar("evidence", { length: 500 }),
+  evidenceUrls: text("evidence_urls").array().default([]),
   actionTaken: text("action_taken"),
+  status: malpracticeStatusEnum("malpractice_status").default('reported'),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
   reportedBy: varchar("reported_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Paper Movement Status Enum
+export const paperMovementStatusEnum = pgEnum('paper_movement_status', [
+  'prepared',
+  'dispatched',
+  'in_transit',
+  'received',
+  'stored',
+  'distributed',
+  'collected',
+  'returned'
+]);
+
+// Paper Movements - Track question papers from HQ to centers and back
+export const paperMovements = pgTable("paper_movements", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
+  centerId: integer("center_id").notNull().references(() => examCenters.id),
+  subjectId: integer("subject_id").references(() => subjects.id),
+  grade: integer("grade"),
+  paperType: varchar("paper_type", { length: 50 }).notNull(), // 'question_paper', 'answer_sheet', 'attendance_sheet'
+  quantity: integer("quantity").notNull().default(0),
+  status: paperMovementStatusEnum("status").default('prepared'),
+  dispatchedAt: timestamp("dispatched_at"),
+  dispatchedBy: varchar("dispatched_by").references(() => users.id),
+  receivedAt: timestamp("received_at"),
+  receivedBy: varchar("received_by").references(() => users.id),
+  storedAt: timestamp("stored_at"),
+  storedBy: varchar("stored_by").references(() => users.id),
+  storageLocation: varchar("storage_location", { length: 255 }),
+  distributedAt: timestamp("distributed_at"),
+  distributedBy: varchar("distributed_by").references(() => users.id),
+  distributedTo: varchar("distributed_to", { length: 255 }), // classroom/hall info
+  collectedAt: timestamp("collected_at"),
+  collectedBy: varchar("collected_by").references(() => users.id),
+  returnedAt: timestamp("returned_at"),
+  returnedBy: varchar("returned_by").references(() => users.id),
+  notes: text("notes"),
+  securitySealNumber: varchar("security_seal_number", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Script Tracking - Track answer scripts after exams
+export const scriptStatusEnum = pgEnum('script_status', [
+  'collected',
+  'counted',
+  'packaged',
+  'dispatched',
+  'received_at_hq',
+  'assigned_for_marking',
+  'marked',
+  'verified',
+  'stored'
+]);
+
+export const scriptMovements = pgTable("script_movements", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
+  centerId: integer("center_id").notNull().references(() => examCenters.id),
+  subjectId: integer("subject_id").notNull().references(() => subjects.id),
+  grade: integer("grade").notNull(),
+  totalScripts: integer("total_scripts").notNull().default(0),
+  presentCount: integer("present_count").default(0),
+  absentCount: integer("absent_count").default(0),
+  status: scriptStatusEnum("script_status").default('collected'),
+  collectedAt: timestamp("collected_at"),
+  collectedBy: varchar("collected_by").references(() => users.id),
+  packageNumber: varchar("package_number", { length: 100 }),
+  dispatchedAt: timestamp("dispatched_at"),
+  dispatchedBy: varchar("dispatched_by").references(() => users.id),
+  receivedAtHqAt: timestamp("received_at_hq_at"),
+  receivedAtHqBy: varchar("received_at_hq_by").references(() => users.id),
+  assignedToExaminerId: integer("assigned_to_examiner_id").references(() => examiners.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Center Assignments - Track school-to-center assignments per exam year
+export const centerAssignments = pgTable("center_assignments", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
+  schoolId: integer("school_id").notNull().references(() => schools.id),
+  centerId: integer("center_id").notNull().references(() => examCenters.id),
+  assignmentMethod: varchar("assignment_method", { length: 20 }).default('manual'), // 'auto', 'manual'
+  assignedBy: varchar("assigned_by").references(() => users.id),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Center Activity Logs - Track all center activities
+export const centerActivityLogs = pgTable("center_activity_logs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  centerId: integer("center_id").notNull().references(() => examCenters.id),
+  examYearId: integer("exam_year_id").references(() => examYears.id),
+  activityType: varchar("activity_type", { length: 100 }).notNull(), // 'attendance', 'paper_received', 'malpractice', etc.
+  description: text("description").notNull(),
+  metadata: jsonb("metadata"),
+  performedBy: varchar("performed_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -689,9 +816,11 @@ export const insertExamCenterSchema = createInsertSchema(examCenters).pick({
   regionId: true,
   clusterId: true,
   capacity: true,
+  grades: true,
   contactPerson: true,
   contactPhone: true,
   contactEmail: true,
+  centerAdminId: true,
   isActive: true,
 });
 
@@ -945,6 +1074,51 @@ export const insertBulkUploadSchema = createInsertSchema(bulkUploads).pick({
   schoolId: true,
 });
 
+// Paper Movement Schema
+export const insertPaperMovementSchema = createInsertSchema(paperMovements).pick({
+  examYearId: true,
+  centerId: true,
+  subjectId: true,
+  grade: true,
+  paperType: true,
+  quantity: true,
+  status: true,
+  securitySealNumber: true,
+  notes: true,
+});
+
+// Script Movement Schema
+export const insertScriptMovementSchema = createInsertSchema(scriptMovements).pick({
+  examYearId: true,
+  centerId: true,
+  subjectId: true,
+  grade: true,
+  totalScripts: true,
+  presentCount: true,
+  absentCount: true,
+  status: true,
+  packageNumber: true,
+  notes: true,
+});
+
+// Center Assignment Schema
+export const insertCenterAssignmentSchema = createInsertSchema(centerAssignments).pick({
+  examYearId: true,
+  schoolId: true,
+  centerId: true,
+  assignmentMethod: true,
+  notes: true,
+});
+
+// Center Activity Log Schema
+export const insertCenterActivityLogSchema = createInsertSchema(centerActivityLogs).pick({
+  centerId: true,
+  examYearId: true,
+  activityType: true,
+  description: true,
+  metadata: true,
+});
+
 // ===== WEBSITE CONTENT MANAGEMENT =====
 
 // News Article Categories
@@ -1165,6 +1339,14 @@ export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
 export type InsertBulkUpload = z.infer<typeof insertBulkUploadSchema>;
 export type BulkUpload = typeof bulkUploads.$inferSelect;
+export type InsertPaperMovement = z.infer<typeof insertPaperMovementSchema>;
+export type PaperMovement = typeof paperMovements.$inferSelect;
+export type InsertScriptMovement = z.infer<typeof insertScriptMovementSchema>;
+export type ScriptMovement = typeof scriptMovements.$inferSelect;
+export type InsertCenterAssignment = z.infer<typeof insertCenterAssignmentSchema>;
+export type CenterAssignment = typeof centerAssignments.$inferSelect;
+export type InsertCenterActivityLog = z.infer<typeof insertCenterActivityLogSchema>;
+export type CenterActivityLog = typeof centerActivityLogs.$inferSelect;
 
 // Website Content Types
 export type InsertNewsCategory = z.infer<typeof insertNewsCategorySchema>;
