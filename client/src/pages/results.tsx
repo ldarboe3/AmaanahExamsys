@@ -193,7 +193,7 @@ export default function Results() {
     if (regionFilter !== "all") {
       const matchingClusters = clusters?.filter(c => c.regionId === parseInt(regionFilter)) || [];
       const clusterIds = new Set(matchingClusters.map(c => c.id));
-      if (!clusterIds.has(school.clusterId)) return false;
+      if (school.clusterId && !clusterIds.has(school.clusterId)) return false;
     }
     if (clusterFilter !== "all") {
       if (school.clusterId !== parseInt(clusterFilter)) return false;
@@ -1059,7 +1059,27 @@ export default function Results() {
 
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">{isRTL ? "هل تحتاج القالب؟" : "Need the template?"}</span>
-              <Button variant="ghost" size="sm" className="h-auto p-0">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-auto p-0"
+                onClick={() => {
+                  const headers = ["Student Number", "Student Name"];
+                  if (subjects) {
+                    subjects.forEach(s => headers.push(s.name));
+                  } else {
+                    headers.push("Subject 1", "Subject 2", "Subject 3");
+                  }
+                  const csv = headers.join(",") + "\n" + "12345,John Doe," + Array(headers.length - 2).fill("80").join(",");
+                  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = "results_template.csv";
+                  link.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
                 <Download className="w-4 h-4 me-1" />
                 {isRTL ? "تحميل القالب" : "Download Template"}
               </Button>
