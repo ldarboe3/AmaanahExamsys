@@ -5153,6 +5153,438 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
   
+  // Comprehensive bulk results upload with auto-creation of all entities
+  // This endpoint handles CSV upload and creates regions, clusters, schools, students, subjects, and results
+  const comprehensiveUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for large CSV files
+    fileFilter: (req: any, file, cb) => {
+      if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only CSV files are allowed'));
+      }
+    },
+  });
+
+  app.post("/api/results/comprehensive-upload", isAuthenticated, comprehensiveUpload.single('file'), async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Only admins can perform comprehensive uploads" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "CSV file is required" });
+      }
+
+      const examYearId = parseInt(req.body.examYearId);
+      const gradeLevel = parseInt(req.body.grade);
+
+      if (!examYearId) {
+        return res.status(400).json({ message: "Exam year is required" });
+      }
+      if (!gradeLevel || ![3, 6, 9, 12].includes(gradeLevel)) {
+        return res.status(400).json({ message: "Valid grade level (3, 6, 9, or 12) is required" });
+      }
+
+      // Parse CSV with UTF-8 encoding for Arabic support
+      const csvContent = req.file.buffer.toString('utf-8');
+      const workbook = XLSX.read(csvContent, { type: 'string', codepage: 65001 }); // UTF-8
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
+
+      if (rows.length === 0) {
+        return res.status(400).json({ message: "CSV file is empty" });
+      }
+
+      // Detect subject columns (columns that are not metadata)
+      const metadataColumns = [
+        'region', 'region_ar', 'regionarabic', 'region_arabic',
+        'cluster', 'cluster_ar', 'clusterarabic', 'cluster_arabic',
+        'school', 'schoolname', 'school_name', 'school_ar', 'schoolarabic', 'school_arabic',
+        'student', 'studentname', 'student_name', 'firstname', 'first_name', 'lastname', 'last_name',
+        'student_ar', 'studentarabic', 'student_arabic', 'firstname_ar', 'lastname_ar',
+        'gender', 'dob', 'dateofbirth', 'date_of_birth', 'placeofbirth', 'place_of_birth',
+        'indexnumber', 'index_number', 'index', 'middlename', 'middle_name'
+      ];
+      
+      const firstRow = rows[0];
+      const allColumns = Object.keys(firstRow);
+      const subjectColumns = allColumns.filter(col => 
+        !metadataColumns.includes(col.toLowerCase().replace(/\s+/g, '').replace(/_/g, ''))
+      );
+
+      if (subjectColumns.length === 0) {
+        return res.status(400).json({ message: "No subject columns found in CSV. Subject columns should contain marks/scores." });
+      }
+
+      // Progress tracking
+      const progress = {
+        total: rows.length,
+        processed: 0,
+        regionsCreated: 0,
+        clustersCreated: 0,
+        schoolsCreated: 0,
+        studentsCreated: 0,
+        subjectsCreated: 0,
+        resultsCreated: 0,
+        skippedNoMarks: 0,
+        errors: [] as any[],
+      };
+
+      // Cache for created/found entities to avoid duplicate lookups
+      const regionCache: Map<string, number> = new Map();
+      const clusterCache: Map<string, number> = new Map();
+      const schoolCache: Map<string, { id: number; credentials?: { username: string; password: string } }> = new Map();
+      const subjectCache: Map<string, number> = new Map();
+      const studentCache: Map<string, number> = new Map();
+
+      // Helper to generate school admin credentials
+      const generateSchoolCredentials = async () => {
+        const allSchools = await storage.getAllSchools();
+        const existingNumbers = allSchools
+          .map(s => {
+            const match = s.email?.match(/schooladmin(\d+)@/);
+            return match ? parseInt(match[1]) : 0;
+          })
+          .filter(n => n > 0);
+        const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
+        const username = `schooladmin${String(nextNumber).padStart(4, '0')}`;
+        const password = randomBytes(4).toString('hex');
+        return { username, password, email: `${username}@amaanah.edu` };
+      };
+
+      // Track schools with students for later cleanup
+      const schoolsWithStudents: Set<string> = new Set();
+
+      // First pass: identify schools with valid students (students with marks)
+      for (const row of rows) {
+        // Check if student has any marks
+        let hasMarks = false;
+        for (const subjectCol of subjectColumns) {
+          const score = parseFloat(row[subjectCol] || '');
+          if (!isNaN(score) && score >= 0) {
+            hasMarks = true;
+            break;
+          }
+        }
+
+        if (hasMarks) {
+          // Find school identifier
+          const schoolName = row['school'] || row['schoolName'] || row['school_name'] || row['School'] || '';
+          const regionName = row['region'] || row['Region'] || '';
+          const clusterName = row['cluster'] || row['Cluster'] || '';
+          if (schoolName && regionName) {
+            schoolsWithStudents.add(`${regionName.trim().toLowerCase()}|${clusterName.trim().toLowerCase()}|${schoolName.trim().toLowerCase()}`);
+          }
+        }
+      }
+
+      // Pre-create subjects for all subject columns
+      for (const subjectCol of subjectColumns) {
+        const subjectKey = `${subjectCol.toLowerCase().trim()}_${gradeLevel}`;
+        if (!subjectCache.has(subjectKey)) {
+          const subject = await storage.getOrCreateSubject(subjectCol.trim(), null, gradeLevel);
+          subjectCache.set(subjectKey, subject.id);
+          if (subject.createdAt && new Date(subject.createdAt).getTime() > Date.now() - 5000) {
+            progress.subjectsCreated++;
+          }
+        }
+      }
+
+      // Process each row
+      const schoolCredentialsList: Array<{
+        schoolName: string;
+        region: string;
+        cluster: string;
+        username: string;
+        password: string;
+        schoolId: number;
+      }> = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        progress.processed = i + 1;
+
+        try {
+          // Extract student data
+          const firstName = row['firstName'] || row['first_name'] || row['FirstName'] || row['student'] || row['studentName'] || '';
+          const lastName = row['lastName'] || row['last_name'] || row['LastName'] || '';
+          const middleName = row['middleName'] || row['middle_name'] || row['MiddleName'] || '';
+          const firstNameAr = row['firstName_ar'] || row['firstname_ar'] || '';
+          const lastNameAr = row['lastName_ar'] || row['lastname_ar'] || '';
+          const gender = (row['gender'] || row['Gender'] || 'male').toLowerCase().includes('f') ? 'female' : 'male';
+          const dob = row['dob'] || row['dateOfBirth'] || row['date_of_birth'] || null;
+          const placeOfBirth = row['placeOfBirth'] || row['place_of_birth'] || '';
+          const existingIndex = row['indexNumber'] || row['index_number'] || row['index'] || '';
+
+          // Extract location data
+          const regionName = row['region'] || row['Region'] || '';
+          const regionNameAr = row['region_ar'] || row['regionArabic'] || row['region_arabic'] || '';
+          const clusterName = row['cluster'] || row['Cluster'] || '';
+          const clusterNameAr = row['cluster_ar'] || row['clusterArabic'] || row['cluster_arabic'] || '';
+          const schoolName = row['school'] || row['schoolName'] || row['school_name'] || row['School'] || '';
+          const schoolNameAr = row['school_ar'] || row['schoolArabic'] || row['school_arabic'] || '';
+
+          // Check if student has any marks
+          let hasMarks = false;
+          const studentMarks: Array<{ subjectId: number; score: number; subjectName: string }> = [];
+          
+          for (const subjectCol of subjectColumns) {
+            const scoreStr = row[subjectCol] || '';
+            const score = parseFloat(scoreStr);
+            if (!isNaN(score) && score >= 0 && score <= 100) {
+              hasMarks = true;
+              const subjectKey = `${subjectCol.toLowerCase().trim()}_${gradeLevel}`;
+              const subjectId = subjectCache.get(subjectKey);
+              if (subjectId) {
+                studentMarks.push({ subjectId, score, subjectName: subjectCol });
+              }
+            }
+          }
+
+          // Skip students without marks
+          if (!hasMarks) {
+            progress.skippedNoMarks++;
+            continue;
+          }
+
+          // Validate required fields
+          if (!firstName.trim()) {
+            progress.errors.push({ row: i + 2, error: "Student first name is required" });
+            continue;
+          }
+          if (!regionName.trim()) {
+            progress.errors.push({ row: i + 2, error: "Region is required" });
+            continue;
+          }
+          if (!schoolName.trim()) {
+            progress.errors.push({ row: i + 2, error: "School name is required" });
+            continue;
+          }
+
+          // Check if school has students (skip if no students have marks for this school)
+          const schoolKey = `${regionName.trim().toLowerCase()}|${clusterName.trim().toLowerCase()}|${schoolName.trim().toLowerCase()}`;
+          if (!schoolsWithStudents.has(schoolKey)) {
+            continue; // Skip this school entirely
+          }
+
+          // Get or create Region
+          let regionId: number;
+          const regionCacheKey = regionName.trim().toLowerCase();
+          if (regionCache.has(regionCacheKey)) {
+            regionId = regionCache.get(regionCacheKey)!;
+          } else {
+            let region = await storage.getRegionByName(regionName.trim());
+            if (!region) {
+              region = await storage.createRegion({ 
+                name: regionName.trim(),
+                arabicName: regionNameAr.trim() || null,
+                description: null 
+              });
+              progress.regionsCreated++;
+            }
+            regionId = region.id;
+            regionCache.set(regionCacheKey, regionId);
+          }
+
+          // Get or create Cluster
+          let clusterId: number | undefined;
+          if (clusterName.trim()) {
+            const clusterCacheKey = `${regionId}_${clusterName.trim().toLowerCase()}`;
+            if (clusterCache.has(clusterCacheKey)) {
+              clusterId = clusterCache.get(clusterCacheKey);
+            } else {
+              let cluster = await storage.getClusterByNameAndRegion(clusterName.trim(), regionId);
+              if (!cluster) {
+                cluster = await storage.createCluster({
+                  name: clusterName.trim(),
+                  arabicName: clusterNameAr.trim() || null,
+                  regionId,
+                  description: null
+                });
+                progress.clustersCreated++;
+              }
+              clusterId = cluster.id;
+              clusterCache.set(clusterCacheKey, clusterId);
+            }
+          }
+
+          // Get or create School
+          let schoolId: number;
+          let schoolCredentials: { username: string; password: string } | undefined;
+          const schoolCacheKey = `${regionId}_${clusterId || 'null'}_${schoolName.trim().toLowerCase()}`;
+          
+          if (schoolCache.has(schoolCacheKey)) {
+            const cached = schoolCache.get(schoolCacheKey)!;
+            schoolId = cached.id;
+            schoolCredentials = cached.credentials;
+          } else {
+            let school = await storage.getSchoolByNameAndLocation(schoolName.trim(), regionId, clusterId);
+            if (!school) {
+              // Generate credentials for new school
+              const creds = await generateSchoolCredentials();
+              const hashedPassword = await bcrypt.hash(creds.password, 10);
+              
+              // Create admin user for school
+              const adminUser = await storage.createUser({
+                username: creds.username,
+                email: creds.email,
+                password: hashedPassword,
+                role: 'school_admin'
+              });
+
+              // Create school
+              school = await storage.createSchool({
+                name: schoolName.trim(),
+                registrarName: schoolNameAr.trim() || schoolName.trim(),
+                email: creds.email,
+                phone: '',
+                address: '',
+                schoolType: 'arabic_only',
+                regionId,
+                clusterId: clusterId || null,
+                adminUserId: adminUser.id,
+                status: 'approved',
+                isEmailVerified: true,
+              });
+
+              // Update user with schoolId
+              await db.update(users)
+                .set({ schoolId: school.id })
+                .where(eq(users.id, adminUser.id));
+
+              progress.schoolsCreated++;
+              schoolCredentials = { username: creds.username, password: creds.password };
+              
+              schoolCredentialsList.push({
+                schoolName: schoolName.trim(),
+                region: regionName.trim(),
+                cluster: clusterName.trim(),
+                username: creds.username,
+                password: creds.password,
+                schoolId: school.id
+              });
+            }
+            schoolId = school.id;
+            schoolCache.set(schoolCacheKey, { id: schoolId, credentials: schoolCredentials });
+          }
+
+          // Get or create Student
+          let studentId: number;
+          const studentFullName = `${firstName.trim()} ${middleName.trim()} ${lastName.trim()}`.trim();
+          const studentCacheKey = `${schoolId}_${studentFullName.toLowerCase()}_${gradeLevel}`;
+          
+          if (studentCache.has(studentCacheKey)) {
+            studentId = studentCache.get(studentCacheKey)!;
+          } else {
+            // Check if student exists by index number first
+            let student = existingIndex ? await storage.getStudentByIndexNumber(existingIndex) : null;
+            
+            if (!student) {
+              // Try to find by name, school, and grade
+              const existingStudents = await storage.getStudentsBySchool(schoolId, examYearId);
+              student = existingStudents.find(s => 
+                s.firstName.toLowerCase() === firstName.trim().toLowerCase() &&
+                s.lastName.toLowerCase() === lastName.trim().toLowerCase() &&
+                s.grade === gradeLevel
+              ) || null;
+            }
+            
+            if (!student) {
+              // Generate new index number
+              const indexNumber = await generateIndexNumber(examYearId, gradeLevel, schoolId);
+              
+              student = await storage.createStudent({
+                firstName: firstName.trim(),
+                lastName: lastName.trim() || firstName.trim(),
+                middleName: middleName.trim() || null,
+                gender: gender as 'male' | 'female',
+                grade: gradeLevel,
+                schoolId,
+                examYearId,
+                dateOfBirth: dob || null,
+                placeOfBirth: placeOfBirth || null,
+                indexNumber,
+                status: 'approved',
+              });
+              progress.studentsCreated++;
+            }
+            studentId = student.id;
+            studentCache.set(studentCacheKey, studentId);
+          }
+
+          // Create results for each subject with marks
+          for (const mark of studentMarks) {
+            // Check if result already exists
+            const existingResult = await storage.getResultByStudentAndSubject(studentId, mark.subjectId, examYearId);
+            if (existingResult) {
+              // Update existing result
+              await storage.updateStudentResult(existingResult.id, {
+                score: mark.score.toFixed(2),
+                grade: calculateGrade(mark.score),
+                status: 'pending'
+              });
+            } else {
+              // Create new result
+              await storage.createStudentResult({
+                studentId,
+                subjectId: mark.subjectId,
+                examYearId,
+                score: mark.score.toFixed(2),
+                grade: calculateGrade(mark.score),
+                status: 'pending',
+                remarks: null
+              });
+              progress.resultsCreated++;
+            }
+          }
+        } catch (error: any) {
+          progress.errors.push({ row: i + 2, error: error.message });
+        }
+      }
+
+      // Helper function to calculate grade
+      function calculateGrade(score: number): string {
+        if (score >= 90) return 'A+';
+        if (score >= 80) return 'A';
+        if (score >= 70) return 'B';
+        if (score >= 60) return 'C';
+        if (score >= 50) return 'D';
+        if (score >= 40) return 'E';
+        return 'F';
+      }
+
+      res.status(201).json({
+        success: true,
+        summary: {
+          totalRows: progress.total,
+          processed: progress.processed,
+          regionsCreated: progress.regionsCreated,
+          clustersCreated: progress.clustersCreated,
+          schoolsCreated: progress.schoolsCreated,
+          studentsCreated: progress.studentsCreated,
+          subjectsCreated: progress.subjectsCreated,
+          resultsCreated: progress.resultsCreated,
+          skippedNoMarks: progress.skippedNoMarks,
+          errorsCount: progress.errors.length,
+        },
+        schoolCredentials: schoolCredentialsList,
+        errors: progress.errors.length > 0 ? progress.errors.slice(0, 50) : undefined,
+      });
+    } catch (error: any) {
+      console.error('Comprehensive upload error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Enhanced bulk results upload with index number lookup
   app.post("/api/results/bulk-upload", isAuthenticated, async (req, res) => {
     try {

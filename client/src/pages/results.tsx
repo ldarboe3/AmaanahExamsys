@@ -129,10 +129,38 @@ export default function Results() {
   const [selectedResult, setSelectedResult] = useState<ResultWithRelations | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showComprehensiveUploadDialog, setShowComprehensiveUploadDialog] = useState(false);
   const [activeTab, setActiveTab] = useState("students");
   const [uploadProgress, setUploadProgress] = useState<{ created: number; updated: number; errors: number } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [comprehensiveProgress, setComprehensiveProgress] = useState<{
+    stage: 'uploading' | 'processing' | 'complete' | 'error';
+    percentage: number;
+    message: string;
+    summary?: {
+      totalRows: number;
+      processed: number;
+      regionsCreated: number;
+      clustersCreated: number;
+      schoolsCreated: number;
+      studentsCreated: number;
+      subjectsCreated: number;
+      resultsCreated: number;
+      skippedNoMarks: number;
+      errorsCount: number;
+    };
+    schoolCredentials?: Array<{
+      schoolName: string;
+      region: string;
+      cluster: string;
+      username: string;
+      password: string;
+      schoolId: number;
+    }>;
+    errors?: any[];
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const comprehensiveFileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: currentUser } = useQuery<any>({
     queryKey: ["/api/auth/user"],
@@ -308,6 +336,98 @@ export default function Results() {
     }
   };
 
+  const handleComprehensiveUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!activeExamYear?.id) {
+      toast({
+        title: t.common.error,
+        description: isRTL ? "يرجى تحديد سنة الامتحان" : "Please select an exam year",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (studentGradeFilter === "all") {
+      toast({
+        title: t.common.error,
+        description: isRTL ? "يرجى تحديد الصف" : "Please select a grade level",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setComprehensiveProgress({
+      stage: 'uploading',
+      percentage: 10,
+      message: isRTL ? 'جاري تحميل الملف...' : 'Uploading file...',
+    });
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('examYearId', String(activeExamYear.id));
+      formData.append('grade', studentGradeFilter);
+
+      setComprehensiveProgress({
+        stage: 'processing',
+        percentage: 30,
+        message: isRTL ? 'جاري معالجة البيانات...' : 'Processing data...',
+      });
+
+      const response = await fetch('/api/results/comprehensive-upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Upload failed');
+      }
+
+      const result = await response.json();
+
+      setComprehensiveProgress({
+        stage: 'complete',
+        percentage: 100,
+        message: isRTL ? 'تم التحميل بنجاح!' : 'Upload complete!',
+        summary: result.summary,
+        schoolCredentials: result.schoolCredentials,
+        errors: result.errors,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['/api/results'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/schools'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/students'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/regions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/clusters'] });
+
+      toast({
+        title: isRTL ? "تم التحميل بنجاح" : "Upload Successful",
+        description: isRTL 
+          ? `تم إنشاء ${result.summary.studentsCreated} طالب و${result.summary.resultsCreated} نتيجة`
+          : `Created ${result.summary.studentsCreated} students and ${result.summary.resultsCreated} results`,
+      });
+    } catch (error: any) {
+      setComprehensiveProgress({
+        stage: 'error',
+        percentage: 0,
+        message: error.message || (isRTL ? "فشل التحميل" : "Upload failed"),
+      });
+      toast({
+        title: t.common.error,
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      if (comprehensiveFileInputRef.current) {
+        comprehensiveFileInputRef.current.value = '';
+      }
+    }
+  };
+
   const filteredResults = results?.filter((result) => {
     const studentName = `${result.student?.firstName} ${result.student?.lastName}`.toLowerCase();
     const matchesSearch =
@@ -348,6 +468,10 @@ export default function Results() {
           )}
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button onClick={() => setShowComprehensiveUploadDialog(true)} data-testid="button-comprehensive-upload">
+            <FileUp className="w-4 h-4 me-2" />
+            {isRTL ? "تحميل شامل" : "Full Upload"}
+          </Button>
           <Button variant="outline" onClick={() => setShowUploadDialog(true)} data-testid="button-upload-results">
             <Upload className="w-4 h-4 me-2" />
             {isRTL ? "تحميل النتائج" : "Upload Results"}
@@ -930,6 +1054,237 @@ export default function Results() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowUploadDialog(false); setUploadProgress(null); }}>
+              {t.common.close}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Comprehensive Upload Dialog */}
+      <Dialog open={showComprehensiveUploadDialog} onOpenChange={setShowComprehensiveUploadDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{isRTL ? "التحميل الشامل للنتائج" : "Comprehensive Results Upload"}</DialogTitle>
+            <DialogDescription>
+              {isRTL 
+                ? "قم بتحميل ملف CSV يحتوي على جميع البيانات. سيتم إنشاء المناطق والمجموعات والمدارس والطلاب تلقائياً إذا لم تكن موجودة." 
+                : "Upload a CSV file with all data. Regions, clusters, schools, and students will be created automatically if they don't exist."}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Grade Selection Warning */}
+            {studentGradeFilter === "all" && (
+              <div className="flex items-center gap-2 p-3 bg-chart-5/10 rounded-md">
+                <AlertCircle className="w-5 h-5 text-chart-5" />
+                <p className="text-sm text-chart-5">
+                  {isRTL ? "يرجى تحديد الصف من القائمة الرئيسية قبل تحميل الملف" : "Please select a grade level from the main filters before uploading"}
+                </p>
+              </div>
+            )}
+
+            {/* Grade Selection */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">{isRTL ? "الصف الدراسي" : "Grade Level"}</label>
+                <Select value={studentGradeFilter} onValueChange={setStudentGradeFilter}>
+                  <SelectTrigger data-testid="select-comprehensive-grade">
+                    <SelectValue placeholder={isRTL ? "اختر الصف" : "Select Grade"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3">{isRTL ? "الصف 3" : "Grade 3"}</SelectItem>
+                    <SelectItem value="6">{isRTL ? "الصف 6" : "Grade 6"}</SelectItem>
+                    <SelectItem value="9">{isRTL ? "الصف 9" : "Grade 9"}</SelectItem>
+                    <SelectItem value="12">{isRTL ? "الصف 12" : "Grade 12"}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">{isRTL ? "سنة الامتحان" : "Exam Year"}</label>
+                <div className="p-2 bg-muted rounded-md text-sm">
+                  {activeExamYear?.name || (isRTL ? "لا توجد سنة نشطة" : "No active year")}
+                </div>
+              </div>
+            </div>
+
+            {/* File Upload Area */}
+            <input
+              type="file"
+              ref={comprehensiveFileInputRef}
+              accept=".csv"
+              onChange={handleComprehensiveUpload}
+              className="hidden"
+            />
+
+            {comprehensiveProgress ? (
+              <div className="space-y-4 p-4 border rounded-lg">
+                {/* Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{comprehensiveProgress.message}</span>
+                    <span className="text-sm text-muted-foreground">{comprehensiveProgress.percentage}%</span>
+                  </div>
+                  <Progress value={comprehensiveProgress.percentage} className="h-2" />
+                </div>
+
+                {/* Summary Stats */}
+                {comprehensiveProgress.summary && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 border-t">
+                    <div className="text-center p-2 bg-chart-3/10 rounded-md">
+                      <p className="text-lg font-bold text-chart-3">{comprehensiveProgress.summary.regionsCreated}</p>
+                      <p className="text-xs text-muted-foreground">{isRTL ? "مناطق جديدة" : "Regions Created"}</p>
+                    </div>
+                    <div className="text-center p-2 bg-chart-2/10 rounded-md">
+                      <p className="text-lg font-bold text-chart-2">{comprehensiveProgress.summary.clustersCreated}</p>
+                      <p className="text-xs text-muted-foreground">{isRTL ? "مجموعات جديدة" : "Clusters Created"}</p>
+                    </div>
+                    <div className="text-center p-2 bg-primary/10 rounded-md">
+                      <p className="text-lg font-bold text-primary">{comprehensiveProgress.summary.schoolsCreated}</p>
+                      <p className="text-xs text-muted-foreground">{isRTL ? "مدارس جديدة" : "Schools Created"}</p>
+                    </div>
+                    <div className="text-center p-2 bg-chart-4/10 rounded-md">
+                      <p className="text-lg font-bold text-chart-4">{comprehensiveProgress.summary.studentsCreated}</p>
+                      <p className="text-xs text-muted-foreground">{isRTL ? "طلاب جدد" : "Students Created"}</p>
+                    </div>
+                    <div className="text-center p-2 bg-chart-1/10 rounded-md">
+                      <p className="text-lg font-bold text-chart-1">{comprehensiveProgress.summary.subjectsCreated}</p>
+                      <p className="text-xs text-muted-foreground">{isRTL ? "مواد جديدة" : "Subjects Created"}</p>
+                    </div>
+                    <div className="text-center p-2 bg-chart-3/10 rounded-md">
+                      <p className="text-lg font-bold text-chart-3">{comprehensiveProgress.summary.resultsCreated}</p>
+                      <p className="text-xs text-muted-foreground">{isRTL ? "نتائج جديدة" : "Results Created"}</p>
+                    </div>
+                    <div className="text-center p-2 bg-muted rounded-md">
+                      <p className="text-lg font-bold">{comprehensiveProgress.summary.skippedNoMarks}</p>
+                      <p className="text-xs text-muted-foreground">{isRTL ? "تم تخطيها" : "Skipped (No Marks)"}</p>
+                    </div>
+                    {comprehensiveProgress.summary.errorsCount > 0 && (
+                      <div className="text-center p-2 bg-destructive/10 rounded-md">
+                        <p className="text-lg font-bold text-destructive">{comprehensiveProgress.summary.errorsCount}</p>
+                        <p className="text-xs text-muted-foreground">{isRTL ? "أخطاء" : "Errors"}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* School Credentials */}
+                {comprehensiveProgress.schoolCredentials && comprehensiveProgress.schoolCredentials.length > 0 && (
+                  <div className="pt-4 border-t">
+                    <h4 className="font-medium mb-2">{isRTL ? "بيانات تسجيل الدخول للمدارس الجديدة" : "New School Login Credentials"}</h4>
+                    <div className="max-h-40 overflow-y-auto border rounded-md">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{isRTL ? "المدرسة" : "School"}</TableHead>
+                            <TableHead>{isRTL ? "اسم المستخدم" : "Username"}</TableHead>
+                            <TableHead>{isRTL ? "كلمة المرور" : "Password"}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {comprehensiveProgress.schoolCredentials.map((cred, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium">{cred.schoolName}</TableCell>
+                              <TableCell className="font-mono text-xs">{cred.username}</TableCell>
+                              <TableCell className="font-mono text-xs">{cred.password}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-2"
+                      onClick={() => {
+                        const csv = "School,Region,Cluster,Username,Password\n" +
+                          comprehensiveProgress.schoolCredentials!.map(c => 
+                            `"${c.schoolName}","${c.region}","${c.cluster}","${c.username}","${c.password}"`
+                          ).join("\n");
+                        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = "school_credentials.csv";
+                        a.click();
+                      }}
+                    >
+                      <Download className="w-4 h-4 me-2" />
+                      {isRTL ? "تحميل بيانات الدخول" : "Download Credentials"}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Errors */}
+                {comprehensiveProgress.errors && comprehensiveProgress.errors.length > 0 && (
+                  <div className="pt-4 border-t">
+                    <h4 className="font-medium text-destructive mb-2">{isRTL ? "الأخطاء" : "Errors"}</h4>
+                    <div className="max-h-32 overflow-y-auto text-xs space-y-1">
+                      {comprehensiveProgress.errors.slice(0, 10).map((err, idx) => (
+                        <div key={idx} className="p-2 bg-destructive/10 rounded text-destructive">
+                          {isRTL ? `الصف ${err.row}: ${err.error}` : `Row ${err.row}: ${err.error}`}
+                        </div>
+                      ))}
+                      {comprehensiveProgress.errors.length > 10 && (
+                        <p className="text-muted-foreground">
+                          {isRTL ? `و ${comprehensiveProgress.errors.length - 10} أخطاء أخرى...` : `And ${comprehensiveProgress.errors.length - 10} more errors...`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div 
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
+                  studentGradeFilter === "all" ? "opacity-50 cursor-not-allowed" : "hover:border-primary/50"
+                }`}
+                onClick={() => studentGradeFilter !== "all" && comprehensiveFileInputRef.current?.click()}
+              >
+                <FileUp className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-sm text-muted-foreground mb-2">
+                  {isRTL 
+                    ? "اسحب وأفلت ملف CSV هنا، أو انقر للتصفح" 
+                    : "Drag and drop your CSV file here, or click to browse"}
+                </p>
+                <Button variant="outline" size="sm" disabled={studentGradeFilter === "all"}>
+                  {isRTL ? "اختر ملف CSV" : "Choose CSV File"}
+                </Button>
+              </div>
+            )}
+
+            {/* CSV Format Guide */}
+            <div className="text-xs text-muted-foreground space-y-2 border-t pt-4">
+              <p className="font-medium">{isRTL ? "الأعمدة المطلوبة في ملف CSV (بترميز UTF-8):" : "Required CSV columns (UTF-8 encoded):"}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 bg-muted rounded">
+                  <p className="font-medium">{isRTL ? "بيانات الموقع" : "Location Data"}</p>
+                  <p className="font-mono text-xs">region, cluster, school</p>
+                </div>
+                <div className="p-2 bg-muted rounded">
+                  <p className="font-medium">{isRTL ? "بيانات الطالب" : "Student Data"}</p>
+                  <p className="font-mono text-xs">firstName, lastName, gender</p>
+                </div>
+              </div>
+              <div className="p-2 bg-muted rounded">
+                <p className="font-medium">{isRTL ? "أعمدة المواد (درجات 0-100)" : "Subject Columns (scores 0-100)"}</p>
+                <p className="font-mono text-xs">القرآن, الحديث, الفقه, English, Mathematics, ...</p>
+              </div>
+              <p className="text-chart-5">
+                {isRTL 
+                  ? "ملاحظة: سيتم تخطي الطلاب بدون درجات والمدارس بدون طلاب"
+                  : "Note: Students without marks and schools without students will be skipped"}
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => { 
+                setShowComprehensiveUploadDialog(false); 
+                setComprehensiveProgress(null); 
+              }}
+            >
               {t.common.close}
             </Button>
           </DialogFooter>
