@@ -978,13 +978,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Bulk school upload API
+  const bulkUploadRowSchema = z.object({
+    schoolName: z.string().min(2, "School name must be at least 2 characters"),
+    address: z.string().optional().default(""),
+    region: z.string().min(1, "Region is required"),
+    cluster: z.string().min(1, "Cluster is required"),
+  });
+
+  const bulkUploadSchema = z.object({
+    schools: z.array(bulkUploadRowSchema).min(1, "At least one school is required"),
+  });
+
   app.post("/api/schools/bulk-upload", isAuthenticated, async (req, res) => {
     try {
-      const { schools: schoolsData } = req.body;
-      
-      if (!Array.isArray(schoolsData) || schoolsData.length === 0) {
-        return res.status(400).json({ message: "No schools data provided" });
+      const parseResult = bulkUploadSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: fromZodError(parseResult.error).message 
+        });
       }
+      
+      const { schools: schoolsData } = parseResult.data;
 
       const results: {
         success: Array<{
@@ -1005,8 +1019,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         clustersCreated: [],
       };
 
-      // Helper to generate random username (school code style)
-      const generateUsername = (schoolName: string, existingUsernames: Set<string>): string => {
+      // Helper to generate random username (school code style) with uniqueness check
+      const generateUsername = async (schoolName: string, existingUsernames: Set<string>): Promise<string> => {
         // Create base from school name
         const words = schoolName.trim().split(/\s+/).filter(w => w.length > 0);
         let base = '';
@@ -1019,27 +1033,61 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           base = 'SCH';
         }
         
-        // Add random number suffix
+        // Add random alphanumeric suffix (6 chars for more entropy)
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No confusing chars
         let username = '';
         let attempts = 0;
+        const maxAttempts = 100;
+        
         do {
-          const random = Math.floor(1000 + Math.random() * 9000); // 4-digit number
-          username = `${base}${random}`;
+          let suffix = '';
+          for (let i = 0; i < 6; i++) {
+            suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+          }
+          username = `${base}${suffix}`;
           attempts++;
-        } while (existingUsernames.has(username.toLowerCase()) && attempts < 100);
+          
+          // Check local cache first
+          if (!existingUsernames.has(username.toLowerCase())) {
+            // Also verify against database
+            const existingUser = await storage.getUserByUsername(username);
+            if (!existingUser) {
+              break;
+            }
+          }
+        } while (attempts < maxAttempts);
+        
+        if (attempts >= maxAttempts) {
+          // Fallback: use timestamp-based suffix
+          username = `${base}${Date.now().toString(36).toUpperCase()}`;
+        }
         
         existingUsernames.add(username.toLowerCase());
         return username;
       };
 
-      // Helper to generate random password
+      // Helper to generate random password (12 chars for better security)
       const generatePassword = (): string => {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        const lower = 'abcdefghjkmnpqrstuvwxyz';
+        const numbers = '23456789';
+        const special = '@#$%';
+        const allChars = upper + lower + numbers + special;
+        
+        // Ensure at least one of each type
         let password = '';
-        for (let i = 0; i < 10; i++) {
-          password += chars.charAt(Math.floor(Math.random() * chars.length));
+        password += upper.charAt(Math.floor(Math.random() * upper.length));
+        password += lower.charAt(Math.floor(Math.random() * lower.length));
+        password += numbers.charAt(Math.floor(Math.random() * numbers.length));
+        password += special.charAt(Math.floor(Math.random() * special.length));
+        
+        // Fill remaining 8 chars randomly
+        for (let i = 0; i < 8; i++) {
+          password += allChars.charAt(Math.floor(Math.random() * allChars.length));
         }
-        return password;
+        
+        // Shuffle the password
+        return password.split('').sort(() => Math.random() - 0.5).join('');
       };
 
       // Helper to generate region code
@@ -1160,7 +1208,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           }
 
           // Generate credentials
-          const username = generateUsername(schoolName, existingUsernames);
+          const username = await generateUsername(schoolName, existingUsernames);
           const password = generatePassword();
           const hashedPassword = await bcrypt.hash(password, 10);
 
