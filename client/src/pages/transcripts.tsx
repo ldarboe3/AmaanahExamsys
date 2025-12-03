@@ -94,9 +94,10 @@ export default function Transcripts() {
     enabled: !!selectedRegion,
   });
 
-  const { data: schools } = useQuery<SchoolType[]>({
+  const { data: schoolsResponse } = useQuery<{ data: SchoolType[]; total: number }>({
     queryKey: ["/api/schools"],
   });
+  const schools = schoolsResponse?.data || [];
 
   const { data: students, isLoading: studentsLoading } = useQuery<StudentWithResults[]>({
     queryKey: [`/api/students?schoolId=${selectedSchool}`],
@@ -119,11 +120,11 @@ export default function Transcripts() {
   };
 
   const filteredClusters = clusters?.filter(c => c.regionId === parseInt(selectedRegion)) || [];
-  const filteredSchools = schools?.filter(s => {
+  const filteredSchools = schools.filter(s => {
     if (selectedCluster) return s.clusterId === parseInt(selectedCluster);
     if (selectedRegion) return s.regionId === parseInt(selectedRegion);
     return true;
-  }) || [];
+  });
 
   const generateTranscriptMutation = useMutation({
     mutationFn: async (studentIds: number[]) => {
