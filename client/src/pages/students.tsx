@@ -63,6 +63,7 @@ import {
   FileText,
   CreditCard,
   AlertCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -451,6 +452,38 @@ export default function Students() {
   const { data: schools } = useQuery<SchoolWithRelations[]>({
     queryKey: [schoolsUrl],
   });
+
+  // Fetch invoices to check payment status for the selected school
+  const selectedSchoolId = isSchoolAdmin ? schoolProfile?.id : (schoolFilter !== "all" ? parseInt(schoolFilter) : null);
+  const currentExamYearId = selectedExamYear || activeExamYear?.id;
+  
+  const invoicesQueryUrl = useMemo(() => {
+    if (!selectedSchoolId) return null;
+    const params = new URLSearchParams();
+    params.set("schoolId", selectedSchoolId.toString());
+    if (currentExamYearId) {
+      params.set("examYearId", currentExamYearId.toString());
+    }
+    return `/api/invoices?${params.toString()}`;
+  }, [selectedSchoolId, currentExamYearId]);
+
+  const { data: schoolInvoices } = useQuery<any[]>({
+    queryKey: [invoicesQueryUrl],
+    enabled: canApproveStudents && !!invoicesQueryUrl,
+  });
+
+  // Check if the school has a paid invoice for the current exam year
+  const schoolPaymentApproved = useMemo(() => {
+    if (!schoolInvoices || !selectedSchoolId || !currentExamYearId) return false;
+    return schoolInvoices.some(
+      (inv: any) => inv.schoolId === selectedSchoolId && 
+                    inv.examYearId === currentExamYearId && 
+                    inv.status === 'paid'
+    );
+  }, [schoolInvoices, selectedSchoolId, currentExamYearId]);
+
+  // Can only approve students if payment is approved
+  const canApproveWithPayment = canApproveStudents && schoolPaymentApproved;
 
   // Filter clusters based on selected region
   const clustersForFilter = clusters?.filter(
@@ -1136,8 +1169,8 @@ export default function Students() {
                 <FileSpreadsheet className="w-4 h-4 me-2" />
                 {isRTL ? "القالب" : "Template"}
               </Button>
-              {/* Approve All button - only for super_admin and examination_admin */}
-              {canApproveStudents && pendingCount > 0 && (
+              {/* Approve All button - only when payment is approved */}
+              {canApproveWithPayment && pendingCount > 0 && (
                 <Button 
                   onClick={() => {
                     const pendingIds = students?.filter(s => s.status === 'pending').map(s => s.id) || [];
@@ -1198,6 +1231,38 @@ export default function Students() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Payment Required Instruction Banner - for admins when payment not approved */}
+        {canApproveStudents && selectedSchoolId && !schoolPaymentApproved && pendingCount > 0 && (
+          <Card className="border-2 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-amber-700 dark:text-amber-400">
+                    {isRTL ? "مطلوب موافقة الدفع" : "Payment Approval Required"}
+                  </h3>
+                  <p className="text-sm text-amber-600 dark:text-amber-300 mt-1">
+                    {isRTL 
+                      ? "يرجى الموافقة على دفع المدرسة أولاً لاعتماد الطلاب تلقائياً. انتقل إلى صفحة المدفوعات للموافقة على الفاتورة، وسيتم اعتماد جميع الطلاب المسجلين تلقائياً."
+                      : "Please approve the school's payment first to automatically approve students. Go to the Payments page to confirm the invoice, and all registered students will be approved automatically."}
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-3 border-amber-500 text-amber-700 hover:bg-amber-100 dark:border-amber-400 dark:text-amber-300 dark:hover:bg-amber-900/30"
+                    onClick={() => window.location.href = '/dashboard/payments'}
+                    data-testid="button-go-to-payments"
+                  >
+                    {isRTL ? "انتقل إلى المدفوعات" : "Go to Payments"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Registration Deadline Countdown */}
@@ -1428,8 +1493,8 @@ export default function Students() {
                 </CardDescription>
               </div>
               <div className="flex gap-2 flex-wrap">
-                {/* Bulk actions for admins */}
-                {canApproveStudents && selectedStudentIds.size > 0 && (
+                {/* Bulk actions for admins - only when payment is approved */}
+                {canApproveWithPayment && selectedStudentIds.size > 0 && (
                   <>
                     <Button 
                       size="sm" 
@@ -1589,8 +1654,8 @@ export default function Students() {
                                 <Printer className="w-4 h-4 me-2" />
                                 {isRTL ? "طباعة البطاقة" : "Print Card"}
                               </DropdownMenuItem>
-                              {/* Approve/Reject actions - only for super_admin and examination_admin */}
-                              {canApproveStudents && student.status === 'pending' && (
+                              {/* Approve/Reject actions - only when payment is approved */}
+                              {canApproveWithPayment && student.status === 'pending' && (
                                 <>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
