@@ -2815,6 +2815,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           }
 
           const newStudent = await storage.createStudent(parsed.data);
+          
+          // Auto-generate index number for approved students
+          if (newStudent.status === 'approved' && !newStudent.indexNumber) {
+            const indexNum = generateIndexNumber();
+            newStudent.indexNumber = indexNum;
+            await storage.updateStudent(newStudent.id, { indexNumber: indexNum });
+          }
+          
           created.push(newStudent);
           
           // Track student count by school
@@ -2898,6 +2906,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
       }
+      
+      // Auto-generate index number for approved students
+      if (student.status === 'approved' && !student.indexNumber) {
+        const indexNum = generateIndexNumber();
+        const updatedStudent = await storage.updateStudent(student.id, { indexNumber: indexNum });
+        return res.json(updatedStudent || student);
+      }
+      
       res.json(student);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2934,8 +2950,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       const approvedStudents = [];
       for (const id of studentIds) {
-        const student = await storage.approveStudent(id);
-        if (student) approvedStudents.push(student);
+        let student = await storage.approveStudent(id);
+        if (student) {
+          // Auto-generate index number for approved students
+          if (student.status === 'approved' && !student.indexNumber) {
+            const indexNum = generateIndexNumber();
+            student = await storage.updateStudent(student.id, { indexNumber: indexNum });
+          }
+          if (student) approvedStudents.push(student);
+        }
       }
       res.json({ approved: approvedStudents.length, students: approvedStudents });
     } catch (error: any) {
