@@ -1064,13 +1064,29 @@ export default function Results() {
                 size="sm" 
                 className="h-auto p-0"
                 onClick={() => {
+                  // Always generate LTR (left-to-right) columns
                   const headers = ["Student Number", "Student Name"];
-                  if (subjects) {
+                  
+                  // Filter subjects by selected grade level
+                  const gradeSubjects = subjects?.filter(s => s.grade === parseInt(studentGradeFilter)) || [];
+                  
+                  if (gradeSubjects.length > 0) {
+                    // Add subjects in order (LTR)
+                    gradeSubjects.forEach(s => headers.push(s.name));
+                  } else if (subjects && subjects.length > 0) {
+                    // Fallback: if no subjects for this grade, show all available subjects
                     subjects.forEach(s => headers.push(s.name));
                   } else {
+                    // Placeholder if no subjects exist
                     headers.push("Subject 1", "Subject 2", "Subject 3");
                   }
-                  const csv = headers.join(",") + "\n" + "12345,John Doe," + Array(headers.length - 2).fill("80").join(",");
+                  
+                  // Generate CSV with sample data
+                  const headerLine = headers.join(",");
+                  const sampleData = "12345,John Doe," + Array(headers.length - 2).fill("80").join(",");
+                  const csv = headerLine + "\n" + sampleData;
+                  
+                  // Download with UTF-8 BOM for proper encoding
                   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
                   const url = URL.createObjectURL(blob);
                   const link = document.createElement("a");
