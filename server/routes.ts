@@ -450,7 +450,24 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/regions", async (req, res) => {
     try {
       const regions = await storage.getAllRegions();
-      res.json(regions);
+      
+      // Enrich regions with clusters and counts
+      const enrichedRegions = await Promise.all(
+        regions.map(async (region) => {
+          const regionClusters = await storage.getClustersByRegion(region.id);
+          const regionSchools = await db.select().from(schools).where(eq(schools.regionId, region.id));
+          const regionStudents = await db.select().from(students).innerJoin(schools, eq(students.schoolId, schools.id)).where(eq(schools.regionId, region.id));
+          
+          return {
+            ...region,
+            clusters: regionClusters,
+            schoolsCount: regionSchools.length,
+            studentsCount: regionStudents.length,
+          };
+        })
+      );
+      
+      res.json(enrichedRegions);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
