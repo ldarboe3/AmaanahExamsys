@@ -10,6 +10,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { NotificationsDropdown } from "@/components/notifications-dropdown";
+import { DocumentationButton } from "@/components/documentation-button";
 import { UserProfileDropdown } from "@/components/user-profile-dropdown";
 import { ScrollToTop } from "@/components/scroll-to-top";
 import NotFound from "@/pages/not-found";
@@ -53,6 +54,7 @@ import SchoolVerify from "@/pages/school-verify";
 import SchoolInvite from "@/pages/school-invite";
 import ForgotPassword from "@/pages/forgot-password";
 import WebsiteManagement from "@/pages/website-management";
+import Documentation from "@/pages/documentation";
 
 function LoadingScreen() {
   return (
@@ -93,6 +95,7 @@ function AuthenticatedRoutes() {
       <Route path="/settings" component={Settings} />
       <Route path="/profile" component={Profile} />
       <Route path="/school-profile" component={SchoolProfile} />
+      <Route path="/documentation" component={Documentation} />
       <Route path="/" component={Dashboard} />
       <Route component={NotFound} />
     </Switch>
@@ -145,6 +148,7 @@ function AuthenticatedLayout() {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-2">
               <NotificationsDropdown />
+              <DocumentationButton />
               <LanguageToggle />
               <ThemeToggle />
               <UserProfileDropdown />
