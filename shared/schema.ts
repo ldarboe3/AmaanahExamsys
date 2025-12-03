@@ -928,6 +928,7 @@ export const insertExamTimetableSchema = createInsertSchema(examTimetable).pick(
   examDate: true,
   startTime: true,
   endTime: true,
+  venue: true,
   grade: true,
 });
 
