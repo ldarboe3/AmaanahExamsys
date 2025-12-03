@@ -822,6 +822,8 @@ export const insertExamCenterSchema = createInsertSchema(examCenters).pick({
   contactEmail: true,
   centerAdminId: true,
   isActive: true,
+}).extend({
+  code: z.string().optional(), // Make code optional - will be auto-generated if not provided
 });
 
 export const insertSchoolSchema = createInsertSchema(schools).pick({
