@@ -816,12 +816,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const regionId = req.query.regionId ? parseInt(req.query.regionId as string) : undefined;
       const clusterId = req.query.clusterId ? parseInt(req.query.clusterId as string) : undefined;
       let centers;
-      if (clusterId) {
-        centers = await storage.getExamCentersByCluster(clusterId);
-      } else if (regionId) {
-        centers = await storage.getExamCentersByRegion(regionId);
+      
+      // For school admins, only show their assigned center
+      if (req.session?.role === 'school_admin' && req.session?.schoolId) {
+        const school = await storage.getSchool(req.session.schoolId);
+        if (school?.assignedCenterId) {
+          const center = await storage.getExamCenter(school.assignedCenterId);
+          centers = center ? [center] : [];
+        } else {
+          centers = [];
+        }
       } else {
-        centers = await storage.getAllExamCenters();
+        // Admins see all centers based on filters
+        if (clusterId) {
+          centers = await storage.getExamCentersByCluster(clusterId);
+        } else if (regionId) {
+          centers = await storage.getExamCentersByRegion(regionId);
+        } else {
+          centers = await storage.getAllExamCenters();
+        }
       }
       
       // Add school and student counts for each center
