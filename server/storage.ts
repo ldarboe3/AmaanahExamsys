@@ -140,6 +140,9 @@ export interface IStorage {
   // Subjects
   createSubject(subject: InsertSubject): Promise<Subject>;
   getSubject(id: number): Promise<Subject | undefined>;
+  getSubjectByCode(code: string): Promise<Subject | undefined>;
+  getSubjectByName(name: string, grade: number): Promise<Subject | undefined>;
+  getOrCreateSubject(name: string, arabicName: string | null, grade: number): Promise<Subject>;
   getSubjectsByGrade(grade: number): Promise<Subject[]>;
   getAllSubjects(): Promise<Subject[]>;
   updateSubject(id: number, subject: Partial<InsertSubject>): Promise<Subject | undefined>;
@@ -156,6 +159,7 @@ export interface IStorage {
   createExaminer(examiner: InsertExaminer): Promise<Examiner>;
   getExaminer(id: number): Promise<Examiner | undefined>;
   getExaminerByEmail(email: string): Promise<Examiner | undefined>;
+  getExaminerByUserId(userId: string): Promise<Examiner | undefined>;
   getExaminersByStatus(status: string): Promise<Examiner[]>;
   getExaminersByRegion(regionId: number): Promise<Examiner[]>;
   getAllExaminers(): Promise<Examiner[]>;
@@ -177,11 +181,14 @@ export interface IStorage {
   getResultsByStudent(studentId: number): Promise<StudentResult[]>;
   getResultsByExamYear(examYearId: number): Promise<StudentResult[]>;
   getResultsBySubject(subjectId: number): Promise<StudentResult[]>;
+  getResultByStudentAndSubject(studentId: number, subjectId: number, examYearId: number): Promise<StudentResult | undefined>;
   getPendingResults(): Promise<StudentResult[]>;
   updateStudentResult(id: number, result: Partial<InsertStudentResult>): Promise<StudentResult | undefined>;
+  upsertStudentResult(studentId: number, subjectId: number, examYearId: number, result: Partial<InsertStudentResult>): Promise<StudentResult>;
   validateResult(id: number, validatorId: string): Promise<StudentResult | undefined>;
   publishResults(examYearId: number): Promise<number>;
   deleteStudentResult(id: number): Promise<boolean>;
+  getStudentsForResultEntry(filters: { schoolId?: number; clusterId?: number; regionId?: number; grade?: number; examYearId?: number }): Promise<Student[]>;
 
   // Certificates
   createCertificate(certificate: InsertCertificate): Promise<Certificate>;
@@ -884,6 +891,41 @@ export class DatabaseStorage implements IStorage {
     return subject;
   }
 
+  async getSubjectByCode(code: string): Promise<Subject | undefined> {
+    const [subject] = await db.select().from(subjects).where(eq(subjects.code, code));
+    return subject;
+  }
+
+  async getSubjectByName(name: string, grade: number): Promise<Subject | undefined> {
+    const [subject] = await db.select().from(subjects).where(
+      and(
+        or(
+          ilike(subjects.name, name.trim()),
+          ilike(subjects.arabicName, name.trim())
+        ),
+        eq(subjects.grade, grade)
+      )
+    );
+    return subject;
+  }
+
+  async getOrCreateSubject(name: string, arabicName: string | null, grade: number): Promise<Subject> {
+    const existing = await this.getSubjectByName(name, grade);
+    if (existing) return existing;
+    
+    const code = name.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 10) + '_G' + grade + '_' + Date.now().toString().slice(-4);
+    const [created] = await db.insert(subjects).values({
+      name: name.trim(),
+      arabicName: arabicName?.trim() || null,
+      code,
+      grade,
+      maxScore: 100,
+      passingScore: 50,
+      isActive: true
+    }).returning();
+    return created;
+  }
+
   async getSubjectsByGrade(grade: number): Promise<Subject[]> {
     return db.select().from(subjects).where(eq(subjects.grade, grade)).orderBy(asc(subjects.name));
   }
@@ -940,6 +982,11 @@ export class DatabaseStorage implements IStorage {
 
   async getExaminerByEmail(email: string): Promise<Examiner | undefined> {
     const [examiner] = await db.select().from(examiners).where(eq(examiners.email, email));
+    return examiner;
+  }
+
+  async getExaminerByUserId(userId: string): Promise<Examiner | undefined> {
+    const [examiner] = await db.select().from(examiners).where(eq(examiners.userId, userId));
     return examiner;
   }
 
@@ -1022,6 +1069,17 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(studentResults).where(eq(studentResults.subjectId, subjectId));
   }
 
+  async getResultByStudentAndSubject(studentId: number, subjectId: number, examYearId: number): Promise<StudentResult | undefined> {
+    const [result] = await db.select().from(studentResults).where(
+      and(
+        eq(studentResults.studentId, studentId),
+        eq(studentResults.subjectId, subjectId),
+        eq(studentResults.examYearId, examYearId)
+      )
+    );
+    return result;
+  }
+
   async getPendingResults(): Promise<StudentResult[]> {
     return db.select().from(studentResults).where(eq(studentResults.status, 'pending'));
   }
@@ -1029,6 +1087,21 @@ export class DatabaseStorage implements IStorage {
   async updateStudentResult(id: number, result: Partial<InsertStudentResult>): Promise<StudentResult | undefined> {
     const [updated] = await db.update(studentResults).set({ ...result, updatedAt: new Date() }).where(eq(studentResults.id, id)).returning();
     return updated;
+  }
+
+  async upsertStudentResult(studentId: number, subjectId: number, examYearId: number, result: Partial<InsertStudentResult>): Promise<StudentResult> {
+    const existing = await this.getResultByStudentAndSubject(studentId, subjectId, examYearId);
+    if (existing) {
+      const updated = await this.updateStudentResult(existing.id, result);
+      return updated!;
+    }
+    const [created] = await db.insert(studentResults).values({
+      studentId,
+      subjectId,
+      examYearId,
+      ...result
+    } as any).returning();
+    return created;
   }
 
   async validateResult(id: number, validatorId: string): Promise<StudentResult | undefined> {
@@ -1044,6 +1117,40 @@ export class DatabaseStorage implements IStorage {
   async deleteStudentResult(id: number): Promise<boolean> {
     await db.delete(studentResults).where(eq(studentResults.id, id));
     return true;
+  }
+
+  async getStudentsForResultEntry(filters: { schoolId?: number; clusterId?: number; regionId?: number; grade?: number; examYearId?: number }): Promise<Student[]> {
+    const conditions = [];
+    
+    if (filters.schoolId) {
+      conditions.push(eq(students.schoolId, filters.schoolId));
+    }
+    if (filters.clusterId) {
+      const schoolIds = await db.select({ id: schools.id }).from(schools).where(eq(schools.clusterId, filters.clusterId));
+      if (schoolIds.length > 0) {
+        conditions.push(inArray(students.schoolId, schoolIds.map(s => s.id)));
+      }
+    }
+    if (filters.regionId) {
+      const schoolIds = await db.select({ id: schools.id }).from(schools).where(eq(schools.regionId, filters.regionId));
+      if (schoolIds.length > 0) {
+        conditions.push(inArray(students.schoolId, schoolIds.map(s => s.id)));
+      }
+    }
+    if (filters.grade) {
+      conditions.push(eq(students.grade, filters.grade));
+    }
+    if (filters.examYearId) {
+      conditions.push(eq(students.examYearId, filters.examYearId));
+    }
+    
+    conditions.push(eq(students.status, 'approved'));
+    
+    if (conditions.length === 1) {
+      return db.select().from(students).where(eq(students.status, 'approved')).orderBy(asc(students.indexNumber));
+    }
+    
+    return db.select().from(students).where(and(...conditions)).orderBy(asc(students.indexNumber));
   }
 
   // Certificates
@@ -1357,11 +1464,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Authentication
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
-  }
-
   async createUserWithPassword(userData: UpsertUser & { password: string }): Promise<User> {
     const passwordHash = await bcrypt.hash(userData.password, 10);
     const { password, ...rest } = userData;
