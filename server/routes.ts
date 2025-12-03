@@ -1039,6 +1039,34 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return 'School@123';
       };
 
+      // Helper to find best matching region (fuzzy matching for numeric inputs)
+      const findBestRegionMatch = (inputName: string, allRegions: any[]): any | null => {
+        const input = inputName.trim().toLowerCase();
+        
+        // If input is numeric (like "1", "2"), try to match to "Region 1", "Region 2"
+        if (/^\d+$/.test(input)) {
+          const regionNum = parseInt(input, 10);
+          const match = allRegions.find(r => 
+            r.name.toLowerCase() === `region ${regionNum}`
+          );
+          if (match) return match;
+        }
+        
+        // Exact match
+        const exactMatch = allRegions.find(r => 
+          r.name.toLowerCase() === input
+        );
+        if (exactMatch) return exactMatch;
+        
+        // Partial match (e.g., "Banjul" matches "Banjul Region")
+        const partialMatch = allRegions.find(r => 
+          r.name.toLowerCase().includes(input) || input.includes(r.name.toLowerCase())
+        );
+        if (partialMatch) return partialMatch;
+        
+        return null;
+      };
+
       // Helper to generate region code
       const generateRegionCode = (name: string, existingCodes: Set<string>): string => {
         const words = name.trim().split(/\s+/);
@@ -1121,19 +1149,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           }
 
           const schoolName = row.schoolName.trim();
-          const regionName = row.region.trim();
+          const regionInput = row.region.trim();
           const clusterName = row.cluster.trim();
           const address = row.address?.trim() || '';
 
-          // Find or create region
-          let regionId = regionCache.get(regionName.toLowerCase());
-          if (!regionId) {
-            const regionCode = generateRegionCode(regionName, existingRegionCodes);
-            const newRegion = await storage.createRegion({ name: regionName, code: regionCode });
-            regionId = newRegion.id;
-            regionCache.set(regionName.toLowerCase(), regionId);
-            results.regionsCreated.push(regionName);
+          // Find or create region with fuzzy matching
+          let regionId: number | undefined;
+          let matchedRegion = findBestRegionMatch(regionInput, allRegions);
+          
+          if (matchedRegion) {
+            // Use existing matching region
+            regionId = matchedRegion.id;
+            regionCache.set(matchedRegion.name.toLowerCase(), regionId);
+          } else {
+            // No match found, try cache
+            regionId = regionCache.get(regionInput.toLowerCase());
+            if (!regionId) {
+              // Create new region only if no match exists
+              const regionCode = generateRegionCode(regionInput, existingRegionCodes);
+              const newRegion = await storage.createRegion({ name: regionInput, code: regionCode });
+              regionId = newRegion.id;
+              regionCache.set(regionInput.toLowerCase(), regionId);
+              results.regionsCreated.push(regionInput);
+            }
           }
+          
+          const actualRegionName = matchedRegion?.name || regionInput;
 
           // Find or create cluster
           const clusterKey = `${regionId}-${clusterName.toLowerCase()}`;
@@ -1144,7 +1185,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             const newCluster = await storage.createCluster({ name: clusterName, code: clusterCode, regionId });
             clusterId = newCluster.id;
             clusterCache.set(clusterKey, clusterId);
-            results.clustersCreated.push(`${clusterName} (${regionName})`);
+            results.clustersCreated.push(`${clusterName} (${actualRegionName})`);
           }
 
           // Check for duplicate school
@@ -1152,7 +1193,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           if (existingSchool) {
             results.errors.push({ 
               row: rowNum, 
-              error: `School "${schoolName}" already exists in ${clusterName}, ${regionName}`,
+              error: `School "${schoolName}" already exists in ${clusterName}, ${actualRegionName}`,
               schoolName 
             });
             continue;
@@ -1193,7 +1234,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
           results.success.push({
             schoolName,
-            region: regionName,
+            region: actualRegionName,
             cluster: clusterName,
             username,
             password, // Plain text password for export
