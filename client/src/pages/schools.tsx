@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -174,6 +174,7 @@ export default function Schools() {
     clustersCreated: string[];
   } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<AddSchoolFormData>({
     resolver: zodResolver(addSchoolSchema),
@@ -1474,19 +1475,18 @@ export default function Schools() {
                 <Download className="w-4 h-4 me-2" />
                 {t.schools.downloadTemplate}
               </Button>
-              <div className="relative">
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleCsvUpload}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                  data-testid="input-csv-file"
-                />
-                <Button variant="outline">
-                  <FileUp className="w-4 h-4 me-2" />
-                  {t.schools.selectCsvFile}
-                </Button>
-              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleCsvUpload}
+                className="hidden"
+                data-testid="input-csv-file"
+              />
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-select-csv">
+                <FileUp className="w-4 h-4 me-2" />
+                {t.schools.selectCsvFile}
+              </Button>
             </div>
 
             {/* Preview Data */}
