@@ -37,6 +37,7 @@ export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserRole(id: string, role: string, schoolId?: number, centerId?: number): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
@@ -44,6 +45,7 @@ export interface IStorage {
   // Regions
   createRegion(region: InsertRegion): Promise<Region>;
   getRegion(id: number): Promise<Region | undefined>;
+  getRegionByName(name: string): Promise<Region | undefined>;
   getAllRegions(): Promise<Region[]>;
   updateRegion(id: number, region: Partial<InsertRegion>): Promise<Region | undefined>;
   deleteRegion(id: number): Promise<boolean>;
@@ -51,6 +53,7 @@ export interface IStorage {
   // Clusters
   createCluster(cluster: InsertCluster): Promise<Cluster>;
   getCluster(id: number): Promise<Cluster | undefined>;
+  getClusterByNameAndRegion(name: string, regionId: number): Promise<Cluster | undefined>;
   getClustersByRegion(regionId: number): Promise<Cluster[]>;
   getAllClusters(): Promise<Cluster[]>;
   updateCluster(id: number, cluster: Partial<InsertCluster>): Promise<Cluster | undefined>;
@@ -79,6 +82,7 @@ export interface IStorage {
   getSchool(id: number): Promise<School | undefined>;
   getSchoolByEmail(email: string): Promise<School | undefined>;
   getSchoolByAdminUserId(userId: string): Promise<School | undefined>;
+  getSchoolByNameAndLocation(name: string, regionId: number, clusterId?: number): Promise<School | undefined>;
   getSchoolsByStatus(status: string): Promise<School[]>;
   getSchoolsByRegion(regionId: number): Promise<School[]>;
   getSchoolsByCenter(centerId: number): Promise<School[]>;
@@ -375,6 +379,11 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
   async upsertUser(userData: UpsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
@@ -417,6 +426,11 @@ export class DatabaseStorage implements IStorage {
     return region;
   }
 
+  async getRegionByName(name: string): Promise<Region | undefined> {
+    const [region] = await db.select().from(regions).where(ilike(regions.name, name.trim()));
+    return region;
+  }
+
   async getAllRegions(): Promise<Region[]> {
     return db.select().from(regions).orderBy(asc(regions.name));
   }
@@ -439,6 +453,13 @@ export class DatabaseStorage implements IStorage {
 
   async getCluster(id: number): Promise<Cluster | undefined> {
     const [cluster] = await db.select().from(clusters).where(eq(clusters.id, id));
+    return cluster;
+  }
+
+  async getClusterByNameAndRegion(name: string, regionId: number): Promise<Cluster | undefined> {
+    const [cluster] = await db.select().from(clusters).where(
+      and(ilike(clusters.name, name.trim()), eq(clusters.regionId, regionId))
+    );
     return cluster;
   }
 
@@ -595,6 +616,15 @@ export class DatabaseStorage implements IStorage {
 
   async getSchoolByAdminUserId(userId: string): Promise<School | undefined> {
     const [school] = await db.select().from(schools).where(eq(schools.adminUserId, userId));
+    return school;
+  }
+
+  async getSchoolByNameAndLocation(name: string, regionId: number, clusterId?: number): Promise<School | undefined> {
+    const conditions = [ilike(schools.name, name.trim()), eq(schools.regionId, regionId)];
+    if (clusterId) {
+      conditions.push(eq(schools.clusterId, clusterId));
+    }
+    const [school] = await db.select().from(schools).where(and(...conditions));
     return school;
   }
 
