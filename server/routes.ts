@@ -3704,12 +3704,53 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
       
-      // Get count of pending students for this school/exam year
+      // Get all pending students for this school/exam year
       const allStudents = await storage.getStudentsBySchool(invoice.schoolId);
       const pendingStudents = allStudents.filter(s => 
         s.examYearId === invoice.examYearId && 
         s.status === 'pending'
       );
+      
+      // Auto-approve students and generate index numbers
+      let approvedCount = 0;
+      let indexNumbersGenerated = 0;
+      
+      if (pendingStudents.length > 0) {
+        // Get existing index numbers to avoid duplicates
+        const usedIndexNumbers = new Set<string>();
+        const existingStudents = await storage.getAllStudents();
+        existingStudents.forEach(s => {
+          if (s.indexNumber) usedIndexNumbers.add(s.indexNumber);
+        });
+        
+        // Approve each pending student and generate index number
+        for (const student of pendingStudents) {
+          // Generate unique index number
+          let indexNumber: string;
+          do {
+            indexNumber = generateIndexNumber();
+          } while (usedIndexNumbers.has(indexNumber));
+          
+          usedIndexNumbers.add(indexNumber);
+          
+          // Update student: approve and assign index number
+          const [updatedStudent] = await db.update(students)
+            .set({ 
+              status: 'approved',
+              indexNumber, 
+              updatedAt: new Date() 
+            })
+            .where(eq(students.id, student.id))
+            .returning();
+          
+          if (updatedStudent) {
+            approvedCount++;
+            if (updatedStudent.indexNumber) {
+              indexNumbersGenerated++;
+            }
+          }
+        }
+      }
       
       // Notify school admin that their payment has been confirmed
       if (school) {
@@ -3719,14 +3760,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           school.name,
           invoice.invoiceNumber,
           parseFloat(invoice.totalAmount || '0'),
-          pendingStudents.length
+          approvedCount
         );
       }
       
       res.json({
         invoice: paidInvoice,
-        message: "Payment confirmed successfully. You can now approve students.",
-        pendingStudentsCount: pendingStudents.length
+        message: approvedCount > 0 
+          ? `Payment confirmed. ${approvedCount} students approved and assigned index numbers.`
+          : "Payment confirmed successfully.",
+        approvedCount,
+        indexNumbersGenerated
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
