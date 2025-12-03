@@ -234,7 +234,7 @@ export default function Students() {
       setUploadProgress(85);
       const response = await apiRequest('POST', '/api/students/bulk', { students });
       setUploadProgress(100);
-      return response;
+      return response.json();
     },
     onSuccess: async (data: any) => {
       toast({
