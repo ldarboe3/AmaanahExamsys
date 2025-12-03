@@ -1053,7 +1053,7 @@ export default function Results() {
             <div className="text-xs text-muted-foreground space-y-1">
               <p>{isRTL ? "تنسيق CSV المتوقع:" : "Expected CSV format:"}</p>
               <p className="font-mono bg-muted p-2 rounded text-xs overflow-x-auto">
-                رقم الطالب, اسم المشارك, القرآن, الحديث, الفقه, English, Mathematics, ...
+                School Code, School Name, Location, Region, Student Number, Student Name, Subject1, Subject2, ...
               </p>
             </div>
 
@@ -1064,26 +1064,30 @@ export default function Results() {
                 size="sm" 
                 className="h-auto p-0"
                 onClick={() => {
-                  // Always generate LTR (left-to-right) columns
-                  const headers = ["Student Number", "Student Name"];
+                  // Generate template matching system structure:
+                  // School Code, School Name, Location, Region, Student Number, Student Name, then Subjects
+                  const headers = ["School Code", "School Name", "Location", "Region", "Student Number", "Student Name"];
                   
-                  // Filter subjects by selected grade level
-                  const gradeSubjects = subjects?.filter(s => s.grade === parseInt(studentGradeFilter)) || [];
+                  // Filter subjects by selected grade level, sorted by name
+                  const gradeSubjects = (subjects?.filter(s => s.grade === parseInt(studentGradeFilter)) || [])
+                    .sort((a, b) => a.name.localeCompare(b.name));
                   
                   if (gradeSubjects.length > 0) {
                     // Add subjects in order (LTR)
                     gradeSubjects.forEach(s => headers.push(s.name));
                   } else if (subjects && subjects.length > 0) {
                     // Fallback: if no subjects for this grade, show all available subjects
-                    subjects.forEach(s => headers.push(s.name));
+                    subjects.sort((a, b) => a.name.localeCompare(b.name)).forEach(s => headers.push(s.name));
                   } else {
                     // Placeholder if no subjects exist
                     headers.push("Subject 1", "Subject 2", "Subject 3");
                   }
                   
-                  // Generate CSV with sample data
+                  // Generate CSV with sample data row
                   const headerLine = headers.join(",");
-                  const sampleData = "12345,John Doe," + Array(headers.length - 2).fill("80").join(",");
+                  const numSubjects = gradeSubjects.length > 0 ? gradeSubjects.length : (headers.length - 6);
+                  const sampleData = "SCH001,School Name,Location,Region,12345,Student Name," + 
+                                     Array(numSubjects).fill("80").join(",");
                   const csv = headerLine + "\n" + sampleData;
                   
                   // Download with UTF-8 BOM for proper encoding
