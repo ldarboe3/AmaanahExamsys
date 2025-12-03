@@ -823,7 +823,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       } else {
         centers = await storage.getAllExamCenters();
       }
-      res.json(centers);
+      
+      // Add school and student counts for each center
+      const centersWithCounts = await Promise.all(centers.map(async (center) => {
+        const schools = await storage.getSchoolsByCenter(center.id);
+        const students = await storage.getStudentsByCenter(center.id);
+        return {
+          ...center,
+          assignedSchoolsCount: schools.length,
+          assignedStudentsCount: students.length,
+        };
+      }));
+      
+      res.json(centersWithCounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
