@@ -184,6 +184,8 @@ export default function Students() {
   const [showInvoiceSummary, setShowInvoiceSummary] = useState(false);
   const [generatedInvoice, setGeneratedInvoice] = useState<any>(null);
   const [printingCards, setPrintingCards] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [currentPage, setCurrentPage] = useState<number>(0);
   
   const isSchoolAdmin = user?.role === 'school_admin';
   const canApproveStudents = user?.role === 'super_admin' || user?.role === 'examination_admin';
@@ -304,6 +306,10 @@ export default function Students() {
         queryParams.set("schoolId", schoolFilter);
       }
     }
+    
+    queryParams.set("limit", pageSize.toString());
+    queryParams.set("offset", (currentPage * pageSize).toString());
+    
     if (selectedGrade !== null) {
       queryParams.set("grade", selectedGrade.toString());
     }
