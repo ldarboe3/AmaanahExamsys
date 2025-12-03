@@ -438,7 +438,7 @@ export default function Timetable() {
                 name="examYearId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t.sidebar.examYears}</FormLabel>
+                    <FormLabel>{t.nav.examYears}</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       value={field.value?.toString()}
