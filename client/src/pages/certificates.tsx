@@ -91,9 +91,10 @@ export default function Certificates() {
     enabled: !!selectedRegion,
   });
 
-  const { data: schools } = useQuery<SchoolType[]>({
+  const { data: schoolsResponse } = useQuery<{ data: SchoolType[]; total: number }>({
     queryKey: ["/api/schools"],
   });
+  const schools = schoolsResponse?.data || [];
 
   const { data: students, isLoading: studentsLoading } = useQuery<StudentWithCertificate[]>({
     queryKey: [`/api/students?schoolId=${selectedSchool}`],
@@ -121,11 +122,11 @@ export default function Certificates() {
   const nonEligibleStudents = students?.filter(s => s.grade < 1 || s.grade > 12) || [];
 
   const filteredClusters = clusters?.filter(c => c.regionId === parseInt(selectedRegion)) || [];
-  const filteredSchools = schools?.filter(s => {
+  const filteredSchools = schools.filter(s => {
     if (selectedCluster) return s.clusterId === parseInt(selectedCluster);
     if (selectedRegion) return s.regionId === parseInt(selectedRegion);
     return true;
-  }) || [];
+  });
 
   const generateCertificateMutation = useMutation({
     mutationFn: async (studentIds: number[]) => {
