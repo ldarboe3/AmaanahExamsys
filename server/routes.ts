@@ -595,6 +595,37 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.get("/api/exam-years/:id/statistics", async (req, res) => {
+    try {
+      const examYearId = parseInt(req.params.id);
+      const examYear = await storage.getExamYear(examYearId);
+      if (!examYear) {
+        return res.status(404).json({ message: "Exam year not found" });
+      }
+
+      // Get students for this exam year
+      const students = await storage.getStudentsByExamYear(examYearId);
+      
+      // Get unique schools with students in this exam year
+      const schoolIds = new Set(students.map(s => s.schoolId));
+      const registeredSchools = schoolIds.size;
+      const totalStudents = students.length;
+
+      // Calculate published results percentage
+      const publishedCount = students.filter(s => s.resultStatus === 'published' || s.resultStatus === 'released').length;
+      const publishedPercentage = totalStudents > 0 ? Math.round((publishedCount / totalStudents) * 100) : 0;
+
+      res.json({
+        registeredSchools,
+        totalStudents,
+        publishedPercentage,
+        publishedCount,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/exam-years", isAuthenticated, async (req, res) => {
     try {
       const parsed = insertExamYearSchema.safeParse(req.body);
