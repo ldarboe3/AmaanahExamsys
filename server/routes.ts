@@ -5325,6 +5325,218 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Get students for result entry - role-based filtering
+  app.get("/api/results/students-for-entry", isAuthenticated, async (req, res) => {
+    try {
+      const { schoolId, clusterId, regionId, grade, examYearId } = req.query;
+      const userId = req.session.userId;
+      const userRole = req.session.role;
+      
+      const filters: { schoolId?: number; clusterId?: number; regionId?: number; grade?: number; examYearId?: number } = {};
+      
+      if (examYearId) filters.examYearId = parseInt(examYearId as string);
+      if (grade) filters.grade = parseInt(grade as string);
+      
+      // Role-based filtering
+      if (userRole === 'examiner') {
+        // Get examiner's assignments
+        const examiner = await storage.getExaminerByUserId(userId!);
+        if (!examiner) {
+          return res.json({ students: [], message: "No examiner profile found" });
+        }
+        
+        const assignments = await storage.getExaminerAssignments(examiner.id);
+        if (assignments.length === 0) {
+          return res.json({ students: [], message: "No assignments found for this examiner" });
+        }
+        
+        // Get students from assigned centers
+        const centerIds = [...new Set(assignments.map(a => a.centerId).filter(Boolean))];
+        let allStudents: any[] = [];
+        
+        for (const centerId of centerIds) {
+          if (centerId) {
+            const centerStudents = await storage.getStudentsByCenter(centerId);
+            allStudents = [...allStudents, ...centerStudents];
+          }
+        }
+        
+        // Filter by approved status and exam year if specified
+        let filteredStudents = allStudents.filter(s => s.status === 'approved');
+        if (filters.examYearId) {
+          filteredStudents = filteredStudents.filter(s => s.examYearId === filters.examYearId);
+        }
+        if (filters.grade) {
+          filteredStudents = filteredStudents.filter(s => s.grade === filters.grade);
+        }
+        
+        // Get school info for each student
+        const studentsWithSchool = await Promise.all(filteredStudents.map(async (student) => {
+          const school = await storage.getSchool(student.schoolId);
+          const cluster = school?.clusterId ? await storage.getCluster(school.clusterId) : null;
+          return {
+            ...student,
+            school: school ? { id: school.id, name: school.name } : null,
+            cluster: cluster ? { id: cluster.id, name: cluster.name } : null
+          };
+        }));
+        
+        return res.json({ students: studentsWithSchool, role: 'examiner' });
+      }
+      
+      // Examination admin or super admin - show all with filters
+      if (schoolId) filters.schoolId = parseInt(schoolId as string);
+      if (clusterId) filters.clusterId = parseInt(clusterId as string);
+      if (regionId) filters.regionId = parseInt(regionId as string);
+      
+      const students = await storage.getStudentsForResultEntry(filters);
+      
+      // Get school info for each student
+      const studentsWithSchool = await Promise.all(students.map(async (student) => {
+        const school = await storage.getSchool(student.schoolId);
+        const cluster = school?.clusterId ? await storage.getCluster(school.clusterId) : null;
+        return {
+          ...student,
+          school: school ? { id: school.id, name: school.name } : null,
+          cluster: cluster ? { id: cluster.id, name: cluster.name } : null
+        };
+      }));
+      
+      res.json({ students: studentsWithSchool, role: userRole });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Multi-subject CSV upload - handles CSV format with multiple subject columns
+  app.post("/api/results/multi-subject-upload", isAuthenticated, async (req, res) => {
+    try {
+      const { rows, examYearId, grade } = req.body;
+      
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ message: "rows must be a non-empty array" });
+      }
+      
+      if (!examYearId) {
+        return res.status(400).json({ message: "examYearId is required" });
+      }
+      
+      if (!grade) {
+        return res.status(400).json({ message: "grade is required" });
+      }
+      
+      const gradeNumber = parseInt(grade);
+      const results: { created: number; updated: number; errors: any[] } = { created: 0, updated: 0, errors: [] };
+      
+      // Subject name mappings (Arabic to English codes)
+      const subjectMappings: Record<string, { name: string; arabicName: string }> = {
+        'القــــــرآن': { name: 'Quran', arabicName: 'القرآن' },
+        'القرآن': { name: 'Quran', arabicName: 'القرآن' },
+        'القراءة (المحفوظات)': { name: 'Reading (Memorization)', arabicName: 'القراءة' },
+        'القراءة': { name: 'Reading', arabicName: 'القراءة' },
+        'السيــــــرة': { name: 'Seerah', arabicName: 'السيرة' },
+        'السيرة': { name: 'Seerah', arabicName: 'السيرة' },
+        'الكتابة (الخط والإملاء)': { name: 'Writing (Calligraphy & Spelling)', arabicName: 'الكتابة' },
+        'الكتابة': { name: 'Writing', arabicName: 'الكتابة' },
+        'الحديـــــث': { name: 'Hadith', arabicName: 'الحديث' },
+        'الحديث': { name: 'Hadith', arabicName: 'الحديث' },
+        'الفقــــــه': { name: 'Fiqh', arabicName: 'الفقه' },
+        'الفقه': { name: 'Fiqh', arabicName: 'الفقه' },
+        'التوحيــــــد': { name: 'Tawheed', arabicName: 'التوحيد' },
+        'التوحيد': { name: 'Tawheed', arabicName: 'التوحيد' },
+        'القواعــــــد': { name: 'Grammar', arabicName: 'القواعد' },
+        'القواعد': { name: 'Grammar', arabicName: 'القواعد' },
+        'English': { name: 'English', arabicName: 'الإنجليزية' },
+        'Mathematics': { name: 'Mathematics', arabicName: 'الرياضيات' },
+        'S E S': { name: 'Social & Environmental Studies', arabicName: 'الدراسات الاجتماعية' },
+        'SES': { name: 'Social & Environmental Studies', arabicName: 'الدراسات الاجتماعية' },
+        'Science': { name: 'Science', arabicName: 'العلوم' },
+        'التعبيـــــر': { name: 'Expression', arabicName: 'التعبير' },
+        'التعبير': { name: 'Expression', arabicName: 'التعبير' }
+      };
+      
+      // Process each row
+      for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+        const row = rows[rowIndex];
+        const rowNum = rowIndex + 1;
+        
+        // Get student index number from the row
+        const indexNumber = row['رقم الطالب'] || row['indexNumber'] || row['index_number'];
+        if (!indexNumber) {
+          results.errors.push({ row: rowNum, error: "Missing student index number" });
+          continue;
+        }
+        
+        // Find student
+        const student = await storage.getStudentByIndexNumber(indexNumber.trim());
+        if (!student) {
+          results.errors.push({ row: rowNum, indexNumber, error: "Student not found" });
+          continue;
+        }
+        
+        // Process each subject column in the row
+        for (const [columnName, scoreValue] of Object.entries(row)) {
+          // Skip non-subject columns
+          if (['رقم المدرسة', 'المدرسة', 'المكــــــان', 'إقليم', 'رقم الطالب', 'اسم المشارك', 
+               'schoolNumber', 'schoolName', 'location', 'region', 'indexNumber', 'studentName'].includes(columnName)) {
+            continue;
+          }
+          
+          // Clean up column name for matching
+          const cleanColumnName = columnName.trim().replace(/\s+/g, ' ');
+          
+          // Get or create subject
+          const subjectInfo = subjectMappings[cleanColumnName] || { name: cleanColumnName, arabicName: cleanColumnName };
+          
+          try {
+            const subject = await storage.getOrCreateSubject(subjectInfo.name, subjectInfo.arabicName, gradeNumber);
+            
+            // Parse score
+            const score = parseFloat(String(scoreValue || '').trim());
+            if (isNaN(score) || String(scoreValue).trim() === '') {
+              continue; // Skip empty scores
+            }
+            
+            // Calculate grade
+            let resultGrade = 'F';
+            if (score >= 14) resultGrade = 'A';
+            else if (score >= 12) resultGrade = 'B';
+            else if (score >= 10) resultGrade = 'C';
+            else if (score >= 8) resultGrade = 'D';
+            else if (score >= 5) resultGrade = 'E';
+            
+            // Upsert result
+            const existing = await storage.getResultByStudentAndSubject(student.id, subject.id, examYearId);
+            await storage.upsertStudentResult(student.id, subject.id, examYearId, {
+              totalScore: String(score),
+              examScore: String(score),
+              grade: resultGrade,
+              status: 'pending'
+            });
+            
+            if (existing) {
+              results.updated++;
+            } else {
+              results.created++;
+            }
+          } catch (err: any) {
+            results.errors.push({ row: rowNum, indexNumber, subject: columnName, error: err.message });
+          }
+        }
+      }
+      
+      res.json({
+        message: `Results processed: ${results.created} created, ${results.updated} updated`,
+        created: results.created,
+        updated: results.updated,
+        errors: results.errors.length,
+        errorDetails: results.errors.length > 0 ? results.errors.slice(0, 50) : undefined
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Public Result Verification
   app.get("/api/verify/result/:indexNumber", async (req, res) => {
     try {
