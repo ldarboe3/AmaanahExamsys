@@ -919,12 +919,10 @@ export default function Results() {
                   <SelectValue placeholder={isRTL ? "اختر الصف" : "Select a grade"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">{isRTL ? "الصف الأول" : "Grade 1"}</SelectItem>
-                  <SelectItem value="2">{isRTL ? "الصف الثاني" : "Grade 2"}</SelectItem>
                   <SelectItem value="3">{isRTL ? "الصف الثالث" : "Grade 3"}</SelectItem>
-                  <SelectItem value="4">{isRTL ? "الصف الرابع" : "Grade 4"}</SelectItem>
-                  <SelectItem value="5">{isRTL ? "الصف الخامس" : "Grade 5"}</SelectItem>
                   <SelectItem value="6">{isRTL ? "الصف السادس" : "Grade 6"}</SelectItem>
+                  <SelectItem value="9">{isRTL ? "الصف التاسع" : "Grade 9"}</SelectItem>
+                  <SelectItem value="12">{isRTL ? "الصف الثاني عشر" : "Grade 12"}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
