@@ -64,6 +64,7 @@ import {
   CreditCard,
   AlertCircle,
   AlertTriangle,
+  MapPin,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -191,6 +192,12 @@ export default function Students() {
   const { data: schoolProfile } = useQuery<SchoolType>({
     queryKey: ["/api/school/profile"],
     enabled: isSchoolAdmin && !!user?.schoolId,
+  });
+
+  // Fetch assigned examination center for school admins
+  const { data: assignedCenter } = useQuery<any>({
+    queryKey: ["/api/center-assignments/school", schoolProfile?.id],
+    enabled: isSchoolAdmin && !!schoolProfile?.id,
   });
 
   // Bulk upload mutation
@@ -987,6 +994,47 @@ export default function Students() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Assigned Examination Center Card - For School Admins */}
+      {isSchoolAdmin && assignedCenter && (
+        <Card className="border-2 border-chart-3/20 bg-chart-3/5" data-testid="card-assigned-center">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-chart-3/20 flex items-center justify-center shrink-0">
+                <MapPin className="w-5 h-5 text-chart-3" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-chart-3">
+                  {isRTL ? "مركز الامتحان المخصص" : "Your Assigned Examination Center"}
+                </h3>
+                <p className="text-lg font-medium mt-1">{assignedCenter.center?.name || assignedCenter.centerName}</p>
+                {(assignedCenter.center?.address || assignedCenter.centerAddress) && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {assignedCenter.center?.address || assignedCenter.centerAddress}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-4 mt-2 text-sm text-muted-foreground">
+                  {assignedCenter.center?.contactPerson && (
+                    <span>{isRTL ? "المسؤول: " : "Contact: "}{assignedCenter.center.contactPerson}</span>
+                  )}
+                  {assignedCenter.center?.contactPhone && (
+                    <span>{assignedCenter.center.contactPhone}</span>
+                  )}
+                </div>
+              </div>
+              {assignedCenter.assignedGrades && assignedCenter.assignedGrades.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {assignedCenter.assignedGrades.map((grade: number) => (
+                    <Badge key={grade} variant="secondary" className="bg-chart-3/10 text-chart-3">
+                      {isRTL ? `الصف ${grade}` : `Grade ${grade}`}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Grade Dashboard Cards */}

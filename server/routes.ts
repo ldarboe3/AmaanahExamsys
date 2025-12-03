@@ -7378,6 +7378,31 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Get assigned center for a specific school
+  app.get("/api/center-assignments/school/:schoolId", isAuthenticated, async (req, res) => {
+    try {
+      const schoolId = parseInt(req.params.schoolId);
+      const assignments = await storage.getCenterAssignmentsBySchool(schoolId);
+      
+      if (assignments.length === 0) {
+        return res.json(null);
+      }
+
+      // Get the most recent active assignment
+      const assignment = assignments[0];
+      
+      // Fetch the center details
+      const center = await storage.getExamCenter(assignment.centerId);
+      
+      res.json({
+        ...assignment,
+        center,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Center Activity Logs API
   app.get("/api/center-activity-logs", isAuthenticated, async (req, res) => {
     try {
