@@ -7,6 +7,7 @@ import {
   auditLogs, notifications, examCards, systemSettings, schoolInvitations,
   newsCategories, newsArticles, resourceCategories, resources, announcements,
   newsletterSubscribers, impactStats,
+  paperMovements, scriptMovements, centerAssignments, centerActivityLogs,
   type User, type UpsertUser, type Region, type InsertRegion,
   type Cluster, type InsertCluster, type ExamYear, type InsertExamYear,
   type ExamCenter, type InsertExamCenter, type School, type InsertSchool,
@@ -24,6 +25,10 @@ import {
   type ResourceCategory, type InsertResourceCategory, type Resource, type InsertResource,
   type Announcement, type InsertAnnouncement, type NewsletterSubscriber, type InsertNewsletterSubscriber,
   type ImpactStat, type InsertImpactStat,
+  type PaperMovement, type InsertPaperMovement,
+  type ScriptMovement, type InsertScriptMovement,
+  type CenterAssignment, type InsertCenterAssignment,
+  type CenterActivityLog, type InsertCenterActivityLog,
 } from "@shared/schema";
 import { randomBytes } from "crypto";
 import bcrypt from "bcrypt";
@@ -323,6 +328,38 @@ export interface IStorage {
   getAllImpactStats(): Promise<ImpactStat[]>;
   updateImpactStat(id: number, stat: Partial<InsertImpactStat>): Promise<ImpactStat | undefined>;
   deleteImpactStat(id: number): Promise<boolean>;
+
+  // ===== LOGISTICS MANAGEMENT =====
+
+  // Paper Movements
+  createPaperMovement(movement: InsertPaperMovement): Promise<PaperMovement>;
+  getPaperMovement(id: number): Promise<PaperMovement | undefined>;
+  getPaperMovementsByCenter(centerId: number, examYearId: number): Promise<PaperMovement[]>;
+  getPaperMovementsByExamYear(examYearId: number): Promise<PaperMovement[]>;
+  updatePaperMovement(id: number, movement: Partial<InsertPaperMovement>): Promise<PaperMovement | undefined>;
+  deletePaperMovement(id: number): Promise<boolean>;
+
+  // Script Movements
+  createScriptMovement(movement: InsertScriptMovement): Promise<ScriptMovement>;
+  getScriptMovement(id: number): Promise<ScriptMovement | undefined>;
+  getScriptMovementsByCenter(centerId: number, examYearId: number): Promise<ScriptMovement[]>;
+  getScriptMovementsByExamYear(examYearId: number): Promise<ScriptMovement[]>;
+  updateScriptMovement(id: number, movement: Partial<InsertScriptMovement>): Promise<ScriptMovement | undefined>;
+  deleteScriptMovement(id: number): Promise<boolean>;
+
+  // Center Assignments
+  createCenterAssignment(assignment: InsertCenterAssignment): Promise<CenterAssignment>;
+  getCenterAssignment(id: number): Promise<CenterAssignment | undefined>;
+  getCenterAssignmentsByExamYear(examYearId: number): Promise<CenterAssignment[]>;
+  getCenterAssignmentsByCenter(centerId: number, examYearId: number): Promise<CenterAssignment[]>;
+  getCenterAssignmentBySchool(schoolId: number, examYearId: number): Promise<CenterAssignment | undefined>;
+  updateCenterAssignment(id: number, assignment: Partial<InsertCenterAssignment>): Promise<CenterAssignment | undefined>;
+  deleteCenterAssignment(id: number): Promise<boolean>;
+
+  // Center Activity Logs
+  createCenterActivityLog(log: InsertCenterActivityLog): Promise<CenterActivityLog>;
+  getCenterActivityLogs(centerId: number, examYearId?: number): Promise<CenterActivityLog[]>;
+  getCenterActivityLogsByType(centerId: number, activityType: string): Promise<CenterActivityLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1674,6 +1711,145 @@ export class DatabaseStorage implements IStorage {
   async deleteImpactStat(id: number): Promise<boolean> {
     await db.delete(impactStats).where(eq(impactStats.id, id));
     return true;
+  }
+
+  // ===== LOGISTICS MANAGEMENT =====
+
+  // Paper Movements
+  async createPaperMovement(movement: InsertPaperMovement): Promise<PaperMovement> {
+    const [created] = await db.insert(paperMovements).values(movement).returning();
+    return created;
+  }
+
+  async getPaperMovement(id: number): Promise<PaperMovement | undefined> {
+    const [movement] = await db.select().from(paperMovements).where(eq(paperMovements.id, id));
+    return movement;
+  }
+
+  async getPaperMovementsByCenter(centerId: number, examYearId: number): Promise<PaperMovement[]> {
+    return db.select().from(paperMovements)
+      .where(and(eq(paperMovements.centerId, centerId), eq(paperMovements.examYearId, examYearId)))
+      .orderBy(desc(paperMovements.createdAt));
+  }
+
+  async getPaperMovementsByExamYear(examYearId: number): Promise<PaperMovement[]> {
+    return db.select().from(paperMovements)
+      .where(eq(paperMovements.examYearId, examYearId))
+      .orderBy(desc(paperMovements.createdAt));
+  }
+
+  async updatePaperMovement(id: number, movement: Partial<InsertPaperMovement>): Promise<PaperMovement | undefined> {
+    const [updated] = await db.update(paperMovements)
+      .set(movement)
+      .where(eq(paperMovements.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePaperMovement(id: number): Promise<boolean> {
+    await db.delete(paperMovements).where(eq(paperMovements.id, id));
+    return true;
+  }
+
+  // Script Movements
+  async createScriptMovement(movement: InsertScriptMovement): Promise<ScriptMovement> {
+    const [created] = await db.insert(scriptMovements).values(movement).returning();
+    return created;
+  }
+
+  async getScriptMovement(id: number): Promise<ScriptMovement | undefined> {
+    const [movement] = await db.select().from(scriptMovements).where(eq(scriptMovements.id, id));
+    return movement;
+  }
+
+  async getScriptMovementsByCenter(centerId: number, examYearId: number): Promise<ScriptMovement[]> {
+    return db.select().from(scriptMovements)
+      .where(and(eq(scriptMovements.centerId, centerId), eq(scriptMovements.examYearId, examYearId)))
+      .orderBy(desc(scriptMovements.createdAt));
+  }
+
+  async getScriptMovementsByExamYear(examYearId: number): Promise<ScriptMovement[]> {
+    return db.select().from(scriptMovements)
+      .where(eq(scriptMovements.examYearId, examYearId))
+      .orderBy(desc(scriptMovements.createdAt));
+  }
+
+  async updateScriptMovement(id: number, movement: Partial<InsertScriptMovement>): Promise<ScriptMovement | undefined> {
+    const [updated] = await db.update(scriptMovements)
+      .set(movement)
+      .where(eq(scriptMovements.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteScriptMovement(id: number): Promise<boolean> {
+    await db.delete(scriptMovements).where(eq(scriptMovements.id, id));
+    return true;
+  }
+
+  // Center Assignments
+  async createCenterAssignment(assignment: InsertCenterAssignment): Promise<CenterAssignment> {
+    const [created] = await db.insert(centerAssignments).values(assignment).returning();
+    return created;
+  }
+
+  async getCenterAssignment(id: number): Promise<CenterAssignment | undefined> {
+    const [assignment] = await db.select().from(centerAssignments).where(eq(centerAssignments.id, id));
+    return assignment;
+  }
+
+  async getCenterAssignmentsByExamYear(examYearId: number): Promise<CenterAssignment[]> {
+    return db.select().from(centerAssignments)
+      .where(eq(centerAssignments.examYearId, examYearId))
+      .orderBy(desc(centerAssignments.createdAt));
+  }
+
+  async getCenterAssignmentsByCenter(centerId: number, examYearId: number): Promise<CenterAssignment[]> {
+    return db.select().from(centerAssignments)
+      .where(and(eq(centerAssignments.centerId, centerId), eq(centerAssignments.examYearId, examYearId)))
+      .orderBy(desc(centerAssignments.createdAt));
+  }
+
+  async getCenterAssignmentBySchool(schoolId: number, examYearId: number): Promise<CenterAssignment | undefined> {
+    const [assignment] = await db.select().from(centerAssignments)
+      .where(and(eq(centerAssignments.schoolId, schoolId), eq(centerAssignments.examYearId, examYearId)));
+    return assignment;
+  }
+
+  async updateCenterAssignment(id: number, assignment: Partial<InsertCenterAssignment>): Promise<CenterAssignment | undefined> {
+    const [updated] = await db.update(centerAssignments)
+      .set(assignment)
+      .where(eq(centerAssignments.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCenterAssignment(id: number): Promise<boolean> {
+    await db.delete(centerAssignments).where(eq(centerAssignments.id, id));
+    return true;
+  }
+
+  // Center Activity Logs
+  async createCenterActivityLog(log: InsertCenterActivityLog): Promise<CenterActivityLog> {
+    const [created] = await db.insert(centerActivityLogs).values(log).returning();
+    return created;
+  }
+
+  async getCenterActivityLogs(centerId: number, examYearId?: number): Promise<CenterActivityLog[]> {
+    if (examYearId) {
+      return db.select().from(centerActivityLogs)
+        .where(and(eq(centerActivityLogs.centerId, centerId), eq(centerActivityLogs.examYearId, examYearId)))
+        .orderBy(desc(centerActivityLogs.createdAt));
+    }
+    return db.select().from(centerActivityLogs)
+      .where(eq(centerActivityLogs.centerId, centerId))
+      .orderBy(desc(centerActivityLogs.createdAt));
+  }
+
+  async getCenterActivityLogsByType(centerId: number, activityType: string): Promise<CenterActivityLog[]> {
+    return db.select().from(centerActivityLogs)
+      .where(and(eq(centerActivityLogs.centerId, centerId), eq(centerActivityLogs.activityType, activityType)))
+      .orderBy(desc(centerActivityLogs.createdAt));
   }
 }
 

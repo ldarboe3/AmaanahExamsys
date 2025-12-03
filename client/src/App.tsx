@@ -21,6 +21,7 @@ import Students from "@/pages/students";
 import ExamYears from "@/pages/exam-years";
 import Payments from "@/pages/payments";
 import Centers from "@/pages/centers";
+import CenterDashboard from "@/pages/center-dashboard";
 import Results from "@/pages/results";
 import Certificates from "@/pages/certificates";
 import Transcripts from "@/pages/transcripts";

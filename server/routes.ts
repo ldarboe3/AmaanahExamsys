@@ -6997,6 +6997,596 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ============ LOGISTICS MANAGEMENT API ============
+
+  // Paper Movements API
+  app.get("/api/paper-movements", isAuthenticated, async (req, res) => {
+    try {
+      const centerId = req.query.centerId ? parseInt(req.query.centerId as string) : undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+
+      let movements;
+      if (centerId && examYearId) {
+        movements = await storage.getPaperMovementsByCenter(centerId, examYearId);
+      } else if (examYearId) {
+        movements = await storage.getPaperMovementsByExamYear(examYearId);
+      } else {
+        const activeExamYear = await storage.getActiveExamYear();
+        if (activeExamYear) {
+          movements = await storage.getPaperMovementsByExamYear(activeExamYear.id);
+        } else {
+          movements = [];
+        }
+      }
+      res.json(movements);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/paper-movements/:id", isAuthenticated, async (req, res) => {
+    try {
+      const movement = await storage.getPaperMovement(parseInt(req.params.id));
+      if (!movement) {
+        return res.status(404).json({ message: "Paper movement not found" });
+      }
+      res.json(movement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/paper-movements", isAuthenticated, async (req, res) => {
+    try {
+      const movement = await storage.createPaperMovement(req.body);
+      
+      // Log the activity
+      await storage.createCenterActivityLog({
+        centerId: movement.centerId,
+        examYearId: movement.examYearId,
+        activityType: 'paper_prepared',
+        description: `Paper movement record created for ${movement.paperType}`,
+        metadata: { movementId: movement.id, paperType: movement.paperType, quantity: movement.quantity },
+        performedBy: req.session.userId,
+      });
+      
+      res.status(201).json(movement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/paper-movements/:id", isAuthenticated, async (req, res) => {
+    try {
+      const movement = await storage.updatePaperMovement(parseInt(req.params.id), req.body);
+      if (!movement) {
+        return res.status(404).json({ message: "Paper movement not found" });
+      }
+      
+      // Log status updates
+      if (req.body.status) {
+        await storage.createCenterActivityLog({
+          centerId: movement.centerId,
+          examYearId: movement.examYearId,
+          activityType: `paper_${req.body.status}`,
+          description: `Paper status updated to ${req.body.status}`,
+          metadata: { movementId: movement.id, newStatus: req.body.status },
+          performedBy: req.session.userId,
+        });
+      }
+      
+      res.json(movement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/paper-movements/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deletePaperMovement(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Script Movements API
+  app.get("/api/script-movements", isAuthenticated, async (req, res) => {
+    try {
+      const centerId = req.query.centerId ? parseInt(req.query.centerId as string) : undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+
+      let movements;
+      if (centerId && examYearId) {
+        movements = await storage.getScriptMovementsByCenter(centerId, examYearId);
+      } else if (examYearId) {
+        movements = await storage.getScriptMovementsByExamYear(examYearId);
+      } else {
+        const activeExamYear = await storage.getActiveExamYear();
+        if (activeExamYear) {
+          movements = await storage.getScriptMovementsByExamYear(activeExamYear.id);
+        } else {
+          movements = [];
+        }
+      }
+      res.json(movements);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/script-movements/:id", isAuthenticated, async (req, res) => {
+    try {
+      const movement = await storage.getScriptMovement(parseInt(req.params.id));
+      if (!movement) {
+        return res.status(404).json({ message: "Script movement not found" });
+      }
+      res.json(movement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/script-movements", isAuthenticated, async (req, res) => {
+    try {
+      const movement = await storage.createScriptMovement(req.body);
+      
+      // Log the activity
+      await storage.createCenterActivityLog({
+        centerId: movement.centerId,
+        examYearId: movement.examYearId,
+        activityType: 'scripts_collected',
+        description: `Script collection record created for grade ${movement.grade}`,
+        metadata: { movementId: movement.id, grade: movement.grade, totalScripts: movement.totalScripts },
+        performedBy: req.session.userId,
+      });
+      
+      res.status(201).json(movement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/script-movements/:id", isAuthenticated, async (req, res) => {
+    try {
+      const movement = await storage.updateScriptMovement(parseInt(req.params.id), req.body);
+      if (!movement) {
+        return res.status(404).json({ message: "Script movement not found" });
+      }
+      
+      // Log status updates
+      if (req.body.status) {
+        await storage.createCenterActivityLog({
+          centerId: movement.centerId,
+          examYearId: movement.examYearId,
+          activityType: `scripts_${req.body.status}`,
+          description: `Script status updated to ${req.body.status}`,
+          metadata: { movementId: movement.id, newStatus: req.body.status },
+          performedBy: req.session.userId,
+        });
+      }
+      
+      res.json(movement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/script-movements/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteScriptMovement(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Center Assignments API
+  app.get("/api/center-assignments", isAuthenticated, async (req, res) => {
+    try {
+      const centerId = req.query.centerId ? parseInt(req.query.centerId as string) : undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      const schoolId = req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined;
+
+      let assignments;
+      if (schoolId && examYearId) {
+        const assignment = await storage.getCenterAssignmentBySchool(schoolId, examYearId);
+        assignments = assignment ? [assignment] : [];
+      } else if (centerId && examYearId) {
+        assignments = await storage.getCenterAssignmentsByCenter(centerId, examYearId);
+      } else if (examYearId) {
+        assignments = await storage.getCenterAssignmentsByExamYear(examYearId);
+      } else {
+        const activeExamYear = await storage.getActiveExamYear();
+        if (activeExamYear) {
+          assignments = await storage.getCenterAssignmentsByExamYear(activeExamYear.id);
+        } else {
+          assignments = [];
+        }
+      }
+      res.json(assignments);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/center-assignments/:id", isAuthenticated, async (req, res) => {
+    try {
+      const assignment = await storage.getCenterAssignment(parseInt(req.params.id));
+      if (!assignment) {
+        return res.status(404).json({ message: "Center assignment not found" });
+      }
+      res.json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/center-assignments", isAuthenticated, async (req, res) => {
+    try {
+      // Check if assignment already exists
+      const existing = await storage.getCenterAssignmentBySchool(req.body.schoolId, req.body.examYearId);
+      if (existing) {
+        return res.status(400).json({ message: "School already assigned to a center for this exam year" });
+      }
+
+      const assignment = await storage.createCenterAssignment({
+        ...req.body,
+        assignedBy: req.session.userId,
+        assignedAt: new Date(),
+      });
+
+      // Also update school's assignedCenterId
+      await storage.updateSchool(req.body.schoolId, { assignedCenterId: req.body.centerId });
+
+      res.status(201).json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/center-assignments/:id", isAuthenticated, async (req, res) => {
+    try {
+      const assignment = await storage.updateCenterAssignment(parseInt(req.params.id), req.body);
+      if (!assignment) {
+        return res.status(404).json({ message: "Center assignment not found" });
+      }
+
+      // Update school's assignedCenterId if center changed
+      if (req.body.centerId) {
+        await storage.updateSchool(assignment.schoolId, { assignedCenterId: req.body.centerId });
+      }
+
+      res.json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/center-assignments/:id", isAuthenticated, async (req, res) => {
+    try {
+      const assignment = await storage.getCenterAssignment(parseInt(req.params.id));
+      if (assignment) {
+        // Clear school's assignedCenterId
+        await storage.updateSchool(assignment.schoolId, { assignedCenterId: null as any });
+      }
+      await storage.deleteCenterAssignment(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Auto-assign schools to centers based on cluster/region/capacity
+  app.post("/api/center-assignments/auto-assign", isAuthenticated, async (req, res) => {
+    try {
+      const { examYearId } = req.body;
+      if (!examYearId) {
+        return res.status(400).json({ message: "examYearId is required" });
+      }
+
+      const allSchools = await storage.getAllSchools();
+      const allCenters = await storage.getAllExamCenters();
+      const existingAssignments = await storage.getCenterAssignmentsByExamYear(examYearId);
+      const assignedSchoolIds = new Set(existingAssignments.map(a => a.schoolId));
+
+      const unassignedSchools = allSchools.filter(s => 
+        s.status === 'approved' && !assignedSchoolIds.has(s.id)
+      );
+
+      // Track center capacities
+      const centerStudentCounts: Record<number, number> = {};
+      for (const center of allCenters) {
+        // Count students already assigned to this center
+        const studentsAtCenter = await storage.getStudentsByCenter(center.id);
+        centerStudentCounts[center.id] = studentsAtCenter.filter(s => s.examYearId === examYearId).length;
+      }
+
+      const results = {
+        assigned: 0,
+        skipped: 0,
+        warnings: [] as string[],
+      };
+
+      for (const school of unassignedSchools) {
+        // Find best center: same cluster > same region > any with capacity
+        let bestCenter = null;
+
+        // Priority 1: Same cluster
+        const clusterCenters = allCenters.filter(c => 
+          c.clusterId === school.clusterId && c.isActive
+        );
+        for (const center of clusterCenters) {
+          const currentCount = centerStudentCounts[center.id] || 0;
+          if (currentCount < (center.capacity || 500)) {
+            bestCenter = center;
+            break;
+          }
+        }
+
+        // Priority 2: Same region
+        if (!bestCenter) {
+          const regionCenters = allCenters.filter(c => 
+            c.regionId === school.regionId && c.isActive
+          );
+          for (const center of regionCenters) {
+            const currentCount = centerStudentCounts[center.id] || 0;
+            if (currentCount < (center.capacity || 500)) {
+              bestCenter = center;
+              break;
+            }
+          }
+        }
+
+        // Priority 3: Any center with capacity
+        if (!bestCenter) {
+          for (const center of allCenters.filter(c => c.isActive)) {
+            const currentCount = centerStudentCounts[center.id] || 0;
+            if (currentCount < (center.capacity || 500)) {
+              bestCenter = center;
+              break;
+            }
+          }
+        }
+
+        if (bestCenter) {
+          await storage.createCenterAssignment({
+            examYearId,
+            schoolId: school.id,
+            centerId: bestCenter.id,
+            assignmentMethod: 'auto',
+            assignedBy: req.session.userId,
+            notes: `Auto-assigned based on cluster/region priority`,
+          });
+          await storage.updateSchool(school.id, { assignedCenterId: bestCenter.id });
+          
+          // Update count tracking
+          const schoolStudents = await storage.getStudentsBySchool(school.id);
+          centerStudentCounts[bestCenter.id] = (centerStudentCounts[bestCenter.id] || 0) + 
+            schoolStudents.filter(s => s.examYearId === examYearId).length;
+          
+          results.assigned++;
+        } else {
+          results.skipped++;
+          results.warnings.push(`No available center for ${school.name}`);
+        }
+      }
+
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Center Activity Logs API
+  app.get("/api/center-activity-logs", isAuthenticated, async (req, res) => {
+    try {
+      const centerId = req.query.centerId ? parseInt(req.query.centerId as string) : undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      const activityType = req.query.activityType as string | undefined;
+
+      if (!centerId) {
+        return res.status(400).json({ message: "centerId is required" });
+      }
+
+      let logs;
+      if (activityType) {
+        logs = await storage.getCenterActivityLogsByType(centerId, activityType);
+      } else {
+        logs = await storage.getCenterActivityLogs(centerId, examYearId);
+      }
+      res.json(logs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/center-activity-logs", isAuthenticated, async (req, res) => {
+    try {
+      const log = await storage.createCenterActivityLog({
+        ...req.body,
+        performedBy: req.session.userId,
+      });
+      res.status(201).json(log);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Enhanced Attendance API - Bulk marking
+  app.post("/api/attendance/bulk", isAuthenticated, async (req, res) => {
+    try {
+      const { records } = req.body;
+      if (!Array.isArray(records) || records.length === 0) {
+        return res.status(400).json({ message: "records array is required" });
+      }
+
+      const createdRecords = [];
+      for (const record of records) {
+        const created = await storage.createAttendanceRecord({
+          ...record,
+          recordedBy: req.session.userId,
+        });
+        createdRecords.push(created);
+      }
+
+      // Log the bulk activity
+      if (records[0]?.centerId) {
+        await storage.createCenterActivityLog({
+          centerId: records[0].centerId,
+          examYearId: records[0].examYearId,
+          activityType: 'bulk_attendance',
+          description: `Bulk attendance marked for ${records.length} students`,
+          metadata: { count: records.length, subjectId: records[0].subjectId },
+          performedBy: req.session.userId,
+        });
+      }
+
+      res.status(201).json({ created: createdRecords.length, records: createdRecords });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Lookup student by index number for attendance
+  app.get("/api/attendance/lookup", isAuthenticated, async (req, res) => {
+    try {
+      const indexNumber = req.query.indexNumber as string;
+      if (!indexNumber) {
+        return res.status(400).json({ message: "indexNumber is required" });
+      }
+
+      const student = await storage.getStudentByIndexNumber(indexNumber);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      const school = await storage.getSchool(student.schoolId);
+      
+      res.json({
+        student: {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          middleName: student.middleName,
+          indexNumber: student.indexNumber,
+          grade: student.grade,
+          gender: student.gender,
+          schoolId: student.schoolId,
+          schoolName: school?.name,
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get center dashboard data
+  app.get("/api/centers/:id/dashboard", isAuthenticated, async (req, res) => {
+    try {
+      const centerId = parseInt(req.params.id);
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      
+      const center = await storage.getExamCenter(centerId);
+      if (!center) {
+        return res.status(404).json({ message: "Center not found" });
+      }
+
+      const activeExamYear = examYearId ? await storage.getExamYear(examYearId) : await storage.getActiveExamYear();
+      const yearId = activeExamYear?.id;
+
+      // Get all related data
+      const assignments = yearId ? await storage.getCenterAssignmentsByCenter(centerId, yearId) : [];
+      const students = await storage.getStudentsByCenter(centerId);
+      const timetable = yearId ? await storage.getTimetableByExamYear(yearId) : [];
+      const paperMovements = yearId ? await storage.getPaperMovementsByCenter(centerId, yearId) : [];
+      const scriptMovements = yearId ? await storage.getScriptMovementsByCenter(centerId, yearId) : [];
+      const malpracticeReports = await storage.getMalpracticeReportsByCenter(centerId);
+      const activityLogs = await storage.getCenterActivityLogs(centerId, yearId);
+      const invigilators = await storage.getAssignmentsByCenter(centerId);
+
+      // Get schools assigned to this center
+      const schoolIds = assignments.map(a => a.schoolId);
+      const schools = await Promise.all(schoolIds.map(id => storage.getSchool(id)));
+
+      // Calculate statistics
+      const totalStudents = yearId ? students.filter(s => s.examYearId === yearId).length : students.length;
+      const studentsByGrade = students.reduce((acc: Record<number, number>, s) => {
+        if (!yearId || s.examYearId === yearId) {
+          acc[s.grade] = (acc[s.grade] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      res.json({
+        center,
+        examYear: activeExamYear,
+        statistics: {
+          totalSchools: assignments.length,
+          totalStudents,
+          studentsByGrade,
+          totalInvigilators: invigilators.length,
+          pendingPapers: paperMovements.filter(p => p.status !== 'returned').length,
+          pendingScripts: scriptMovements.filter(s => s.status !== 'stored').length,
+          malpracticeCount: malpracticeReports.length,
+        },
+        schools: schools.filter(Boolean),
+        timetable,
+        paperMovements,
+        scriptMovements,
+        malpracticeReports,
+        recentActivity: activityLogs.slice(0, 20),
+        invigilators,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get school's assigned center info (for school admin/student view)
+  app.get("/api/schools/:id/center-info", async (req, res) => {
+    try {
+      const schoolId = parseInt(req.params.id);
+      const school = await storage.getSchool(schoolId);
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+
+      const activeExamYear = await storage.getActiveExamYear();
+      if (!activeExamYear) {
+        return res.json({ center: null, timetable: [], message: "No active exam year" });
+      }
+
+      const assignment = await storage.getCenterAssignmentBySchool(schoolId, activeExamYear.id);
+      if (!assignment) {
+        return res.json({ center: null, timetable: [], message: "No center assigned" });
+      }
+
+      const center = await storage.getExamCenter(assignment.centerId);
+      const timetable = await storage.getTimetableByExamYear(activeExamYear.id);
+      const subjects = await storage.getAllSubjects();
+
+      // Enrich timetable with subject names
+      const enrichedTimetable = timetable.map(t => {
+        const subject = subjects.find(s => s.id === t.subjectId);
+        return {
+          ...t,
+          subjectName: subject?.name,
+          subjectArabicName: subject?.arabicName,
+        };
+      });
+
+      res.json({
+        examYear: activeExamYear,
+        center,
+        assignment,
+        timetable: enrichedTimetable,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }
 
