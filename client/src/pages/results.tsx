@@ -930,7 +930,7 @@ export default function Results() {
             <div className="text-xs text-muted-foreground space-y-1">
               <p>{isRTL ? "تنسيق CSV المتوقع:" : "Expected CSV format:"}</p>
               <p className="font-mono bg-muted p-2 rounded text-xs overflow-x-auto">
-                School Code, School Name, Location, Region, Student Number, Student Name, Subject1, Subject2, ...
+                رقم المدرسة, المدرسة, المكــــــان, إقليم, رقم الطالب, اسم الطالب, موضوع1, موضوع2, ...
               </p>
             </div>
 
@@ -941,28 +941,29 @@ export default function Results() {
                 size="sm" 
                 className="h-auto p-0"
                 onClick={() => {
-                  // Generate template with columns: School Name, Region, Cluster, Student Name, Subjects
-                  const headers = ["School Name", "Region", "Cluster", "Student Name"];
+                  // Generate template with Arabic column names: رقم المدرسة, المدرسة, المكــــــان, إقليم, رقم الطالب, اسم الطالب, Subjects
+                  const headers = ["رقم المدرسة", "المدرسة", "المكــــــان", "إقليم", "رقم الطالب", "اسم الطالب"];
                   
-                  // Filter subjects by selected grade level, sorted by name
+                  // Filter subjects by selected grade level, use Arabic names (arabicName field)
                   const gradeSubjects = (subjects?.filter(s => s.grade === parseInt(studentGradeFilter)) || [])
-                    .sort((a, b) => a.name.localeCompare(b.name));
+                    .sort((a, b) => (a.arabicName || a.name).localeCompare(b.arabicName || b.name));
                   
                   if (gradeSubjects.length > 0) {
-                    // Add subjects in order (LTR)
-                    gradeSubjects.forEach(s => headers.push(s.name));
+                    // Add subjects using Arabic names
+                    gradeSubjects.forEach(s => headers.push(s.arabicName || s.name));
                   } else if (subjects && subjects.length > 0) {
-                    // Fallback: if no subjects for this grade, show all available subjects
-                    subjects.sort((a, b) => a.name.localeCompare(b.name)).forEach(s => headers.push(s.name));
+                    // Fallback: if no subjects for this grade, show all available subjects with Arabic names
+                    subjects.sort((a, b) => (a.arabicName || a.name).localeCompare(b.arabicName || b.name))
+                      .forEach(s => headers.push(s.arabicName || s.name));
                   } else {
                     // Placeholder if no subjects exist
-                    headers.push("Subject 1", "Subject 2", "Subject 3");
+                    headers.push("موضوع 1", "موضوع 2", "موضوع 3");
                   }
                   
                   // Generate CSV with sample data row
                   const headerLine = headers.join(",");
-                  const numSubjects = gradeSubjects.length > 0 ? gradeSubjects.length : (headers.length - 4);
-                  const sampleData = "School Name,Region,Cluster,Student Name," + 
+                  const numSubjects = gradeSubjects.length > 0 ? gradeSubjects.length : (headers.length - 6);
+                  const sampleData = "001,اسم المدرسة,الموقع,المنطقة,001,اسم الطالب," + 
                                      Array(numSubjects).fill("80").join(",");
                   const csv = headerLine + "\n" + sampleData;
                   

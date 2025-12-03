@@ -5840,7 +5840,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // Multi-subject CSV upload - handles CSV format with School Name, Region, Cluster, Student Name, Subjects
+  // Multi-subject CSV upload - handles CSV format with school code, name, location, region, student number, student name, subjects
   app.post("/api/results/multi-subject-upload", isAuthenticated, async (req, res) => {
     try {
       const { rows, examYearId, grade } = req.body;
@@ -5860,16 +5860,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const gradeNumber = parseInt(grade);
       const results: { created: number; updated: number; errors: any[] } = { created: 0, updated: 0, errors: [] };
       
-      // Subject name mappings (Arabic to English codes)
+      // Subject name mappings for normalized variations
       const subjectMappings: Record<string, { name: string; arabicName: string }> = {
         'القــــــرآن': { name: 'Quran', arabicName: 'القرآن' },
         'القرآن': { name: 'Quran', arabicName: 'القرآن' },
-        'القراءة (المحفوظات)': { name: 'Reading (Memorization)', arabicName: 'القراءة' },
-        'القراءة': { name: 'Reading', arabicName: 'القراءة' },
+        'القراءة (المحفوظات)': { name: 'Reading (Memorization)', arabicName: 'القراءة (المحفوظات)' },
+        'القراءة': { name: 'Reading (Memorization)', arabicName: 'القراءة (المحفوظات)' },
         'السيــــــرة': { name: 'Seerah', arabicName: 'السيرة' },
         'السيرة': { name: 'Seerah', arabicName: 'السيرة' },
-        'الكتابة (الخط والإملاء)': { name: 'Writing (Calligraphy & Spelling)', arabicName: 'الكتابة' },
-        'الكتابة': { name: 'Writing', arabicName: 'الكتابة' },
+        'الكتابة (الخط والإملاء)': { name: 'Writing (Calligraphy & Spelling)', arabicName: 'الكتابة (الخط والإملاء)' },
+        'الكتابة': { name: 'Writing (Calligraphy & Spelling)', arabicName: 'الكتابة (الخط والإملاء)' },
         'الحديـــــث': { name: 'Hadith', arabicName: 'الحديث' },
         'الحديث': { name: 'Hadith', arabicName: 'الحديث' },
         'الفقــــــه': { name: 'Fiqh', arabicName: 'الفقه' },
@@ -5878,11 +5878,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         'التوحيد': { name: 'Tawheed', arabicName: 'التوحيد' },
         'القواعــــــد': { name: 'Grammar', arabicName: 'القواعد' },
         'القواعد': { name: 'Grammar', arabicName: 'القواعد' },
-        'English': { name: 'English', arabicName: 'الإنجليزية' },
-        'Mathematics': { name: 'Mathematics', arabicName: 'الرياضيات' },
-        'S E S': { name: 'Social & Environmental Studies', arabicName: 'الدراسات الاجتماعية' },
-        'SES': { name: 'Social & Environmental Studies', arabicName: 'الدراسات الاجتماعية' },
-        'Science': { name: 'Science', arabicName: 'العلوم' },
+        'English': { name: 'English', arabicName: 'English' },
+        'Mathematics': { name: 'Mathematics', arabicName: 'Mathematics' },
+        'S E S': { name: 'S E S', arabicName: 'S E S' },
+        'SES': { name: 'S E S', arabicName: 'S E S' },
+        'Science': { name: 'Science', arabicName: 'Science' },
         'التعبيـــــر': { name: 'Expression', arabicName: 'التعبير' },
         'التعبير': { name: 'Expression', arabicName: 'التعبير' }
       };
@@ -5893,14 +5893,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const rowNum = rowIndex + 1;
         
         try {
-          // Extract key fields (disregard school code, student number)
-          const schoolName = (row['School Name'] || row['المدرسة'] || '').trim();
-          const regionName = (row['Region'] || row['إقليم'] || '').trim();
-          const clusterName = (row['Cluster'] || '').trim();
-          const studentName = (row['Student Name'] || row['اسم الطالب'] || '').trim();
+          // Extract key fields (Arabic column names)
+          const schoolName = (row['المدرسة'] || '').trim();
+          const regionName = (row['إقليم'] || '').trim();
+          const studentIndexNumber = (row['رقم الطالب'] || '').trim();
+          const studentName = (row['اسم الطالب'] || '').trim();
           
           if (!schoolName || !regionName || !studentName) {
-            results.errors.push({ row: rowNum, error: "Missing School Name, Region, or Student Name" });
+            results.errors.push({ row: rowNum, error: "Missing school name, region, or student name" });
             continue;
           }
           
@@ -5910,17 +5910,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             region = await storage.createRegion({ name: regionName });
           }
           
-          // Find or create cluster
-          let cluster = (await storage.getAllClusters()).find(c => c.name.toLowerCase() === clusterName.toLowerCase() && c.regionId === region.id);
-          if (!cluster && clusterName) {
-            cluster = await storage.createCluster({ name: clusterName, regionId: region.id });
-          }
-          
-          // Find or create school (match by name and region/cluster)
+          // Find or create school (match by name and region)
           let school = (await storage.getAllSchools()).find(s => 
             s.name.toLowerCase() === schoolName.toLowerCase() && 
-            s.regionId === region.id &&
-            (!cluster || s.clusterId === cluster.id)
+            s.regionId === region.id
           );
           
           if (!school) {
@@ -5928,23 +5921,31 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             school = await storage.createSchool({
               name: schoolName,
               regionId: region.id,
-              clusterId: cluster?.id || null,
+              clusterId: null,
               registrationStatus: 'verified',
               adminUserId: null
             });
           }
           
-          // Find or create student (match by name and school)
-          let students = await storage.getStudentsBySchool(school.id);
-          let student = students.find(s => 
-            `${s.firstName} ${s.lastName}`.toLowerCase() === studentName.toLowerCase()
-          );
+          // Find or create student (match by index number or name)
+          let student: any = null;
+          if (studentIndexNumber) {
+            student = await storage.getStudentByIndexNumber(studentIndexNumber);
+          }
+          
+          if (!student) {
+            // Try to find by name and school
+            let students = await storage.getStudentsBySchool(school.id);
+            student = students.find(s => 
+              `${s.firstName} ${s.lastName}`.toLowerCase() === studentName.toLowerCase()
+            );
+          }
           
           if (!student) {
             // Auto-create student
             const [firstName, ...lastNameParts] = studentName.split(' ');
             const lastName = lastNameParts.join(' ') || 'Student';
-            const indexNumber = await generateIndexNumber(gradeNumber, school.id);
+            const indexNumber = studentIndexNumber || await generateIndexNumber(gradeNumber, school.id);
             
             student = await storage.createStudent({
               firstName,
@@ -5961,18 +5962,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           
           // Process each subject column in the row
           for (const [columnName, scoreValue] of Object.entries(row)) {
-            // Skip non-subject columns
-            if (['School Name', 'Region', 'Cluster', 'Student Name', 
-                 'المدرسة', 'إقليم', 'اسم الطالب', 
-                 'رقم المدرسة', 'المكــــــان', 'رقم الطالب'].includes(columnName)) {
+            // Skip non-subject columns (Arabic names)
+            if (['رقم المدرسة', 'المدرسة', 'المكــــــان', 'إقليم', 'رقم الطالب', 'اسم الطالب'].includes(columnName)) {
               continue;
             }
             
-            // Clean up column name for matching
+            // Clean up column name
             const cleanColumnName = columnName.trim().replace(/\s+/g, ' ');
             
-            // Get or create subject
-            const subjectInfo = subjectMappings[cleanColumnName] || { name: cleanColumnName, arabicName: cleanColumnName };
+            // Skip empty column names
+            if (!cleanColumnName) continue;
+            
+            // Get or create subject with Arabic names (using dynamically created subjects)
+            const subjectInfo = subjectMappings[cleanColumnName] || { 
+              name: cleanColumnName, 
+              arabicName: cleanColumnName 
+            };
             
             const subject = await storage.getOrCreateSubject(subjectInfo.name, subjectInfo.arabicName, gradeNumber);
             
