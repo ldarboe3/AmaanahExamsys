@@ -280,8 +280,10 @@ export default function Centers() {
   const selectedRegionId = form.watch("regionId");
   
   // Filter clusters based on selected region in form
-  const filteredClusters = selectedRegionId 
-    ? clusters?.filter(c => c.regionId === selectedRegionId)
+  // Convert to number since form field values are strings
+  const numericRegionId = selectedRegionId ? Number(selectedRegionId) : 0;
+  const filteredClusters = numericRegionId 
+    ? clusters?.filter(c => c.regionId === numericRegionId)
     : [];
 
   // Helper to invalidate all center queries (including filtered variants)
