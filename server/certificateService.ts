@@ -15,6 +15,7 @@ import {
   arabicMonths,
 } from './certificateTemplates';
 import { gradeTranscriptConfigs, getGradeConfig, getGradeLabelArabic, isEnglishSubject } from './transcriptTemplates';
+import { generateGrade6CertificatePDF } from './grade6CertificateService';
 
 interface StudentData {
   id: number;
@@ -61,7 +62,21 @@ if (!fs.existsSync(outputDir)) {
 export async function generateCertificatePDF(data: CertificateData): Promise<string> {
   const { student, school, examYear, finalGrade, qrToken, certificateNumber, verifyUrl, isReprint } = data;
   
-  // Support all grades with grade-specific templates and fallbacks
+  // Use specialized Grade 6 certificate template
+  if (student.grade === 6) {
+    return generateGrade6CertificatePDF({
+      student,
+      school,
+      examYear,
+      finalGrade,
+      qrToken,
+      certificateNumber,
+      verifyUrl,
+      isReprint
+    });
+  }
+  
+  // Support all other grades with grade-specific templates and fallbacks
   const template = getCertificateTemplate(student.grade, student.gender);
   
   // Get grade level names for the certificate with fallbacks
