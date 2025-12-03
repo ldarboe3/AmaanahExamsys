@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,8 @@ import {
   AlertCircle,
   AlertTriangle,
   MapPin,
+  FileSearch,
+  Plus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -187,6 +189,17 @@ export default function Students() {
   const [pageSize, setPageSize] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(0);
   
+  // Admin bulk upload state
+  const [showAdminUploadDialog, setShowAdminUploadDialog] = useState(false);
+  const [adminUploadFile, setAdminUploadFile] = useState<File | null>(null);
+  const [adminUploadProgress, setAdminUploadProgress] = useState(0);
+  const [adminUploadPhase, setAdminUploadPhase] = useState<'idle' | 'uploading' | 'parsing' | 'matching' | 'preview' | 'confirming' | 'complete'>('idle');
+  const [adminUploadPreview, setAdminUploadPreview] = useState<any[]>([]);
+  const [adminUploadSummary, setAdminUploadSummary] = useState<any>(null);
+  const [adminUploadExamYear, setAdminUploadExamYear] = useState<number | null>(null);
+  const [adminUploadGrade, setAdminUploadGrade] = useState<number | null>(null);
+  const adminFileInputRef = useRef<HTMLInputElement>(null);
+  
   const isSchoolAdmin = user?.role === 'school_admin';
   const canApproveStudents = user?.role === 'super_admin' || user?.role === 'examination_admin';
   
@@ -280,6 +293,123 @@ export default function Students() {
       setUploadProgress(0);
     },
   });
+
+  // Admin bulk upload with school matching - preview phase
+  const adminUploadPreviewMutation = useMutation({
+    mutationFn: async (file: File) => {
+      if (!adminUploadExamYear || !adminUploadGrade) {
+        throw new Error(isRTL ? "يجب اختيار السنة الامتحانية والصف" : "Please select exam year and grade");
+      }
+
+      setAdminUploadPhase('uploading');
+      setAdminUploadProgress(5);
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('examYearId', adminUploadExamYear.toString());
+      formData.append('grade', adminUploadGrade.toString());
+
+      setAdminUploadProgress(20);
+      setAdminUploadPhase('parsing');
+
+      const response = await fetch('/api/students/bulk-upload-preview', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      setAdminUploadProgress(60);
+      setAdminUploadPhase('matching');
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
+      }
+
+      setAdminUploadProgress(100);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAdminUploadPhase('preview');
+      setAdminUploadPreview(data.preview || []);
+      setAdminUploadSummary(data.summary);
+      toast({
+        title: isRTL ? "تم تحليل الملف" : "File Analyzed",
+        description: isRTL 
+          ? `تم العثور على ${data.summary?.total || 0} طالب، ${data.summary?.matched || 0} مطابق`
+          : `Found ${data.summary?.total || 0} students, ${data.summary?.matched || 0} matched`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: isRTL ? "خطأ في التحليل" : "Analysis Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      setAdminUploadPhase('idle');
+      setAdminUploadProgress(0);
+    },
+  });
+
+  // Admin bulk upload - confirm and create students
+  const adminUploadConfirmMutation = useMutation({
+    mutationFn: async () => {
+      if (!adminUploadExamYear || !adminUploadGrade) {
+        throw new Error("Exam year and grade required");
+      }
+
+      setAdminUploadPhase('confirming');
+      setAdminUploadProgress(10);
+
+      // Only send students that have a matched school
+      const matchedStudents = adminUploadPreview.filter(s => s.matchedSchoolId);
+
+      const response = await apiRequest('POST', '/api/students/bulk-upload-confirm', {
+        students: matchedStudents,
+        examYearId: adminUploadExamYear,
+        grade: adminUploadGrade,
+      });
+
+      setAdminUploadProgress(100);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAdminUploadPhase('complete');
+      toast({
+        title: isRTL ? "تم الرفع بنجاح" : "Upload Complete",
+        description: isRTL 
+          ? `تم إضافة ${data.created} طالب، فشل ${data.failed} طالب`
+          : `Created ${data.created} students, ${data.failed} failed`,
+      });
+      invalidateStudentQueries();
+      
+      // Close dialog after a short delay
+      setTimeout(() => {
+        resetAdminUpload();
+        setShowAdminUploadDialog(false);
+      }, 2000);
+    },
+    onError: (error: any) => {
+      toast({
+        title: isRTL ? "خطأ في الحفظ" : "Save Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      setAdminUploadPhase('preview');
+      setAdminUploadProgress(0);
+    },
+  });
+
+  // Reset admin upload state
+  const resetAdminUpload = () => {
+    setAdminUploadFile(null);
+    setAdminUploadProgress(0);
+    setAdminUploadPhase('idle');
+    setAdminUploadPreview([]);
+    setAdminUploadSummary(null);
+    setAdminUploadExamYear(null);
+    setAdminUploadGrade(null);
+  };
 
   // Memoize student query URL - scoped to selected exam year
   const studentsUrl = useMemo(() => {
@@ -719,6 +849,15 @@ export default function Students() {
             {isRTL ? "لوحة تسجيل الطلاب" : "Student Registration Dashboard"}
           </p>
         </div>
+        {canApproveStudents && (
+          <Button 
+            onClick={() => setShowAdminUploadDialog(true)}
+            data-testid="button-admin-bulk-upload"
+          >
+            <Upload className="w-4 h-4 me-2" />
+            {isRTL ? "رفع الطلاب بالجملة" : "Bulk Student Upload"}
+          </Button>
+        )}
       </div>
 
       {/* Step 1 Instructions */}
@@ -2000,6 +2139,250 @@ export default function Students() {
                 isRTL ? "رفع والتحقق" : "Upload & Validate"
               )}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin Bulk Upload Dialog with School Matching */}
+      <Dialog open={showAdminUploadDialog} onOpenChange={(open) => {
+        if (!open) resetAdminUpload();
+        setShowAdminUploadDialog(open);
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="w-5 h-5" />
+              {isRTL ? "رفع الطلاب مع مطابقة المدارس" : "Bulk Student Upload with School Matching"}
+            </DialogTitle>
+            <DialogDescription>
+              {isRTL 
+                ? "قم برفع ملف Excel أو CSV يحتوي على أسماء الطلاب والمدارس. سيتم مطابقة المدارس تلقائياً."
+                : "Upload an Excel or CSV file with student names and schools. Schools will be automatically matched."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-4 py-4">
+            {/* Step 1: Select Exam Year and Grade */}
+            {adminUploadPhase === 'idle' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">{isRTL ? "السنة الامتحانية" : "Exam Year"}</label>
+                    <Select 
+                      value={adminUploadExamYear?.toString() || ""} 
+                      onValueChange={(v) => setAdminUploadExamYear(parseInt(v))}
+                      data-testid="select-admin-upload-exam-year"
+                    >
+                      <SelectTrigger data-testid="select-admin-upload-exam-year-trigger">
+                        <SelectValue placeholder={isRTL ? "اختر السنة" : "Select Year"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(examYears as any[])?.map((ey: any) => (
+                          <SelectItem key={ey.id} value={ey.id.toString()}>{ey.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">{isRTL ? "الصف" : "Grade"}</label>
+                    <Select 
+                      value={adminUploadGrade?.toString() || ""} 
+                      onValueChange={(v) => setAdminUploadGrade(parseInt(v))}
+                      data-testid="select-admin-upload-grade"
+                    >
+                      <SelectTrigger data-testid="select-admin-upload-grade-trigger">
+                        <SelectValue placeholder={isRTL ? "اختر الصف" : "Select Grade"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((g) => (
+                          <SelectItem key={g} value={g.toString()}>
+                            {isRTL ? `الصف ${g}` : `Grade ${g}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div 
+                  className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                  onClick={() => adminFileInputRef.current?.click()}
+                >
+                  <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {adminUploadFile 
+                      ? adminUploadFile.name 
+                      : (isRTL ? "اسحب وأفلت ملف Excel أو CSV هنا، أو انقر للتصفح" : "Drag and drop your Excel or CSV file here, or click to browse")}
+                  </p>
+                  <Button variant="outline" size="sm" type="button" data-testid="button-select-admin-upload-file">
+                    {isRTL ? "اختر ملف" : "Choose File"}
+                  </Button>
+                  <input
+                    ref={adminFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    hidden
+                    onChange={(e) => setAdminUploadFile(e.target.files?.[0] || null)}
+                    data-testid="input-admin-upload-file"
+                  />
+                </div>
+
+                <div className="text-xs text-muted-foreground">
+                  <p className="font-medium mb-1">{isRTL ? "الأعمدة المطلوبة:" : "Required columns:"}</p>
+                  <ul className="list-disc list-inside space-y-0.5">
+                    <li>{isRTL ? "اسم الطالب (أو الاسم الأول واسم العائلة)" : "Student Name (or First Name and Last Name)"}</li>
+                    <li>{isRTL ? "اسم المدرسة" : "School Name"}</li>
+                    <li>{isRTL ? "المنطقة (اختياري - يساعد في المطابقة)" : "Region (optional - helps with matching)"}</li>
+                    <li>{isRTL ? "المجموعة (اختياري - يساعد في المطابقة)" : "Cluster (optional - helps with matching)"}</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Progress Bar */}
+            {(adminUploadPhase === 'uploading' || adminUploadPhase === 'parsing' || adminUploadPhase === 'matching' || adminUploadPhase === 'confirming') && (
+              <div className="space-y-4 py-8">
+                <div className="flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {adminUploadPhase === 'uploading' && (isRTL ? "جاري الرفع..." : "Uploading...")}
+                      {adminUploadPhase === 'parsing' && (isRTL ? "جاري تحليل الملف..." : "Parsing file...")}
+                      {adminUploadPhase === 'matching' && (isRTL ? "جاري مطابقة المدارس..." : "Matching schools...")}
+                      {adminUploadPhase === 'confirming' && (isRTL ? "جاري حفظ الطلاب..." : "Saving students...")}
+                    </span>
+                    <span className="font-semibold">{adminUploadProgress}%</span>
+                  </div>
+                  <Progress value={adminUploadProgress} className="w-full h-3" />
+                </div>
+              </div>
+            )}
+
+            {/* Preview Results */}
+            {adminUploadPhase === 'preview' && adminUploadSummary && (
+              <div className="space-y-4">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-4 gap-3">
+                  <Card className="p-3">
+                    <p className="text-xs text-muted-foreground">{isRTL ? "الإجمالي" : "Total"}</p>
+                    <p className="text-xl font-bold">{adminUploadSummary.total}</p>
+                  </Card>
+                  <Card className="p-3 border-chart-3">
+                    <p className="text-xs text-muted-foreground">{isRTL ? "مطابق" : "Matched"}</p>
+                    <p className="text-xl font-bold text-chart-3">{adminUploadSummary.matched}</p>
+                  </Card>
+                  <Card className="p-3 border-yellow-500">
+                    <p className="text-xs text-muted-foreground">{isRTL ? "غير مؤكد" : "Ambiguous"}</p>
+                    <p className="text-xl font-bold text-yellow-500">{adminUploadSummary.ambiguous}</p>
+                  </Card>
+                  <Card className="p-3 border-destructive">
+                    <p className="text-xs text-muted-foreground">{isRTL ? "غير مطابق" : "Unmatched"}</p>
+                    <p className="text-xl font-bold text-destructive">{adminUploadSummary.unmatched + adminUploadSummary.errors}</p>
+                  </Card>
+                </div>
+
+                {/* Preview Table */}
+                <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background">
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>{isRTL ? "الطالب" : "Student"}</TableHead>
+                        <TableHead>{isRTL ? "المدرسة (الملف)" : "School (File)"}</TableHead>
+                        <TableHead>{isRTL ? "المدرسة المطابقة" : "Matched School"}</TableHead>
+                        <TableHead>{isRTL ? "الحالة" : "Status"}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {adminUploadPreview.slice(0, 100).map((row, idx) => (
+                        <TableRow key={idx} className={row.status === 'error' || row.status === 'unmatched' ? 'bg-destructive/5' : ''}>
+                          <TableCell className="font-mono text-xs">{row.row}</TableCell>
+                          <TableCell className="font-medium">
+                            {row.firstName} {row.middleName} {row.lastName}
+                          </TableCell>
+                          <TableCell className="text-sm">{row.schoolName}</TableCell>
+                          <TableCell className="text-sm">
+                            {row.matchedSchoolName || (
+                              <span className="text-muted-foreground italic">
+                                {isRTL ? "لم يتم المطابقة" : "Not matched"}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={row.status === 'matched' ? 'default' : row.status === 'ambiguous' ? 'secondary' : 'destructive'}
+                              className={row.status === 'matched' ? 'bg-chart-3' : ''}
+                            >
+                              {row.status === 'matched' && (isRTL ? "مطابق" : "Matched")}
+                              {row.status === 'ambiguous' && (isRTL ? "غير مؤكد" : "Ambiguous")}
+                              {row.status === 'unmatched' && (isRTL ? "غير مطابق" : "Unmatched")}
+                              {row.status === 'error' && (isRTL ? "خطأ" : "Error")}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {adminUploadPreview.length > 100 && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    {isRTL 
+                      ? `عرض أول 100 صف من ${adminUploadPreview.length}`
+                      : `Showing first 100 rows of ${adminUploadPreview.length}`}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Complete */}
+            {adminUploadPhase === 'complete' && (
+              <div className="text-center py-8">
+                <CheckCircle className="w-16 h-16 text-chart-3 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">
+                  {isRTL ? "تم الرفع بنجاح!" : "Upload Complete!"}
+                </h3>
+                <p className="text-muted-foreground">
+                  {isRTL ? "تم إضافة الطلاب بنجاح" : "Students have been added successfully"}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="border-t pt-4">
+            {adminUploadPhase === 'idle' && (
+              <>
+                <Button variant="outline" onClick={() => setShowAdminUploadDialog(false)} data-testid="button-cancel-admin-upload">
+                  {t.common.cancel}
+                </Button>
+                <Button 
+                  disabled={!adminUploadFile || !adminUploadExamYear || !adminUploadGrade}
+                  onClick={() => adminUploadFile && adminUploadPreviewMutation.mutate(adminUploadFile)}
+                  data-testid="button-analyze-admin-upload"
+                >
+                  <FileSearch className="w-4 h-4 me-2" />
+                  {isRTL ? "تحليل ومطابقة" : "Analyze & Match"}
+                </Button>
+              </>
+            )}
+            {adminUploadPhase === 'preview' && (
+              <>
+                <Button variant="outline" onClick={resetAdminUpload} data-testid="button-back-admin-upload">
+                  {isRTL ? "رجوع" : "Back"}
+                </Button>
+                <Button 
+                  disabled={!adminUploadPreview.some(s => s.matchedSchoolId)}
+                  onClick={() => adminUploadConfirmMutation.mutate()}
+                  data-testid="button-confirm-admin-upload"
+                >
+                  <CheckCircle className="w-4 h-4 me-2" />
+                  {isRTL 
+                    ? `إضافة ${adminUploadPreview.filter(s => s.matchedSchoolId).length} طالب`
+                    : `Add ${adminUploadPreview.filter(s => s.matchedSchoolId).length} Students`}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
