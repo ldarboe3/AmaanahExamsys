@@ -73,6 +73,7 @@ export interface IStorage {
   createSchool(school: InsertSchool): Promise<School>;
   getSchool(id: number): Promise<School | undefined>;
   getSchoolByEmail(email: string): Promise<School | undefined>;
+  getSchoolByAdminUserId(userId: string): Promise<School | undefined>;
   getSchoolsByStatus(status: string): Promise<School[]>;
   getSchoolsByRegion(regionId: number): Promise<School[]>;
   getSchoolsByCenter(centerId: number): Promise<School[]>;
@@ -536,6 +537,11 @@ export class DatabaseStorage implements IStorage {
 
   async getSchoolByEmail(email: string): Promise<School | undefined> {
     const [school] = await db.select().from(schools).where(eq(schools.email, email));
+    return school;
+  }
+
+  async getSchoolByAdminUserId(userId: string): Promise<School | undefined> {
+    const [school] = await db.select().from(schools).where(eq(schools.adminUserId, userId));
     return school;
   }
 
