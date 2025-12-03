@@ -68,6 +68,7 @@ const timetableSchema = z.object({
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
   venue: z.string().optional(),
+  grade: z.number(),
 });
 
 type TimetableFormData = z.infer<typeof timetableSchema>;
@@ -120,6 +121,7 @@ export default function Timetable() {
       startTime: "",
       endTime: "",
       venue: "",
+      grade: 0,
     },
   });
 
@@ -161,7 +163,7 @@ export default function Timetable() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: TimetableFormData }) => {
-      return apiRequest("POST", `/api/timetable/${id}`, data);
+      return apiRequest("PATCH", `/api/timetable/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
@@ -205,10 +207,23 @@ export default function Timetable() {
   });
 
   const onSubmit = (data: TimetableFormData) => {
+    // Get the selected subject to extract the grade
+    const selectedSubject = subjects?.find(s => s.id === data.subjectId);
+    if (!selectedSubject) {
+      toast({
+        title: t.common.error,
+        description: "Selected subject not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const dataWithGrade = { ...data, grade: selectedSubject.grade };
+
     if (editingEntry) {
-      updateMutation.mutate({ id: editingEntry.id, data });
+      updateMutation.mutate({ id: editingEntry.id, data: dataWithGrade });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(dataWithGrade);
     }
   };
 
@@ -221,6 +236,7 @@ export default function Timetable() {
       startTime: entry.startTime || "",
       endTime: entry.endTime || "",
       venue: entry.venue || "",
+      grade: entry.grade || 0,
     });
     setShowDialog(true);
   };
@@ -234,6 +250,7 @@ export default function Timetable() {
       startTime: "09:00",
       endTime: "11:00",
       venue: "",
+      grade: 0,
     });
     setShowDialog(true);
   };
