@@ -2624,9 +2624,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       // Fetch all schools, regions, and clusters for matching
-      const allSchools = await storage.getSchools({});
-      const allRegions = await storage.getRegions();
-      const allClusters = await storage.getClusters();
+      const allSchools = await storage.getAllSchools();
+      const allRegions = await storage.getAllRegions();
+      const allClusters = await storage.getAllClusters();
 
       // Create lookup maps
       const regionMap = new Map(allRegions.map(r => [r.id, r]));
