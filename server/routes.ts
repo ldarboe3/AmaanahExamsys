@@ -39,6 +39,7 @@ import {
 import bcrypt from "bcrypt";
 import multer from "multer";
 import { randomBytes } from "crypto";
+import * as XLSX from "xlsx";
 
 const schoolDocUploadConfig = multer({
   storage: multer.memoryStorage(),
@@ -2502,6 +2503,341 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const students = await storage.createStudentsBulk(validStudents);
       res.status(201).json({ created: students.length, students });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Helper function to normalize school names for matching
+  function normalizeSchoolName(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '') // Remove special chars
+      .replace(/\s+/g, ' ')        // Normalize spaces
+      .replace(/\b(the|of|and|school|islamic|arabic|madrasa|madrassa|institute|center|centre)\b/g, '')
+      .trim();
+  }
+
+  // Calculate similarity score between two strings (simple Levenshtein-based)
+  function calculateSimilarity(str1: string, str2: string): number {
+    const s1 = normalizeSchoolName(str1);
+    const s2 = normalizeSchoolName(str2);
+    
+    // Exact match after normalization
+    if (s1 === s2) return 1.0;
+    
+    // Check if one contains the other
+    if (s1.includes(s2) || s2.includes(s1)) return 0.9;
+    
+    // Simple word overlap score
+    const words1 = s1.split(' ').filter(w => w.length > 2);
+    const words2 = s2.split(' ').filter(w => w.length > 2);
+    
+    if (words1.length === 0 || words2.length === 0) return 0;
+    
+    const commonWords = words1.filter(w => words2.includes(w));
+    const score = (2 * commonWords.length) / (words1.length + words2.length);
+    
+    return score;
+  }
+
+  // Multer config for Excel/CSV file upload
+  const studentBulkUploadConfig = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req: any, file, cb) => {
+      const allowedTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+        'application/vnd.ms-excel', // xls
+        'text/csv',
+        'application/csv',
+      ];
+      const allowedExtensions = ['.xlsx', '.xls', '.csv'];
+      const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
+      
+      if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
+        cb(null, true);
+      } else {
+        req.fileRejected = true;
+        req.fileRejectedReason = 'Invalid file type. Only XLSX, XLS, and CSV files are allowed.';
+        cb(null, false);
+      }
+    },
+  });
+
+  // Admin bulk student upload with school matching - preview/parse phase
+  app.post("/api/students/bulk-upload-preview", isAuthenticated, studentBulkUploadConfig.single('file'), async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only super admin and examination admin can bulk upload students" });
+      }
+
+      if (req.fileRejected) {
+        return res.status(400).json({ message: req.fileRejectedReason });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const { examYearId, grade } = req.body;
+      if (!examYearId || !grade) {
+        return res.status(400).json({ message: "examYearId and grade are required" });
+      }
+
+      // Parse the Excel/CSV file
+      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+      
+      if (rawData.length < 2) {
+        return res.status(400).json({ message: "File must contain headers and at least one data row" });
+      }
+
+      // Get headers (first row) and normalize them
+      const headers = (rawData[0] as string[]).map(h => 
+        String(h || '').toLowerCase().trim().replace(/\s+/g, '')
+      );
+      
+      // Find column indices for required fields
+      const findColumnIndex = (possibleNames: string[]): number => {
+        return headers.findIndex(h => possibleNames.some(name => h.includes(name)));
+      };
+
+      const studentNameCol = findColumnIndex(['studentname', 'name', 'fullname', 'student']);
+      const firstNameCol = findColumnIndex(['firstname', 'first']);
+      const lastNameCol = findColumnIndex(['lastname', 'last', 'surname']);
+      const schoolNameCol = findColumnIndex(['schoolname', 'school']);
+      const regionCol = findColumnIndex(['region', 'regionname']);
+      const clusterCol = findColumnIndex(['cluster', 'clustername']);
+      const genderCol = findColumnIndex(['gender', 'sex']);
+
+      if (schoolNameCol === -1) {
+        return res.status(400).json({ message: "Could not find 'School Name' column in the file" });
+      }
+
+      if (studentNameCol === -1 && (firstNameCol === -1 || lastNameCol === -1)) {
+        return res.status(400).json({ 
+          message: "Could not find student name columns. File must have either 'Student Name' or both 'First Name' and 'Last Name'" 
+        });
+      }
+
+      // Fetch all schools, regions, and clusters for matching
+      const allSchools = await storage.getSchools({});
+      const allRegions = await storage.getRegions();
+      const allClusters = await storage.getClusters();
+
+      // Create lookup maps
+      const regionMap = new Map(allRegions.map(r => [r.id, r]));
+      const clusterMap = new Map(allClusters.map(c => [c.id, c]));
+
+      // Process each row
+      const previewResults: any[] = [];
+      const dataRows = rawData.slice(1);
+
+      for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i];
+        if (!row || row.every(cell => !cell)) continue; // Skip empty rows
+
+        // Extract student data
+        let firstName = '';
+        let lastName = '';
+        let middleName = '';
+        
+        if (studentNameCol !== -1 && row[studentNameCol]) {
+          const nameParts = String(row[studentNameCol]).trim().split(/\s+/);
+          firstName = nameParts[0] || '';
+          lastName = nameParts[nameParts.length - 1] || '';
+          if (nameParts.length > 2) {
+            middleName = nameParts.slice(1, -1).join(' ');
+          }
+        } else {
+          firstName = firstNameCol !== -1 ? String(row[firstNameCol] || '').trim() : '';
+          lastName = lastNameCol !== -1 ? String(row[lastNameCol] || '').trim() : '';
+        }
+
+        const schoolName = schoolNameCol !== -1 ? String(row[schoolNameCol] || '').trim() : '';
+        const regionName = regionCol !== -1 ? String(row[regionCol] || '').trim() : '';
+        const clusterName = clusterCol !== -1 ? String(row[clusterCol] || '').trim() : '';
+        const gender = genderCol !== -1 ? String(row[genderCol] || '').trim().toLowerCase() : '';
+
+        if (!firstName || !schoolName) {
+          previewResults.push({
+            row: i + 2,
+            firstName,
+            lastName,
+            middleName,
+            schoolName,
+            regionName,
+            clusterName,
+            gender: gender === 'm' || gender === 'male' ? 'male' : (gender === 'f' || gender === 'female' ? 'female' : ''),
+            status: 'error',
+            message: !firstName ? 'Missing student name' : 'Missing school name',
+            matchedSchoolId: null,
+            matchedSchoolName: null,
+            matchScore: 0,
+          });
+          continue;
+        }
+
+        // Find matching school
+        let bestMatch: { school: any; score: number } | null = null;
+        
+        // Filter schools by region/cluster if provided
+        let candidateSchools = allSchools;
+        
+        if (regionName) {
+          const matchedRegion = allRegions.find(r => 
+            normalizeSchoolName(r.name).includes(normalizeSchoolName(regionName)) ||
+            normalizeSchoolName(regionName).includes(normalizeSchoolName(r.name))
+          );
+          if (matchedRegion) {
+            candidateSchools = candidateSchools.filter(s => s.regionId === matchedRegion.id);
+          }
+        }
+        
+        if (clusterName && candidateSchools.length > 0) {
+          const matchedCluster = allClusters.find(c => 
+            normalizeSchoolName(c.name).includes(normalizeSchoolName(clusterName)) ||
+            normalizeSchoolName(clusterName).includes(normalizeSchoolName(c.name))
+          );
+          if (matchedCluster) {
+            candidateSchools = candidateSchools.filter(s => s.clusterId === matchedCluster.id);
+          }
+        }
+
+        // Calculate similarity with each candidate school
+        for (const school of candidateSchools) {
+          const score = calculateSimilarity(schoolName, school.name);
+          if (score >= 0.5 && (!bestMatch || score > bestMatch.score)) {
+            bestMatch = { school, score };
+          }
+        }
+
+        // Check if exact match
+        if (!bestMatch) {
+          // Try exact match ignoring case
+          const exactMatch = candidateSchools.find(s => 
+            s.name.toLowerCase() === schoolName.toLowerCase()
+          );
+          if (exactMatch) {
+            bestMatch = { school: exactMatch, score: 1.0 };
+          }
+        }
+
+        const normalizedGender = gender === 'm' || gender === 'male' ? 'male' : 
+                                 (gender === 'f' || gender === 'female' ? 'female' : '');
+
+        previewResults.push({
+          row: i + 2,
+          firstName,
+          lastName,
+          middleName,
+          schoolName,
+          regionName,
+          clusterName,
+          gender: normalizedGender,
+          status: bestMatch ? (bestMatch.score >= 0.8 ? 'matched' : 'ambiguous') : 'unmatched',
+          message: bestMatch ? 
+            (bestMatch.score >= 0.8 ? `Matched to: ${bestMatch.school.name}` : `Possible match: ${bestMatch.school.name} (${Math.round(bestMatch.score * 100)}%)`) :
+            'No matching school found',
+          matchedSchoolId: bestMatch?.school.id || null,
+          matchedSchoolName: bestMatch?.school.name || null,
+          matchScore: bestMatch?.score || 0,
+        });
+      }
+
+      // Calculate summary
+      const matched = previewResults.filter(r => r.status === 'matched').length;
+      const ambiguous = previewResults.filter(r => r.status === 'ambiguous').length;
+      const unmatched = previewResults.filter(r => r.status === 'unmatched').length;
+      const errors = previewResults.filter(r => r.status === 'error').length;
+
+      res.json({
+        success: true,
+        preview: previewResults,
+        summary: {
+          total: previewResults.length,
+          matched,
+          ambiguous,
+          unmatched,
+          errors,
+        },
+        availableSchools: allSchools.map(s => ({ 
+          id: s.id, 
+          name: s.name, 
+          region: regionMap.get(s.regionId!)?.name,
+          cluster: clusterMap.get(s.clusterId!)?.name,
+        })),
+      });
+    } catch (error: any) {
+      console.error('Bulk upload preview error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin bulk student upload - confirm and create students
+  app.post("/api/students/bulk-upload-confirm", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only super admin and examination admin can bulk upload students" });
+      }
+
+      const { students: studentList, examYearId, grade } = req.body;
+      
+      if (!Array.isArray(studentList) || studentList.length === 0) {
+        return res.status(400).json({ message: "No students to upload" });
+      }
+
+      if (!examYearId || !grade) {
+        return res.status(400).json({ message: "examYearId and grade are required" });
+      }
+
+      const created: any[] = [];
+      const failed: any[] = [];
+
+      for (const student of studentList) {
+        if (!student.matchedSchoolId) {
+          failed.push({ ...student, error: 'No school matched' });
+          continue;
+        }
+
+        try {
+          const studentData = {
+            firstName: student.firstName,
+            lastName: student.lastName,
+            middleName: student.middleName || '',
+            gender: student.gender || 'male',
+            schoolId: student.matchedSchoolId,
+            examYearId: parseInt(examYearId),
+            grade: parseInt(grade),
+            status: 'pending' as const,
+          };
+
+          const parsed = insertStudentSchema.safeParse(studentData);
+          if (!parsed.success) {
+            failed.push({ ...student, error: fromZodError(parsed.error).message });
+            continue;
+          }
+
+          const newStudent = await storage.createStudent(parsed.data);
+          created.push(newStudent);
+        } catch (error: any) {
+          failed.push({ ...student, error: error.message });
+        }
+      }
+
+      res.json({
+        success: true,
+        created: created.length,
+        failed: failed.length,
+        students: created,
+        errors: failed,
+      });
+    } catch (error: any) {
+      console.error('Bulk upload confirm error:', error);
       res.status(500).json({ message: error.message });
     }
   });
