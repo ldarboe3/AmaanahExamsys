@@ -3,7 +3,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +68,11 @@ import {
   Plus,
   Loader2,
   Pencil,
+  Upload,
+  FileUp,
+  AlertCircle,
+  CheckCircle2,
+  Info,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -157,6 +165,15 @@ export default function Schools() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
+  const [bulkUploadData, setBulkUploadData] = useState<Array<{schoolName: string; address: string; region: string; cluster: string}>>([]);
+  const [bulkUploadResults, setBulkUploadResults] = useState<{
+    success: Array<{schoolName: string; region: string; cluster: string; username: string; password: string; schoolId: number}>;
+    errors: Array<{row: number; error: string; schoolName?: string}>;
+    regionsCreated: string[];
+    clustersCreated: string[];
+  } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const form = useForm<AddSchoolFormData>({
     resolver: zodResolver(addSchoolSchema),
@@ -400,6 +417,178 @@ export default function Schools() {
     createSchoolMutation.mutate(data);
   };
 
+  // CSV parsing function for bulk upload
+  const parseCsvFile = (file: File): Promise<Array<{schoolName: string; address: string; region: string; cluster: string}>> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target?.result as string;
+          const lines = text.split('\n').filter(line => line.trim());
+          
+          if (lines.length < 2) {
+            reject(new Error(t.schools.invalidCsvFormat));
+            return;
+          }
+
+          // Parse header - support both comma and semicolon delimiters
+          const delimiter = lines[0].includes(';') ? ';' : ',';
+          const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+          
+          // Find column indices
+          const schoolNameIdx = headers.findIndex(h => h.includes('school') && h.includes('name') || h === 'schoolname' || h === 'name');
+          const addressIdx = headers.findIndex(h => h === 'address');
+          const regionIdx = headers.findIndex(h => h === 'region');
+          const clusterIdx = headers.findIndex(h => h === 'cluster');
+
+          if (schoolNameIdx === -1 || regionIdx === -1 || clusterIdx === -1) {
+            reject(new Error(t.schools.csvMustHaveColumns));
+            return;
+          }
+
+          const data = [];
+          for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(delimiter).map(v => v.trim().replace(/['"]/g, ''));
+            if (values.length >= Math.max(schoolNameIdx, regionIdx, clusterIdx) + 1) {
+              const schoolName = values[schoolNameIdx]?.trim();
+              const region = values[regionIdx]?.trim();
+              const cluster = values[clusterIdx]?.trim();
+              
+              if (schoolName && region && cluster) {
+                data.push({
+                  schoolName,
+                  address: addressIdx !== -1 ? values[addressIdx]?.trim() || '' : '',
+                  region,
+                  cluster,
+                });
+              }
+            }
+          }
+
+          resolve(data);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file);
+    });
+  };
+
+  const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const data = await parseCsvFile(file);
+      setBulkUploadData(data);
+      setBulkUploadResults(null);
+      toast({
+        title: t.common.success,
+        description: `${data.length} ${t.schools.rowsToUpload}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: t.common.error,
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+    // Reset file input
+    e.target.value = '';
+  };
+
+  const handleBulkUpload = async () => {
+    if (bulkUploadData.length === 0) {
+      toast({
+        title: t.common.error,
+        description: t.schools.noDataToUpload,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const response = await apiRequest("POST", "/api/schools/bulk-upload", {
+        schools: bulkUploadData,
+      });
+      
+      const result = await response.json();
+      setBulkUploadResults({
+        success: result.schools || [],
+        errors: result.errors || [],
+        regionsCreated: result.regionsCreated || [],
+        clustersCreated: result.clustersCreated || [],
+      });
+      
+      // Refresh data
+      invalidateSchoolQueries();
+      queryClient.invalidateQueries({ queryKey: ["/api/regions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clusters"] });
+      
+      if (result.successCount > 0) {
+        toast({
+          title: t.schools.bulkUploadSuccess,
+          description: `${result.successCount} ${t.schools.schoolsUploaded}`,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: t.common.error,
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const downloadCsvTemplate = () => {
+    const headers = ['schoolName', 'address', 'region', 'cluster'];
+    const sampleRow = ['Example School', '123 Main Street', 'Banjul Region', 'Banjul Cluster'];
+    const csvContent = [headers.join(','), sampleRow.join(',')].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'schools_upload_template.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const exportCredentials = () => {
+    if (!bulkUploadResults?.success || bulkUploadResults.success.length === 0) return;
+
+    const headers = ['School Name', 'Region', 'Cluster', 'Username', 'Password'];
+    const rows = bulkUploadResults.success.map(s => [
+      `"${s.schoolName}"`,
+      `"${s.region}"`,
+      `"${s.cluster}"`,
+      s.username,
+      s.password,
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `school_credentials_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+
+    toast({
+      title: t.schools.credentialsExported,
+      description: t.schools.credentialsExportedDesc,
+    });
+  };
+
+  const resetBulkUpload = () => {
+    setBulkUploadData([]);
+    setBulkUploadResults(null);
+    setShowBulkUploadDialog(false);
+  };
+
   return (
     <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
@@ -410,10 +599,16 @@ export default function Schools() {
             {isRTL ? "إدارة تسجيلات المدارس والموافقات" : "Manage school registrations and approvals"}
           </p>
         </div>
-        <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-school">
-          <Plus className="w-4 h-4 me-2" />
-          {t.schools.addSchool}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowBulkUploadDialog(true)} data-testid="button-bulk-upload">
+            <Upload className="w-4 h-4 me-2" />
+            {t.schools.bulkUpload}
+          </Button>
+          <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-school">
+            <Plus className="w-4 h-4 me-2" />
+            {t.schools.addSchool}
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -1217,6 +1412,191 @@ export default function Schools() {
                   {t.common.approve}
                 </Button>
               </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Upload Dialog */}
+      <Dialog open={showBulkUploadDialog} onOpenChange={(open) => {
+        if (!open) resetBulkUpload();
+        setShowBulkUploadDialog(open);
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="w-5 h-5" />
+              {t.schools.bulkUploadTitle}
+            </DialogTitle>
+            <DialogDescription>
+              {t.schools.bulkUploadDesc}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-6">
+            {/* CSV Format Info */}
+            <Alert>
+              <Info className="w-4 h-4" />
+              <AlertTitle>{t.schools.csvFormat}</AlertTitle>
+              <AlertDescription>
+                <p className="mb-2">{t.schools.csvFormatDesc}</p>
+                <ul className="list-disc list-inside text-sm space-y-1">
+                  <li><code className="bg-muted px-1 rounded">schoolName</code> - {t.schools.schoolNameColumn}</li>
+                  <li><code className="bg-muted px-1 rounded">address</code> - {t.schools.addressColumn}</li>
+                  <li><code className="bg-muted px-1 rounded">region</code> - {t.schools.regionColumn}</li>
+                  <li><code className="bg-muted px-1 rounded">cluster</code> - {t.schools.clusterColumn}</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+
+            {/* Upload Area */}
+            <div className="flex flex-wrap gap-3">
+              <Button variant="outline" onClick={downloadCsvTemplate} data-testid="button-download-template">
+                <Download className="w-4 h-4 me-2" />
+                {t.schools.downloadTemplate}
+              </Button>
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCsvUpload}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  data-testid="input-csv-file"
+                />
+                <Button variant="outline">
+                  <FileUp className="w-4 h-4 me-2" />
+                  {t.schools.selectCsvFile}
+                </Button>
+              </div>
+            </div>
+
+            {/* Preview Data */}
+            {bulkUploadData.length > 0 && !bulkUploadResults && (
+              <div className="space-y-3">
+                <h3 className="font-medium flex items-center gap-2">
+                  {t.schools.previewData}
+                  <Badge variant="secondary">{bulkUploadData.length} {t.schools.rowsToUpload}</Badge>
+                </h3>
+                <ScrollArea className="h-[250px] border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">#</TableHead>
+                        <TableHead>{t.schools.schoolName}</TableHead>
+                        <TableHead>{t.schools.address}</TableHead>
+                        <TableHead>{t.schools.region}</TableHead>
+                        <TableHead>{t.schools.cluster}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {bulkUploadData.map((row, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="font-mono text-muted-foreground">{idx + 1}</TableCell>
+                          <TableCell className="font-medium">{row.schoolName}</TableCell>
+                          <TableCell>{row.address || '-'}</TableCell>
+                          <TableCell>{row.region}</TableCell>
+                          <TableCell>{row.cluster}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
+            )}
+
+            {/* Upload Results */}
+            {bulkUploadResults && (
+              <div className="space-y-4">
+                {/* Success Summary */}
+                {bulkUploadResults.success.length > 0 && (
+                  <Alert className="border-green-500/50 bg-green-500/10">
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    <AlertTitle className="text-green-600">{t.schools.successfullyUploaded}</AlertTitle>
+                    <AlertDescription>
+                      <p>{bulkUploadResults.success.length} {t.schools.schoolsUploaded}</p>
+                      {bulkUploadResults.regionsCreated.length > 0 && (
+                        <p className="text-sm mt-1">
+                          {bulkUploadResults.regionsCreated.length} {t.schools.newRegions}: {bulkUploadResults.regionsCreated.join(', ')}
+                        </p>
+                      )}
+                      {bulkUploadResults.clustersCreated.length > 0 && (
+                        <p className="text-sm mt-1">
+                          {bulkUploadResults.clustersCreated.length} {t.schools.newClusters}: {bulkUploadResults.clustersCreated.join(', ')}
+                        </p>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Errors */}
+                {bulkUploadResults.errors.length > 0 && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="w-4 h-4" />
+                    <AlertTitle>{t.schools.uploadErrors}</AlertTitle>
+                    <AlertDescription>
+                      <ScrollArea className="h-[120px] mt-2">
+                        <ul className="space-y-1 text-sm">
+                          {bulkUploadResults.errors.map((err, idx) => (
+                            <li key={idx}>
+                              <span className="font-medium">{t.schools.row} {err.row}:</span> {err.error}
+                              {err.schoolName && <span className="text-muted-foreground"> ({err.schoolName})</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </ScrollArea>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Credentials Table */}
+                {bulkUploadResults.success.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium">{t.schools.uploadResults}</h3>
+                      <Button onClick={exportCredentials} size="sm" data-testid="button-export-credentials">
+                        <Download className="w-4 h-4 me-2" />
+                        {t.schools.exportCredentials}
+                      </Button>
+                    </div>
+                    <ScrollArea className="h-[200px] border rounded-md">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t.schools.schoolName}</TableHead>
+                            <TableHead>{t.schools.region}</TableHead>
+                            <TableHead>{t.schools.cluster}</TableHead>
+                            <TableHead>{t.schools.username}</TableHead>
+                            <TableHead>{t.schools.password}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {bulkUploadResults.success.map((school, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium">{school.schoolName}</TableCell>
+                              <TableCell>{school.region}</TableCell>
+                              <TableCell>{school.cluster}</TableCell>
+                              <TableCell className="font-mono">{school.username}</TableCell>
+                              <TableCell className="font-mono">{school.password}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={resetBulkUpload}>
+              {bulkUploadResults ? t.common.close : t.common.cancel}
+            </Button>
+            {!bulkUploadResults && bulkUploadData.length > 0 && (
+              <Button onClick={handleBulkUpload} disabled={isUploading} data-testid="button-upload-schools">
+                {isUploading && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+                {isUploading ? t.schools.uploading : t.schools.uploadSchools}
+              </Button>
             )}
           </DialogFooter>
         </DialogContent>
