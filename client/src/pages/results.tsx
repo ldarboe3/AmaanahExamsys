@@ -188,6 +188,19 @@ export default function Results() {
 
   const schoolsList = Array.isArray(schools) ? schools : schools?.data || [];
 
+  // Filter schools based on selected region and cluster
+  const filteredSchools = schoolsList.filter((school: School) => {
+    if (regionFilter !== "all") {
+      const matchingClusters = clusters?.filter(c => c.regionId === parseInt(regionFilter)) || [];
+      const clusterIds = new Set(matchingClusters.map(c => c.id));
+      if (!clusterIds.has(school.clusterId)) return false;
+    }
+    if (clusterFilter !== "all") {
+      if (school.clusterId !== parseInt(clusterFilter)) return false;
+    }
+    return true;
+  });
+
   const studentsQueryParams = new URLSearchParams();
   if (schoolFilter !== "all") studentsQueryParams.set("schoolId", schoolFilter);
   if (clusterFilter !== "all") studentsQueryParams.set("clusterId", clusterFilter);
@@ -608,7 +621,7 @@ export default function Results() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{isRTL ? "جميع المدارس" : "All Schools"}</SelectItem>
-                      {schoolsList.map((s: School) => (
+                      {filteredSchools.map((s: School) => (
                         <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
                       ))}
                     </SelectContent>
