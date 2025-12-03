@@ -80,6 +80,7 @@ export default function Transcripts() {
   const [selectedRegion, setSelectedRegion] = useState<string>("");
   const [selectedCluster, setSelectedCluster] = useState<string>("");
   const [selectedSchool, setSelectedSchool] = useState<string>("");
+  const [selectedExamYear, setSelectedExamYear] = useState<string>("");
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [previewStudent, setPreviewStudent] = useState<StudentWithResults | null>(null);
@@ -111,9 +112,10 @@ export default function Transcripts() {
   });
 
   const activeExamYear = examYears?.find(ey => ey.isActive);
+  const currentExamYear = selectedExamYear ? examYears?.find(ey => ey.id === parseInt(selectedExamYear)) : activeExamYear;
 
   const getStudentTranscript = (studentId: number): Transcript | undefined => {
-    return allTranscripts?.find(t => t.studentId === studentId && t.examYearId === activeExamYear?.id);
+    return allTranscripts?.find(t => t.studentId === studentId && t.examYearId === currentExamYear?.id);
   };
 
   const filteredClusters = clusters?.filter(c => c.regionId === parseInt(selectedRegion)) || [];
@@ -243,7 +245,29 @@ export default function Transcripts() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                {isRTL ? "السنة الامتحانية" : "Exam Year"}
+              </label>
+              <Select value={selectedExamYear} onValueChange={(value) => {
+                setSelectedExamYear(value);
+                setSelectedStudents([]);
+              }}>
+                <SelectTrigger data-testid="select-exam-year">
+                  <SelectValue placeholder={isRTL ? "اختر السنة" : "Select Year"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {examYears?.map(year => (
+                    <SelectItem key={year.id} value={year.id.toString()}>
+                      {year.name} {year.isActive && "(Active)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-muted-foreground" />
