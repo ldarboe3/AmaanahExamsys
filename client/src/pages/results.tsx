@@ -134,7 +134,7 @@ export default function Results() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadPercentage, setUploadPercentage] = useState(0);
   const [showMatchingPreview, setShowMatchingPreview] = useState(false);
-  const [previewData, setPreviewData] = useState<{ rows: any[]; schoolsCount: number; studentsCount: number; subjectsCount: number } | null>(null);
+  const [previewData, setPreviewData] = useState<{ rows: any[]; schoolsCount: number; schoolsToCreate: number; studentsCount: number; subjectsCount: number; regionsToCreate: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: currentUser } = useQuery<any>({
@@ -302,21 +302,48 @@ export default function Results() {
         rows.push(row);
       }
 
-      // Count unique schools and students in preview
-      const uniqueSchools = new Set();
-      const uniqueStudents = new Set();
+      // Count unique schools and students in preview, and predict what will be created vs matched
+      const uniqueSchools = new Map<string, string>(); // schoolName -> regionName
+      const uniqueStudents = new Map<string, string>(); // studentName -> schoolName
+      const uniqueRegions = new Set<string>();
+      
       rows.forEach(row => {
         const schoolName = (row['المدرسة'] || '').trim();
         const studentName = (row['اسم الطالب'] || '').trim();
-        if (schoolName) uniqueSchools.add(schoolName);
-        if (studentName) uniqueStudents.add(studentName);
+        const regionName = (row['إقليم'] || '').trim();
+        if (schoolName && regionName) {
+          uniqueSchools.set(schoolName, regionName);
+          uniqueRegions.add(regionName);
+        }
+        if (studentName && schoolName) {
+          uniqueStudents.set(studentName, schoolName);
+        }
       });
+
+      // Count how many schools will be matched vs created
+      const existingSchools = schools?.filter((s: any) => {
+        for (const [schoolName, regionName] of uniqueSchools) {
+          if (s.name.toLowerCase() === schoolName.toLowerCase()) {
+            const matchingRegion = regions?.find((r: any) => r.name.toLowerCase() === regionName.toLowerCase());
+            if (matchingRegion && s.regionId === matchingRegion.id) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }) || [];
+      const schoolsToCreate = uniqueSchools.size - existingSchools.length;
+      const regionsToCreate = Array.from(uniqueRegions).filter((rName: string) => 
+        !(regions?.find((r: any) => r.name.toLowerCase() === rName.toLowerCase()))
+      ).length;
 
       setPreviewData({
         rows,
         schoolsCount: uniqueSchools.size,
+        schoolsToCreate: Math.max(0, schoolsToCreate),
         studentsCount: uniqueStudents.size,
         subjectsCount: headers.length - 6, // Subtract: school code, school name, location, region, student number, student name
+        regionsToCreate,
       });
       setShowMatchingPreview(true);
     } catch (error: any) {
@@ -1121,26 +1148,37 @@ export default function Results() {
               <div className="grid grid-cols-2 gap-4">
                 <Card>
                   <CardContent className="p-4">
-                    <p className="text-sm text-muted-foreground">{isRTL ? "المدارس الفريدة" : "Unique Schools"}</p>
+                    <p className="text-sm text-muted-foreground">{isRTL ? "إجمالي المدارس" : "Total Schools"}</p>
                     <p className="text-3xl font-semibold text-primary">{previewData.schoolsCount}</p>
+                    <p className="text-xs text-chart-5 mt-1">
+                      {isRTL 
+                        ? `${previewData.schoolsToCreate} سيتم إنشاء` 
+                        : `${previewData.schoolsToCreate} will be created`}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">{isRTL ? "المناطق الجديدة" : "New Regions"}</p>
+                    <p className="text-3xl font-semibold text-chart-5">{previewData.regionsToCreate}</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="p-4">
                     <p className="text-sm text-muted-foreground">{isRTL ? "الطلاب الفريدين" : "Unique Students"}</p>
                     <p className="text-3xl font-semibold text-primary">{previewData.studentsCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {isRTL ? "سيتم إنشاء إذا لم يتم العثور عليهم" : "Will be created if not found"}
+                    </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="p-4">
                     <p className="text-sm text-muted-foreground">{isRTL ? "الموضوعات" : "Subjects"}</p>
                     <p className="text-3xl font-semibold text-primary">{previewData.subjectsCount}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-sm text-muted-foreground">{isRTL ? "صفوف البيانات" : "Data Rows"}</p>
-                    <p className="text-3xl font-semibold text-primary">{previewData.rows.length}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {isRTL ? "سيتم إنشاء تلقائياً" : "Auto-created"}
+                    </p>
                   </CardContent>
                 </Card>
               </div>
