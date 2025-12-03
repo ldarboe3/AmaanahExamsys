@@ -525,7 +525,22 @@ export class DatabaseStorage implements IStorage {
 
   // Exam Centers
   async createExamCenter(center: InsertExamCenter): Promise<ExamCenter> {
-    const [created] = await db.insert(examCenters).values(center).returning();
+    // Auto-generate center code if not provided
+    let centerCode = center.code;
+    if (!centerCode) {
+      // Get the region to use its code
+      const region = await db.select().from(regions).where(eq(regions.id, center.regionId));
+      const regionCode = region[0]?.code || "GM";
+      
+      // Get the count of centers in this region to create a sequential code
+      const existingCenters = await db.select().from(examCenters).where(eq(examCenters.regionId, center.regionId));
+      const nextSequence = (existingCenters.length + 1).toString().padStart(3, '0');
+      
+      // Format: EXC-REGIONCODE-001 (e.g., EXC-WCR-001)
+      centerCode = `EXC-${regionCode}-${nextSequence}`;
+    }
+    
+    const [created] = await db.insert(examCenters).values({ ...center, code: centerCode }).returning();
     return created;
   }
 
