@@ -74,6 +74,7 @@ import {
   CheckCircle2,
   Info,
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { School, Region, Cluster } from "@shared/schema";
@@ -176,6 +177,7 @@ export default function Schools() {
     clustersCreated: string[];
   } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<AddSchoolFormData>({
@@ -537,10 +539,19 @@ export default function Schools() {
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
     try {
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + Math.random() * 30, 90));
+      }, 300);
+
       const response = await apiRequest("POST", "/api/schools/bulk-upload", {
         schools: bulkUploadData,
       });
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
       
       const result = await response.json();
       setBulkUploadResults({
@@ -569,6 +580,7 @@ export default function Schools() {
       });
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -1539,6 +1551,17 @@ export default function Schools() {
                 {t.schools.selectCsvFile}
               </Button>
             </div>
+
+            {/* Progress Bar */}
+            {isUploading && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">{isRTL ? "جاري الرفع..." : "Uploading..."}</span>
+                  <span className="text-sm text-muted-foreground">{Math.round(uploadProgress)}%</span>
+                </div>
+                <Progress value={uploadProgress} className="h-2" />
+              </div>
+            )}
 
             {/* Preview Data */}
             {bulkUploadData.length > 0 && !bulkUploadResults && (
