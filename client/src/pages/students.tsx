@@ -1207,7 +1207,7 @@ export default function Students() {
             </div>
           </div>
           {/* Hide action buttons for read-only mode */}
-          {!isReadOnly && (
+          {!isReadOnly && !isPastExamYear && (
             <div className="flex gap-2 flex-wrap">
               <Button variant="outline" onClick={() => setShowUploadDialog(true)} data-testid="button-upload-csv">
                 <Upload className="w-4 h-4 me-2" />
@@ -1313,8 +1313,24 @@ export default function Students() {
           </Card>
         )}
 
-        {/* Registration Deadline Countdown */}
-        {countdown && (() => {
+        {/* Registration Deadline Countdown or Past Exam Message */}
+        {isPastExamYear ? (
+          <Card className="border-2 border-destructive/50 bg-destructive/5">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <Calendar className="w-6 h-6 text-destructive" />
+                <h2 className="text-lg font-bold text-destructive">
+                  {isRTL ? "انتهت السنة الامتحانية" : "Examination Year Has Passed"}
+                </h2>
+              </div>
+              <p className="text-center text-sm text-destructive/80">
+                {isRTL 
+                  ? "هذه السنة الامتحانية قد انتهت. يمكنك فقط عرض سجلاتك هنا."
+                  : "This examination year has already passed. You can only view your records here."}
+              </p>
+            </CardContent>
+          </Card>
+        ) : countdown && (() => {
           const isUrgent = countdown.days < 3;
           const cardClass = isUrgent 
             ? "border-2 border-destructive bg-destructive text-white" 
@@ -1577,7 +1593,7 @@ export default function Students() {
                   variant="outline" 
                   size="sm" 
                   onClick={handlePrintCards}
-                  disabled={printingCards}
+                  disabled={printingCards || isPastExamYear}
                   data-testid="button-print-cards"
                 >
                   {printingCards ? (

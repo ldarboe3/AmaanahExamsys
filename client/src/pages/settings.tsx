@@ -35,6 +35,7 @@ import {
   Shield,
   Save,
   Globe,
+  AlertTriangle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -401,27 +402,44 @@ export default function Settings() {
                     onSubmit={examSettingsForm.handleSubmit(onSaveExamSettings)}
                     className="space-y-6"
                   >
-                    <FormField
-                      control={examSettingsForm.control}
-                      name="allowLateRegistration"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">Allow Late Registration</FormLabel>
-                            <FormDescription>
-                              Enable registration after the deadline with late fees
-                            </FormDescription>
+                    {/* Check if there's an active exam year and if it's past the end date */}
+                    {activeExamYear && new Date(activeExamYear.examEndDate || '') < new Date() ? (
+                      <Card className="border-2 border-destructive/50 bg-destructive/5">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                            <div>
+                              <h3 className="font-semibold text-destructive">Examination Year Has Passed</h3>
+                              <p className="text-sm text-destructive/80 mt-1">
+                                The current examination year has already ended. Registration options are no longer available. Schools can only view their records.
+                              </p>
+                            </div>
                           </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              data-testid="switch-late-registration"
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <FormField
+                        control={examSettingsForm.control}
+                        name="allowLateRegistration"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Allow Late Registration</FormLabel>
+                              <FormDescription>
+                                Enable registration after the deadline with late fees
+                              </FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-late-registration"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    )}
                     <FormField
                       control={examSettingsForm.control}
                       name="autoGenerateIndexNumbers"
