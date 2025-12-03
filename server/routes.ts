@@ -2795,8 +2795,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "examYearId and grade are required" });
       }
 
+      // Get exam year details for fee calculation
+      const examYear = await storage.getExamYear(parseInt(examYearId));
+      if (!examYear) {
+        return res.status(404).json({ message: "Exam year not found" });
+      }
+
       const created: any[] = [];
       const failed: any[] = [];
+      const schoolStudentMap = new Map<number, number>(); // Track students by school for invoice creation
 
       for (const student of studentList) {
         if (!student.matchedSchoolId) {
@@ -2813,7 +2820,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             schoolId: student.matchedSchoolId,
             examYearId: parseInt(examYearId),
             grade: parseInt(grade),
-            status: 'pending' as const,
+            status: 'approved' as const, // Auto-approve bulk uploaded students
           };
 
           const parsed = insertStudentSchema.safeParse(studentData);
@@ -2824,8 +2831,47 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
           const newStudent = await storage.createStudent(parsed.data);
           created.push(newStudent);
+          
+          // Track student count by school
+          const count = schoolStudentMap.get(student.matchedSchoolId) || 0;
+          schoolStudentMap.set(student.matchedSchoolId, count + 1);
         } catch (error: any) {
           failed.push({ ...student, error: error.message });
+        }
+      }
+
+      // Create financial records (invoices) for each school
+      const invoicesCreated: any[] = [];
+      for (const [schoolId, studentCount] of Array.from(schoolStudentMap.entries())) {
+        try {
+          const invoiceNumber = generateInvoiceNumber(schoolId, parseInt(examYearId));
+          const feePerStudent = examYear.feePerStudent ? parseFloat(examYear.feePerStudent.toString()) : 100;
+          const totalAmount = (feePerStudent * studentCount).toFixed(2);
+
+          const invoice = await storage.createInvoice({
+            invoiceNumber,
+            schoolId,
+            examYearId: parseInt(examYearId),
+            totalStudents: studentCount,
+            feePerStudent: feePerStudent.toString(),
+            totalAmount,
+            status: 'paid' as const, // Mark as paid since payment is pre-settled for bulk uploads
+          });
+
+          // Create invoice item for this grade
+          if (invoice) {
+            const subtotal = (feePerStudent * studentCount).toFixed(2);
+            await storage.createInvoiceItem({
+              invoiceId: invoice.id,
+              grade: parseInt(grade),
+              studentCount,
+              feePerStudent: feePerStudent.toString(),
+              subtotal,
+            });
+            invoicesCreated.push(invoice);
+          }
+        } catch (error: any) {
+          console.error('Error creating invoice for school:', schoolId, error);
         }
       }
 
@@ -2835,6 +2881,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         failed: failed.length,
         students: created,
         errors: failed,
+        invoicesCreated: invoicesCreated.length,
+        message: `${created.length} students auto-approved and ${invoicesCreated.length} financial record(s) created`,
       });
     } catch (error: any) {
       console.error('Bulk upload confirm error:', error);
