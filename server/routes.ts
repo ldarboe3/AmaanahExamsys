@@ -5560,15 +5560,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           if (studentCache.has(studentCacheKey)) {
             studentId = studentCache.get(studentCacheKey)!;
           } else {
-            // Check if student exists by index number first
-            let student = existingIndex ? await storage.getStudentByIndexNumber(existingIndex) : null;
+            let student: any = null;
             
+            // Priority 1: Check if student exists by index number (most reliable)
+            if (existingIndex && existingIndex.trim()) {
+              student = await storage.getStudentByIndexNumber(existingIndex.trim());
+              if (student && student.schoolId !== schoolId) {
+                // Index exists but for different school - don't use it
+                student = null;
+              }
+            }
+            
+            // Priority 2: Find by name, school, and grade
             if (!student) {
-              // Try to find by name, school, and grade
-              const existingStudents = await storage.getStudentsBySchool(schoolId, examYearId);
+              const existingStudents = await storage.getStudentsBySchool(schoolId);
+              // Normalize names for comparison (trim whitespace, lowercase)
+              const fNameLower = firstName.trim().toLowerCase();
+              const lNameLower = lastName.trim().toLowerCase();
               student = existingStudents.find(s => 
-                s.firstName.toLowerCase() === firstName.trim().toLowerCase() &&
-                s.lastName.toLowerCase() === lastName.trim().toLowerCase() &&
+                s.firstName.trim().toLowerCase() === fNameLower &&
+                s.lastName.trim().toLowerCase() === lNameLower &&
                 s.grade === gradeLevel
               ) || null;
             }
@@ -5596,29 +5607,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             studentCache.set(studentCacheKey, studentId);
           }
 
-          // Create results for each subject with marks
+          // Create or update results for each subject with marks
           for (const mark of studentMarks) {
-            // Check if result already exists
-            const existingResult = await storage.getResultByStudentAndSubject(studentId, mark.subjectId, examYearId);
-            if (existingResult) {
-              // Update existing result
-              await storage.updateStudentResult(existingResult.id, {
-                score: mark.score.toFixed(2),
-                grade: calculateGrade(mark.score),
-                status: 'pending'
-              });
-            } else {
-              // Create new result
-              await storage.createStudentResult({
-                studentId,
-                subjectId: mark.subjectId,
-                examYearId,
-                score: mark.score.toFixed(2),
-                grade: calculateGrade(mark.score),
-                status: 'pending',
-                remarks: null
-              });
-              progress.resultsCreated++;
+            // Use upsert to atomically update or create results
+            const result = await storage.upsertStudentResult(studentId, mark.subjectId, examYearId, {
+              score: mark.score.toFixed(2),
+              grade: calculateGrade(mark.score),
+              status: 'pending',
+              remarks: null
+            });
+            
+            // Only count as created if it's a new result (no id in the original request means it was created)
+            const existing = await storage.getResultByStudentAndSubject(studentId, mark.subjectId, examYearId);
+            if (existing && existing.id === result.id) {
+              // Check if this is new by seeing if createdAt is very recent
+              const createdTime = new Date(result.createdAt || new Date()).getTime();
+              const now = Date.now();
+              if (now - createdTime < 5000) { // Created within last 5 seconds
+                progress.resultsCreated++;
+              }
             }
           }
         } catch (error: any) {
