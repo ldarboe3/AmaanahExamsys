@@ -118,8 +118,9 @@ export default function Certificates() {
 
   // All grades are now supported with grade-specific templates and fallbacks
   // Filter students into eligible (grades 1-12) and non-eligible groups
-  const eligibleStudents = students?.filter(s => s.grade >= 1 && s.grade <= 12) || [];
-  const nonEligibleStudents = students?.filter(s => s.grade < 1 || s.grade > 12) || [];
+  const studentsList = Array.isArray(students) ? students : [];
+  const eligibleStudents = studentsList.filter(s => s.grade >= 1 && s.grade <= 12) || [];
+  const nonEligibleStudents = studentsList.filter(s => s.grade < 1 || s.grade > 12) || [];
 
   const filteredClusters = clusters?.filter(c => c.regionId === parseInt(selectedRegion)) || [];
   const filteredSchools = schools.filter(s => {
