@@ -119,6 +119,8 @@ export default function Transcripts() {
     return allTranscripts?.find(t => t.studentId === studentId && t.examYearId === currentExamYear?.id);
   };
 
+  const studentsList = Array.isArray(students) ? students : [];
+
   const filteredClusters = clusters?.filter(c => c.regionId === parseInt(selectedRegion)) || [];
   const filteredSchools = schools.filter(s => {
     if (selectedCluster) return s.clusterId === parseInt(selectedCluster);
