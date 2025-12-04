@@ -291,6 +291,11 @@ export default function Results() {
     },
   });
 
+  // Helper function to map both Arabic and English headers
+  const getHeaderValue = (row: any, arabicHeader: string, englishHeader: string): string => {
+    return (row[arabicHeader] || row[englishHeader] || '').trim();
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -341,9 +346,9 @@ export default function Results() {
       const uniqueRegions = new Set<string>();
       
       rows.forEach(row => {
-        const schoolName = (row['المدرسة'] || '').trim();
-        const studentName = (row['اسم الطالب'] || '').trim();
-        const regionName = (row['إقليم'] || '').trim();
+        const schoolName = getHeaderValue(row, 'المدرسة', 'school');
+        const studentName = getHeaderValue(row, 'اسم الطالب', 'student_name');
+        const regionName = getHeaderValue(row, 'إقليم', 'region');
         if (schoolName && regionName) {
           uniqueSchools.set(schoolName, regionName);
           uniqueRegions.add(regionName);
@@ -413,28 +418,30 @@ export default function Results() {
         });
       }, 200);
 
-      // Map Arabic columns to English columns that backend expects
-      // Headers: school, region, cluster (optional), firstName, lastName, indexNumber, then subjects
-      const studentName = previewData.rows[0]?.['اسم الطالب'] || '';
-      const firstNameAr = studentName.split(' ')[0];
-      const lastNameAr = studentName.split(' ').slice(1).join(' ') || firstNameAr;
-      
-      // Build CSV rows with proper headers for backend
+      // Map columns to backend format, supporting both Arabic and English headers
       const subjectNames = gridSubjects.map(s => s.arabicName || s.name);
       const headerRow = ['school', 'region', 'cluster', 'firstName', 'lastName', 'indexNumber', ...subjectNames];
       
       const csvRows = [headerRow, ...previewData.rows.map((row: any) => {
-        const parts = (row['اسم الطالب'] || '').split(' ');
+        // Support both Arabic and English headers
+        const schoolName = getHeaderValue(row, 'المدرسة', 'school');
+        const regionName = getHeaderValue(row, 'إقليم', 'region');
+        const clusterName = getHeaderValue(row, 'المكــــــان', 'cluster');
+        const studentFullName = getHeaderValue(row, 'اسم الطالب', 'student_name');
+        const indexNum = getHeaderValue(row, 'رقم الطالب', 'student_number');
+        
+        const parts = studentFullName.split(' ');
         const fName = parts[0];
         const lName = parts.slice(1).join(' ') || fName;
+        
         return [
-          row['المدرسة'] || '',         // school
-          row['إقليم'] || '',           // region
-          row['المكــــــان'] || '',     // cluster/location
-          fName,                         // firstName
-          lName,                         // lastName
-          row['رقم الطالب'] || '',      // indexNumber
-          ...subjectNames.map(s => row[s] || '')  // subject scores
+          schoolName,
+          regionName,
+          clusterName,
+          fName,
+          lName,
+          indexNum,
+          ...subjectNames.map(s => getHeaderValue(row, s, s.toLowerCase().replace(/\s+/g, '_')))
         ];
       })];
       
