@@ -184,7 +184,7 @@ export default function Results() {
   
   const studentsQueryUrl = `/api/results/students-for-entry${studentsQueryParams.toString() ? `?${studentsQueryParams.toString()}` : ''}`;
   
-  const { data: studentsData, isLoading: studentsLoading } = useQuery<{ students: StudentWithSchool[]; role: string }>({
+  const { data: studentsData, isLoading: studentsLoading } = useQuery<{ students: any[]; subjects: Subject[]; role: string }>({
     queryKey: [studentsQueryUrl],
     enabled: !!activeExamYear?.id,
   });
@@ -422,6 +422,9 @@ export default function Results() {
       student.indexNumber?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
+
+  // Get subjects for grid display
+  const gridSubjects = studentsData?.subjects?.filter(s => s.grade === parseInt(studentGradeFilter) || studentGradeFilter === "all") || [];
 
   const pendingCount = results?.filter(r => r.status === 'pending').length || 0;
   const validatedCount = results?.filter(r => r.status === 'validated').length || 0;
@@ -707,49 +710,32 @@ export default function Results() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>{isRTL ? "رقم الفهرس" : "Index No."}</TableHead>
-                        <TableHead>{isRTL ? "اسم الطالب" : "Student Name"}</TableHead>
-                        <TableHead>{isRTL ? "المدرسة" : "School"}</TableHead>
-                        <TableHead>{isRTL ? "العنقود" : "Cluster"}</TableHead>
-                        <TableHead>{isRTL ? "الصف" : "Grade"}</TableHead>
-                        <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
+                        <TableHead className="sticky left-0 bg-background z-10 min-w-48">{isRTL ? "اسم الطالب" : "Student Name"}</TableHead>
+                        {gridSubjects.map((subject) => (
+                          <TableHead key={subject.id} className="text-center min-w-20">
+                            {subject.arabicName || subject.name}
+                          </TableHead>
+                        ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredStudents.map((student) => (
                         <TableRow key={student.id} data-testid={`row-student-${student.id}`}>
-                          <TableCell>
-                            <Badge variant="outline" className="font-mono">
-                              {student.indexNumber || (isRTL ? "لا يوجد" : "N/A")}
-                            </Badge>
+                          <TableCell className="sticky left-0 bg-background z-10 font-medium">
+                            {student.firstName} {student.lastName}
                           </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                                <User className="w-4 h-4 text-primary" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-foreground">
-                                  {student.firstName} {student.lastName}
-                                </p>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm">{student.school?.name || "-"}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm">{student.cluster?.name || "-"}</span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{isRTL ? `الصف ${student.grade}` : `Grade ${student.grade}`}</Badge>
-                          </TableCell>
-                          <TableCell className={isRTL ? "text-left" : "text-right"}>
-                            <Button variant="outline" size="sm" data-testid={`button-enter-results-${student.id}`}>
-                              <Edit className="w-4 h-4 me-2" />
-                              {isRTL ? "إدخال النتائج" : "Enter Results"}
-                            </Button>
-                          </TableCell>
+                          {gridSubjects.map((subject) => {
+                            const result = student.results?.find((r: any) => r.subjectId === subject.id);
+                            return (
+                              <TableCell key={`${student.id}-${subject.id}`} className="text-center">
+                                {result ? (
+                                  <Badge variant="outline">{result.totalScore}</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                            );
+                          })}
                         </TableRow>
                       ))}
                     </TableBody>

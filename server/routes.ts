@@ -2384,6 +2384,66 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Results entry - students with subjects for grid display
+  app.get("/api/results/students-for-entry", isAuthenticated, async (req, res) => {
+    try {
+      const activeExamYear = await storage.getActiveExamYear();
+      if (!activeExamYear) {
+        return res.json({ students: [], subjects: [] });
+      }
+
+      let students = await storage.getAllStudents();
+      const allSchools = await storage.getAllSchools();
+      const allSubjects = await storage.getAllSubjects();
+      
+      // Apply filters
+      const schoolId = req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : activeExamYear.id;
+      const regionId = req.query.regionId ? parseInt(req.query.regionId as string) : undefined;
+      const clusterId = req.query.clusterId ? parseInt(req.query.clusterId as string) : undefined;
+      
+      students = students.filter(s => s.examYearId === examYearId);
+      
+      if (schoolId) {
+        students = students.filter(s => s.schoolId === schoolId);
+      }
+      if (regionId) {
+        const schoolIdsInRegion = allSchools.filter(s => s.regionId === regionId).map(s => s.id);
+        students = students.filter(s => s.schoolId && schoolIdsInRegion.includes(s.schoolId));
+      }
+      if (clusterId) {
+        const schoolIdsInCluster = allSchools.filter(s => s.clusterId === clusterId).map(s => s.id);
+        students = students.filter(s => s.schoolId && schoolIdsInCluster.includes(s.schoolId));
+      }
+      
+      // Get all results for these students
+      const allResults = await storage.getAllResults();
+      
+      // Enrich students with results
+      const enrichedStudents = await Promise.all(students.map(async (student) => {
+        const school = allSchools.find(s => s.id === student.schoolId);
+        const results = allResults.filter(r => r.studentId === student.id && r.examYearId === examYearId);
+        return {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          indexNumber: student.indexNumber,
+          grade: student.grade,
+          school: school ? { id: school.id, name: school.name } : null,
+          results: results.map(r => ({
+            subjectId: r.subjectId,
+            totalScore: r.totalScore,
+            grade: r.grade
+          }))
+        };
+      }));
+      
+      res.json({ students: enrichedStudents, subjects: allSubjects, role: req.session.role });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/students/:id", async (req, res) => {
     try {
       const student = await storage.getStudent(parseInt(req.params.id));
