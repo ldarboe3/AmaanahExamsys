@@ -677,216 +677,199 @@ export default function Results() {
         </CardContent>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="students" data-testid="tab-students">
-            <Users className="w-4 h-4 me-2" />
-            {isRTL ? "قائمة الطلاب" : "Student List"}
-          </TabsTrigger>
-          <TabsTrigger value="results" data-testid="tab-results">
-            <FileCheck className="w-4 h-4 me-2" />
-            {isRTL ? "النتائج المسجلة" : "Recorded Results"}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="students" className="mt-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div>
-                  <CardTitle className="text-lg">{isRTL ? "قائمة الطلاب للنتائج" : "Students for Result Entry"}</CardTitle>
-                  <CardDescription>
-                    {filteredStudents?.length || 0} {isRTL ? "طالب" : "students"}
-                    {isExaminer && (isRTL ? " (المعينون لك)" : " (assigned to you)")}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {studentsLoading ? (
-                <ResultsTableSkeleton />
-              ) : filteredStudents && filteredStudents.length > 0 ? (
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="sticky left-0 bg-background z-10 min-w-48">{isRTL ? "اسم الطالب" : "Student Name"}</TableHead>
-                        {gridSubjects.map((subject) => (
-                          <TableHead key={subject.id} className="text-center min-w-20">
-                            {subject.arabicName || subject.name}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredStudents.map((student) => (
-                        <TableRow key={student.id} data-testid={`row-student-${student.id}`}>
-                          <TableCell className="sticky left-0 bg-background z-10 font-medium">
-                            {student.firstName} {student.lastName}
-                          </TableCell>
-                          {gridSubjects.map((subject) => {
-                            const result = student.results?.find((r: any) => r.subjectId === subject.id);
-                            return (
-                              <TableCell key={`${student.id}-${subject.id}`} className="text-center">
-                                {result ? (
-                                  <Badge variant="outline">{result.totalScore}</Badge>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">{isRTL ? "لم يتم العثور على طلاب" : "No students found"}</h3>
-                  <p className="text-muted-foreground">
-                    {isExaminer 
-                      ? (isRTL ? "لا يوجد طلاب معينين لك حالياً" : "No students are currently assigned to you")
-                      : (isRTL ? "حاول تعديل الفلاتر" : "Try adjusting your filters")}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="results" className="mt-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div>
-                  <CardTitle className="text-lg">{isRTL ? "النتائج المسجلة" : "Recorded Results"}</CardTitle>
-                  <CardDescription>
-                    {filteredResults?.length || 0} {isRTL ? "نتيجة موجودة" : "results found"}
-                  </CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    <BarChart3 className="w-4 h-4 me-2" />
-                    {t.nav.analytics}
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Download className="w-4 h-4 me-2" />
-                    {t.common.export}
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {resultsLoading ? (
-                <ResultsTableSkeleton />
-              ) : filteredResults && filteredResults.length > 0 ? (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t.students.title}</TableHead>
-                        <TableHead>{t.subjects.title}</TableHead>
-                        <TableHead>{isRTL ? "الدرجة" : "Score"}</TableHead>
-                        <TableHead>{isRTL ? "التقدير" : "Grade"}</TableHead>
-                        <TableHead>{t.common.status}</TableHead>
-                        <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredResults.map((result) => (
-                        <TableRow key={result.id} data-testid={`row-result-${result.id}`}>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                                <User className="w-4 h-4 text-primary" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-foreground">
-                                  {result.student?.firstName} {result.student?.lastName}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {result.student?.indexNumber || (isRTL ? "لا يوجد فهرس" : "No Index")}
-                                </p>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm">{result.subject?.name || (isRTL ? "غير معروف" : "Unknown")}</span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              <span className="font-medium">{result.totalScore || 0}</span>
-                              <span className="text-muted-foreground">/100</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {result.grade && (
-                              <Badge className={`${gradeColors[result.grade] || ''} text-xs`}>
-                                {result.grade}
-                              </Badge>
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <CardTitle className="text-lg">{isRTL ? "قائمة الطلاب للنتائج" : "Students for Result Entry"}</CardTitle>
+              <CardDescription>
+                {filteredStudents?.length || 0} {isRTL ? "طالب" : "students"}
+                {isExaminer && (isRTL ? " (المعينون لك)" : " (assigned to you)")}
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {studentsLoading ? (
+            <ResultsTableSkeleton />
+          ) : filteredStudents && filteredStudents.length > 0 ? (
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="sticky left-0 bg-background z-10 min-w-48">{isRTL ? "اسم الطالب" : "Student Name"}</TableHead>
+                    {gridSubjects.map((subject) => (
+                      <TableHead key={subject.id} className="text-center min-w-20">
+                        {subject.arabicName || subject.name}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredStudents.map((student) => (
+                    <TableRow key={student.id} data-testid={`row-student-${student.id}`}>
+                      <TableCell className="sticky left-0 bg-background z-10 font-medium">
+                        {student.firstName} {student.lastName}
+                      </TableCell>
+                      {gridSubjects.map((subject) => {
+                        const result = student.results?.find((r: any) => r.subjectId === subject.id);
+                        return (
+                          <TableCell key={`${student.id}-${subject.id}`} className="text-center">
+                            {result ? (
+                              <Badge variant="outline">{result.totalScore}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <Badge className={`${statusColors[result.status || 'pending']} text-xs`}>
-                              {getResultStatusLabel(result.status || 'pending', isRTL)}
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">{isRTL ? "لم يتم العثور على طلاب" : "No students found"}</h3>
+              <p className="text-muted-foreground">
+                {isExaminer 
+                  ? (isRTL ? "لا يوجد طلاب معينين لك حالياً" : "No students are currently assigned to you")
+                  : (isRTL ? "حاول تعديل الفلاتر" : "Try adjusting your filters")}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <CardTitle className="text-lg">{isRTL ? "النتائج المسجلة" : "Recorded Results"}</CardTitle>
+              <CardDescription>
+                {filteredResults?.length || 0} {isRTL ? "نتيجة موجودة" : "results found"}
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm">
+                <BarChart3 className="w-4 h-4 me-2" />
+                {t.nav.analytics}
+              </Button>
+              <Button variant="outline" size="sm">
+                <Download className="w-4 h-4 me-2" />
+                {t.common.export}
+              </Button>
+            </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {resultsLoading ? (
+              <ResultsTableSkeleton />
+            ) : filteredResults && filteredResults.length > 0 ? (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t.students.title}</TableHead>
+                      <TableHead>{t.subjects.title}</TableHead>
+                      <TableHead>{isRTL ? "الدرجة" : "Score"}</TableHead>
+                      <TableHead>{isRTL ? "التقدير" : "Grade"}</TableHead>
+                      <TableHead>{t.common.status}</TableHead>
+                      <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredResults.map((result) => (
+                      <TableRow key={result.id} data-testid={`row-result-${result.id}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                              <User className="w-4 h-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {result.student?.firstName} {result.student?.lastName}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {result.student?.indexNumber || (isRTL ? "لا يوجد فهرس" : "No Index")}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{result.subject?.name || (isRTL ? "غير معروف" : "Unknown")}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <span className="font-medium">{result.totalScore || 0}</span>
+                            <span className="text-muted-foreground">/100</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {result.grade && (
+                            <Badge className={`${gradeColors[result.grade] || ''} text-xs`}>
+                              {result.grade}
                             </Badge>
-                          </TableCell>
-                          <TableCell className={isRTL ? "text-left" : "text-right"}>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" data-testid={`button-actions-${result.id}`}>
-                                  <MoreVertical className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align={isRTL ? "start" : "end"}>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`${statusColors[result.status || 'pending']} text-xs`}>
+                            {getResultStatusLabel(result.status || 'pending', isRTL)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={isRTL ? "text-left" : "text-right"}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-actions-${result.id}`}>
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align={isRTL ? "start" : "end"}>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedResult(result);
+                                  setShowDetailsDialog(true);
+                                }}
+                              >
+                                <Eye className="w-4 h-4 me-2" />
+                                {t.common.viewDetails}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {result.status === 'pending' && (
                                 <DropdownMenuItem
-                                  onClick={() => {
-                                    setSelectedResult(result);
-                                    setShowDetailsDialog(true);
-                                  }}
+                                  onClick={() => validateResultMutation.mutate(result.id)}
+                                  className="text-chart-3"
                                 >
-                                  <Eye className="w-4 h-4 me-2" />
-                                  {t.common.viewDetails}
+                                  <CheckCircle className="w-4 h-4 me-2" />
+                                  {isRTL ? "التحقق" : "Validate"}
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                {result.status === 'pending' && (
-                                  <DropdownMenuItem
-                                    onClick={() => validateResultMutation.mutate(result.id)}
-                                    className="text-chart-3"
-                                  >
-                                    <CheckCircle className="w-4 h-4 me-2" />
-                                    {isRTL ? "التحقق" : "Validate"}
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <FileCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">{isRTL ? "لم يتم العثور على نتائج" : "No results found"}</h3>
-                  <p className="text-muted-foreground mb-4">
-                    {searchQuery
-                      ? (isRTL ? "حاول تعديل البحث أو الفلاتر" : "Try adjusting your search or filters")
-                      : (isRTL ? "قم بتحميل النتائج للبدء" : "Upload results to get started")}
-                  </p>
-                  <Button onClick={() => setShowUploadDialog(true)}>
-                    <Upload className="w-4 h-4 me-2" />
-                    {isRTL ? "تحميل النتائج" : "Upload Results"}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <FileCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">{isRTL ? "لم يتم العثور على نتائج" : "No results found"}</h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchQuery
+                    ? (isRTL ? "حاول تعديل البحث أو الفلاتر" : "Try adjusting your search or filters")
+                    : (isRTL ? "قم بتحميل النتائج للبدء" : "Upload results to get started")}
+                </p>
+                <Button onClick={() => setShowUploadDialog(true)}>
+                  <Upload className="w-4 h-4 me-2" />
+                  {isRTL ? "تحميل النتائج" : "Upload Results"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
         <DialogContent className="max-w-lg">
