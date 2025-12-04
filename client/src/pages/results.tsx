@@ -134,7 +134,7 @@ export default function Results() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadPercentage, setUploadPercentage] = useState(0);
   const [showMatchingPreview, setShowMatchingPreview] = useState(false);
-  const [previewData, setPreviewData] = useState<{ rows: any[]; schoolsCount: number; schoolsToCreate: number; studentsCount: number; subjectsCount: number; regionsToCreate: number; subjectColumns?: string[] } | null>(null);
+  const [previewData, setPreviewData] = useState<{ rows: any[]; schoolsCount: number; schoolsToCreate: number; studentsCount: number; subjectsCount: number; regionsToCreate: number; subjectColumns?: string[]; originalFile?: File } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: currentUser } = useQuery<any>({
@@ -240,20 +240,10 @@ export default function Results() {
   });
 
   const uploadResultsMutation = useMutation({
-    mutationFn: async (data: { rows: any[]; examYearId: number; grade: number }) => {
-      // Use comprehensive-upload endpoint that auto-creates and approves students
+    mutationFn: async (data: { file: File; examYearId: number; grade: number }) => {
+      // Send the raw CSV file directly to backend - let backend handle all parsing
       const formData = new FormData();
-      // Create CSV with proper headers for backend parsing
-      const csvLines: string[] = [];
-      // Add headers - backend expects: school, region, cluster, firstName, lastName, indexNumber, and subject names
-      csvLines.push(data.rows[0].join(','));
-      // Add data rows
-      for (let i = 1; i < data.rows.length; i++) {
-        csvLines.push(data.rows[i].join(','));
-      }
-      const csvContent = csvLines.join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      formData.append('file', blob, 'results.csv');
+      formData.append('file', data.file);
       formData.append('examYearId', String(data.examYearId));
       formData.append('grade', String(data.grade));
       
@@ -408,7 +398,8 @@ export default function Results() {
         studentsCount: uniqueStudents.size,
         subjectsCount: subjectColumns.length,
         regionsToCreate,
-        subjectColumns, // Store subject columns for later use
+        subjectColumns,
+        originalFile: file, // Store original file for upload
       });
       setShowMatchingPreview(true);
     } catch (error: any) {
@@ -417,15 +408,11 @@ export default function Results() {
         description: error.message || (isRTL ? "فشل قراءة الملف" : "Failed to read file"),
         variant: "destructive",
       });
-    } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     }
   };
 
   const handleConfirmUpload = async () => {
-    if (!previewData || !activeExamYear?.id) return;
+    if (!previewData || !activeExamYear?.id || !previewData.originalFile) return;
     
     setShowMatchingPreview(false);
     setIsUploading(true);
@@ -433,7 +420,6 @@ export default function Results() {
     setUploadPercentage(0);
 
     try {
-      // Simulate progress
       const progressInterval = setInterval(() => {
         setUploadPercentage(prev => {
           if (prev >= 90) {
@@ -444,35 +430,8 @@ export default function Results() {
         });
       }, 200);
 
-      // Map columns to backend format, supporting both Arabic and English headers
-      const subjectColumns = (previewData.subjectColumns as string[]) || [];
-      const headerRow = ['school', 'region', 'cluster', 'firstName', 'lastName', 'indexNumber', ...subjectColumns];
-      
-      const csvRows = [headerRow, ...previewData.rows.map((row: any) => {
-        // Support both Arabic and English headers
-        const schoolName = getHeaderValue(row, 'المدرسة', 'school');
-        const regionName = getHeaderValue(row, 'إقليم', 'region');
-        const clusterName = getHeaderValue(row, 'المكــــــان', 'cluster');
-        const studentFullName = getHeaderValue(row, 'اسم الطالب', 'student_name');
-        const indexNum = getHeaderValue(row, 'رقم الطالب', 'student_number');
-        
-        const parts = studentFullName.split(' ');
-        const fName = parts[0];
-        const lName = parts.slice(1).join(' ') || fName;
-        
-        return [
-          schoolName,
-          regionName,
-          clusterName,
-          fName,
-          lName,
-          indexNum,
-          ...subjectColumns.map(s => row[s] || '')
-        ];
-      })];
-      
       await uploadResultsMutation.mutateAsync({
-        rows: csvRows,
+        file: previewData.originalFile,
         examYearId: activeExamYear.id,
         grade: parseInt(studentGradeFilter),
       });
