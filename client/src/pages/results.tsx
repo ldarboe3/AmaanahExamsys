@@ -256,10 +256,11 @@ export default function Results() {
       return response.json();
     },
     onSuccess: (data: any) => {
+      const summary = data.summary || {};
       setUploadProgress({ 
-        created: data.summary.studentsCreated + data.summary.resultsCreated, 
+        created: (summary.studentsCreated || 0) + (summary.resultsCreated || 0), 
         updated: 0, 
-        errors: data.summary.errorsCount 
+        errors: summary.errorsCount || 0
       });
       queryClient.invalidateQueries({ queryKey: [studentsQueryUrl] });
       queryClient.invalidateQueries({ queryKey: ["/api/results"] });
@@ -268,8 +269,8 @@ export default function Results() {
       toast({
         title: isRTL ? "تم تحميل النتائج" : "Results Uploaded Successfully",
         description: isRTL 
-          ? `تم إنشاء ${data.summary.studentsCreated} طالب و${data.summary.resultsCreated} نتيجة` 
-          : `Created ${data.summary.studentsCreated} students and ${data.summary.resultsCreated} results`,
+          ? `تم إنشاء ${summary.studentsCreated || 0} طالب و${summary.resultsCreated || 0} نتيجة` 
+          : `Created ${summary.studentsCreated || 0} students and ${summary.resultsCreated || 0} results`,
       });
     },
     onError: (error: any) => {
@@ -375,7 +376,7 @@ export default function Results() {
 
       // Count how many schools will be matched vs created
       const existingSchools = schoolsList.filter((s: any) => {
-        for (const schoolName of uniqueSchools.keys()) {
+        for (const schoolName of Array.from(uniqueSchools.keys())) {
           const regionName = uniqueSchools.get(schoolName);
           if (s.name.toLowerCase() === schoolName.toLowerCase()) {
             const matchingRegion = regions?.find((r: any) => r.name.toLowerCase() === regionName?.toLowerCase());
