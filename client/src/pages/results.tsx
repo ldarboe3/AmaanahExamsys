@@ -243,7 +243,15 @@ export default function Results() {
     mutationFn: async (data: { rows: any[]; examYearId: number; grade: number }) => {
       // Use comprehensive-upload endpoint that auto-creates and approves students
       const formData = new FormData();
-      const csvContent = data.rows.map((row: any) => Object.values(row).join(',')).join('\n');
+      // Create CSV with proper headers for backend parsing
+      const csvLines: string[] = [];
+      // Add headers - backend expects: school, region, cluster, firstName, lastName, indexNumber, and subject names
+      csvLines.push(data.rows[0].join(','));
+      // Add data rows
+      for (let i = 1; i < data.rows.length; i++) {
+        csvLines.push(data.rows[i].join(','));
+      }
+      const csvContent = csvLines.join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       formData.append('file', blob, 'results.csv');
       formData.append('examYearId', String(data.examYearId));
@@ -405,22 +413,33 @@ export default function Results() {
         });
       }, 200);
 
-      // Upload with headers for CSV format
-      const headers = ['رقم المدرسة', 'المدرسة', 'المكــــــان', 'إقليم', 'رقم الطالب', 'اسم الطالب', ...gridSubjects.map(s => s.arabicName || s.name)];
-      const rowsWithHeaders = [headers, ...previewData.rows.map(row => {
+      // Map Arabic columns to English columns that backend expects
+      // Headers: school, region, cluster (optional), firstName, lastName, indexNumber, then subjects
+      const studentName = previewData.rows[0]?.['اسم الطالب'] || '';
+      const firstNameAr = studentName.split(' ')[0];
+      const lastNameAr = studentName.split(' ').slice(1).join(' ') || firstNameAr;
+      
+      // Build CSV rows with proper headers for backend
+      const subjectNames = gridSubjects.map(s => s.arabicName || s.name);
+      const headerRow = ['school', 'region', 'cluster', 'firstName', 'lastName', 'indexNumber', ...subjectNames];
+      
+      const csvRows = [headerRow, ...previewData.rows.map((row: any) => {
+        const parts = (row['اسم الطالب'] || '').split(' ');
+        const fName = parts[0];
+        const lName = parts.slice(1).join(' ') || fName;
         return [
-          row['رقم المدرسة'] || '',
-          row['المدرسة'] || '',
-          row['المكــــــان'] || '',
-          row['إقليم'] || '',
-          row['رقم الطالب'] || '',
-          row['اسم الطالب'] || '',
-          ...gridSubjects.map(s => row[s.arabicName || s.name] || '')
+          row['المدرسة'] || '',         // school
+          row['إقليم'] || '',           // region
+          row['المكــــــان'] || '',     // cluster/location
+          fName,                         // firstName
+          lName,                         // lastName
+          row['رقم الطالب'] || '',      // indexNumber
+          ...subjectNames.map(s => row[s] || '')  // subject scores
         ];
       })];
       
       await uploadResultsMutation.mutateAsync({
-        rows: rowsWithHeaders,
+        rows: csvRows,
         examYearId: activeExamYear.id,
         grade: parseInt(studentGradeFilter),
       });
