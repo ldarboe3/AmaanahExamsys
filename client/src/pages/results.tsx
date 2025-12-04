@@ -134,7 +134,7 @@ export default function Results() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadPercentage, setUploadPercentage] = useState(0);
   const [showMatchingPreview, setShowMatchingPreview] = useState(false);
-  const [previewData, setPreviewData] = useState<{ rows: any[]; schoolsCount: number; schoolsToCreate: number; studentsCount: number; subjectsCount: number; regionsToCreate: number } | null>(null);
+  const [previewData, setPreviewData] = useState<{ rows: any[]; schoolsCount: number; schoolsToCreate: number; studentsCount: number; subjectsCount: number; regionsToCreate: number; subjectColumns?: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: currentUser } = useQuery<any>({
@@ -296,6 +296,23 @@ export default function Results() {
     return (row[arabicHeader] || row[englishHeader] || '').trim();
   };
 
+  // Helper to identify subject columns (same logic as backend)
+  const getSubjectColumns = (headers: string[]): string[] => {
+    const metadataColumns = [
+      'region', 'region_ar', 'regionarabic', 'region_arabic',
+      'cluster', 'cluster_ar', 'clusterarabic', 'cluster_arabic',
+      'school', 'schoolname', 'school_name', 'school_ar', 'schoolarabic', 'school_arabic',
+      'student', 'studentname', 'student_name', 'firstname', 'first_name', 'lastname', 'last_name',
+      'student_ar', 'studentarabic', 'student_arabic', 'firstname_ar', 'lastname_ar',
+      'gender', 'dob', 'dateofbirth', 'date_of_birth', 'placeofbirth', 'place_of_birth',
+      'indexnumber', 'index_number', 'index', 'middlename', 'middle_name'
+    ];
+    
+    return headers.filter(col => 
+      !metadataColumns.includes(col.toLowerCase().replace(/\s+/g, '').replace(/_/g, ''))
+    );
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -340,6 +357,9 @@ export default function Results() {
         rows.push(row);
       }
 
+      // Identify subject columns
+      const subjectColumns = getSubjectColumns(headers);
+
       // Count unique schools and students in preview, and predict what will be created vs matched
       const uniqueSchools = new Map<string, string>(); // schoolName -> regionName
       const uniqueStudents = new Map<string, string>(); // studentName -> schoolName
@@ -381,8 +401,9 @@ export default function Results() {
         schoolsCount: uniqueSchools.size,
         schoolsToCreate: Math.max(0, schoolsToCreate),
         studentsCount: uniqueStudents.size,
-        subjectsCount: headers.length - 6, // Subtract: school code, school name, location, region, student number, student name
+        subjectsCount: subjectColumns.length,
         regionsToCreate,
+        subjectColumns, // Store subject columns for later use
       });
       setShowMatchingPreview(true);
     } catch (error: any) {
@@ -419,8 +440,8 @@ export default function Results() {
       }, 200);
 
       // Map columns to backend format, supporting both Arabic and English headers
-      const subjectNames = gridSubjects.map(s => s.arabicName || s.name);
-      const headerRow = ['school', 'region', 'cluster', 'firstName', 'lastName', 'indexNumber', ...subjectNames];
+      const subjectColumns = (previewData.subjectColumns as string[]) || [];
+      const headerRow = ['school', 'region', 'cluster', 'firstName', 'lastName', 'indexNumber', ...subjectColumns];
       
       const csvRows = [headerRow, ...previewData.rows.map((row: any) => {
         // Support both Arabic and English headers
@@ -441,7 +462,7 @@ export default function Results() {
           fName,
           lName,
           indexNum,
-          ...subjectNames.map(s => getHeaderValue(row, s, s.toLowerCase().replace(/\s+/g, '_')))
+          ...subjectColumns.map(s => row[s] || '')
         ];
       })];
       
