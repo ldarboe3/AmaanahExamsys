@@ -326,7 +326,7 @@ export default function Results() {
       });
 
       // Count how many schools will be matched vs created
-      const existingSchools = schools?.filter((s: any) => {
+      const existingSchools = schoolsList.filter((s: any) => {
         for (const [schoolName, regionName] of uniqueSchools) {
           if (s.name.toLowerCase() === schoolName.toLowerCase()) {
             const matchingRegion = regions?.find((r: any) => r.name.toLowerCase() === regionName.toLowerCase());
@@ -336,7 +336,7 @@ export default function Results() {
           }
         }
         return false;
-      }) || [];
+      });
       const schoolsToCreate = uniqueSchools.size - existingSchools.length;
       const regionsToCreate = Array.from(uniqueRegions).filter((rName: string) => 
         !(regions?.find((r: any) => r.name.toLowerCase() === rName.toLowerCase()))
