@@ -241,17 +241,37 @@ export default function Results() {
 
   const uploadResultsMutation = useMutation({
     mutationFn: async (data: { rows: any[]; examYearId: number; grade: number }) => {
-      return apiRequest("POST", "/api/results/multi-subject-upload", data);
+      // Use comprehensive-upload endpoint that auto-creates and approves students
+      const formData = new FormData();
+      const csvContent = data.rows.map((row: any) => Object.values(row).join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      formData.append('file', blob, 'results.csv');
+      formData.append('examYearId', String(data.examYearId));
+      formData.append('grade', String(data.grade));
+      
+      const response = await fetch('/api/results/comprehensive-upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Upload failed');
+      return response.json();
     },
     onSuccess: (data: any) => {
-      setUploadProgress({ created: data.created, updated: data.updated, errors: data.errors });
+      setUploadProgress({ 
+        created: data.summary.studentsCreated + data.summary.resultsCreated, 
+        updated: 0, 
+        errors: data.summary.errorsCount 
+      });
+      queryClient.invalidateQueries({ queryKey: [studentsQueryUrl] });
       queryClient.invalidateQueries({ queryKey: ["/api/results"] });
       queryClient.invalidateQueries({ queryKey: ["/api/subjects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/students"] });
       toast({
-        title: isRTL ? "تم تحميل النتائج" : "Results Uploaded",
+        title: isRTL ? "تم تحميل النتائج" : "Results Uploaded Successfully",
         description: isRTL 
-          ? `تم إنشاء ${data.created} وتحديث ${data.updated} نتيجة` 
-          : `Created ${data.created} and updated ${data.updated} results`,
+          ? `تم إنشاء ${data.summary.studentsCreated} طالب و${data.summary.resultsCreated} نتيجة` 
+          : `Created ${data.summary.studentsCreated} students and ${data.summary.resultsCreated} results`,
       });
     },
     onError: (error: any) => {
@@ -327,9 +347,10 @@ export default function Results() {
 
       // Count how many schools will be matched vs created
       const existingSchools = schoolsList.filter((s: any) => {
-        for (const [schoolName, regionName] of uniqueSchools) {
+        for (const schoolName of uniqueSchools.keys()) {
+          const regionName = uniqueSchools.get(schoolName);
           if (s.name.toLowerCase() === schoolName.toLowerCase()) {
-            const matchingRegion = regions?.find((r: any) => r.name.toLowerCase() === regionName.toLowerCase());
+            const matchingRegion = regions?.find((r: any) => r.name.toLowerCase() === regionName?.toLowerCase());
             if (matchingRegion && s.regionId === matchingRegion.id) {
               return true;
             }
@@ -384,8 +405,22 @@ export default function Results() {
         });
       }, 200);
 
+      // Upload with headers for CSV format
+      const headers = ['رقم المدرسة', 'المدرسة', 'المكــــــان', 'إقليم', 'رقم الطالب', 'اسم الطالب', ...gridSubjects.map(s => s.arabicName || s.name)];
+      const rowsWithHeaders = [headers, ...previewData.rows.map(row => {
+        return [
+          row['رقم المدرسة'] || '',
+          row['المدرسة'] || '',
+          row['المكــــــان'] || '',
+          row['إقليم'] || '',
+          row['رقم الطالب'] || '',
+          row['اسم الطالب'] || '',
+          ...gridSubjects.map(s => row[s.arabicName || s.name] || '')
+        ];
+      })];
+      
       await uploadResultsMutation.mutateAsync({
-        rows: previewData.rows,
+        rows: rowsWithHeaders,
         examYearId: activeExamYear.id,
         grade: parseInt(studentGradeFilter),
       });
