@@ -5393,12 +5393,40 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const existingIndex = row['indexNumber'] || row['index_number'] || row['index'] || row['رقم الطالب'] || row['رقمالطالب'] || '';
 
           // Extract location data - support both Arabic and English column names
-          const regionName = row['region'] || row['Region'] || row['إقليم'] || '';
+          let regionName = row['region'] || row['Region'] || row['إقليم'] || '';
+          let clusterName = row['cluster'] || row['Cluster'] || row['المكــــــان'] || row['المكان'] || '';
           const regionNameAr = row['region_ar'] || row['regionArabic'] || row['region_arabic'] || row['إقليم'] || '';
-          const clusterName = row['cluster'] || row['Cluster'] || row['المكــــــان'] || row['المكان'] || '';
           const clusterNameAr = row['cluster_ar'] || row['clusterArabic'] || row['cluster_arabic'] || row['المكــــــان'] || row['المكان'] || '';
           const schoolName = row['school'] || row['schoolName'] || row['school_name'] || row['School'] || row['المدرسة'] || '';
           const schoolNameAr = row['school_ar'] || row['schoolArabic'] || row['school_arabic'] || row['المدرسة'] || '';
+          
+          // Handle region/cluster codes in format "1.1" (region 1, cluster 1)
+          if (regionName.includes('.')) {
+            const parts = regionName.split('.');
+            const regionCode = parts[0].trim();
+            const clusterCode = parts[1]?.trim() || '';
+            
+            // Look up region by code
+            const allRegions = await storage.getAllRegions();
+            const matchedRegion = allRegions.find(r => r.code === regionCode);
+            if (matchedRegion) {
+              regionName = matchedRegion.name;
+              // Find cluster by code within this region
+              if (clusterCode) {
+                const allClusters = await storage.getClustersByRegion(matchedRegion.id);
+                const matchedCluster = allClusters.find(c => c.code === `RG${matchedRegion.id}-${clusterCode}`);
+                if (matchedCluster) {
+                  clusterName = matchedCluster.name;
+                } else {
+                  clusterName = `Cluster ${clusterCode}`;
+                }
+              }
+            } else {
+              // If region not found by code, create it
+              regionName = `Region ${regionCode}`;
+              clusterName = clusterCode ? `Cluster ${clusterCode}` : clusterName;
+            }
+          }
 
           // Check if student has any marks
           let hasMarks = false;
