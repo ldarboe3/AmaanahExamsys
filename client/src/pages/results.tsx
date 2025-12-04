@@ -298,18 +298,23 @@ export default function Results() {
 
   // Helper to identify subject columns (same logic as backend)
   const getSubjectColumns = (headers: string[]): string[] => {
+    // Include both Arabic and English metadata column names
     const metadataColumns = [
-      'region', 'region_ar', 'regionarabic', 'region_arabic',
-      'cluster', 'cluster_ar', 'clusterarabic', 'cluster_arabic',
-      'school', 'schoolname', 'school_name', 'school_ar', 'schoolarabic', 'school_arabic',
+      'region', 'region_ar', 'regionarabic', 'region_arabic', 'إقليم',
+      'cluster', 'cluster_ar', 'clusterarabic', 'cluster_arabic', 'المكــــــان', 'المكان',
+      'school', 'schoolname', 'school_name', 'school_ar', 'schoolarabic', 'school_arabic', 'المدرسة',
+      'schoolcode', 'school_code', 'رقم المدرسة', 'رقمالمدرسة',
       'student', 'studentname', 'student_name', 'firstname', 'first_name', 'lastname', 'last_name',
       'student_ar', 'studentarabic', 'student_arabic', 'firstname_ar', 'lastname_ar',
+      'اسم الطالب', 'اسمالطالب', 'الطالب',
       'gender', 'dob', 'dateofbirth', 'date_of_birth', 'placeofbirth', 'place_of_birth',
-      'indexnumber', 'index_number', 'index', 'middlename', 'middle_name'
+      'indexnumber', 'index_number', 'index', 'middlename', 'middle_name',
+      'رقم الطالب', 'رقمالطالب', 'الرقم'
     ];
     
     return headers.filter(col => 
-      !metadataColumns.includes(col.toLowerCase().replace(/\s+/g, '').replace(/_/g, ''))
+      !metadataColumns.includes(col.toLowerCase().replace(/\s+/g, '').replace(/_/g, '')) &&
+      !metadataColumns.includes(col) // Also check exact match for Arabic
     );
   };
 

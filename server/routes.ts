@@ -5265,14 +5265,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       // Detect subject columns (columns that are not metadata)
+      // Include both Arabic and English metadata column names
       const metadataColumns = [
-        'region', 'region_ar', 'regionarabic', 'region_arabic',
-        'cluster', 'cluster_ar', 'clusterarabic', 'cluster_arabic',
-        'school', 'schoolname', 'school_name', 'school_ar', 'schoolarabic', 'school_arabic',
+        'region', 'region_ar', 'regionarabic', 'region_arabic', 'إقليم',
+        'cluster', 'cluster_ar', 'clusterarabic', 'cluster_arabic', 'المكــــــان', 'المكان',
+        'school', 'schoolname', 'school_name', 'school_ar', 'schoolarabic', 'school_arabic', 'المدرسة',
+        'schoolcode', 'school_code', 'رقم المدرسة', 'رقمالمدرسة',
         'student', 'studentname', 'student_name', 'firstname', 'first_name', 'lastname', 'last_name',
         'student_ar', 'studentarabic', 'student_arabic', 'firstname_ar', 'lastname_ar',
+        'اسم الطالب', 'اسمالطالب', 'الطالب',
         'gender', 'dob', 'dateofbirth', 'date_of_birth', 'placeofbirth', 'place_of_birth',
-        'indexnumber', 'index_number', 'index', 'middlename', 'middle_name'
+        'indexnumber', 'index_number', 'index', 'middlename', 'middle_name',
+        'رقم الطالب', 'رقمالطالب', 'الرقم'
       ];
       
       const firstRow = rows[0];
@@ -5337,10 +5341,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
 
         if (hasMarks) {
-          // Find school identifier
-          const schoolName = row['school'] || row['schoolName'] || row['school_name'] || row['School'] || '';
-          const regionName = row['region'] || row['Region'] || '';
-          const clusterName = row['cluster'] || row['Cluster'] || '';
+          // Find school identifier - support both Arabic and English column names
+          const schoolName = row['school'] || row['schoolName'] || row['school_name'] || row['School'] || row['المدرسة'] || '';
+          const regionName = row['region'] || row['Region'] || row['إقليم'] || '';
+          const clusterName = row['cluster'] || row['Cluster'] || row['المكــــــان'] || row['المكان'] || '';
           if (schoolName && regionName) {
             schoolsWithStudents.add(`${regionName.trim().toLowerCase()}|${clusterName.trim().toLowerCase()}|${schoolName.trim().toLowerCase()}`);
           }
@@ -5374,24 +5378,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         progress.processed = i + 1;
 
         try {
-          // Extract student data
-          const firstName = row['firstName'] || row['first_name'] || row['FirstName'] || row['student'] || row['studentName'] || '';
-          const lastName = row['lastName'] || row['last_name'] || row['LastName'] || '';
+          // Extract student data - support both Arabic and English column names
+          // For Arabic اسم الطالب, split the full name into first/last
+          const arabicStudentName = row['اسم الطالب'] || row['اسمالطالب'] || row['الطالب'] || '';
+          const arabicNameParts = arabicStudentName.trim().split(/\s+/);
+          const firstName = row['firstName'] || row['first_name'] || row['FirstName'] || row['student'] || row['studentName'] || arabicNameParts[0] || '';
+          const lastName = row['lastName'] || row['last_name'] || row['LastName'] || arabicNameParts.slice(1).join(' ') || '';
           const middleName = row['middleName'] || row['middle_name'] || row['MiddleName'] || '';
-          const firstNameAr = row['firstName_ar'] || row['firstname_ar'] || '';
-          const lastNameAr = row['lastName_ar'] || row['lastname_ar'] || '';
+          const firstNameAr = row['firstName_ar'] || row['firstname_ar'] || arabicNameParts[0] || '';
+          const lastNameAr = row['lastName_ar'] || row['lastname_ar'] || arabicNameParts.slice(1).join(' ') || '';
           const gender = (row['gender'] || row['Gender'] || 'male').toLowerCase().includes('f') ? 'female' : 'male';
           const dob = row['dob'] || row['dateOfBirth'] || row['date_of_birth'] || null;
           const placeOfBirth = row['placeOfBirth'] || row['place_of_birth'] || '';
-          const existingIndex = row['indexNumber'] || row['index_number'] || row['index'] || '';
+          const existingIndex = row['indexNumber'] || row['index_number'] || row['index'] || row['رقم الطالب'] || row['رقمالطالب'] || '';
 
-          // Extract location data
-          const regionName = row['region'] || row['Region'] || '';
-          const regionNameAr = row['region_ar'] || row['regionArabic'] || row['region_arabic'] || '';
-          const clusterName = row['cluster'] || row['Cluster'] || '';
-          const clusterNameAr = row['cluster_ar'] || row['clusterArabic'] || row['cluster_arabic'] || '';
-          const schoolName = row['school'] || row['schoolName'] || row['school_name'] || row['School'] || '';
-          const schoolNameAr = row['school_ar'] || row['schoolArabic'] || row['school_arabic'] || '';
+          // Extract location data - support both Arabic and English column names
+          const regionName = row['region'] || row['Region'] || row['إقليم'] || '';
+          const regionNameAr = row['region_ar'] || row['regionArabic'] || row['region_arabic'] || row['إقليم'] || '';
+          const clusterName = row['cluster'] || row['Cluster'] || row['المكــــــان'] || row['المكان'] || '';
+          const clusterNameAr = row['cluster_ar'] || row['clusterArabic'] || row['cluster_arabic'] || row['المكــــــان'] || row['المكان'] || '';
+          const schoolName = row['school'] || row['schoolName'] || row['school_name'] || row['School'] || row['المدرسة'] || '';
+          const schoolNameAr = row['school_ar'] || row['schoolArabic'] || row['school_arabic'] || row['المدرسة'] || '';
 
           // Check if student has any marks
           let hasMarks = false;
@@ -5444,8 +5451,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           } else {
             let region = await storage.getRegionByName(regionName.trim());
             if (!region) {
+              // Generate a unique region code
+              const allRegions = await storage.getAllRegions();
+              const regionCode = `RG${allRegions.length + 1}`;
               region = await storage.createRegion({ 
                 name: regionName.trim(),
+                code: regionCode,
                 arabicName: regionNameAr.trim() || null,
                 description: null 
               });
@@ -5464,8 +5475,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             } else {
               let cluster = await storage.getClusterByNameAndRegion(clusterName.trim(), regionId);
               if (!cluster) {
+                // Generate a unique cluster code
+                const regionClusters = await storage.getClustersByRegion(regionId);
+                const clusterCode = `RG${regionId}-${regionClusters.length + 1}`;
                 cluster = await storage.createCluster({
                   name: clusterName.trim(),
+                  code: clusterCode,
                   arabicName: clusterNameAr.trim() || null,
                   regionId,
                   description: null
