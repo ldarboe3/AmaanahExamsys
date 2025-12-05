@@ -1,0 +1,164 @@
+Feature: Arabic Certificates with Auto Gender Detection + New Student Fields
+Goal
+
+Generate an Arabic-only primary certificate for each student using the correct template (male or female). Because current student records do not include gender, the system must infer gender from the student’s name and allow an admin override. Also, add Gender, Date of Birth, and Place of Birth to the student registration and store them so future certificates don’t need re-entry.
+
+Certificate templates to use (Arabic, do not translate to English):
+• Male template: /mnt/data/certificate for men.pdf 
+
+certificate for men
+
+
+• Female template: /mnt/data/female certificate for female.pdf 
+
+female certificate for female
+
+Inputs available per student (from results/certificate data)
+
+اسم الطالب/الطالبة (Student name)
+
+اسم المدرسة – العنوان (School name – address)
+
+مكان الميلاد (Place of birth)
+
+تاريخ الميلاد (Date of birth)
+
+الفترة/العام الدراسي (Academic year)
+
+النتيجة النهائية (Final result / grade)
+
+التاريخ الهجري (Islamic calendar year/date)
+
+التاريخ الميلادي (Gregorian calendar year/date)
+
+رقم الشهادة (Certificate number)
+
+Wording/layout must match the Arabic on the provided templates (see page 1 of each PDF for exact phrasing/labels). 
+
+certificate for men
+
+ 
+
+female certificate for female
+
+A) Data model / UI updates
+
+Add fields to Student:
+
+gender (enum: male, female, unknown) — required after detection or manual set
+
+date_of_birth (date)
+
+place_of_birth (string)
+
+Student Registration Page:
+
+Show Gender (required), Date of Birth, Place of Birth inputs.
+
+If a record is missing these, prompt the user to fill them before generating a certificate.
+
+B) Auto-detect gender from Arabic name
+
+Run a name-based classifier on save/import:
+
+Heuristics list (e.g., common male names: محمد، عبدالله، عمر…; female: فاطمة، عائشة، مريم…).
+
+Handle endings like “ـة/ه” and markers (e.g., “بنت” vs “بن”) when present.
+
+Confidence & override:
+
+If confidence ≥ threshold, set gender.
+
+If low confidence or ambiguous, set gender = unknown → UI banner asks the admin to choose male/female manually (required before certificate generation).
+
+Always allow manual override on the Student profile.
+
+C) Certificate selection & Arabic rendering
+
+Template choice by gender:
+
+If gender = male → use male template /mnt/data/certificate for men.pdf. 
+
+certificate for men
+
+If gender = female → use female template /mnt/data/female certificate for female.pdf. 
+
+female certificate for female
+
+If unknown → block generation with a clear Arabic message: “الرجاء تحديد جنس الطالب/الطالبة قبل إصدار الشهادة”.
+
+Arabic-only output:
+
+Do not translate or output English labels; keep all wording exactly as in the templates (see the Arabic body text on page 1 of each PDF). 
+
+certificate for men
+
+ 
+
+female certificate for female
+
+Field mapping (examples; use exact placeholders from the templates):
+
+{student name} → اسم الطالب/الطالبة
+
+{Place of Birth} → مكان الميلاد
+
+{Date of Birth} → تاريخ الميلاد
+
+{School name} – {Address} → اسم المدرسة – العنوان
+
+{Academic year} → الفترة/العام الدراسي
+
+{Final Result} → النتيجة النهائية
+
+{Islamic calendar year} → التاريخ الهجري
+
+{Georgian/Gregorian Calendar year} → التاريخ الميلادي
+
+{Certificate Number} → رقم الشهادة
+(See the Arabic labels in the PDFs to ensure correct placement and grammar; female template uses المؤنث في النصوص.) 
+
+female certificate for female
+
+D) Arabic text normalization (pre-render)
+
+Before matching or rendering, clean Arabic fields to avoid spacing/shape mismatches:
+
+Remove tatweel (ـ), collapse spaces, normalize أ/إ/آ→ا، ى→ي، ة→ه, strip punctuation inside names (e.g., “أ . م سيسي” → “ا م سيسي”).
+
+Convert Arabic digits to ASCII where dates/codes are parsed.
+(Use the same cleaner already planned for uploads.)
+
+E) Validation rules before generation
+
+Gender present? (male/female) → required.
+
+Date of birth & Place of birth present? → required (both appear on certificate).
+
+Certificate number, academic year, final result → required.
+
+If any required field missing, show a single Arabic error message listing the missing fields.
+
+F) Output
+
+Generate a PDF certificate in Arabic only using the selected template layout.
+
+One PDF per student (with unique file name convention, e.g., CERT_{certificateNumber}_{studentId}.pdf).
+
+Optionally, support batch generation with zip download.
+
+G) Acceptance criteria
+
+When a student has no stored gender, the system auto-detects from the Arabic name and proposes a selection; admin can override.
+
+If gender is set to male/female and all fields are present, the system produces a PDF using the correct Arabic template with accurate grammar (masculine vs feminine phrasing exactly as in the templates). 
+
+certificate for men
+
+ 
+
+female certificate for female
+
+Certificates never include English labels/text.
+
+Errors are in Arabic, and generation is blocked if required fields are missing.
