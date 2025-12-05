@@ -1289,6 +1289,252 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // CSV Bulk School Upload Configuration
+  const csvUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req: any, file, cb) => {
+      const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+      if (allowedTypes.includes(file.mimetype) || file.originalname.endsWith('.csv')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only CSV files are allowed.'));
+      }
+    },
+  }).single('file');
+
+  // CSV Bulk School Upload API
+  app.post("/api/schools/bulk-upload-csv", isAuthenticated, (req, res) => {
+    csvUpload(req, res, async (err) => {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ message: `Upload error: ${err.message}` });
+      } else if (err) {
+        return res.status(400).json({ message: err.message });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      try {
+        // Parse CSV file
+        const fileContent = req.file.buffer.toString('utf-8');
+        const lines = fileContent.trim().split('\n');
+        
+        if (lines.length < 2) {
+          return res.status(400).json({ message: "CSV file must contain headers and at least one data row" });
+        }
+
+        // Parse headers (support both Arabic and English)
+        const headerLine = lines[0];
+        const headers = headerLine.split(',').map(h => h.trim());
+        
+        // Normalize header names - support both Arabic and English
+        const schoolNameIndex = headers.findIndex(h => 
+          h.toLowerCase().includes('school') || h.includes('مدرسة') || h.includes('School Name')
+        );
+        const addressIndex = headers.findIndex(h => 
+          h.toLowerCase().includes('address') || h.includes('عنوان') || h.includes('Address')
+        );
+        const regionIndex = headers.findIndex(h => 
+          h.toLowerCase().includes('region') || h.includes('منطقة') || h.includes('Region')
+        );
+        const clusterIndex = headers.findIndex(h => 
+          h.toLowerCase().includes('cluster') || h.includes('عنقود') || h.includes('Cluster')
+        );
+
+        if (schoolNameIndex === -1 || addressIndex === -1 || regionIndex === -1 || clusterIndex === -1) {
+          return res.status(400).json({ 
+            message: "CSV must contain 'School Name', 'Address', 'Region', and 'Cluster' columns" 
+          });
+        }
+
+        // Get all existing regions and clusters for lookup
+        const allRegions = await storage.getAllRegions();
+        const allClusters = await storage.getAllClusters();
+
+        // Create lookup maps: region ID -> region, (region ID, cluster ID) -> cluster
+        const regionMap = new Map<number, any>();
+        const clusterMap = new Map<string, any>();
+        
+        allRegions.forEach(r => regionMap.set(r.id, r));
+        allClusters.forEach(c => clusterMap.set(`${c.regionId}-${c.id}`, c));
+
+        const results: {
+          success: Array<{
+            schoolName: string;
+            address: string;
+            regionCode: string;
+            clusterCode: string;
+            schoolId: number;
+          }>;
+          errors: Array<{ row: number; error: string; schoolName?: string }>;
+        } = {
+          success: [],
+          errors: [],
+        };
+
+        // Process data rows
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue; // Skip empty lines
+
+          const row: number = i;
+
+          try {
+            // Split CSV row - handle quoted fields
+            let cells: string[] = [];
+            let currentCell = '';
+            let insideQuotes = false;
+
+            for (let j = 0; j < line.length; j++) {
+              const char = line[j];
+              if (char === '"') {
+                insideQuotes = !insideQuotes;
+              } else if (char === ',' && !insideQuotes) {
+                cells.push(currentCell.trim().replace(/^"+|"+$/g, ''));
+                currentCell = '';
+              } else {
+                currentCell += char;
+              }
+            }
+            cells.push(currentCell.trim().replace(/^"+|"+$/g, ''));
+
+            const schoolName = cells[schoolNameIndex]?.trim();
+            const address = cells[addressIndex]?.trim() || '';
+            const regionInput = cells[regionIndex]?.trim();
+            const clusterInput = cells[clusterIndex]?.trim();
+
+            // Validate required fields
+            if (!schoolName) {
+              results.errors.push({ row: row + 1, error: "School name is required" });
+              continue;
+            }
+            if (!regionInput) {
+              results.errors.push({ row: row + 1, error: "Region is required", schoolName });
+              continue;
+            }
+            if (!clusterInput) {
+              results.errors.push({ row: row + 1, error: "Cluster is required", schoolName });
+              continue;
+            }
+
+            // Parse region and cluster codes (numeric IDs)
+            const regionId = parseInt(regionInput, 10);
+            const clusterId = parseInt(clusterInput, 10);
+
+            if (isNaN(regionId)) {
+              results.errors.push({ 
+                row: row + 1, 
+                error: `Invalid region code "${regionInput}". Region must be a numeric ID (e.g., "1").`,
+                schoolName 
+              });
+              continue;
+            }
+
+            if (isNaN(clusterId)) {
+              results.errors.push({ 
+                row: row + 1, 
+                error: `Invalid cluster code "${clusterInput}". Cluster must be a numeric ID (e.g., "1").`,
+                schoolName 
+              });
+              continue;
+            }
+
+            // Look up region
+            const region = regionMap.get(regionId);
+            if (!region) {
+              results.errors.push({ 
+                row: row + 1, 
+                error: `Region code ${regionId} not found. Please create the region first.`,
+                schoolName 
+              });
+              continue;
+            }
+
+            // Look up cluster
+            const cluster = clusterMap.get(`${regionId}-${clusterId}`);
+            if (!cluster) {
+              results.errors.push({ 
+                row: row + 1, 
+                error: `Cluster code ${clusterId} not found in Region ${regionId}. Format should be "X.Y" (e.g., "1.1" for Region 1, Cluster 1).`,
+                schoolName 
+              });
+              continue;
+            }
+
+            // Check for duplicate school
+            const existingSchool = await storage.getSchoolByNameAndLocation(schoolName, regionId, clusterId);
+            if (existingSchool) {
+              results.errors.push({ 
+                row: row + 1, 
+                error: `School "${schoolName}" already exists in ${cluster.name}, ${region.name}`,
+                schoolName 
+              });
+              continue;
+            }
+
+            // Generate credentials
+            const username = `school${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+            const password = `School@${Math.random().toString(36).substring(2, 10)}`;
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            // Create user account
+            const [user] = await db.insert(users).values({
+              username,
+              passwordHash: hashedPassword,
+              role: 'school_admin',
+              firstName: schoolName,
+              lastName: 'Admin',
+              email: `${username.toLowerCase()}@placeholder.local`,
+            }).returning();
+
+            // Create school with auto-approval
+            const [createdSchool] = await db.insert(schools).values({
+              name: schoolName,
+              registrarName: 'School Admin',
+              email: `${username.toLowerCase()}@school.local`,
+              address,
+              schoolType: 'LBS' as const,
+              regionId,
+              clusterId,
+              status: 'approved' as const,
+              isEmailVerified: true,
+              adminUserId: user.id,
+            }).returning();
+
+            // Update user with schoolId
+            await db.update(users).set({ schoolId: createdSchool.id }).where(eq(users.id, user.id));
+
+            results.success.push({
+              schoolName,
+              address,
+              regionCode: `${region.code}`,
+              clusterCode: `${region.code}.${cluster.code}`,
+              schoolId: createdSchool.id,
+            });
+          } catch (error: any) {
+            results.errors.push({ 
+              row: row + 1, 
+              error: error.message || "Unknown error"
+            });
+          }
+        }
+
+        res.json({
+          message: `Processed ${lines.length - 1} schools from CSV`,
+          totalProcessed: lines.length - 1,
+          successCount: results.success.length,
+          errorCount: results.errors.length,
+          schools: results.success,
+          errors: results.errors,
+        });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+  });
+
   // Get school info for verification page (validates token without consuming it)
   app.get("/api/schools/verify-info/:token", async (req, res) => {
     try {
