@@ -303,17 +303,21 @@ export default function Results() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/results"] });
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/schools"] });
       setUploadSummary(data);
       setUploadPhase('confirmed');
       setIsConfirming(false);
       
+      const schoolsCreatedMsg = data.summary?.schoolsCreated > 0 
+        ? (isRTL ? `${data.summary.schoolsCreated} مدرسة جديدة، ` : `${data.summary.schoolsCreated} new schools, `)
+        : '';
       const studentsCreatedMsg = data.summary?.studentsCreated > 0 
         ? (isRTL ? `${data.summary.studentsCreated} طالب جديد، ` : `${data.summary.studentsCreated} new students, `)
         : '';
       
       toast({
         title: isRTL ? "تم تحميل النتائج بنجاح" : "Results Applied Successfully",
-        description: `${studentsCreatedMsg}${data.summary?.resultsCreated || 0} ${isRTL ? "نتائج جديدة" : "new results"}, ${data.summary?.resultsUpdated || 0} ${isRTL ? "نتائج محدثة" : "updated"}`,
+        description: `${schoolsCreatedMsg}${studentsCreatedMsg}${data.summary?.resultsCreated || 0} ${isRTL ? "نتائج جديدة" : "new results"}, ${data.summary?.resultsUpdated || 0} ${isRTL ? "نتائج محدثة" : "updated"}`,
       });
     },
     onError: (error: any) => {
