@@ -5696,12 +5696,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "Valid grade level (3, 6, 9, or 12) is required" });
       }
 
-      // Parse CSV with UTF-8 encoding
-      const csvContent = req.file.buffer.toString('utf-8');
+      // Parse CSV with UTF-8 encoding, strip BOM if present
+      let csvContent = req.file.buffer.toString('utf-8');
+      // Strip UTF-8 BOM if present (EF BB BF or \uFEFF)
+      if (csvContent.charCodeAt(0) === 0xFEFF) {
+        csvContent = csvContent.slice(1);
+      }
       const workbook = XLSX.read(csvContent, { type: 'string', codepage: 65001 });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
+      let rows: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
+      
+      // Additional safety: sanitize all row keys by stripping BOM from any keys
+      rows = rows.map(row => {
+        const sanitizedRow: any = {};
+        for (const key of Object.keys(row)) {
+          const sanitizedKey = key.replace(/^\uFEFF/, '');
+          sanitizedRow[sanitizedKey] = row[key];
+        }
+        return sanitizedRow;
+      });
 
       if (rows.length === 0) {
         return res.status(400).json({ message: "CSV file is empty" });
