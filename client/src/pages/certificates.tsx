@@ -96,10 +96,11 @@ export default function Certificates() {
   });
   const schools = schoolsResponse?.data || [];
 
-  const { data: students, isLoading: studentsLoading } = useQuery<StudentWithCertificate[]>({
+  const { data: studentsResponse, isLoading: studentsLoading } = useQuery<{ data: StudentWithCertificate[]; total: number }>({
     queryKey: [`/api/students?schoolId=${selectedSchool}`],
     enabled: !!selectedSchool,
   });
+  const students = studentsResponse?.data || [];
 
   const { data: examYears } = useQuery<ExamYear[]>({
     queryKey: ["/api/exam-years"],
