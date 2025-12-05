@@ -116,7 +116,7 @@ export default function Results() {
   const schools = Array.isArray(schoolsList) ? schoolsList : [];
 
   // Fetch students based on filters
-  const { data: studentList, isLoading: studentsLoading } = useQuery<StudentWithResults[]>({
+  const { data: studentListResponse, isLoading: studentsLoading } = useQuery<{ data: StudentWithResults[] }>({
     queryKey: ["/api/students", selectedExamYear!, selectedGrade!, regionFilter, clusterFilter, schoolFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -131,6 +131,8 @@ export default function Results() {
     },
     enabled: !!selectedExamYear && !!selectedGrade,
   });
+
+  const studentList = studentListResponse?.data || [];
 
   // Fetch results for students
   const { data: resultsList, isLoading: resultsLoading } = useQuery<StudentResult[]>({
