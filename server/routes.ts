@@ -1054,16 +1054,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         errors: [],
       };
 
-      // Helper to generate simplified username (schooladmin0001, schooladmin0002, etc.)
+      // Helper to generate sequential username (SchoolAdmin0001, SchoolAdmin0002, etc.)
       const generateUsername = async (counter: number, existingUsernames: Set<string>): Promise<string> => {
-        const username = `schooladmin${String(counter).padStart(4, '0')}`;
+        const username = `SchoolAdmin${String(counter).padStart(4, '0')}`;
         existingUsernames.add(username.toLowerCase());
         return username;
       };
 
-      // Helper to generate simplified password (always School@123)
+      // Helper to generate fixed password
       const generatePassword = (): string => {
-        return 'School@123';
+        return 'Admin@123';
       };
 
       // Helper to find best matching region (fuzzy matching for numeric inputs)
@@ -1180,22 +1180,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const clusterName = row.cluster.trim();
           const address = row.address?.trim() || '';
 
-          // Find existing region - NO CREATION
+          // Validate region and cluster exist - NO CREATION
           let regionId: number | undefined;
           let matchedRegion = findBestRegionMatch(regionInput, allRegions);
           
           if (matchedRegion) {
-            // Use existing matching region
             regionId = matchedRegion.id;
             regionCache.set(matchedRegion.name.toLowerCase(), regionId);
           } else {
-            // Check cache for previously validated region
             regionId = regionCache.get(regionInput.toLowerCase());
             if (!regionId) {
-              // Region does not exist - flag as error instead of creating
               results.errors.push({ 
                 row: rowNum, 
-                error: `Region "${regionInput}" not found in system. Regions must be created before uploading schools.`,
+                error: `Region/Cluster mismatch in Row ${rowNum} — does not match existing records.`,
                 schoolName 
               });
               continue;
@@ -1208,7 +1205,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const clusterKey = `${regionId}-${clusterName.toLowerCase()}`;
           let clusterId = clusterCache.get(clusterKey);
           if (!clusterId) {
-            // Try to find cluster in allClusters list
             const foundCluster = allClusters.find(c => 
               c.regionId === regionId && c.name.toLowerCase().trim() === clusterName.toLowerCase()
             );
@@ -1216,10 +1212,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               clusterId = foundCluster.id;
               clusterCache.set(clusterKey, clusterId);
             } else {
-              // Cluster does not exist - flag as error instead of creating
               results.errors.push({ 
                 row: rowNum, 
-                error: `Cluster "${clusterName}" not found in Region "${actualRegionName}". Clusters must be created before uploading schools.`,
+                error: `Region/Cluster mismatch in Row ${rowNum} — does not match existing records.`,
                 schoolName 
               });
               continue;
@@ -1243,31 +1238,31 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const password = generatePassword();
           const hashedPassword = await bcrypt.hash(password, 10);
 
-          // Create user account first
+          // Create user account (SEPARATE from school - no email)
           const [user] = await db.insert(users).values({
             username,
             passwordHash: hashedPassword,
             role: 'school_admin',
-            firstName: schoolName,
+            firstName: username, // Just username
             lastName: 'Admin',
-            email: `${username.toLowerCase()}@placeholder.local`, // Placeholder email
+            mustChangePassword: true, // Force password change on first login
           }).returning();
 
-          // Create school with minimal data
+          // Create school WITHOUT email requirement
           const [createdSchool] = await db.insert(schools).values({
             name: schoolName,
-            registrarName: 'School Admin', // Default value
-            email: `${username.toLowerCase()}@school.local`, // Placeholder, can be updated
+            registrarName: 'School Admin',
+            email: `school_${username}@internal.local`, // Internal placeholder only
             address,
-            schoolType: 'LBS' as const, // Default, can be updated
+            schoolType: 'LBS' as const,
+            schoolTypes: ['LBS'],
             regionId,
             clusterId,
             status: 'approved' as const, // Auto-approve bulk uploaded schools
-            isEmailVerified: true, // Skip verification for bulk uploads
-            adminUserId: user.id,
+            isEmailVerified: true, // No email verification needed
           }).returning();
 
-          // Update user with schoolId
+          // Link user to school after creation
           await db.update(users).set({ schoolId: createdSchool.id }).where(eq(users.id, user.id));
 
           results.success.push({
@@ -1439,41 +1434,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             const regionId = parseInt(regionInput, 10);
             const clusterId = parseInt(clusterInput, 10);
 
-            if (isNaN(regionId)) {
+            if (isNaN(regionId) || isNaN(clusterId)) {
               results.errors.push({ 
                 row: row + 1, 
-                error: `Invalid region code "${regionInput}". Region must be a numeric ID (e.g., "1").`,
+                error: `Region/Cluster mismatch in Row ${row + 1} — does not match existing records.`,
                 schoolName 
               });
               continue;
             }
 
-            if (isNaN(clusterId)) {
-              results.errors.push({ 
-                row: row + 1, 
-                error: `Invalid cluster code "${clusterInput}". Cluster must be a numeric ID (e.g., "1").`,
-                schoolName 
-              });
-              continue;
-            }
-
-            // Look up region
+            // Validate both region and cluster exist
             const region = regionMap.get(regionId);
-            if (!region) {
-              results.errors.push({ 
-                row: row + 1, 
-                error: `Region code ${regionId} not found. Please create the region first.`,
-                schoolName 
-              });
-              continue;
-            }
-
-            // Look up cluster
             const cluster = clusterMap.get(`${regionId}-${clusterId}`);
-            if (!cluster) {
+            
+            if (!region || !cluster) {
               results.errors.push({ 
                 row: row + 1, 
-                error: `Cluster code ${clusterId} not found in Region ${regionId}. Format should be "X.Y" (e.g., "1.1" for Region 1, Cluster 1).`,
+                error: `Region/Cluster mismatch in Row ${row + 1} — does not match existing records.`,
                 schoolName 
               });
               continue;
@@ -1504,7 +1481,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             // Mark this school as processed
             processedSchools.add(schoolKey);
 
-            // Generate sequential username
+            // Generate sequential username (separate from school)
             // Count existing school_admin users to get the next sequential number
             const existingAdminsCount = await db.select({ id: users.id }).from(users).where(eq(users.role, 'school_admin'));
             const sequentialNumber = existingAdminsCount.length + 1;
@@ -1514,31 +1491,34 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             const password = 'Admin@123';
             const hashedPassword = await bcrypt.hash(password, 10);
 
-            // Create user account with mustChangePassword flag
+            // Create user account (SEPARATE from school - no email required)
             const [user] = await db.insert(users).values({
               username,
               passwordHash: hashedPassword,
               role: 'school_admin',
-              firstName: schoolName,
+              firstName: username, // Just username
               lastName: 'Admin',
               mustChangePassword: true, // Force password change on first login
             }).returning();
 
-            // Create school with auto-approval (no email required)
+            // Create school WITHOUT email requirement
             const [createdSchool] = await db.insert(schools).values({
               name: schoolName,
               registrarName: 'School Admin',
+              email: `school_${username}@internal.local`, // Internal placeholder only (not used)
               address,
               schoolType: 'LBS' as const,
+              schoolTypes: ['LBS'],
               regionId,
               clusterId,
               status: 'approved' as const,
-              isEmailVerified: true,
-              adminUserId: user.id,
+              isEmailVerified: true, // No email verification needed
             }).returning();
 
-            // Update user with schoolId
-            await db.update(users).set({ schoolId: createdSchool.id }).where(eq(users.id, user.id));
+            // Link user to school after creation
+            await db.update(users).set({ 
+              schoolId: createdSchool.id 
+            }).where(eq(users.id, user.id));
 
             results.success.push({
               schoolName,
