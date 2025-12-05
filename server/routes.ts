@@ -6335,6 +6335,67 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Cleanup orphaned data - delete students with no marks and schools with no students
+  app.post("/api/cleanup/orphaned-data", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+      
+      // Get all students and schools
+      const allStudents = await storage.getAllStudents();
+      const allSchools = await storage.getAllSchools();
+      let studentsDeleted = 0;
+      let schoolsDeleted = 0;
+      
+      // Pass 1: Delete students with no results
+      for (const student of allStudents) {
+        try {
+          const studentResults = await storage.getStudentResults(student.id);
+          const hasResults = studentResults && studentResults.length > 0;
+          
+          if (!hasResults) {
+            await storage.deleteStudent(student.id);
+            studentsDeleted++;
+            console.log(`[Cleanup] Deleted student ${student.id} (${student.firstName} ${student.lastName}) - no marks`);
+          }
+        } catch (error: any) {
+          console.warn(`[Cleanup] Failed to delete student ${student.id}:`, error.message);
+        }
+      }
+      
+      // Pass 2: Delete schools with no students
+      for (const school of allSchools) {
+        try {
+          // Re-fetch students to account for deletions
+          const remainingStudents = await storage.getAllStudents();
+          const hasStudents = remainingStudents.some(s => s.schoolId === school.id);
+          
+          if (!hasStudents) {
+            await storage.deleteSchool(school.id);
+            schoolsDeleted++;
+            console.log(`[Cleanup] Deleted school ${school.id} (${school.name}) - no students`);
+          }
+        } catch (error: any) {
+          console.warn(`[Cleanup] Failed to delete school ${school.id}:`, error.message);
+        }
+      }
+      
+      console.log(`[Cleanup] Complete: Deleted ${studentsDeleted} students with no marks and ${schoolsDeleted} empty schools`);
+      
+      res.json({
+        success: true,
+        message: `Cleanup complete: Deleted ${studentsDeleted} students with no marks and ${schoolsDeleted} empty schools`,
+        summary: {
+          studentsDeleted,
+          schoolsDeleted,
+        },
+      });
+    } catch (error: any) {
+      console.error('[Cleanup] Error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Results template download - MUST be before /api/results/:id to prevent route conflict
   app.get("/api/results/template", isAuthenticated, async (req, res) => {
     try {
