@@ -1049,13 +1049,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           schoolId: number;
         }>;
         errors: Array<{ row: number; error: string; schoolName?: string }>;
-        regionsCreated: string[];
-        clustersCreated: string[];
       } = {
         success: [],
         errors: [],
-        regionsCreated: [],
-        clustersCreated: [],
       };
 
       // Helper to generate simplified username (schooladmin0001, schooladmin0002, etc.)
@@ -1184,7 +1180,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const clusterName = row.cluster.trim();
           const address = row.address?.trim() || '';
 
-          // Find or create region with fuzzy matching
+          // Find existing region - NO CREATION
           let regionId: number | undefined;
           let matchedRegion = findBestRegionMatch(regionInput, allRegions);
           
@@ -1193,30 +1189,41 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             regionId = matchedRegion.id;
             regionCache.set(matchedRegion.name.toLowerCase(), regionId);
           } else {
-            // No match found, try cache
+            // Check cache for previously validated region
             regionId = regionCache.get(regionInput.toLowerCase());
             if (!regionId) {
-              // Create new region only if no match exists
-              const regionCode = generateRegionCode(regionInput, existingRegionCodes);
-              const newRegion = await storage.createRegion({ name: regionInput, code: regionCode });
-              regionId = newRegion.id;
-              regionCache.set(regionInput.toLowerCase(), regionId);
-              results.regionsCreated.push(regionInput);
+              // Region does not exist - flag as error instead of creating
+              results.errors.push({ 
+                row: rowNum, 
+                error: `Region "${regionInput}" not found in system. Regions must be created before uploading schools.`,
+                schoolName 
+              });
+              continue;
             }
           }
           
           const actualRegionName = matchedRegion?.name || regionInput;
 
-          // Find or create cluster
+          // Find existing cluster - NO CREATION
           const clusterKey = `${regionId}-${clusterName.toLowerCase()}`;
           let clusterId = clusterCache.get(clusterKey);
           if (!clusterId) {
-            const region = await storage.getRegion(regionId);
-            const clusterCode = generateClusterCode(clusterName, region?.code || 'XX', existingClusterCodes);
-            const newCluster = await storage.createCluster({ name: clusterName, code: clusterCode, regionId });
-            clusterId = newCluster.id;
-            clusterCache.set(clusterKey, clusterId);
-            results.clustersCreated.push(`${clusterName} (${actualRegionName})`);
+            // Try to find cluster in allClusters list
+            const foundCluster = allClusters.find(c => 
+              c.regionId === regionId && c.name.toLowerCase().trim() === clusterName.toLowerCase()
+            );
+            if (foundCluster) {
+              clusterId = foundCluster.id;
+              clusterCache.set(clusterKey, clusterId);
+            } else {
+              // Cluster does not exist - flag as error instead of creating
+              results.errors.push({ 
+                row: rowNum, 
+                error: `Cluster "${clusterName}" not found in Region "${actualRegionName}". Clusters must be created before uploading schools.`,
+                schoolName 
+              });
+              continue;
+            }
           }
 
           // Check for duplicate school
@@ -1285,8 +1292,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         totalProcessed: schoolsData.length,
         successCount: results.success.length,
         errorCount: results.errors.length,
-        regionsCreated: results.regionsCreated,
-        clustersCreated: results.clustersCreated,
         schools: results.success,
         errors: results.errors,
       });
