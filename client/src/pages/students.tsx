@@ -209,9 +209,57 @@ export default function Students() {
   const [adminUploadExamYear, setAdminUploadExamYear] = useState<number | null>(null);
   const [adminUploadGrade, setAdminUploadGrade] = useState<number | null>(null);
   const adminFileInputRef = useRef<HTMLInputElement>(null);
+  const [isDownloadingUnmatched, setIsDownloadingUnmatched] = useState(false);
   
   const isSchoolAdmin = user?.role === 'school_admin';
   const canApproveStudents = user?.role === 'super_admin' || user?.role === 'examination_admin';
+
+  // Download unmatched schools
+  const downloadUnmatchedSchools = async () => {
+    if (!adminUploadSummary?.unmatchedSchools || adminUploadSummary.unmatchedSchools.length === 0) {
+      toast({
+        title: isRTL ? "لا توجد مدارس غير مطابقة" : "No Unmatched Schools",
+        description: isRTL ? "لم يتم العثور على أي مدارس غير مطابقة" : "No unmatched schools found",
+        variant: "default",
+      });
+      return;
+    }
+
+    try {
+      setIsDownloadingUnmatched(true);
+      const response = await fetch('/api/students/download-unmatched-schools', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unmatchedSchools: adminUploadSummary.unmatchedSchools }),
+      });
+      
+      if (!response.ok) throw new Error('Download failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'unmatched-schools.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: isRTL ? "تم التحميل" : "Downloaded",
+        description: isRTL ? "تم تحميل قائمة المدارس غير المطابقة" : "Unmatched schools list downloaded",
+        variant: "default",
+      });
+    } catch (error: any) {
+      toast({
+        title: isRTL ? "خطأ في التحميل" : "Download Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloadingUnmatched(false);
+    }
+  };
   
   // Fetch school profile for school admins
   const { data: schoolProfile } = useQuery<SchoolType>({
@@ -2413,9 +2461,24 @@ export default function Students() {
             )}
             {adminUploadPhase === 'preview' && (
               <>
-                <Button variant="outline" onClick={resetAdminUpload} data-testid="button-back-admin-upload">
-                  {isRTL ? "رجوع" : "Back"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={resetAdminUpload} data-testid="button-back-admin-upload">
+                    {isRTL ? "رجوع" : "Back"}
+                  </Button>
+                  {adminUploadSummary?.unmatchedSchools && adminUploadSummary.unmatchedSchools.length > 0 && (
+                    <Button 
+                      variant="outline"
+                      onClick={downloadUnmatchedSchools}
+                      disabled={isDownloadingUnmatched}
+                      data-testid="button-download-unmatched-schools"
+                    >
+                      <Download className="w-4 h-4 me-2" />
+                      {isRTL 
+                        ? `تحميل ${adminUploadSummary.unmatchedSchools.length} مدرسة غير مطابقة`
+                        : `Download ${adminUploadSummary.unmatchedSchools.length} Unmatched Schools`}
+                    </Button>
+                  )}
+                </div>
                 <Button 
                   disabled={!adminUploadPreview.some(s => s.matchedSchoolId)}
                   onClick={() => adminUploadConfirmMutation.mutate()}
