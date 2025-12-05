@@ -5600,6 +5600,106 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Store error files for download (keyed by session) - defined here so routes below can access it
+  const uploadErrorFiles: Map<string, {
+    unmatchedSchools: any[];
+    unmatchedStudents: any[];
+    noMarks: any[];
+    invalidMarks: any[];
+    timestamp: number;
+  }> = new Map();
+
+  // Results template download - MUST be before /api/results/:id to prevent route conflict
+  app.get("/api/results/template", isAuthenticated, async (req, res) => {
+    try {
+      // Parse grade with proper NaN handling
+      let gradeLevel = parseInt(String(req.query.grade || '3'));
+      if (isNaN(gradeLevel) || ![3, 6, 9, 12].includes(gradeLevel)) {
+        gradeLevel = 3; // Default to grade 3
+      }
+      
+      // Get subjects for the grade level
+      const subjects = await storage.getSubjectsByGrade(gradeLevel);
+      
+      // Build template headers
+      const headers = ['School name', 'address', 'Student name'];
+      subjects.forEach(s => headers.push(s.name));
+      
+      // Create CSV with BOM for UTF-8
+      const BOM = '\uFEFF';
+      const csvContent = BOM + headers.join(',') + '\n';
+      
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="results_template_grade_${gradeLevel}.csv"`);
+      res.send(csvContent);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Error file download endpoints - MUST be before /api/results/:id to prevent route conflict
+  app.get("/api/results/errors/:type", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+      
+      const errorType = req.params.type as 'unmatched' | 'unmatchedstudents' | 'nomarks' | 'invalid';
+      const sessionKey = `upload_${userId}`;
+      const errorData = uploadErrorFiles.get(sessionKey);
+      
+      if (!errorData) {
+        return res.status(404).json({ message: "No error data found. Please upload a file first." });
+      }
+      
+      let rows: any[] = [];
+      let filename = '';
+      
+      if (errorType === 'unmatched') {
+        rows = errorData.unmatchedSchools;
+        filename = 'unmatched_schools.csv';
+      } else if (errorType === 'unmatchedstudents') {
+        rows = errorData.unmatchedStudents;
+        filename = 'unmatched_students.csv';
+      } else if (errorType === 'nomarks') {
+        rows = errorData.noMarks;
+        filename = 'no_valid_marks.csv';
+      } else if (errorType === 'invalid') {
+        rows = errorData.invalidMarks;
+        filename = 'invalid_marks.csv';
+      } else {
+        return res.status(400).json({ message: "Invalid error type" });
+      }
+      
+      if (rows.length === 0) {
+        return res.status(404).json({ message: "No errors of this type" });
+      }
+      
+      // Create CSV with BOM for UTF-8
+      const BOM = '\uFEFF';
+      const headers = Object.keys(rows[0]);
+      let csvContent = BOM + headers.join(',') + '\n';
+      
+      rows.forEach(row => {
+        const values = headers.map(h => {
+          const val = row[h] ?? '';
+          // Escape quotes and wrap in quotes if contains comma or quotes
+          const strVal = String(val);
+          if (strVal.includes(',') || strVal.includes('"') || strVal.includes('\n')) {
+            return '"' + strVal.replace(/"/g, '""') + '"';
+          }
+          return strVal;
+        });
+        csvContent += values.join(',') + '\n';
+      });
+      
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(csvContent);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/results/:id", async (req, res) => {
     try {
       const result = await storage.getStudentResult(parseInt(req.params.id));
@@ -5739,106 +5839,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         cb(new Error('Only CSV files are allowed'));
       }
     },
-  });
-
-  // Store error files for download (keyed by session)
-  const uploadErrorFiles: Map<string, {
-    unmatchedSchools: any[];
-    unmatchedStudents: any[];
-    noMarks: any[];
-    invalidMarks: any[];
-    timestamp: number;
-  }> = new Map();
-
-  // Results template download
-  app.get("/api/results/template", isAuthenticated, async (req, res) => {
-    try {
-      // Parse grade with proper NaN handling
-      let gradeLevel = parseInt(req.query.grade as string);
-      if (isNaN(gradeLevel) || ![3, 6, 9, 12].includes(gradeLevel)) {
-        gradeLevel = 3; // Default to grade 3
-      }
-      
-      // Get subjects for the grade level
-      const subjects = await storage.getSubjectsByGrade(gradeLevel);
-      
-      // Build template headers
-      const headers = ['School name', 'address', 'Student name'];
-      subjects.forEach(s => headers.push(s.name));
-      
-      // Create CSV with BOM for UTF-8
-      const BOM = '\uFEFF';
-      const csvContent = BOM + headers.join(',') + '\n';
-      
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="results_template_grade_${gradeLevel}.csv"`);
-      res.send(csvContent);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Error file download endpoints
-  app.get("/api/results/errors/:type", isAuthenticated, async (req, res) => {
-    try {
-      const userId = req.session.userId;
-      if (!userId) return res.status(401).json({ message: "Not authenticated" });
-      
-      const errorType = req.params.type as 'unmatched' | 'unmatchedstudents' | 'nomarks' | 'invalid';
-      const sessionKey = `upload_${userId}`;
-      const errorData = uploadErrorFiles.get(sessionKey);
-      
-      if (!errorData) {
-        return res.status(404).json({ message: "No error data found. Please upload a file first." });
-      }
-      
-      let rows: any[] = [];
-      let filename = '';
-      
-      if (errorType === 'unmatched') {
-        rows = errorData.unmatchedSchools;
-        filename = 'unmatched_schools.csv';
-      } else if (errorType === 'unmatchedstudents') {
-        rows = errorData.unmatchedStudents;
-        filename = 'unmatched_students.csv';
-      } else if (errorType === 'nomarks') {
-        rows = errorData.noMarks;
-        filename = 'no_valid_marks.csv';
-      } else if (errorType === 'invalid') {
-        rows = errorData.invalidMarks;
-        filename = 'invalid_marks.csv';
-      } else {
-        return res.status(400).json({ message: "Invalid error type" });
-      }
-      
-      if (rows.length === 0) {
-        return res.status(404).json({ message: "No errors of this type" });
-      }
-      
-      // Create CSV with BOM for UTF-8
-      const BOM = '\uFEFF';
-      const headers = Object.keys(rows[0]);
-      let csvContent = BOM + headers.join(',') + '\n';
-      
-      rows.forEach(row => {
-        const values = headers.map(h => {
-          const val = row[h] ?? '';
-          // Escape quotes and wrap in quotes if contains comma or quotes
-          const strVal = String(val);
-          if (strVal.includes(',') || strVal.includes('"') || strVal.includes('\n')) {
-            return '"' + strVal.replace(/"/g, '""') + '"';
-          }
-          return strVal;
-        });
-        csvContent += values.join(',') + '\n';
-      });
-      
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(csvContent);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
   });
 
   app.post("/api/results/comprehensive-upload", isAuthenticated, comprehensiveUpload.single('file'), async (req, res) => {
