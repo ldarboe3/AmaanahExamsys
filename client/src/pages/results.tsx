@@ -322,49 +322,15 @@ export default function Results() {
     },
   });
 
-  // Legacy upload mutation (kept for compatibility)
-  const uploadMutation = useMutation({
-    mutationFn: async (data: { file: File; examYearId: number; grade: number }) => {
-      const formData = new FormData();
-      formData.append('file', data.file);
-      formData.append('examYearId', String(data.examYearId));
-      formData.append('grade', String(data.grade));
-      
-      const response = await fetch('/api/results/comprehensive-upload', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Upload failed');
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/results"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/students"] });
-      setUploadSummary(data);
-      setIsUploading(false);
-      
-      if (data.errors?.hasErrors) {
-        toast({
-          title: isRTL ? "تم تحميل النتائج مع بعض المشاكل" : "Results Uploaded with Issues",
-          description: isRTL ? "راجع التفاصيل وقم بتنزيل ملفات الأخطاء" : "Review the details and download error files",
-        });
-      } else {
-        toast({
-          title: isRTL ? "تم تحميل النتائج بنجاح" : "Results Uploaded Successfully",
-          description: `${data.summary?.resultsCreated || 0} ${isRTL ? "نتائج جديدة" : "new results"}, ${data.summary?.resultsUpdated || 0} ${isRTL ? "نتائج محدثة" : "updated"}`,
-        });
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: t.common.error,
-        description: error.message || (isRTL ? "فشل تحميل النتائج" : "Failed to upload results"),
-        variant: "destructive",
-      });
-      setIsUploading(false);
-    },
-  });
+  // Reset upload dialog state when closing
+  const resetUploadState = () => {
+    setShowUploadDialog(false);
+    setUploadSummary(null);
+    setPreviewData(null);
+    setUploadPhase('idle');
+    setIsUploading(false);
+    setIsConfirming(false);
+  };
 
   const handleDownloadTemplate = async () => {
     if (!selectedGrade) return;
@@ -786,8 +752,11 @@ export default function Results() {
 
       {/* Upload Dialog */}
       <Dialog open={showUploadDialog} onOpenChange={(open) => {
-        setShowUploadDialog(open);
-        if (!open) setUploadSummary(null);
+        if (!open) {
+          resetUploadState();
+        } else {
+          setShowUploadDialog(open);
+        }
       }}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -971,13 +940,13 @@ export default function Results() {
                   </Button>
                   <Button 
                     onClick={() => {
-                      if (previewData?.sessionKey) {
+                      if (previewData?.sessionKey && uploadPhase === 'preview_complete') {
                         setIsConfirming(true);
                         setUploadPhase('confirming');
                         confirmMutation.mutate(previewData.sessionKey);
                       }
                     }}
-                    disabled={!previewData?.canConfirm || isConfirming}
+                    disabled={!previewData?.canConfirm || !previewData?.sessionKey || uploadPhase !== 'preview_complete' || isConfirming}
                     data-testid="button-confirm-upload"
                   >
                     {isConfirming ? (
@@ -1025,12 +994,7 @@ export default function Results() {
                 {/* Close Button */}
                 <div className="flex justify-end">
                   <Button 
-                    onClick={() => { 
-                      setShowUploadDialog(false); 
-                      setUploadSummary(null); 
-                      setPreviewData(null);
-                      setUploadPhase('idle');
-                    }} 
+                    onClick={resetUploadState} 
                     data-testid="button-close-upload"
                   >
                     {isRTL ? "إغلاق" : "Close"}
