@@ -307,9 +307,13 @@ export default function Results() {
       setUploadPhase('confirmed');
       setIsConfirming(false);
       
+      const studentsCreatedMsg = data.summary?.studentsCreated > 0 
+        ? (isRTL ? `${data.summary.studentsCreated} طالب جديد، ` : `${data.summary.studentsCreated} new students, `)
+        : '';
+      
       toast({
         title: isRTL ? "تم تحميل النتائج بنجاح" : "Results Applied Successfully",
-        description: `${data.summary?.resultsCreated || 0} ${isRTL ? "نتائج جديدة" : "new results"}, ${data.summary?.resultsUpdated || 0} ${isRTL ? "نتائج محدثة" : "updated"}`,
+        description: `${studentsCreatedMsg}${data.summary?.resultsCreated || 0} ${isRTL ? "نتائج جديدة" : "new results"}, ${data.summary?.resultsUpdated || 0} ${isRTL ? "نتائج محدثة" : "updated"}`,
       });
     },
     onError: (error: any) => {
@@ -853,15 +857,20 @@ export default function Results() {
                       <span className="font-medium">{previewData.summary?.matchedSchools || 0}</span>
                     </div>
                     <div className="flex justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-muted-foreground">{isRTL ? "الطلاب المتطابقين" : "Students Matched"}</span>
-                      <span className="font-medium">{previewData.summary?.matchedStudents || 0}</span>
+                      <span className="text-muted-foreground">{isRTL ? "الطلاب الموجودين" : "Existing Students"}</span>
+                      <span className="font-medium">{previewData.summary?.existingStudentsCount || 0}</span>
                     </div>
+                    {(previewData.summary?.newStudentsCount || 0) > 0 && (
+                      <div className="flex justify-between p-2 bg-blue-500/10 rounded col-span-2">
+                        <span className="text-blue-600">{isRTL ? "طلاب جدد سيتم إنشاؤهم" : "New Students to Create"}</span>
+                        <span className="font-medium text-blue-600">{previewData.summary?.newStudentsCount || 0}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Error Details - Always show if there are any issues */}
+                {/* Error Details - Show only for actual issues (not for new students which will be created) */}
                 {(previewData.summary?.unmatchedSchools > 0 || 
-                  previewData.summary?.unmatchedStudents > 0 || 
                   previewData.summary?.noMarksRows > 0 ||
                   previewData.summary?.invalidMarksRows > 0) && (
                   <div className="border border-amber-500/30 rounded-lg p-4 space-y-3 bg-amber-50/50 dark:bg-amber-500/5">
@@ -879,19 +888,6 @@ export default function Results() {
                             </p>
                           </div>
                           <Button variant="outline" size="sm" onClick={() => handleDownloadErrors('unmatched')} data-testid="button-download-unmatched">
-                            <Download className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      )}
-                      {previewData.summary?.unmatchedStudents > 0 && (
-                        <div className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded border">
-                          <div>
-                            <p className="text-sm font-medium">{isRTL ? "طلاب غير متطابقين" : "Unmatched Students"}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {previewData.summary.unmatchedStudents} {isRTL ? "طالب لم يتم العثور عليهم" : "students not found in system"}
-                            </p>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => handleDownloadErrors('unmatchedstudents')} data-testid="button-download-unmatchedstudents">
                             <Download className="w-4 h-4" />
                           </Button>
                         </div>
