@@ -1,0 +1,182 @@
+Feature: Arabic Text Cleaner for Uploads (Schools + Students)
+
+Goal
+Before any validation or matching, automatically normalize Arabic text in uploaded files so the system can reliably match:
+
+Students → Schools
+
+Subjects → Subject records
+
+Schools → Regions & Clusters
+
+This prevents mismatches caused by spacing, tatweel, punctuation, and letter variants.
+
+Scope (apply cleaner to these fields)
+
+School name
+
+Address
+
+Student name
+
+Region and Cluster (also convert Arabic numerals)
+
+(Optional) Subject headers when mapping columns → subjects
+
+The cleaner runs only on text fields. Do not alter numeric marks.
+
+Normalization Rules (in this exact order)
+
+Trim & collapse whitespace
+
+Remove leading/trailing spaces.
+
+Collapse all internal whitespace to a single space.
+
+Convert non-breaking/Arabic spaces to regular spaces.
+
+Remove tatweel (kashida)
+
+Delete ـ anywhere in the string.
+
+Unify Alef forms
+
+Replace أ, إ, آ → ا.
+
+Unify taa marbuta & alef maqsura
+
+Replace ة → ه (system standard)
+
+Replace ى → ي
+
+Strip punctuation/formatting inside names
+
+Remove periods, middle dots, slashes, repeated dashes, extra quotes, decorative punctuation:
+
+Examples to drop: . ، ؛ / \ | ( ) [ ] { } : ; ' " … — – ·
+
+Also remove isolated dots between letters:
+
+أ . م سيسي → ا م سيسي
+
+Keep single spaces between tokens.
+
+Remove zero-width & control characters
+
+Delete \u200b, \u200f, and any other invisible formatting chars.
+
+Normalize Arabic digits for Region/Cluster
+
+Convert ٠١٢٣٤٥٦٧٨٩ → 0123456789.
+
+Accept composite codes like 2.1 or 2-1 and parse as:
+
+Region = 2, Cluster = 1 (don’t create new codes).
+
+Case & locale
+
+Arabic is case-less; for any Latin text, lower-case.
+
+Examples (before → after)
+
+Extra spaces
+ساجولامين يابو → ساجولامين يابو
+
+Tatweel
+المكــــــان → المكان
+
+Alef variants
+الآثار → الاثار
+
+ة vs ه
+التعاون الإسلامية → التعاون الاسلاميه
+
+Dots/punctuation
+أ . م سيسي → ا م سيسي
+
+Arabic numerals
+٣.١ → 3.1 → Region 3, Cluster 1
+
+Pipeline Integration
+
+Upload → Parse file (UTF-8 with BOM preferred for CSV).
+
+Run Arabic Text Cleaner on the mapped fields.
+
+Validate (e.g., Region/Cluster exist; subjects map; marks numeric).
+
+Matching:
+
+Normalize DB reference strings with the same cleaner at compare time (or store canonical versions).
+
+Match: Student→School, School→(Region, Cluster), Subjects→IDs.
+
+Apply business rules (e.g., upload only students with matched school and ≥1 valid mark).
+
+Persist + summaries + downloadable error files.
+
+Keep the original (raw) value alongside the normalized value in memory for error reporting and logs. Store canonical value per your data model.
+
+API/Code Sketch (language-agnostic)
+function cleanArabic(text, fieldType):
+    if text is null: return ""
+    s = text
+
+    // 1) normalize spaces & unicode spaces
+    s = replaceUnicodeSpacesWithRegular(s)
+    s = trim(s)
+    s = collapseMultipleSpaces(s)
+
+    // 2) remove tatweel
+    s = removeChars(s, ["ـ"])
+
+    // 3) unify alef forms
+    s = replaceAll(s, ["أ","إ","آ"], "ا")
+
+    // 4) taa marbuta & alef maqsura
+    s = replaceAll(s, ["ة"], "ه")
+    s = replaceAll(s, ["ى"], "ي")
+
+    // 5) punctuation/formatting
+    s = removeChars(s, [".","،","؛","/","\\","|","(",")","[","]","{","}",";",":","'","\"","…","—","–","·"])
+    s = collapseMultipleSpaces(s)
+
+    // 6) zero-width & controls
+    s = removeChars(s, ["\u200b","\u200f","\u200e"])
+
+    if fieldType in ["Region","Cluster","RegionClusterCode"]:
+        s = convertArabicDigitsToASCII(s)       // ٠١٢٣٤٥٦٧٨٩ -> 0123456789
+
+    return s
+
+Matching Notes
+
+Subjects: build a header alias table, also cleaned with the same function.
+
+Schools: compare cleanArabic(file_school) with cleanArabic(db_school) (or store school_name_normalized for fast lookups).
+
+Region/Cluster: parse composite codes (2.1, 2-1) after digit normalization; do not create new regions/clusters.
+
+Error Files & Logging (unchanged behavior, but better matches)
+
+Unmatched schools: include raw + normalized school names.
+
+Rows with no marks: unchanged.
+
+Invalid marks: unchanged.
+
+Preserve original headers and sheet/tab names of the uploaded file.
+
+Acceptance Criteria
+
+Given messy inputs (with spaces/tatweel/punctuation/letter variants), uploads match as expected and no longer fail due to formatting.
+
+Student rows only upload when:
+
+School matched after cleaning, and
+
+The row has ≥1 valid subject mark.
+
+Region/Cluster values normalize and match existing records.
+
+Error exports preserve original columns/tabs and include both raw and normalized values for diagnosis.
