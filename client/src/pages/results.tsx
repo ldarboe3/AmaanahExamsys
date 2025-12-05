@@ -287,11 +287,11 @@ export default function Results() {
 
   // Phase 2: Confirm upload (applies matched results to database)
   const confirmMutation = useMutation({
-    mutationFn: async (sessionKey: string) => {
+    mutationFn: async (params: { sessionKey: string; defaultRegionId?: number; defaultClusterId?: number }) => {
       const response = await fetch('/api/results/upload/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionKey }),
+        body: JSON.stringify(params),
         credentials: 'include'
       });
       if (!response.ok) {
@@ -853,13 +853,19 @@ export default function Results() {
                       <span className="font-medium text-green-600">{previewData.summary?.matchedRows || 0}</span>
                     </div>
                     <div className="flex justify-between p-2 bg-muted/50 rounded">
-                      <span className="text-muted-foreground">{isRTL ? "المدارس المتطابقة" : "Schools Matched"}</span>
+                      <span className="text-muted-foreground">{isRTL ? "المدارس الموجودة" : "Existing Schools"}</span>
                       <span className="font-medium">{previewData.summary?.matchedSchools || 0}</span>
                     </div>
                     <div className="flex justify-between p-2 bg-muted/50 rounded">
                       <span className="text-muted-foreground">{isRTL ? "الطلاب الموجودين" : "Existing Students"}</span>
                       <span className="font-medium">{previewData.summary?.existingStudentsCount || 0}</span>
                     </div>
+                    {(previewData.summary?.newSchoolsCount || 0) > 0 && (
+                      <div className="flex justify-between p-2 bg-emerald-500/10 rounded col-span-2">
+                        <span className="text-emerald-600">{isRTL ? "مدارس جديدة سيتم إنشاؤها" : "New Schools to Create"}</span>
+                        <span className="font-medium text-emerald-600">{previewData.summary?.newSchoolsCount || 0}</span>
+                      </div>
+                    )}
                     {(previewData.summary?.newStudentsCount || 0) > 0 && (
                       <div className="flex justify-between p-2 bg-blue-500/10 rounded col-span-2">
                         <span className="text-blue-600">{isRTL ? "طلاب جدد سيتم إنشاؤهم" : "New Students to Create"}</span>
@@ -869,9 +875,8 @@ export default function Results() {
                   </div>
                 </div>
 
-                {/* Error Details - Show only for actual issues (not for new students which will be created) */}
-                {(previewData.summary?.unmatchedSchools > 0 || 
-                  previewData.summary?.noMarksRows > 0 ||
+                {/* Error Details - Show only for actual issues (noMarks, invalidMarks) */}
+                {(previewData.summary?.noMarksRows > 0 ||
                   previewData.summary?.invalidMarksRows > 0) && (
                   <div className="border border-amber-500/30 rounded-lg p-4 space-y-3 bg-amber-50/50 dark:bg-amber-500/5">
                     <h4 className="font-semibold flex items-center gap-2 text-amber-600">
@@ -879,19 +884,6 @@ export default function Results() {
                       {isRTL ? "المشاكل المكتشفة" : "Issues Found"}
                     </h4>
                     <div className="space-y-2">
-                      {previewData.summary?.unmatchedSchools > 0 && (
-                        <div className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded border">
-                          <div>
-                            <p className="text-sm font-medium">{isRTL ? "مدارس غير متطابقة" : "Unmatched Schools"}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {previewData.summary.unmatchedSchools} {isRTL ? "مدرسة لم يتم العثور عليها" : "schools not found in system"}
-                            </p>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => handleDownloadErrors('unmatched')} data-testid="button-download-unmatched">
-                            <Download className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      )}
                       {previewData.summary?.noMarksRows > 0 && (
                         <div className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded border">
                           <div>
@@ -939,7 +931,7 @@ export default function Results() {
                       if (previewData?.sessionKey && uploadPhase === 'preview_complete') {
                         setIsConfirming(true);
                         setUploadPhase('confirming');
-                        confirmMutation.mutate(previewData.sessionKey);
+                        confirmMutation.mutate({ sessionKey: previewData.sessionKey });
                       }
                     }}
                     disabled={!previewData?.canConfirm || !previewData?.sessionKey || uploadPhase !== 'preview_complete' || isConfirming}
@@ -972,6 +964,18 @@ export default function Results() {
                     {isRTL ? "تم تطبيق النتائج بنجاح" : "Results Applied Successfully"}
                   </h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
+                    {(uploadSummary.summary?.schoolsCreated || 0) > 0 && (
+                      <div className="flex justify-between p-2 bg-emerald-500/10 rounded">
+                        <span className="text-muted-foreground">{isRTL ? "مدارس جديدة" : "Schools Created"}</span>
+                        <span className="font-medium text-emerald-600">{uploadSummary.summary?.schoolsCreated || 0}</span>
+                      </div>
+                    )}
+                    {(uploadSummary.summary?.studentsCreated || 0) > 0 && (
+                      <div className="flex justify-between p-2 bg-blue-500/10 rounded">
+                        <span className="text-muted-foreground">{isRTL ? "طلاب جدد" : "Students Created"}</span>
+                        <span className="font-medium text-blue-600">{uploadSummary.summary?.studentsCreated || 0}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between p-2 bg-white dark:bg-slate-900 rounded">
                       <span className="text-muted-foreground">{isRTL ? "الطلاب المعالجين" : "Students Processed"}</span>
                       <span className="font-medium">{uploadSummary.summary?.studentsProcessed || 0}</span>
@@ -980,9 +984,9 @@ export default function Results() {
                       <span className="text-muted-foreground">{isRTL ? "نتائج جديدة" : "Results Created"}</span>
                       <span className="font-medium text-green-600">{uploadSummary.summary?.resultsCreated || 0}</span>
                     </div>
-                    <div className="flex justify-between p-2 bg-blue-500/10 rounded col-span-2">
+                    <div className="flex justify-between p-2 bg-muted/50 rounded col-span-2">
                       <span className="text-muted-foreground">{isRTL ? "نتائج محدثة" : "Results Updated"}</span>
-                      <span className="font-medium text-blue-600">{uploadSummary.summary?.resultsUpdated || 0}</span>
+                      <span className="font-medium">{uploadSummary.summary?.resultsUpdated || 0}</span>
                     </div>
                   </div>
                 </div>
