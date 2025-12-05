@@ -97,6 +97,7 @@ export default function Results() {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [editedMarks, setEditedMarks] = useState<Record<string, Record<number, number | null>>>({});
+  const [uploadSummary, setUploadSummary] = useState<any>(null);
 
   // Fetch exam years
   const { data: examYears, isLoading: examYearsLoading } = useQuery<ExamYear[]>({
@@ -254,14 +255,23 @@ export default function Results() {
       if (!response.ok) throw new Error('Upload failed');
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/results"] });
-      toast({
-        title: isRTL ? "تم تحميل النتائج" : "Results Uploaded",
-        description: isRTL ? "تم تحميل النتائج بنجاح" : "Results uploaded successfully",
-      });
-      setShowUploadDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+      setUploadSummary(data);
       setIsUploading(false);
+      
+      if (data.errors?.hasErrors) {
+        toast({
+          title: isRTL ? "تم تحميل النتائج مع بعض المشاكل" : "Results Uploaded with Issues",
+          description: isRTL ? "راجع التفاصيل وقم بتنزيل ملفات الأخطاء" : "Review the details and download error files",
+        });
+      } else {
+        toast({
+          title: isRTL ? "تم تحميل النتائج بنجاح" : "Results Uploaded Successfully",
+          description: `${data.summary?.resultsCreated || 0} ${isRTL ? "نتائج جديدة" : "new results"}, ${data.summary?.resultsUpdated || 0} ${isRTL ? "نتائج محدثة" : "updated"}`,
+        });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -272,6 +282,64 @@ export default function Results() {
       setIsUploading(false);
     },
   });
+
+  const handleDownloadTemplate = async () => {
+    if (!selectedGrade) return;
+    try {
+      const response = await fetch(`/api/results/template?grade=${selectedGrade}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to download template');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `results_template_grade_${selectedGrade}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast({
+        title: t.common.error,
+        description: isRTL ? "فشل تنزيل القالب" : "Failed to download template",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadErrors = async (type: 'unmatched' | 'unmatchedstudents' | 'nomarks' | 'invalid') => {
+    try {
+      const response = await fetch(`/api/results/errors/${type}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Download failed');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filenames: Record<string, string> = {
+        'unmatched': 'unmatched_schools.csv',
+        'unmatchedstudents': 'unmatched_students.csv',
+        'nomarks': 'no_valid_marks.csv',
+        'invalid': 'invalid_marks.csv'
+      };
+      a.download = filenames[type] || 'errors.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل تنزيل الملف" : "Failed to download file"),
+        variant: "destructive",
+      });
+    }
+  };
 
   // LEVEL 1: Exam Years View
   const renderExamYears = () => {
@@ -634,36 +702,166 @@ export default function Results() {
       )}
 
       {/* Upload Dialog */}
-      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent>
+      <Dialog open={showUploadDialog} onOpenChange={(open) => {
+        setShowUploadDialog(open);
+        if (!open) setUploadSummary(null);
+      }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isRTL ? "تحميل النتائج" : "Upload Results"}</DialogTitle>
             <DialogDescription>
-              {isRTL ? "قم بتحميل ملف CSV يحتوي على النتائج" : "Upload a CSV file containing results"}
+              {isRTL 
+                ? "قم بتحميل ملف CSV يحتوي على النتائج. التنسيق المطلوب: اسم المدرسة، العنوان، اسم الطالب، [أعمدة المواد]" 
+                : "Upload a CSV file containing results. Expected format: School name, address, Student name, [subject columns]"}
             </DialogDescription>
           </DialogHeader>
+          
           <div className="space-y-4">
-            <Input 
-              type="file" 
-              accept=".csv"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file && selectedExamYear && selectedGrade) {
-                  setIsUploading(true);
-                  uploadMutation.mutate({
-                    file,
-                    examYearId: selectedExamYear,
-                    grade: selectedGrade,
-                  });
-                }
-              }}
-              disabled={isUploading}
-              data-testid="input-results-file"
-            />
+            {/* Template Download */}
+            <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+              <div>
+                <p className="text-sm font-medium">{isRTL ? "تنزيل القالب" : "Download Template"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {isRTL ? "احصل على ملف CSV مع العناوين الصحيحة" : "Get a CSV file with correct headers"}
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleDownloadTemplate} data-testid="button-download-template">
+                <Download className="w-4 h-4 me-2" />
+                {isRTL ? "تنزيل" : "Download"}
+              </Button>
+            </div>
+
+            {/* File Upload */}
+            <div className="border-2 border-dashed rounded-lg p-4">
+              <Input 
+                type="file" 
+                accept=".csv"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file && selectedExamYear && selectedGrade) {
+                    setIsUploading(true);
+                    setUploadSummary(null);
+                    uploadMutation.mutate({
+                      file,
+                      examYearId: selectedExamYear,
+                      grade: selectedGrade,
+                    });
+                  }
+                }}
+                disabled={isUploading}
+                data-testid="input-results-file"
+              />
+            </div>
+
             {isUploading && (
-              <div className="flex items-center justify-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>{isRTL ? "جاري التحميل..." : "Uploading..."}</span>
+              <div className="flex items-center justify-center gap-2 p-4">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                <span className="text-sm">{isRTL ? "جاري التحميل..." : "Uploading..."}</span>
+              </div>
+            )}
+
+            {/* Upload Summary */}
+            {uploadSummary && (
+              <div className="space-y-4">
+                <div className="border rounded-lg p-4 space-y-3">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-500" />
+                    {isRTL ? "ملخص التحميل" : "Upload Summary"}
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex justify-between p-2 bg-muted/50 rounded">
+                      <span className="text-muted-foreground">{isRTL ? "إجمالي الصفوف" : "Total Rows"}</span>
+                      <span className="font-medium">{uploadSummary.summary?.totalRows || 0}</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-muted/50 rounded">
+                      <span className="text-muted-foreground">{isRTL ? "المدارس المتطابقة" : "Schools Matched"}</span>
+                      <span className="font-medium">{uploadSummary.summary?.schoolsMatched || 0}</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-muted/50 rounded">
+                      <span className="text-muted-foreground">{isRTL ? "الطلاب المتطابقين" : "Students Matched"}</span>
+                      <span className="font-medium">{uploadSummary.summary?.studentsMatched || 0}</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-green-500/10 rounded">
+                      <span className="text-muted-foreground">{isRTL ? "نتائج جديدة" : "Results Created"}</span>
+                      <span className="font-medium text-green-600">{uploadSummary.summary?.resultsCreated || 0}</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-blue-500/10 rounded">
+                      <span className="text-muted-foreground">{isRTL ? "نتائج محدثة" : "Results Updated"}</span>
+                      <span className="font-medium text-blue-600">{uploadSummary.summary?.resultsUpdated || 0}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Error Details */}
+                {uploadSummary.errors?.hasErrors && (
+                  <div className="border border-amber-500/30 rounded-lg p-4 space-y-3 bg-amber-50/50 dark:bg-amber-500/5">
+                    <h4 className="font-semibold flex items-center gap-2 text-amber-600">
+                      <AlertCircle className="w-4 h-4" />
+                      {isRTL ? "تفاصيل الأخطاء" : "Error Details"}
+                    </h4>
+                    <div className="space-y-2">
+                      {uploadSummary.errors?.unmatchedSchoolsCount > 0 && (
+                        <div className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded border">
+                          <div>
+                            <p className="text-sm font-medium">{isRTL ? "مدارس غير متطابقة" : "Unmatched Schools"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {uploadSummary.errors.unmatchedSchoolsCount} {isRTL ? "مدرسة لم يتم العثور عليها" : "schools not found in system"}
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadErrors('unmatched')} data-testid="button-download-unmatched">
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+                      {uploadSummary.errors?.unmatchedStudentsCount > 0 && (
+                        <div className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded border">
+                          <div>
+                            <p className="text-sm font-medium">{isRTL ? "طلاب غير متطابقين" : "Unmatched Students"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {uploadSummary.errors.unmatchedStudentsCount} {isRTL ? "طالب لم يتم العثور عليهم" : "students not found in system"}
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadErrors('unmatchedstudents')} data-testid="button-download-unmatchedstudents">
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+                      {uploadSummary.errors?.noMarksCount > 0 && (
+                        <div className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded border">
+                          <div>
+                            <p className="text-sm font-medium">{isRTL ? "بدون درجات صالحة" : "No Valid Marks"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {uploadSummary.errors.noMarksCount} {isRTL ? "صفوف بدون درجات" : "rows without valid marks"}
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadErrors('nomarks')} data-testid="button-download-nomarks">
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+                      {uploadSummary.errors?.invalidMarksCount > 0 && (
+                        <div className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded border">
+                          <div>
+                            <p className="text-sm font-medium">{isRTL ? "درجات غير صالحة" : "Invalid Marks"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {uploadSummary.errors.invalidMarksCount} {isRTL ? "درجات خارج النطاق" : "marks out of valid range"}
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadErrors('invalid')} data-testid="button-download-invalid">
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Close Button */}
+                <div className="flex justify-end">
+                  <Button onClick={() => { setShowUploadDialog(false); setUploadSummary(null); }} data-testid="button-close-upload">
+                    {isRTL ? "إغلاق" : "Close"}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
