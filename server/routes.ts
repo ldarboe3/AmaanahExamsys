@@ -6262,6 +6262,57 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
 
+      // Step 3: Clean up - Delete students with no results and schools with no students
+      try {
+        // Get all students and schools to check for cleanup needs
+        const allStudents = await storage.getAllStudents();
+        const allSchools = await storage.getAllSchools();
+        let studentsDeleted = 0;
+        let schoolsDeleted = 0;
+        
+        // First pass: Delete students with no results in this exam year
+        for (const student of allStudents) {
+          if (student.examYearId === previewData.examYearId && student.grade === previewData.gradeLevel) {
+            // Check if this student has any results by trying to get them
+            const studentResults = await storage.getStudentResults(student.id);
+            const hasResultsInExamYear = studentResults?.some(r => r.examYearId === previewData.examYearId);
+            
+            if (!hasResultsInExamYear) {
+              try {
+                await storage.deleteStudent(student.id);
+                studentsDeleted++;
+                console.log(`[Confirm] Deleted student ${student.id} (${student.firstName} ${student.lastName}) - no results`);
+              } catch (error: any) {
+                console.warn(`[Confirm] Failed to delete student ${student.id}:`, error.message);
+              }
+            }
+          }
+        }
+        
+        // Second pass: Delete schools with no students
+        for (const school of allSchools) {
+          // Re-fetch students to account for deletions
+          const remainingStudents = await storage.getAllStudents();
+          const hasStudents = remainingStudents.some(s => s.schoolId === school.id);
+          
+          if (!hasStudents) {
+            try {
+              await storage.deleteSchool(school.id);
+              schoolsDeleted++;
+              console.log(`[Confirm] Deleted school ${school.id} (${school.name}) - no students`);
+            } catch (error: any) {
+              console.warn(`[Confirm] Failed to delete school ${school.id}:`, error.message);
+            }
+          }
+        }
+        
+        if (studentsDeleted > 0 || schoolsDeleted > 0) {
+          console.log(`[Confirm] Cleanup: Deleted ${studentsDeleted} students with no results and ${schoolsDeleted} empty schools`);
+        }
+      } catch (error: any) {
+        console.warn('[Confirm] Cleanup failed (non-fatal):', error.message);
+      }
+
       // Clean up preview data
       uploadPreviewStore.delete(sessionKey);
 
