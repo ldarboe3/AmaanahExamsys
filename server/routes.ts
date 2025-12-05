@@ -5753,7 +5753,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Results template download
   app.get("/api/results/template", isAuthenticated, async (req, res) => {
     try {
-      const gradeLevel = parseInt(req.query.grade as string) || 3;
+      // Parse grade with proper NaN handling
+      let gradeLevel = parseInt(req.query.grade as string);
+      if (isNaN(gradeLevel) || ![3, 6, 9, 12].includes(gradeLevel)) {
+        gradeLevel = 3; // Default to grade 3
+      }
       
       // Get subjects for the grade level
       const subjects = await storage.getSubjectsByGrade(gradeLevel);
