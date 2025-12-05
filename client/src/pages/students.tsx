@@ -390,7 +390,10 @@ export default function Students() {
     onSuccess: (data) => {
       setAdminUploadPhase('preview');
       setAdminUploadPreview(data.preview || []);
-      setAdminUploadSummary(data.summary);
+      setAdminUploadSummary({
+        ...data.summary,
+        unmatchedSchools: data.unmatchedSchools || [],
+      });
       toast({
         title: isRTL ? "تم تحليل الملف" : "File Analyzed",
         description: isRTL 
