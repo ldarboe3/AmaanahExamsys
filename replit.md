@@ -47,7 +47,14 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Student Management**: CSV import, index number generation, and a 3-tier registration navigation workflow.
 - **Financial Management**: Three-tier fee structure (`feePerStudent`, `certificateFee`, `transcriptFee`), auto-invoice generation, bank slip upload, payment confirmation, and professional PDF invoice downloads. School admin payments page shows current invoice with examination year badge and past invoices table with columns for invoice number, examination year, payment amount, status, and download button.
 - **Results & Certificates**: 
-  - **Three-Tier Results Navigation**: Level 1 displays all Examination Years as interactive boards → Level 2 shows Grades (3, 6, 9, 12) as boards → Level 3 displays student results list with filtering by Region, Cluster, and School
+  - **Three-Tier Results Navigation**: 
+    - Level 1: All Examination Years as interactive boards
+    - Level 2: Grades (3, 6, 9, 12) as color-coded boards  
+    - Level 3: Editable marks table with Region/Cluster/School filtering
+  - **Editable Marks Entry**: Interactive table format with columns: School Name, Address, Region, Student Name, [Subject columns as editable inputs], Total Marks (auto-calculated), Percentage (auto-calculated)
+  - Real-time auto-calculation of Total Marks and Percentage as marks are entered (0-100 per subject)
+  - Pagination controls: 10/50/100 students per page
+  - Dynamic student list updates based on Region/Cluster/School filters
   - CSV upload for results with bilingual support (Arabic/English column headers), automatic entity creation (regions, clusters, schools, students), and region/cluster code parsing ("X.Y" format support)
   - Public result checker, PDF certificate and transcript generation with gender-specific templates and QR verification
 - **Administrative Tools**: Comprehensive audit logging, advanced export functionalities (CSV), and role-based access control.
