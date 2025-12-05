@@ -1,6 +1,7 @@
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { formatNumber } from "@/lib/formatters";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -554,7 +555,7 @@ export default function Results() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">{isRTL ? "الطلاب" : "Students"}</p>
-                  <p className="text-2xl font-semibold">{resultRows.length}</p>
+                  <p className="text-2xl font-semibold">{formatNumber(resultRows.length)}</p>
                 </div>
                 <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
                   <Users className="w-5 h-5 text-primary" />
@@ -877,30 +878,30 @@ export default function Results() {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="flex justify-between p-2 bg-muted/50 rounded">
                       <span className="text-muted-foreground">{isRTL ? "إجمالي الصفوف" : "Total Rows"}</span>
-                      <span className="font-medium">{previewData.summary?.totalRows || 0}</span>
+                      <span className="font-medium">{formatNumber(previewData.summary?.totalRows || 0)}</span>
                     </div>
                     <div className="flex justify-between p-2 bg-green-500/10 rounded">
                       <span className="text-muted-foreground">{isRTL ? "الصفوف المتطابقة" : "Matched Rows"}</span>
-                      <span className="font-medium text-green-600">{previewData.summary?.matchedRows || 0}</span>
+                      <span className="font-medium text-green-600">{formatNumber(previewData.summary?.matchedRows || 0)}</span>
                     </div>
                     <div className="flex justify-between p-2 bg-muted/50 rounded">
                       <span className="text-muted-foreground">{isRTL ? "المدارس الموجودة" : "Existing Schools"}</span>
-                      <span className="font-medium">{previewData.summary?.matchedSchools || 0}</span>
+                      <span className="font-medium">{formatNumber(previewData.summary?.matchedSchools || 0)}</span>
                     </div>
                     <div className="flex justify-between p-2 bg-muted/50 rounded">
                       <span className="text-muted-foreground">{isRTL ? "الطلاب الموجودين" : "Existing Students"}</span>
-                      <span className="font-medium">{previewData.summary?.existingStudentsCount || 0}</span>
+                      <span className="font-medium">{formatNumber(previewData.summary?.existingStudentsCount || 0)}</span>
                     </div>
                     {(previewData.summary?.newSchoolsCount || 0) > 0 && (
                       <div className="flex justify-between p-2 bg-emerald-500/10 rounded col-span-2">
                         <span className="text-emerald-600">{isRTL ? "مدارس جديدة سيتم إنشاؤها" : "New Schools to Create"}</span>
-                        <span className="font-medium text-emerald-600">{previewData.summary?.newSchoolsCount || 0}</span>
+                        <span className="font-medium text-emerald-600">{formatNumber(previewData.summary?.newSchoolsCount || 0)}</span>
                       </div>
                     )}
                     {(previewData.summary?.newStudentsCount || 0) > 0 && (
                       <div className="flex justify-between p-2 bg-blue-500/10 rounded col-span-2">
                         <span className="text-blue-600">{isRTL ? "طلاب جدد سيتم إنشاؤهم" : "New Students to Create"}</span>
-                        <span className="font-medium text-blue-600">{previewData.summary?.newStudentsCount || 0}</span>
+                        <span className="font-medium text-blue-600">{formatNumber(previewData.summary?.newStudentsCount || 0)}</span>
                       </div>
                     )}
                   </div>
@@ -998,26 +999,26 @@ export default function Results() {
                     {(uploadSummary.summary?.schoolsCreated || 0) > 0 && (
                       <div className="flex justify-between p-2 bg-emerald-500/10 rounded">
                         <span className="text-muted-foreground">{isRTL ? "مدارس جديدة" : "Schools Created"}</span>
-                        <span className="font-medium text-emerald-600">{uploadSummary.summary?.schoolsCreated || 0}</span>
+                        <span className="font-medium text-emerald-600">{formatNumber(uploadSummary.summary?.schoolsCreated || 0)}</span>
                       </div>
                     )}
                     {(uploadSummary.summary?.studentsCreated || 0) > 0 && (
                       <div className="flex justify-between p-2 bg-blue-500/10 rounded">
                         <span className="text-muted-foreground">{isRTL ? "طلاب جدد" : "Students Created"}</span>
-                        <span className="font-medium text-blue-600">{uploadSummary.summary?.studentsCreated || 0}</span>
+                        <span className="font-medium text-blue-600">{formatNumber(uploadSummary.summary?.studentsCreated || 0)}</span>
                       </div>
                     )}
                     <div className="flex justify-between p-2 bg-white dark:bg-slate-900 rounded">
                       <span className="text-muted-foreground">{isRTL ? "الطلاب المعالجين" : "Students Processed"}</span>
-                      <span className="font-medium">{uploadSummary.summary?.studentsProcessed || 0}</span>
+                      <span className="font-medium">{formatNumber(uploadSummary.summary?.studentsProcessed || 0)}</span>
                     </div>
                     <div className="flex justify-between p-2 bg-green-500/10 rounded">
                       <span className="text-muted-foreground">{isRTL ? "نتائج جديدة" : "Results Created"}</span>
-                      <span className="font-medium text-green-600">{uploadSummary.summary?.resultsCreated || 0}</span>
+                      <span className="font-medium text-green-600">{formatNumber(uploadSummary.summary?.resultsCreated || 0)}</span>
                     </div>
                     <div className="flex justify-between p-2 bg-muted/50 rounded col-span-2">
                       <span className="text-muted-foreground">{isRTL ? "نتائج محدثة" : "Results Updated"}</span>
-                      <span className="font-medium">{uploadSummary.summary?.resultsUpdated || 0}</span>
+                      <span className="font-medium">{formatNumber(uploadSummary.summary?.resultsUpdated || 0)}</span>
                     </div>
                   </div>
                 </div>
