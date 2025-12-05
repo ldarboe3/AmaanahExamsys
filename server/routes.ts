@@ -6231,6 +6231,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           
           // Update row with new student ID for result processing
           row.studentId = newStudent.id;
+          row.isMatched = true; // Ensure row is processed for results
           studentsCreated++;
           
           console.log(`[Confirm] Created student: ${firstName} ${lastName} (ID: ${newStudent.id}) for school ${row.schoolId}`);
