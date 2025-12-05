@@ -5620,7 +5620,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     studentId: number | null;
     marks: Array<{ subjectId: number; score: number }>;
     isMatched: boolean;
-    matchStatus: 'matched' | 'school_not_found' | 'student_not_found' | 'no_marks' | 'invalid_marks';
+    matchStatus: 'matched' | 'school_not_found' | 'student_not_found' | 'will_create' | 'no_marks' | 'invalid_marks';
   }
 
   interface PreviewData {
@@ -5907,15 +5907,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           }
 
           if (!studentId) {
-            unmatchedStudents.push({
-              rowNumber: i + 2,
-              rawSchoolName: schoolName.trim(),
-              matchedSchoolName: matchedSchool.name,
-              rawStudentName: fullStudentName,
-              normalizedStudentName,
-              grade: gradeLevel,
-              reason: 'Student not found in system',
-            });
+            // Student not found - mark for creation (user approved this behavior)
+            // We'll create the student during confirm phase
             previewRows.push({
               rowNumber: i + 2,
               rawSchoolName: schoolName.trim(),
@@ -5925,8 +5918,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               schoolId: matchedSchool.id,
               studentId: null,
               marks: validMarks,
-              isMatched: false,
-              matchStatus: 'student_not_found',
+              isMatched: true, // Treat as matched since we'll create the student
+              matchStatus: 'will_create',
             });
             continue;
           }
@@ -5951,6 +5944,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       const matchedRows = previewRows.filter(r => r.isMatched).length;
+      const newStudentsCount = previewRows.filter(r => r.matchStatus === 'will_create').length;
+      const existingStudentsCount = previewRows.filter(r => r.matchStatus === 'matched').length;
 
       // Store preview data for confirmation
       const sessionKey = `preview_${userId}_${Date.now()}`;
@@ -5967,6 +5962,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           unmatchedStudents: unmatchedStudents.length,
           noMarksRows: noMarksRows.length,
           invalidMarksRows: invalidMarksRows.length,
+          newStudentsCount,
+          existingStudentsCount,
         },
         examYearId,
         gradeLevel,
@@ -5986,7 +5983,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         timestamp: Date.now(),
       });
 
-      console.log(`[Preview] Complete: ${rows.length} rows, ${matchedRows} matched, ${matchedSchoolIds.size} schools, ${matchedStudentIds.size} students`);
+      console.log(`[Preview] Complete: ${rows.length} rows, ${matchedRows} matched, ${matchedSchoolIds.size} schools, ${existingStudentsCount} existing students, ${newStudentsCount} new students to create`);
 
       res.json({
         success: true,
@@ -6001,6 +5998,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           unmatchedStudents: unmatchedStudents.length,
           noMarksRows: noMarksRows.length,
           invalidMarksRows: invalidMarksRows.length,
+          newStudentsCount,
+          existingStudentsCount,
         },
         sampleUnmatchedSchools: unmatchedSchools.slice(0, 5),
         sampleUnmatchedStudents: unmatchedStudents.slice(0, 5),
@@ -6046,13 +6045,59 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return 'F';
       }
 
+      // Helper function to parse Arabic name into firstName and lastName
+      function parseStudentName(fullName: string): { firstName: string; lastName: string } {
+        const cleaned = fullName.trim().replace(/\s+/g, ' ');
+        const parts = cleaned.split(' ');
+        
+        if (parts.length === 1) {
+          // Single name: use as firstName, placeholder lastName
+          return { firstName: parts[0], lastName: 'غير متوفر' };
+        } else if (parts.length === 2) {
+          // Two parts: firstName lastName
+          return { firstName: parts[0], lastName: parts[1] };
+        } else {
+          // Multiple parts: first part is firstName, rest is lastName
+          return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+        }
+      }
+
       let resultsCreated = 0;
       let resultsUpdated = 0;
+      let studentsCreated = 0;
 
-      // Apply only matched rows
-      const matchedRows = previewData.rows.filter(r => r.isMatched && r.studentId && r.marks.length > 0);
+      // Step 1: Create students for "will_create" rows
+      const willCreateRows = previewData.rows.filter(r => r.matchStatus === 'will_create' && r.schoolId && r.marks.length > 0);
+      
+      for (const row of willCreateRows) {
+        try {
+          const { firstName, lastName } = parseStudentName(row.rawStudentName);
+          
+          // Create student with minimal required data
+          const newStudent = await storage.createStudent({
+            firstName,
+            lastName,
+            schoolId: row.schoolId!,
+            grade: previewData.gradeLevel,
+            status: 'approved', // Auto-approve to allow result publication
+            examYearId: previewData.examYearId,
+            gender: 'male', // Default, will be updated if needed
+          });
+          
+          // Update row with new student ID for result processing
+          row.studentId = newStudent.id;
+          studentsCreated++;
+          
+          console.log(`[Confirm] Created student: ${firstName} ${lastName} (ID: ${newStudent.id}) for school ${row.schoolId}`);
+        } catch (error: any) {
+          console.error(`[Confirm] Failed to create student for row ${row.rowNumber}:`, error.message);
+        }
+      }
 
-      for (const row of matchedRows) {
+      // Step 2: Apply results for all matched rows (existing + newly created students)
+      const processableRows = previewData.rows.filter(r => r.isMatched && r.studentId && r.marks.length > 0);
+
+      for (const row of processableRows) {
         for (const mark of row.marks) {
           const existing = await storage.getResultByStudentAndSubject(row.studentId!, mark.subjectId, previewData.examYearId);
           
@@ -6074,12 +6119,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Clean up preview data
       uploadPreviewStore.delete(sessionKey);
 
-      console.log(`[Confirm] Applied: ${resultsCreated} created, ${resultsUpdated} updated`);
+      console.log(`[Confirm] Applied: ${studentsCreated} students created, ${resultsCreated} results created, ${resultsUpdated} results updated`);
 
       res.json({
         success: true,
         summary: {
-          studentsProcessed: matchedRows.length,
+          studentsProcessed: processableRows.length,
+          studentsCreated,
           resultsCreated,
           resultsUpdated,
         },
