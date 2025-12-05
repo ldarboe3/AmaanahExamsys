@@ -1066,30 +1066,68 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return 'Admin@123';
       };
 
-      // Helper to find best matching region (fuzzy matching for numeric inputs)
-      const findBestRegionMatch = (inputName: string, allRegions: any[]): any | null => {
-        const input = inputName.trim().toLowerCase();
+      // Helper to normalize Arabic numerals to ASCII
+      const normalizeArabicNumerals = (str: string): string => {
+        const arabicToAscii: { [key: string]: string } = {
+          '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+          '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+        };
+        return str.replace(/[٠-٩]/g, (match) => arabicToAscii[match]);
+      };
+
+      // Helper to find region by numeric ID or code
+      const findRegionByInput = (input: string, allRegions: any[]): any | null => {
+        const normalized = normalizeArabicNumerals(input).trim();
         
-        // If input is numeric (like "1", "2"), try to match to "Region 1", "Region 2"
-        if (/^\d+$/.test(input)) {
-          const regionNum = parseInt(input, 10);
-          const match = allRegions.find(r => 
-            r.name.toLowerCase() === `region ${regionNum}`
-          );
-          if (match) return match;
+        // Try numeric ID matching first (input "2" → Region 2 with code RG2)
+        if (/^\d+$/.test(normalized)) {
+          const regionNum = parseInt(normalized, 10);
+          // Match by code like "RG2"
+          const matchByCode = allRegions.find(r => r.code === `RG${regionNum}`);
+          if (matchByCode) return matchByCode;
+          // Match by name like "Region 2"
+          const matchByName = allRegions.find(r => r.name.toLowerCase() === `region ${regionNum}`);
+          if (matchByName) return matchByName;
         }
         
-        // Exact match
-        const exactMatch = allRegions.find(r => 
-          r.name.toLowerCase() === input
-        );
-        if (exactMatch) return exactMatch;
+        // Try exact match on code
+        const exactCodeMatch = allRegions.find(r => r.code === normalized.toUpperCase());
+        if (exactCodeMatch) return exactCodeMatch;
         
-        // Partial match (e.g., "Banjul" matches "Banjul Region")
-        const partialMatch = allRegions.find(r => 
-          r.name.toLowerCase().includes(input) || input.includes(r.name.toLowerCase())
-        );
-        if (partialMatch) return partialMatch;
+        // Try exact match on name
+        const exactNameMatch = allRegions.find(r => r.name.toLowerCase() === normalized.toLowerCase());
+        if (exactNameMatch) return exactNameMatch;
+        
+        return null;
+      };
+
+      // Helper to find cluster by region and numeric ID
+      const findClusterByInput = (regionId: number, input: string, allClusters: any[]): any | null => {
+        const normalized = normalizeArabicNumerals(input).trim();
+        
+        // Filter clusters for this region
+        const regionClusters = allClusters.filter(c => c.regionId === regionId);
+        
+        // Try numeric ID matching (input "1" → find cluster with code like "CL1" or "RG{n}-1")
+        if (/^\d+$/.test(normalized)) {
+          const clusterNum = parseInt(normalized, 10);
+          // Try exact numeric match in cluster name or ID
+          const matchByCode = regionClusters.find(c => {
+            // Check if code ends with the number or matches CL{n}
+            return c.code === `CL${clusterNum}` || 
+                   c.code.endsWith(`-${clusterNum}`) ||
+                   c.code === normalized;
+          });
+          if (matchByCode) return matchByCode;
+        }
+        
+        // Try exact match on code
+        const exactCodeMatch = regionClusters.find(c => c.code === normalized.toUpperCase());
+        if (exactCodeMatch) return exactCodeMatch;
+        
+        // Try match on name
+        const nameMatch = regionClusters.find(c => c.name.toLowerCase().includes(normalized.toLowerCase()));
+        if (nameMatch) return nameMatch;
         
         return null;
       };
@@ -1181,45 +1219,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const address = row.address?.trim() || '';
 
           // Validate region and cluster exist - NO CREATION
-          let regionId: number | undefined;
-          let matchedRegion = findBestRegionMatch(regionInput, allRegions);
+          const matchedRegion = findRegionByInput(regionInput, allRegions);
           
-          if (matchedRegion) {
-            regionId = matchedRegion.id;
-            regionCache.set(matchedRegion.name.toLowerCase(), regionId);
-          } else {
-            regionId = regionCache.get(regionInput.toLowerCase());
-            if (!regionId) {
-              results.errors.push({ 
-                row: rowNum, 
-                error: `Region/Cluster mismatch in Row ${rowNum} — does not match existing records.`,
-                schoolName 
-              });
-              continue;
-            }
+          if (!matchedRegion) {
+            results.errors.push({ 
+              row: rowNum, 
+              error: `Region/Cluster mismatch in Row ${rowNum} — does not match existing records.`,
+              schoolName 
+            });
+            continue;
           }
           
-          const actualRegionName = matchedRegion?.name || regionInput;
+          const regionId = matchedRegion.id;
+          const actualRegionName = matchedRegion.name;
 
           // Find existing cluster - NO CREATION
-          const clusterKey = `${regionId}-${clusterName.toLowerCase()}`;
-          let clusterId = clusterCache.get(clusterKey);
-          if (!clusterId) {
-            const foundCluster = allClusters.find(c => 
-              c.regionId === regionId && c.name.toLowerCase().trim() === clusterName.toLowerCase()
-            );
-            if (foundCluster) {
-              clusterId = foundCluster.id;
-              clusterCache.set(clusterKey, clusterId);
-            } else {
-              results.errors.push({ 
-                row: rowNum, 
-                error: `Region/Cluster mismatch in Row ${rowNum} — does not match existing records.`,
-                schoolName 
-              });
-              continue;
-            }
+          const matchedCluster = findClusterByInput(regionId, clusterName, allClusters);
+          
+          if (!matchedCluster) {
+            results.errors.push({ 
+              row: rowNum, 
+              error: `Region/Cluster mismatch in Row ${rowNum} — does not match existing records.`,
+              schoolName 
+            });
+            continue;
           }
+          
+          const clusterId = matchedCluster.id;
 
           // Check for duplicate school
           const existingSchool = await storage.getSchoolByNameAndLocation(schoolName, regionId, clusterId);
@@ -1359,12 +1385,60 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const allRegions = await storage.getAllRegions();
         const allClusters = await storage.getAllClusters();
 
-        // Create lookup maps: region ID -> region, (region ID, cluster ID) -> cluster
-        const regionMap = new Map<number, any>();
-        const clusterMap = new Map<string, any>();
-        
-        allRegions.forEach(r => regionMap.set(r.id, r));
-        allClusters.forEach(c => clusterMap.set(`${c.regionId}-${c.id}`, c));
+        // Helper to normalize Arabic numerals to ASCII
+        const normalizeArabicNumerals = (str: string): string => {
+          const arabicToAscii: { [key: string]: string } = {
+            '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+            '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+          };
+          return str.replace(/[٠-٩]/g, (match) => arabicToAscii[match]);
+        };
+
+        // Helper to find region by numeric ID or code
+        const findRegionByInput = (input: string, regions: any[]): any | null => {
+          const normalized = normalizeArabicNumerals(input).trim();
+          
+          if (/^\d+$/.test(normalized)) {
+            const regionNum = parseInt(normalized, 10);
+            const matchByCode = regions.find(r => r.code === `RG${regionNum}`);
+            if (matchByCode) return matchByCode;
+            const matchByName = regions.find(r => r.name.toLowerCase() === `region ${regionNum}`);
+            if (matchByName) return matchByName;
+          }
+          
+          const exactCodeMatch = regions.find(r => r.code === normalized.toUpperCase());
+          if (exactCodeMatch) return exactCodeMatch;
+          
+          const exactNameMatch = regions.find(r => r.name.toLowerCase() === normalized.toLowerCase());
+          if (exactNameMatch) return exactNameMatch;
+          
+          return null;
+        };
+
+        // Helper to find cluster by region and numeric ID
+        const findClusterByInput = (regionId: number, input: string, clusters: any[]): any | null => {
+          const normalized = normalizeArabicNumerals(input).trim();
+          
+          const regionClusters = clusters.filter(c => c.regionId === regionId);
+          
+          if (/^\d+$/.test(normalized)) {
+            const clusterNum = parseInt(normalized, 10);
+            const matchByCode = regionClusters.find(c => {
+              return c.code === `CL${clusterNum}` || 
+                     c.code.endsWith(`-${clusterNum}`) ||
+                     c.code === normalized;
+            });
+            if (matchByCode) return matchByCode;
+          }
+          
+          const exactCodeMatch = regionClusters.find(c => c.code === normalized.toUpperCase());
+          if (exactCodeMatch) return exactCodeMatch;
+          
+          const nameMatch = regionClusters.find(c => c.name.toLowerCase().includes(normalized.toLowerCase()));
+          if (nameMatch) return nameMatch;
+          
+          return null;
+        };
 
         const results: {
           success: Array<{
@@ -1430,24 +1504,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               continue;
             }
 
-            // Parse region and cluster codes (numeric IDs)
-            const regionId = parseInt(regionInput, 10);
-            const clusterId = parseInt(clusterInput, 10);
-
-            if (isNaN(regionId) || isNaN(clusterId)) {
-              results.errors.push({ 
-                row: row + 1, 
-                error: `Region/Cluster mismatch in Row ${row + 1} — does not match existing records.`,
-                schoolName 
-              });
-              continue;
-            }
-
-            // Validate both region and cluster exist
-            const region = regionMap.get(regionId);
-            const cluster = clusterMap.get(`${regionId}-${clusterId}`);
+            // Find matching region and cluster
+            const matchedRegion = findRegionByInput(regionInput, allRegions);
             
-            if (!region || !cluster) {
+            if (!matchedRegion) {
               results.errors.push({ 
                 row: row + 1, 
                 error: `Region/Cluster mismatch in Row ${row + 1} — does not match existing records.`,
@@ -1455,6 +1515,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               });
               continue;
             }
+            
+            const regionId = matchedRegion.id;
+            const region = matchedRegion;
+
+            const matchedCluster = findClusterByInput(regionId, clusterInput, allClusters);
+            
+            if (!matchedCluster) {
+              results.errors.push({ 
+                row: row + 1, 
+                error: `Region/Cluster mismatch in Row ${row + 1} — does not match existing records.`,
+                schoolName 
+              });
+              continue;
+            }
+            
+            const clusterId = matchedCluster.id;
+            const cluster = matchedCluster;
 
             // Check for duplicate within THIS upload
             const schoolKey = `${regionId}-${clusterId}-${schoolName.toLowerCase()}`;
