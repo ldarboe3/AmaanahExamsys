@@ -1,0 +1,103 @@
+Upload an exam results file and, for each row, match the Student to the correct School and map Subjects to the right subject records. Only upload students who (a) are matched to a school and (b) have at least one valid mark. Skip rows with unmatched schools or with all-empty marks.
+
+Sample file for reference:
+/mnt/data/النتيجية النهاية السادس الإبتدئي 2025 الصحيح - Copy.csv
+
+1) What the system receives (columns in the file)
+
+School name
+
+Address
+
+Student name
+
+Subjects — one column per subject (e.g., القرآن، القراءة (المحفوظات)، السيرة، الكتابة، الحديث، الفقه، التوحيد، القواعد، English, Mathematics, S E S, Science, التعبير…)
+
+The system must support Arabic text (UTF-8 with BOM).
+
+2) Template download
+
+Provide a Download Template button that returns an empty CSV/XLSX with the exact headers the system expects:
+
+School name, Address, Student name, plus all subject columns (one per subject).
+
+Use UTF-8-SIG for CSV.
+
+3) Matching rules
+3.1 Match student → school
+
+Normalize text before matching (trim spaces, remove tatweel “ـ”, normalize Arabic letters: أ/إ/آ → ا, ة → ه, ى → ي).
+
+Find the School in the database by normalized School name (Address can help disambiguate but must not create new schools).
+
+If the school is not found → skip this row (status: Unmatched school).
+
+3.2 Map columns → subjects
+
+Maintain a subject header → subject ID mapping table (handle small header variations and spacing).
+
+Only create marks for columns that map to a known subject.
+
+4) Valid marks only
+
+A valid mark = numeric (int/decimal) and within allowed range (e.g., 0–100 or the subject’s max).
+
+If all subject cells are empty or invalid for a student → skip this row (status: No marks).
+
+If at least one subject mark is valid:
+
+Upload only the valid subject marks for that student.
+
+Ignore empty/invalid subject cells.
+
+5) Insert logic (must satisfy BOTH)
+
+For each row:
+
+School matched? If no → skip.
+
+Has ≥1 valid mark? If no → skip.
+
+If yes to both → insert/update the results for that student & those subjects.
+
+Idempotency: update existing records for the same (school_id, student_name, exam, subject_id) instead of duplicating.
+
+6) Post-processing outputs
+
+Show summary counters:
+
+Total rows processed
+
+Uploaded/Updated
+
+Skipped – Unmatched school
+
+Skipped – No marks
+
+Skipped – Invalid marks
+
+Offer downloadable CSVs (UTF-8-SIG) that preserve original headers:
+
+Unmatched schools (all affected rows)
+
+No marks (all affected rows)
+
+Invalid marks (rows + the columns that failed)
+
+7) Guardrails
+
+Do not create new schools during result upload (schools must already exist).
+
+Preserve original column names and Arabic text.
+
+Log original row numbers for all skipped items.
+
+8) Acceptance criteria
+
+The template downloads with the exact expected headers and UTF-8 encoding.
+
+Upload inserts only rows where the school matched and there’s ≥1 valid mark.
+
+Summary and downloadable error files are accurate and keep the original headers.
+
+Arabic text is preserved end-to-end.
