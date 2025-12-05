@@ -1367,6 +1367,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             regionCode: string;
             clusterCode: string;
             schoolId: number;
+            username: string;
+            password: string;
+            userEmail: string;
+            schoolEmail: string;
           }>;
           errors: Array<{ row: number; error: string; schoolName?: string }>;
         } = {
@@ -1491,9 +1495,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             // Mark this school as processed
             processedSchools.add(schoolKey);
 
-            // Generate credentials
-            const username = `school${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-            const password = `School@${Math.random().toString(36).substring(2, 10)}`;
+            // Generate unique credentials using crypto
+            const uniqueId = randomBytes(8).toString('hex').toUpperCase();
+            const username = `school_${uniqueId}`;
+            const password = `Sch00l@${randomBytes(4).toString('hex')}`;
+            const userEmail = `school_${uniqueId}@amaanah.local`;
+            const schoolEmail = `admin_${uniqueId}@amaanah.local`;
             const hashedPassword = await bcrypt.hash(password, 10);
 
             // Create user account
@@ -1503,14 +1510,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               role: 'school_admin',
               firstName: schoolName,
               lastName: 'Admin',
-              email: `${username.toLowerCase()}@placeholder.local`,
+              email: userEmail,
             }).returning();
 
             // Create school with auto-approval
             const [createdSchool] = await db.insert(schools).values({
               name: schoolName,
               registrarName: 'School Admin',
-              email: `${username.toLowerCase()}@school.local`,
+              email: schoolEmail,
               address,
               schoolType: 'LBS' as const,
               regionId,
@@ -1529,6 +1536,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               regionCode: `${region.code}`,
               clusterCode: `${region.code}.${cluster.code}`,
               schoolId: createdSchool.id,
+              username,
+              password,
+              userEmail,
+              schoolEmail,
             });
           } catch (error: any) {
             results.errors.push({ 
