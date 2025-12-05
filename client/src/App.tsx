@@ -54,6 +54,7 @@ import SchoolRegistration from "@/pages/school-registration";
 import SchoolVerify from "@/pages/school-verify";
 import SchoolInvite from "@/pages/school-invite";
 import ForgotPassword from "@/pages/forgot-password";
+import ChangePassword from "@/pages/change-password";
 import WebsiteManagement from "@/pages/website-management";
 import Documentation from "@/pages/documentation";
 
@@ -72,6 +73,7 @@ function LoadingScreen() {
 function AuthenticatedRoutes() {
   return (
     <Switch>
+      <Route path="/change-password" component={ChangePassword} />
       <Route path="/school-verify/:token" component={SchoolVerify} />
       <Route path="/school-invite/:token" component={SchoolInvite} />
       <Route path="/forgot-password/:token" component={ForgotPassword} />

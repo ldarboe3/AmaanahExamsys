@@ -319,6 +319,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       await storage.updatePassword(req.session.userId!, newPassword);
+      
+      // Clear the mustChangePassword flag after successful password change
+      await db.update(users)
+        .set({ mustChangePassword: false })
+        .where(eq(users.id, req.session.userId!));
+      
       res.json({ message: "Password changed successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1369,8 +1375,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             schoolId: number;
             username: string;
             password: string;
-            userEmail: string;
-            schoolEmail: string;
           }>;
           errors: Array<{ row: number; error: string; schoolName?: string }>;
         } = {
@@ -1495,29 +1499,30 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             // Mark this school as processed
             processedSchools.add(schoolKey);
 
-            // Generate unique credentials using crypto
-            const uniqueId = randomBytes(8).toString('hex').toUpperCase();
-            const username = `school_${uniqueId}`;
-            const password = `Sch00l@${randomBytes(4).toString('hex')}`;
-            const userEmail = `school_${uniqueId}@amaanah.local`;
-            const schoolEmail = `admin_${uniqueId}@amaanah.local`;
+            // Generate sequential username
+            // Count existing school_admin users to get the next sequential number
+            const existingAdminsCount = await db.select({ id: users.id }).from(users).where(eq(users.role, 'school_admin'));
+            const sequentialNumber = existingAdminsCount.length + 1;
+            const username = `SchoolAdmin${sequentialNumber.toString().padStart(4, '0')}`;
+            
+            // Use fixed default password
+            const password = 'Admin@123';
             const hashedPassword = await bcrypt.hash(password, 10);
 
-            // Create user account
+            // Create user account with mustChangePassword flag
             const [user] = await db.insert(users).values({
               username,
               passwordHash: hashedPassword,
               role: 'school_admin',
               firstName: schoolName,
               lastName: 'Admin',
-              email: userEmail,
+              mustChangePassword: true, // Force password change on first login
             }).returning();
 
-            // Create school with auto-approval
+            // Create school with auto-approval (no email required)
             const [createdSchool] = await db.insert(schools).values({
               name: schoolName,
               registrarName: 'School Admin',
-              email: schoolEmail,
               address,
               schoolType: 'LBS' as const,
               regionId,
@@ -1538,8 +1543,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               schoolId: createdSchool.id,
               username,
               password,
-              userEmail,
-              schoolEmail,
             });
           } catch (error: any) {
             results.errors.push({ 
