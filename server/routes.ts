@@ -3143,6 +3143,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const unmatched = previewResults.filter(r => r.status === 'unmatched').length;
       const errors = previewResults.filter(r => r.status === 'error').length;
 
+      // Collect unique unmatched schools with their first occurrence row number
+      const unmatchedSchoolsMap = new Map<string, number>();
+      previewResults
+        .filter(r => r.status === 'unmatched')
+        .forEach(r => {
+          if (!unmatchedSchoolsMap.has(r.schoolName)) {
+            unmatchedSchoolsMap.set(r.schoolName, r.row);
+          }
+        });
+      
+      const unmatchedSchools = Array.from(unmatchedSchoolsMap.entries()).map(([name, rowNum]) => ({
+        schoolName: name,
+        originalRowNumber: rowNum,
+      }));
+
       res.json({
         success: true,
         preview: previewResults,
@@ -3153,6 +3168,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           unmatched,
           errors,
         },
+        unmatchedSchools,
         availableSchools: allSchools.map(s => ({ 
           id: s.id, 
           name: s.name, 
@@ -3283,6 +3299,39 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       });
     } catch (error: any) {
       console.error('Bulk upload confirm error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Download unmatched schools as CSV
+  app.post("/api/students/download-unmatched-schools", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only super admin and examination admin can download unmatched schools" });
+      }
+
+      const { unmatchedSchools } = req.body;
+      if (!Array.isArray(unmatchedSchools) || unmatchedSchools.length === 0) {
+        return res.status(400).json({ message: "No unmatched schools provided" });
+      }
+
+      // Create CSV content with UTF-8 BOM
+      const BOM = '\uFEFF';
+      let csvContent = BOM + '"School name (unmatched)","Original row number"\n';
+      
+      unmatchedSchools.forEach((school: { schoolName: string; originalRowNumber: number }) => {
+        // Escape quotes in school name
+        const escapedName = school.schoolName.replace(/"/g, '""');
+        csvContent += `"${escapedName}",${school.originalRowNumber}\n`;
+      });
+
+      // Set response headers for file download
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="unmatched-schools.csv"');
+      res.send(csvContent);
+    } catch (error: any) {
+      console.error('Download unmatched schools error:', error);
       res.status(500).json({ message: error.message });
     }
   });
