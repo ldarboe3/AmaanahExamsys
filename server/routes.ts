@@ -5651,17 +5651,80 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
   
-  // Arabic text normalization for matching
-  function normalizeArabicText(text: string): string {
+  // Enhanced Arabic Text Cleaner for robust matching
+  // Applies normalization rules in specific order for reliable matching:
+  // 1. Normalize spaces & unicode spaces
+  // 2. Remove tatweel (kashida)
+  // 3. Unify alef forms (أ إ آ → ا)
+  // 4. Unify taa marbuta & alef maqsura (ة → ه, ى → ي)
+  // 5. Strip punctuation/formatting
+  // 6. Remove zero-width & control characters
+  // 7. Convert Arabic digits (for Region/Cluster fields)
+  // 8. Lowercase Latin text
+  type CleanFieldType = 'default' | 'region' | 'cluster' | 'regionClusterCode' | 'school' | 'student' | 'address' | 'subject';
+  
+  function cleanArabicText(text: string, fieldType: CleanFieldType = 'default'): string {
     if (!text) return '';
-    return text
-      .trim()
-      .replace(/\u0640/g, '') // Remove tatweel (ـ)
-      .replace(/[\u0622\u0623\u0625]/g, '\u0627') // آ أ إ → ا
-      .replace(/\u0629/g, '\u0647') // ة → ه
-      .replace(/\u0649/g, '\u064A') // ى → ي
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .toLowerCase();
+    let s = text;
+    
+    // 1) Normalize spaces & unicode spaces
+    // Convert non-breaking spaces, Arabic spaces, and other unicode spaces to regular spaces
+    s = s.replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ');
+    s = s.trim();
+    s = s.replace(/\s+/g, ' '); // Collapse multiple spaces to single
+    
+    // 2) Remove tatweel (kashida) - the extension character ـ
+    s = s.replace(/\u0640/g, '');
+    
+    // 3) Unify alef forms: أ إ آ → ا
+    s = s.replace(/[\u0622\u0623\u0625]/g, '\u0627');
+    
+    // 4) Unify taa marbuta & alef maqsura: ة → ه, ى → ي
+    s = s.replace(/\u0629/g, '\u0647'); // ة → ه
+    s = s.replace(/\u0649/g, '\u064A'); // ى → ي
+    
+    // 5) Strip punctuation/formatting inside names
+    // Remove: . ، ؛ / \ | ( ) [ ] { } : ; ' " … — – · and similar
+    s = s.replace(/[.،؛/\\|()[\]{};:'"…—–·«»„""''`~!@#$%^&*+=<>?]/g, '');
+    // Also remove Arabic comma, semicolon, question mark variants
+    s = s.replace(/[\u060C\u061B\u061F]/g, '');
+    // Collapse any resulting multiple spaces
+    s = s.replace(/\s+/g, ' ');
+    s = s.trim();
+    
+    // 6) Remove zero-width & control characters
+    s = s.replace(/[\u200B\u200C\u200D\u200E\u200F\uFEFF]/g, '');
+    // Remove other invisible formatting characters
+    s = s.replace(/[\u2060-\u206F]/g, '');
+    
+    // 7) Convert Arabic-Indic digits to ASCII for Region/Cluster fields
+    // ٠١٢٣٤٥٦٧٨٩ → 0123456789
+    if (['region', 'cluster', 'regionClusterCode'].includes(fieldType)) {
+      s = s.replace(/[\u0660-\u0669]/g, (c) => String(c.charCodeAt(0) - 0x0660));
+      // Also handle Extended Arabic-Indic digits (used in Persian/Urdu)
+      s = s.replace(/[\u06F0-\u06F9]/g, (c) => String(c.charCodeAt(0) - 0x06F0));
+    }
+    
+    // 8) Lowercase Latin text (Arabic is case-less)
+    s = s.toLowerCase();
+    
+    return s;
+  }
+  
+  // Backward-compatible alias for existing code
+  function normalizeArabicText(text: string): string {
+    return cleanArabicText(text, 'default');
+  }
+  
+  // Parse composite Region.Cluster codes (e.g., "2.1" or "2-1" or "٢.١")
+  function parseRegionClusterCode(code: string): { regionCode: string; clusterCode: string } | null {
+    const cleaned = cleanArabicText(code, 'regionClusterCode');
+    // Match patterns like "2.1", "2-1", "2 1"
+    const match = cleaned.match(/^(\d+)[\.\-\s](\d+)$/);
+    if (match) {
+      return { regionCode: match[1], clusterCode: match[2] };
+    }
+    return null;
   }
 
   // Comprehensive bulk results upload with school matching (NO auto-creation)
@@ -5917,13 +5980,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
           if (!matchedSchool) {
             // School not matched - add to unmatched list and skip
+            // Include both raw and normalized values for diagnosis
             summary.skippedUnmatchedSchool++;
             if (!processedSchools.has(normalizedSchoolName)) {
               unmatchedSchools.push({
                 rowNumber: i + 2,
-                schoolName: schoolName.trim(),
+                rawSchoolName: schoolName.trim(),
+                normalizedSchoolName: normalizedSchoolName,
                 address: address.trim(),
                 studentName: studentName.trim(),
+                reason: 'School not found in database',
               });
               processedSchools.add(normalizedSchoolName);
             }
@@ -5940,8 +6006,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           if (!studentName.trim()) {
             noMarksRows.push({
               rowNumber: i + 2,
-              schoolName: schoolName.trim(),
-              studentName: '(empty)',
+              rawSchoolName: schoolName.trim(),
+              normalizedSchoolName: normalizedSchoolName,
+              rawStudentName: '(empty)',
               reason: 'Missing student name',
             });
             continue;
@@ -5976,8 +6043,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           if (invalidMarkDetails.length > 0) {
             invalidMarksRows.push({
               rowNumber: i + 2,
-              schoolName: schoolName.trim(),
-              studentName: studentName.trim(),
+              rawSchoolName: schoolName.trim(),
+              normalizedSchoolName: normalizedSchoolName,
+              rawStudentName: studentName.trim(),
+              normalizedStudentName: cleanArabicText(fullStudentName, 'student'),
               invalidMarks: invalidMarkDetails.join('; '),
             });
           }
@@ -5987,8 +6056,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             summary.skippedNoMarks++;
             noMarksRows.push({
               rowNumber: i + 2,
-              schoolName: schoolName.trim(),
-              studentName: studentName.trim(),
+              rawSchoolName: schoolName.trim(),
+              normalizedSchoolName: normalizedSchoolName,
+              rawStudentName: fullStudentName,
+              normalizedStudentName: cleanArabicText(fullStudentName, 'student'),
               reason: 'No valid marks (0-100)',
             });
             continue;
@@ -6033,11 +6104,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               studentCache.set(studentCacheKey, studentId);
             } else {
               // Student not found - track as error and skip (NO auto-creation)
+              // Include both raw and normalized values for diagnosis
               summary.skippedUnmatchedStudent++;
               unmatchedStudents.push({
                 rowNumber: i + 2,
-                schoolName: schoolName.trim(),
-                studentName: fullStudentName,
+                rawSchoolName: schoolName.trim(),
+                normalizedSchoolName: normalizedSchoolName,
+                rawStudentName: fullStudentName,
+                normalizedStudentName: normalizedFullName,
                 grade: gradeLevel,
                 reason: 'Student not found in system',
               });
