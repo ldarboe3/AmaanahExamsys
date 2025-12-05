@@ -44,6 +44,9 @@ The system is built on a robust architecture featuring a React-based frontend, a
 
 ### Feature Specifications
 - **School Management**: Registration with email verification, profile management, school badge upload, and an invitation system for additional school administrators.
+  - **CRITICAL: Regions & Clusters are Authoritative**: During school upload (both JSON and CSV), the system validates that Region and Cluster IDs/names match existing records. **NO new Regions or Clusters are created during upload**. CSV values are used for validation/matching only. If a Region or Cluster does not exist, upload errors are flagged for those rows.
+  - **School Credentials**: Sequential usernames (SchoolAdmin0001, SchoolAdmin0002, etc.), fixed password (Admin@123), mandatory password change on first login.
+  - **CSV Export**: Enhanced with UTF-8 BOM for proper Arabic text rendering, bilingual headers (English/Arabic), and complete school details.
 - **Student Management**: CSV import, index number generation, and a 3-tier registration navigation workflow.
 - **Financial Management**: Three-tier fee structure (`feePerStudent`, `certificateFee`, `transcriptFee`), auto-invoice generation, bank slip upload, payment confirmation, and professional PDF invoice downloads. School admin payments page shows current invoice with examination year badge and past invoices table with columns for invoice number, examination year, payment amount, status, and download button.
 - **Results & Certificates**: 
