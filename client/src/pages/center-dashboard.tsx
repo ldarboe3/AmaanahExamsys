@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { formatNumber } from "@/lib/formatters";
 import {
   Dialog,
   DialogContent,
@@ -171,6 +172,7 @@ function StatCard({ label, value, icon: Icon, variant = "default" }: {
   icon: any;
   variant?: "default" | "success" | "warning" | "error";
 }) {
+  const displayValue = typeof value === 'number' ? formatNumber(value) : value;
   const colorClasses = {
     default: "bg-primary/10 text-primary",
     success: "bg-chart-2/10 text-chart-2",
@@ -184,7 +186,7 @@ function StatCard({ label, value, icon: Icon, variant = "default" }: {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="text-2xl font-semibold">{value}</p>
+            <p className="text-2xl font-semibold">{displayValue}</p>
           </div>
           <div className={`w-10 h-10 rounded-md flex items-center justify-center ${colorClasses[variant]}`}>
             <Icon className="w-5 h-5" />
