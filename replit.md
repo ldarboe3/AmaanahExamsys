@@ -43,10 +43,14 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Website CMS**: Integrated content management system for news articles, resources, announcements, and impact statistics.
 
 ### Feature Specifications
-- **School Management**: Registration with email verification, profile management, school badge upload, and an invitation system for additional school administrators.
-  - **CRITICAL: Regions & Clusters are Authoritative**: During school upload (both JSON and CSV), the system validates that Region and Cluster IDs/names match existing records. **NO new Regions or Clusters are created during upload**. CSV values are used for validation/matching only. If a Region or Cluster does not exist, upload errors are flagged for those rows.
-  - **School Credentials**: Sequential usernames (SchoolAdmin0001, SchoolAdmin0002, etc.), fixed password (Admin@123), mandatory password change on first login.
-  - **CSV Export**: Enhanced with UTF-8 BOM for proper Arabic text rendering, bilingual headers (English/Arabic), and complete school details.
+- **School Management**: Profile management, school badge upload, and an invitation system for additional school administrators.
+  - **CRITICAL: Regions & Clusters are Authoritative**: During school upload (both JSON and CSV), the system validates that Region and Cluster IDs/names match existing records. **NO new Regions or Clusters are created during upload**. Validation-only approach: CSV values are matched against existing system records. If a Region or Cluster does not exist, error flagged: "Region/Cluster mismatch in Row X — does not match existing records."
+  - **School Upload Process**: Schools are uploaded WITHOUT email requirement. Separate login accounts created for each school with:
+    - Sequential usernames: SchoolAdmin0001, SchoolAdmin0002, etc.
+    - Fixed password: Admin@123 (must change on first login via /change-password)
+    - Users stored in users table (separate from schools table)
+    - Forced password change enforced via mustChangePassword flag
+  - **Credential Export**: Download credentials as UTF-8 CSV with BOM for proper Arabic text rendering, bilingual headers (English/Arabic), and complete school details including username and temporary password.
 - **Student Management**: CSV import, index number generation, and a 3-tier registration navigation workflow.
 - **Financial Management**: Three-tier fee structure (`feePerStudent`, `certificateFee`, `transcriptFee`), auto-invoice generation, bank slip upload, payment confirmation, and professional PDF invoice downloads. School admin payments page shows current invoice with examination year badge and past invoices table with columns for invoice number, examination year, payment amount, status, and download button.
 - **Results & Certificates**: 
@@ -58,7 +62,7 @@ The system is built on a robust architecture featuring a React-based frontend, a
   - Real-time auto-calculation of Total Marks and Percentage as marks are entered (0-100 per subject)
   - Pagination controls: 10/50/100 students per page
   - Dynamic student list updates based on Region/Cluster/School filters
-  - CSV upload for results with bilingual support (Arabic/English column headers), automatic entity creation (regions, clusters, schools, students), and region/cluster code parsing ("X.Y" format support)
+  - CSV results upload with bilingual support (Arabic/English column headers), validation against existing regions/clusters/schools/students
   - Public result checker, PDF certificate and transcript generation with gender-specific templates and QR verification
 - **Administrative Tools**: Comprehensive audit logging, advanced export functionalities (CSV), and role-based access control.
 - **Exam Management**: Examiner, subject, timetable, and exam center management.
