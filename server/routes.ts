@@ -5609,6 +5609,488 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     timestamp: number;
   }> = new Map();
 
+  // Two-phase upload: Store preview results for confirmation
+  interface PreviewRow {
+    rowNumber: number;
+    rawSchoolName: string;
+    rawStudentName: string;
+    normalizedSchoolName: string;
+    normalizedStudentName: string;
+    schoolId: number | null;
+    studentId: number | null;
+    marks: Array<{ subjectId: number; score: number }>;
+    isMatched: boolean;
+    matchStatus: 'matched' | 'school_not_found' | 'student_not_found' | 'no_marks' | 'invalid_marks';
+  }
+
+  interface PreviewData {
+    rows: PreviewRow[];
+    summary: {
+      totalRows: number;
+      matchedRows: number;
+      matchedSchools: Set<number>;
+      matchedStudents: Set<number>;
+      unmatchedSchools: number;
+      unmatchedStudents: number;
+      noMarksRows: number;
+      invalidMarksRows: number;
+    };
+    examYearId: number;
+    gradeLevel: number;
+    unmatchedSchools: any[];
+    unmatchedStudents: any[];
+    noMarksRows: any[];
+    invalidMarksRows: any[];
+    timestamp: number;
+  }
+
+  const uploadPreviewStore: Map<string, PreviewData> = new Map();
+
+  // Clean up old preview data (older than 30 minutes)
+  function cleanupOldPreviews() {
+    const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+    for (const [key, data] of uploadPreviewStore.entries()) {
+      if (data.timestamp < thirtyMinutesAgo) {
+        uploadPreviewStore.delete(key);
+      }
+    }
+  }
+
+  // Preview upload for multer
+  const previewUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 },
+    fileFilter: (req: any, file, cb) => {
+      if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only CSV files are allowed'));
+      }
+    },
+  });
+
+  // PHASE 1: Preview upload - matches schools/students, returns stats, NO saving
+  app.post("/api/results/upload/preview", isAuthenticated, previewUpload.single('file'), async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Only admins can upload results" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "CSV file is required" });
+      }
+
+      const examYearId = parseInt(req.body.examYearId);
+      const gradeLevel = parseInt(req.body.grade);
+
+      if (!examYearId) {
+        return res.status(400).json({ message: "Exam year is required" });
+      }
+      if (!gradeLevel || ![3, 6, 9, 12].includes(gradeLevel)) {
+        return res.status(400).json({ message: "Valid grade level (3, 6, 9, or 12) is required" });
+      }
+
+      // Parse CSV with UTF-8 encoding
+      const csvContent = req.file.buffer.toString('utf-8');
+      const workbook = XLSX.read(csvContent, { type: 'string', codepage: 65001 });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
+
+      if (rows.length === 0) {
+        return res.status(400).json({ message: "CSV file is empty" });
+      }
+
+      // Metadata columns for identification
+      const metadataColumns = [
+        'school name', 'schoolname', 'school_name', 'school', 'المدرسة',
+        'address', 'العنوان',
+        'student name', 'studentname', 'student_name', 'student', 'اسم الطالب', 'الطالب'
+      ];
+      
+      const allColumns = Object.keys(rows[0]);
+      const subjectColumns = allColumns.filter(col => 
+        !metadataColumns.includes(col.toLowerCase().replace(/\s+/g, '').replace(/_/g, '')) && col.trim() !== ''
+      );
+
+      // Get all schools and create lookup map
+      const allSchools = await storage.getAllSchools();
+      const schoolLookupMap = new Map<string, { id: number; name: string }>();
+      
+      for (const school of allSchools) {
+        const normalizedName = cleanArabicText(school.name, 'school');
+        schoolLookupMap.set(normalizedName, { id: school.id, name: school.name });
+      }
+
+      console.log('[Preview] School lookup map size:', schoolLookupMap.size);
+      console.log('[Preview] First 5 normalized school names:', Array.from(schoolLookupMap.keys()).slice(0, 5));
+
+      // Get subjects for grade and create mapping
+      const dbSubjects = await storage.getSubjectsByGrade(gradeLevel);
+      const subjectHeaderMap = new Map<string, number>();
+      
+      for (const subject of dbSubjects) {
+        const normalizedName = cleanArabicText(subject.name, 'subject');
+        subjectHeaderMap.set(normalizedName, subject.id);
+        if (subject.arabicName) {
+          subjectHeaderMap.set(cleanArabicText(subject.arabicName, 'subject'), subject.id);
+        }
+      }
+
+      // Map CSV columns to subject IDs
+      const subjectColumnMapping: Map<string, number> = new Map();
+      for (const col of subjectColumns) {
+        const normalizedCol = cleanArabicText(col, 'subject');
+        const subjectId = subjectHeaderMap.get(normalizedCol);
+        if (subjectId) {
+          subjectColumnMapping.set(col, subjectId);
+        }
+      }
+
+      // Tracking
+      const previewRows: PreviewRow[] = [];
+      const unmatchedSchools: any[] = [];
+      const unmatchedStudents: any[] = [];
+      const noMarksRows: any[] = [];
+      const invalidMarksRows: any[] = [];
+      const processedSchoolNames = new Set<string>();
+      const matchedSchoolIds = new Set<number>();
+      const matchedStudentIds = new Set<number>();
+      const studentCache = new Map<string, number | null>();
+
+      // Process each row (matching only, no saving)
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+
+        try {
+          const schoolName = row['School name'] || row['school name'] || row['schoolname'] || row['المدرسة'] || row['school'] || '';
+          const address = row['address'] || row['Address'] || row['العنوان'] || '';
+          const studentName = row['Student name'] || row['student name'] || row['studentname'] || row['اسم الطالب'] || row['student'] || '';
+
+          if (!schoolName.trim()) {
+            continue;
+          }
+
+          const normalizedSchoolName = cleanArabicText(schoolName, 'school');
+          const matchedSchool = schoolLookupMap.get(normalizedSchoolName);
+
+          // Debug first few rows
+          if (i < 3) {
+            console.log(`[Preview] Row ${i+2}: rawSchool="${schoolName.trim()}" normalized="${normalizedSchoolName}" matched=${!!matchedSchool}`);
+          }
+
+          if (!matchedSchool) {
+            if (!processedSchoolNames.has(normalizedSchoolName)) {
+              unmatchedSchools.push({
+                rowNumber: i + 2,
+                rawSchoolName: schoolName.trim(),
+                normalizedSchoolName: normalizedSchoolName,
+                address: address.trim(),
+                reason: 'School not found in database',
+              });
+              processedSchoolNames.add(normalizedSchoolName);
+            }
+            previewRows.push({
+              rowNumber: i + 2,
+              rawSchoolName: schoolName.trim(),
+              rawStudentName: studentName.trim(),
+              normalizedSchoolName,
+              normalizedStudentName: cleanArabicText(studentName, 'student'),
+              schoolId: null,
+              studentId: null,
+              marks: [],
+              isMatched: false,
+              matchStatus: 'school_not_found',
+            });
+            continue;
+          }
+
+          matchedSchoolIds.add(matchedSchool.id);
+
+          if (!studentName.trim()) {
+            noMarksRows.push({
+              rowNumber: i + 2,
+              rawSchoolName: schoolName.trim(),
+              reason: 'Missing student name',
+            });
+            continue;
+          }
+
+          const fullStudentName = studentName.trim();
+          const normalizedStudentName = cleanArabicText(fullStudentName, 'student');
+
+          // Parse marks
+          let hasValidMarks = false;
+          const validMarks: Array<{ subjectId: number; score: number }> = [];
+          const invalidMarkDetails: string[] = [];
+
+          for (const [colName, subjectId] of subjectColumnMapping.entries()) {
+            const rawValue = row[colName];
+            if (rawValue === undefined || rawValue === null || rawValue === '') continue;
+
+            const score = parseFloat(rawValue);
+            if (isNaN(score)) {
+              invalidMarkDetails.push(`${colName}: "${rawValue}" (not a number)`);
+            } else if (score < 0 || score > 100) {
+              invalidMarkDetails.push(`${colName}: ${score} (out of range 0-100)`);
+            } else {
+              hasValidMarks = true;
+              validMarks.push({ subjectId, score });
+            }
+          }
+
+          if (invalidMarkDetails.length > 0) {
+            invalidMarksRows.push({
+              rowNumber: i + 2,
+              rawSchoolName: schoolName.trim(),
+              rawStudentName: fullStudentName,
+              invalidMarks: invalidMarkDetails.join('; '),
+            });
+          }
+
+          if (!hasValidMarks) {
+            noMarksRows.push({
+              rowNumber: i + 2,
+              rawSchoolName: schoolName.trim(),
+              rawStudentName: fullStudentName,
+              reason: 'No valid marks (0-100)',
+            });
+            previewRows.push({
+              rowNumber: i + 2,
+              rawSchoolName: schoolName.trim(),
+              rawStudentName: fullStudentName,
+              normalizedSchoolName,
+              normalizedStudentName,
+              schoolId: matchedSchool.id,
+              studentId: null,
+              marks: [],
+              isMatched: false,
+              matchStatus: 'no_marks',
+            });
+            continue;
+          }
+
+          // Try to match student
+          const schoolId = matchedSchool.id;
+          const studentCacheKey = `${schoolId}_${normalizedStudentName}_${gradeLevel}`;
+          let studentId = studentCache.get(studentCacheKey);
+
+          if (studentId === undefined) {
+            const existingStudents = await storage.getStudentsBySchool(schoolId);
+            
+            const existingStudent = existingStudents.find(s => {
+              if (s.grade !== gradeLevel) return false;
+              
+              const storedFullName = `${s.firstName || ''} ${s.middleName || ''} ${s.lastName || ''}`.replace(/\s+/g, ' ').trim();
+              const normalizedStoredName = cleanArabicText(storedFullName, 'student');
+              
+              if (normalizedStoredName === normalizedStudentName) return true;
+              
+              // Fuzzy matching for name variations
+              if (normalizedStoredName.includes(normalizedStudentName) || normalizedStudentName.includes(normalizedStoredName)) {
+                const shorterLen = Math.min(normalizedStoredName.length, normalizedStudentName.length);
+                const longerLen = Math.max(normalizedStoredName.length, normalizedStudentName.length);
+                if (shorterLen / longerLen >= 0.6) return true;
+              }
+              
+              return false;
+            });
+
+            studentId = existingStudent?.id || null;
+            studentCache.set(studentCacheKey, studentId);
+          }
+
+          if (!studentId) {
+            unmatchedStudents.push({
+              rowNumber: i + 2,
+              rawSchoolName: schoolName.trim(),
+              matchedSchoolName: matchedSchool.name,
+              rawStudentName: fullStudentName,
+              normalizedStudentName,
+              grade: gradeLevel,
+              reason: 'Student not found in system',
+            });
+            previewRows.push({
+              rowNumber: i + 2,
+              rawSchoolName: schoolName.trim(),
+              rawStudentName: fullStudentName,
+              normalizedSchoolName,
+              normalizedStudentName,
+              schoolId: matchedSchool.id,
+              studentId: null,
+              marks: validMarks,
+              isMatched: false,
+              matchStatus: 'student_not_found',
+            });
+            continue;
+          }
+
+          matchedStudentIds.add(studentId);
+          previewRows.push({
+            rowNumber: i + 2,
+            rawSchoolName: schoolName.trim(),
+            rawStudentName: fullStudentName,
+            normalizedSchoolName,
+            normalizedStudentName,
+            schoolId: matchedSchool.id,
+            studentId,
+            marks: validMarks,
+            isMatched: true,
+            matchStatus: 'matched',
+          });
+
+        } catch (error: any) {
+          console.error(`[Preview] Error processing row ${i + 2}:`, error);
+        }
+      }
+
+      const matchedRows = previewRows.filter(r => r.isMatched).length;
+
+      // Store preview data for confirmation
+      const sessionKey = `preview_${userId}_${Date.now()}`;
+      cleanupOldPreviews();
+      
+      uploadPreviewStore.set(sessionKey, {
+        rows: previewRows,
+        summary: {
+          totalRows: rows.length,
+          matchedRows,
+          matchedSchools: matchedSchoolIds,
+          matchedStudents: matchedStudentIds,
+          unmatchedSchools: unmatchedSchools.length,
+          unmatchedStudents: unmatchedStudents.length,
+          noMarksRows: noMarksRows.length,
+          invalidMarksRows: invalidMarksRows.length,
+        },
+        examYearId,
+        gradeLevel,
+        unmatchedSchools,
+        unmatchedStudents,
+        noMarksRows,
+        invalidMarksRows,
+        timestamp: Date.now(),
+      });
+
+      // Also store for error downloads
+      uploadErrorFiles.set(`upload_${userId}`, {
+        unmatchedSchools,
+        unmatchedStudents,
+        noMarks: noMarksRows,
+        invalidMarks: invalidMarksRows,
+        timestamp: Date.now(),
+      });
+
+      console.log(`[Preview] Complete: ${rows.length} rows, ${matchedRows} matched, ${matchedSchoolIds.size} schools, ${matchedStudentIds.size} students`);
+
+      res.json({
+        success: true,
+        sessionKey,
+        canConfirm: matchedRows > 0,
+        summary: {
+          totalRows: rows.length,
+          matchedRows,
+          matchedSchools: matchedSchoolIds.size,
+          matchedStudents: matchedStudentIds.size,
+          unmatchedSchools: unmatchedSchools.length,
+          unmatchedStudents: unmatchedStudents.length,
+          noMarksRows: noMarksRows.length,
+          invalidMarksRows: invalidMarksRows.length,
+        },
+        sampleUnmatchedSchools: unmatchedSchools.slice(0, 5),
+        sampleUnmatchedStudents: unmatchedStudents.slice(0, 5),
+      });
+
+    } catch (error: any) {
+      console.error('[Preview] Error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PHASE 2: Confirm upload - apply matched results to database
+  app.post("/api/results/upload/confirm", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Only admins can confirm uploads" });
+      }
+
+      const { sessionKey } = req.body;
+      if (!sessionKey) {
+        return res.status(400).json({ message: "Session key is required" });
+      }
+
+      const previewData = uploadPreviewStore.get(sessionKey);
+      if (!previewData) {
+        return res.status(404).json({ message: "Preview data expired or not found. Please upload again." });
+      }
+
+      // Helper function
+      function calculateGrade(score: number): string {
+        if (score >= 90) return 'A+';
+        if (score >= 80) return 'A';
+        if (score >= 70) return 'B';
+        if (score >= 60) return 'C';
+        if (score >= 50) return 'D';
+        if (score >= 40) return 'E';
+        return 'F';
+      }
+
+      let resultsCreated = 0;
+      let resultsUpdated = 0;
+
+      // Apply only matched rows
+      const matchedRows = previewData.rows.filter(r => r.isMatched && r.studentId && r.marks.length > 0);
+
+      for (const row of matchedRows) {
+        for (const mark of row.marks) {
+          const existing = await storage.getResultByStudentAndSubject(row.studentId!, mark.subjectId, previewData.examYearId);
+          
+          await storage.upsertStudentResult(row.studentId!, mark.subjectId, previewData.examYearId, {
+            score: mark.score.toFixed(2),
+            grade: calculateGrade(mark.score),
+            status: 'pending',
+            remarks: null,
+          });
+
+          if (existing) {
+            resultsUpdated++;
+          } else {
+            resultsCreated++;
+          }
+        }
+      }
+
+      // Clean up preview data
+      uploadPreviewStore.delete(sessionKey);
+
+      console.log(`[Confirm] Applied: ${resultsCreated} created, ${resultsUpdated} updated`);
+
+      res.json({
+        success: true,
+        summary: {
+          studentsProcessed: matchedRows.length,
+          resultsCreated,
+          resultsUpdated,
+        },
+      });
+
+    } catch (error: any) {
+      console.error('[Confirm] Error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Results template download - MUST be before /api/results/:id to prevent route conflict
   app.get("/api/results/template", isAuthenticated, async (req, res) => {
     try {
