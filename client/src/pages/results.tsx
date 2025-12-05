@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -338,6 +339,18 @@ export default function Results() {
     setUploadPhase('idle');
     setIsUploading(false);
     setIsConfirming(false);
+  };
+
+  // Calculate progress percentage based on upload phase
+  const getProgressPercentage = () => {
+    switch (uploadPhase) {
+      case 'idle': return 0;
+      case 'previewing': return 25;
+      case 'preview_complete': return 50;
+      case 'confirming': return 75;
+      case 'confirmed': return 100;
+      default: return 0;
+    }
   };
 
   const handleDownloadTemplate = async () => {
@@ -822,16 +835,30 @@ export default function Results() {
               </div>
             )}
 
-            {/* Loading State */}
+            {/* Loading State with Progress Bar */}
             {(uploadPhase === 'previewing' || uploadPhase === 'confirming') && (
-              <div className="flex items-center justify-center gap-2 p-4">
-                <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                <span className="text-sm">
-                  {uploadPhase === 'previewing' 
-                    ? (isRTL ? "جاري تحليل الملف..." : "Analyzing file...") 
-                    : (isRTL ? "جاري تطبيق النتائج..." : "Applying results...")}
-                </span>
+              <div className="space-y-3 p-4">
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  <span className="text-sm">
+                    {uploadPhase === 'previewing' 
+                      ? (isRTL ? "جاري تحليل الملف..." : "Analyzing file...") 
+                      : (isRTL ? "جاري تطبيق النتائج..." : "Applying results...")}
+                  </span>
+                </div>
+                <Progress value={getProgressPercentage()} className="h-2" />
+                <p className="text-xs text-center text-muted-foreground">{getProgressPercentage()}%</p>
               </div>
+            )}
+
+            {/* Progress Bar for Preview Complete */}
+            {uploadPhase === 'preview_complete' && (
+              <Progress value={50} className="h-2" />
+            )}
+
+            {/* Progress Bar for Confirmed */}
+            {uploadPhase === 'confirmed' && (
+              <Progress value={100} className="h-2" />
             )}
 
             {/* Phase 1 Complete: Preview Summary */}
