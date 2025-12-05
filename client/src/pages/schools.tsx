@@ -180,7 +180,7 @@ export default function Schools() {
   const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
   const [bulkUploadData, setBulkUploadData] = useState<Array<{schoolName: string; address: string; region: string; cluster: string}>>([]);
   const [bulkUploadResults, setBulkUploadResults] = useState<{
-    success: Array<{schoolName: string; region: string; cluster: string; username: string; password: string; schoolId: number}>;
+    success: Array<{schoolName: string; address: string; region: string; cluster: string; regionCode: string; clusterCode: string; username: string; password: string; schoolId: number}>;
     errors: Array<{row: number; error: string; schoolName?: string}>;
     regionsCreated: string[];
     clustersCreated: string[];
@@ -611,17 +611,40 @@ export default function Schools() {
   const exportCredentials = () => {
     if (!bulkUploadResults?.success || bulkUploadResults.success.length === 0) return;
 
-    const headers = ['School Name', 'Region', 'Cluster', 'Username', 'Password'];
+    // Create headers with both English and Arabic
+    const headers = [
+      'School Name | اسم المدرسة',
+      'Address | العنوان',
+      'Region | المنطقة',
+      'Cluster | العنقود',
+      'Username | اسم المستخدم',
+      'Password | كلمة المرور',
+      'Default Password Note | ملاحظة كلمة المرور الافتراضية'
+    ];
+
+    // Map results to CSV rows with proper escaping
     const rows = bulkUploadResults.success.map(s => [
-      `"${s.schoolName}"`,
-      `"${s.region}"`,
-      `"${s.cluster}"`,
+      escapeCsvField(s.schoolName),
+      escapeCsvField(s.address || ''),
+      escapeCsvField(s.regionCode || s.region || ''),
+      escapeCsvField(s.clusterCode || s.cluster || ''),
       s.username,
       s.password,
+      'Must change on first login | يجب تغييره عند أول دخول'
     ]);
 
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Build CSV content with proper formatting
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+
+    // UTF-8 BOM for proper encoding of Arabic text
+    const BOM = '\uFEFF';
+    const csvWithBOM = BOM + csvContent;
+
+    // Create blob with explicit UTF-8 encoding
+    const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `school_credentials_${new Date().toISOString().split('T')[0]}.csv`;
@@ -632,6 +655,17 @@ export default function Schools() {
       title: t.schools.credentialsExported,
       description: t.schools.credentialsExportedDesc,
     });
+  };
+
+  // Helper function to escape CSV fields
+  const escapeCsvField = (field: any): string => {
+    if (field === null || field === undefined) return '';
+    const stringField = String(field);
+    // If field contains comma, quote, or newline, wrap in quotes and escape inner quotes
+    if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+      return `"${stringField.replace(/"/g, '""')}"`;
+    }
+    return stringField;
   };
 
   const resetBulkUpload = () => {
