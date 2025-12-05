@@ -1054,18 +1054,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         errors: [],
       };
 
-      // Helper to generate sequential username (SchoolAdmin0001, SchoolAdmin0002, etc.)
-      const generateUsername = async (counter: number, existingUsernames: Set<string>): Promise<string> => {
-        const username = `SchoolAdmin${String(counter).padStart(4, '0')}`;
-        existingUsernames.add(username.toLowerCase());
-        return username;
-      };
-
-      // Helper to generate fixed password
-      const generatePassword = (): string => {
-        return 'Admin@123';
-      };
-
       // Helper to normalize Arabic numerals to ASCII
       const normalizeArabicNumerals = (str: string): string => {
         const arabicToAscii: { [key: string]: string } = {
@@ -1177,22 +1165,76 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const allClusters = await storage.getAllClusters();
       const existingRegionCodes = new Set(allRegions.map(r => r.code));
       const existingClusterCodes = new Set(allClusters.map(c => c.code));
-      const existingUsernames = new Set<string>();
       
-      // Get all existing usernames
-      const allUsers = await storage.getAllUsers();
-      allUsers.forEach(u => {
-        if (u.username) existingUsernames.add(u.username.toLowerCase());
+      // Get the highest existing sequential number from existing usernames
+      const allExistingUsers = await storage.getAllUsers();
+      let maxSequentialNumber = 0;
+      allExistingUsers.forEach(u => {
+        if (u.username) {
+          const match = u.username.match(/SchoolAdmin(\d+)/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxSequentialNumber) maxSequentialNumber = num;
+          }
+        }
       });
 
-      // Cache for regions and clusters to avoid duplicate DB queries
-      const regionCache = new Map<string, number>();
-      const clusterCache = new Map<string, number>();
-      
-      allRegions.forEach(r => regionCache.set(r.name.toLowerCase().trim(), r.id));
-      allClusters.forEach(c => clusterCache.set(`${c.regionId}-${c.name.toLowerCase().trim()}`, c.id));
+      // Helper to normalize Arabic numerals to ASCII (for JSON endpoint)
+      const normalizeArabicNumeralsJSON = (str: string): string => {
+        const arabicToAscii: { [key: string]: string } = {
+          '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+          '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+        };
+        return str.replace(/[٠-٩]/g, (match) => arabicToAscii[match]);
+      };
 
-      let successCounter = 0; // Counter for username generation
+      // Helper to find region by numeric ID or code (for JSON endpoint)
+      const findRegionByInputJSON = (input: string, regions: any[]): any | null => {
+        const normalized = normalizeArabicNumeralsJSON(input).trim();
+        
+        if (/^\d+$/.test(normalized)) {
+          const regionNum = parseInt(normalized, 10);
+          const matchByCode = regions.find(r => r.code === `RG${regionNum}`);
+          if (matchByCode) return matchByCode;
+          const matchByName = regions.find(r => r.name.toLowerCase() === `region ${regionNum}`);
+          if (matchByName) return matchByName;
+        }
+        
+        const exactCodeMatch = regions.find(r => r.code === normalized.toUpperCase());
+        if (exactCodeMatch) return exactCodeMatch;
+        
+        const exactNameMatch = regions.find(r => r.name.toLowerCase() === normalized.toLowerCase());
+        if (exactNameMatch) return exactNameMatch;
+        
+        return null;
+      };
+
+      // Helper to find cluster by region and numeric ID (for JSON endpoint)
+      const findClusterByInputJSON = (regionId: number, input: string, clusters: any[]): any | null => {
+        const normalized = normalizeArabicNumeralsJSON(input).trim();
+        
+        const regionClusters = clusters.filter(c => c.regionId === regionId);
+        
+        if (/^\d+$/.test(normalized)) {
+          const clusterNum = parseInt(normalized, 10);
+          const matchByCode = regionClusters.find(c => {
+            return c.code === `CL${clusterNum}` || 
+                   c.code.endsWith(`-${clusterNum}`) ||
+                   c.code === normalized;
+          });
+          if (matchByCode) return matchByCode;
+        }
+        
+        const exactCodeMatch = regionClusters.find(c => c.code === normalized.toUpperCase());
+        if (exactCodeMatch) return exactCodeMatch;
+        
+        const nameMatch = regionClusters.find(c => c.name.toLowerCase().includes(normalized.toLowerCase()));
+        if (nameMatch) return nameMatch;
+        
+        return null;
+      };
+
+      let currentSequentialNumber = maxSequentialNumber;
 
       for (let i = 0; i < schoolsData.length; i++) {
         const row = schoolsData[i];
@@ -1219,7 +1261,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const address = row.address?.trim() || '';
 
           // Validate region and cluster exist - NO CREATION
-          const matchedRegion = findRegionByInput(regionInput, allRegions);
+          const matchedRegion = findRegionByInputJSON(regionInput, allRegions);
           
           if (!matchedRegion) {
             results.errors.push({ 
@@ -1234,7 +1276,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const actualRegionName = matchedRegion.name;
 
           // Find existing cluster - NO CREATION
-          const matchedCluster = findClusterByInput(regionId, clusterName, allClusters);
+          const matchedCluster = findClusterByInputJSON(regionId, clusterName, allClusters);
           
           if (!matchedCluster) {
             results.errors.push({ 
@@ -1259,9 +1301,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           }
 
           // Generate credentials
-          successCounter++;
-          const username = await generateUsername(successCounter, existingUsernames);
-          const password = generatePassword();
+          currentSequentialNumber++;
+          const username = `SchoolAdmin${currentSequentialNumber.toString().padStart(4, '0')}`;
+          const password = 'Admin@123';
           const hashedPassword = await bcrypt.hash(password, 10);
 
           // Create user account (SEPARATE from school - no email)
@@ -1559,9 +1601,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             processedSchools.add(schoolKey);
 
             // Generate sequential username (separate from school)
-            // Count existing school_admin users to get the next sequential number
-            const existingAdminsCount = await db.select({ id: users.id }).from(users).where(eq(users.role, 'school_admin'));
-            const sequentialNumber = existingAdminsCount.length + 1;
+            // Get the highest existing sequential number from existing usernames
+            const existingAdmins = await db.select({ username: users.username }).from(users).where(eq(users.role, 'school_admin'));
+            let maxSequentialNumber = 0;
+            existingAdmins.forEach(u => {
+              const match = u.username?.match(/SchoolAdmin(\d+)/);
+              if (match) {
+                const num = parseInt(match[1], 10);
+                if (num > maxSequentialNumber) maxSequentialNumber = num;
+              }
+            });
+            const sequentialNumber = maxSequentialNumber + 1;
             const username = `SchoolAdmin${sequentialNumber.toString().padStart(4, '0')}`;
             
             // Use fixed default password
