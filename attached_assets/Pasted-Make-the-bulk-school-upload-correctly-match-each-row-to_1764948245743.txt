@@ -1,0 +1,108 @@
+Make the bulk school upload correctly match each row to an existing Region and Cluster in the database—without creating new Regions/Clusters—and remove any dependency on emails during import.
+
+Reference Files
+
+Original sample CSV to reproduce issue: /mnt/data/Region 2.csv
+
+Cleaned CSV with derived codes (useful for testing): /mnt/data/Region2_codes_RG_CL.csv
+
+Functional Requirements
+
+No creation of new Regions/Clusters
+
+During upload, strictly validate against existing records only.
+
+If no match, return an error; do not insert Regions or Clusters.
+
+Input normalization (per row)
+
+Trim whitespace on all fields.
+
+Convert Arabic numerals to ASCII (٠١٢٣٤٥٦٧٨٩ → 0123456789) for Region and Cluster.
+
+Keep Region and Cluster as strings after normalization.
+
+Canonical keys for matching
+
+Derive codes to match DB records:
+
+region_code = 'RG' + Region
+
+cluster_code = 'CL' + Cluster
+
+Validate with:
+
+SELECT 1
+FROM clusters c
+JOIN regions r ON r.id = c.region_id
+WHERE r.code = :region_code
+  AND c.code = :cluster_code;
+
+
+If your DB uses a composite like RG{R}-{C}, allow equivalence by mapping:
+
+composite = 'RG' + Region + '-' + Cluster
+
+Match either via (r.code, c.code) or the composite—but use one canonical scheme consistently.
+
+Error handling
+
+On mismatch, return a precise message:
+
+Row {n}: Region/Cluster mismatch — does not match existing records.
+Provided: Region={Region}, Cluster={Cluster}
+Expected format: region_code=RG{Region}, cluster_code=CL{Cluster}
+
+
+Do not continue to create partial records for that row.
+
+Remove email requirement
+
+The importer must not read, validate, or generate emails for schools.
+
+Do not insert schools into the users table based on email.
+
+School account creation (post-insert)
+
+After a school is created (in the schools table), create a login account with:
+
+username = SchoolAdmin{NNNN} (sequential, zero-padded to 4 digits, unique)
+
+password = Admin@123 (hash before storing)
+
+On first login, force redirect to Change Password page (cannot skip).
+
+Idempotency / duplicates
+
+Prevent duplicates by a unique constraint or check on:
+
+(school_name, region_id, cluster_id)
+
+If a duplicate is detected, return:
+
+Row {n}: School already exists in Region {region_code}, Cluster {cluster_code}.
+
+
+Do not alter master data
+
+Regions/Clusters currently registered are authoritative.
+
+The CSV values are only for validation and matching.
+
+Acceptance Criteria
+
+Uploading /mnt/data/Region 2.csv succeeds for rows where Region/Cluster exists, and fails with clear row-level messages where they don’t.
+
+Uploading /mnt/data/Region2_codes_RG_CL.csv succeeds without Region/Cluster errors.
+
+No new Region/Cluster records are created during import.
+
+No email-related errors appear (e.g., users_email_unique).
+
+Accounts are generated with SchoolAdmin0001, SchoolAdmin0002, … and Admin@123, with forced password change on first login.
+
+Notes
+
+Standardize on one Region/Cluster code scheme in the DB. Based on the UI, use regions.code = RG{n} and clusters.code = CL{m} (with cluster linked to its region).
+
+If Region 1 uses RG1-1 style anywhere, normalize everything to the RG{n} + CL{m} pair internally and expose a single canonical path in code.
