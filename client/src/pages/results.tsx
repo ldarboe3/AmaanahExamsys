@@ -530,8 +530,6 @@ export default function Results() {
                   <thead className="bg-muted/50 border-b">
                     <tr>
                       <th className="text-left px-3 py-3 font-semibold">{isRTL ? "المدرسة" : "School"}</th>
-                      <th className="text-left px-3 py-3 font-semibold">{isRTL ? "العنوان" : "Address"}</th>
-                      <th className="text-left px-3 py-3 font-semibold">{isRTL ? "الإقليم" : "Region"}</th>
                       <th className="text-left px-3 py-3 font-semibold">{isRTL ? "اسم الطالب" : "Student Name"}</th>
                       {(subjects || []).map((subj: Subject) => (
                         <th key={subj.id} className="text-center px-2 py-3 font-semibold text-xs">
@@ -550,8 +548,6 @@ export default function Results() {
                       return (
                         <tr key={row.student.id} className={idx % 2 === 0 ? "bg-white dark:bg-slate-950" : "bg-muted/30"}>
                           <td className="px-3 py-2">{row.student.school?.name}</td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">{row.student.school?.address || '-'}</td>
-                          <td className="px-3 py-2 text-xs">{row.student.school?.regionId || '-'}</td>
                           <td className="px-3 py-2 font-medium">{row.student.firstName} {row.student.lastName}</td>
                           
                           {(subjects || []).map((subj: Subject) => (
