@@ -160,7 +160,7 @@ export default function Results() {
 
   // Build result rows with calculated totals
   const resultRows = useMemo(() => {
-    if (!studentList || !resultsList || !subjects || subjects.length === 0) return [];
+    if (!Array.isArray(studentList) || !Array.isArray(resultsList) || !Array.isArray(subjects) || subjects.length === 0) return [];
 
     return studentList.map(student => {
       const studentKey = `${student.id}`;
