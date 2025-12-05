@@ -62,7 +62,14 @@ The system is built on a robust architecture featuring a React-based frontend, a
   - Real-time auto-calculation of Total Marks and Percentage as marks are entered (0-100 per subject)
   - Pagination controls: 10/50/100 students per page
   - Dynamic student list updates based on Region/Cluster/School filters
-  - CSV results upload with bilingual support (Arabic/English column headers), validation against existing regions/clusters/schools/students
+  - **Comprehensive Results CSV Upload**: 
+    - Template download with correct database subject headers by grade
+    - Arabic Text Cleaner for robust matching (normalizes spaces, removes tatweel, unifies alef forms, strips punctuation, converts Arabic digits)
+    - Schools/Students are authoritative - NO auto-creation during upload, only matching
+    - Mark validation (0-100 range) with invalid mark tracking
+    - Error downloads: unmatched schools, unmatched students, no marks rows, invalid marks
+    - Error files include raw + normalized values for diagnosis
+    - UTF-8-SIG encoding for Excel compatibility
   - Public result checker, PDF certificate and transcript generation with gender-specific templates and QR verification
 - **Administrative Tools**: Comprehensive audit logging, advanced export functionalities (CSV), and role-based access control.
 - **Exam Management**: Examiner, subject, timetable, and exam center management.
