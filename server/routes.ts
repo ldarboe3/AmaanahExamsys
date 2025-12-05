@@ -1374,6 +1374,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           errors: [],
         };
 
+        // Track processed schools in this upload to detect duplicates (regionId-clusterId-schoolName)
+        const processedSchools = new Set<string>();
+
         // Process data rows
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
@@ -1463,7 +1466,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               continue;
             }
 
-            // Check for duplicate school
+            // Check for duplicate within THIS upload
+            const schoolKey = `${regionId}-${clusterId}-${schoolName.toLowerCase()}`;
+            if (processedSchools.has(schoolKey)) {
+              results.errors.push({ 
+                row: row + 1, 
+                error: `Duplicate: School "${schoolName}" in Region ${region.name}, Cluster ${cluster.name} already processed in this upload. Only the first occurrence will be uploaded.`,
+                schoolName 
+              });
+              continue;
+            }
+
+            // Check for duplicate school in database
             const existingSchool = await storage.getSchoolByNameAndLocation(schoolName, regionId, clusterId);
             if (existingSchool) {
               results.errors.push({ 
@@ -1473,6 +1487,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               });
               continue;
             }
+
+            // Mark this school as processed
+            processedSchools.add(schoolKey);
 
             // Generate credentials
             const username = `school${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
