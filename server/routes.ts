@@ -7547,9 +7547,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         });
       }
       
+      // Filter to only show students WITH results (for certificate generation)
+      const studentsWithResults = eligibleStudents.filter(s => s.hasResults);
+      
       // Apply pagination
-      const totalCount = eligibleStudents.length;
-      const paginatedStudents = eligibleStudents.slice(offset, offset + limit);
+      const totalCount = studentsWithResults.length;
+      const paginatedStudents = studentsWithResults.slice(offset, offset + limit);
       
       res.json({
         examYear: targetExamYear,
@@ -7558,12 +7561,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         limit,
         offset,
         summary: {
-          total: eligibleStudents.length,
-          eligible: eligibleStudents.filter(s => s.isEligible).length,
-          withCertificate: eligibleStudents.filter(s => s.hasCertificate).length,
-          missingData: eligibleStudents.filter(s => s.missingFields.length > 0).length,
-          noResults: eligibleStudents.filter(s => !s.hasResults).length,
-          failed: eligibleStudents.filter(s => !s.passed && s.hasResults).length,
+          total: studentsWithResults.length,
+          eligible: studentsWithResults.filter(s => s.isEligible).length,
+          withCertificate: studentsWithResults.filter(s => s.hasCertificate).length,
+          missingData: studentsWithResults.filter(s => s.missingFields.length > 0).length,
+          noResults: 0, // All students shown have results
+          failed: studentsWithResults.filter(s => !s.passed).length,
         }
       });
     } catch (error: any) {
