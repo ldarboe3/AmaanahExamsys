@@ -8891,7 +8891,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!examYearId) {
         return res.status(400).json({ message: "examYearId is required" });
       }
-      const data = await storage.getResultsAggregateBySubject(examYearId);
+      const filters = {
+        regionId: req.query.regionId ? parseInt(req.query.regionId as string) : undefined,
+        clusterId: req.query.clusterId ? parseInt(req.query.clusterId as string) : undefined,
+        schoolId: req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined,
+        grade: req.query.grade ? parseInt(req.query.grade as string) : undefined,
+      };
+      const data = await storage.getResultsAggregateBySubject(examYearId, filters);
       res.json(data);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -8904,7 +8910,44 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!examYearId) {
         return res.status(400).json({ message: "examYearId is required" });
       }
-      const data = await storage.getResultsAggregateByGender(examYearId);
+      const filters = {
+        regionId: req.query.regionId ? parseInt(req.query.regionId as string) : undefined,
+        clusterId: req.query.clusterId ? parseInt(req.query.clusterId as string) : undefined,
+        schoolId: req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined,
+        grade: req.query.grade ? parseInt(req.query.grade as string) : undefined,
+      };
+      const data = await storage.getResultsAggregateByGender(examYearId, filters);
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/analytics/performance-by-region", async (req, res) => {
+    try {
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      if (!examYearId) {
+        return res.status(400).json({ message: "examYearId is required" });
+      }
+      const data = await storage.getPerformanceByRegion(examYearId);
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/analytics/performance-by-grade", async (req, res) => {
+    try {
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      if (!examYearId) {
+        return res.status(400).json({ message: "examYearId is required" });
+      }
+      const filters = {
+        regionId: req.query.regionId ? parseInt(req.query.regionId as string) : undefined,
+        clusterId: req.query.clusterId ? parseInt(req.query.clusterId as string) : undefined,
+        schoolId: req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined,
+      };
+      const data = await storage.getPerformanceByGrade(examYearId, filters);
       res.json(data);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

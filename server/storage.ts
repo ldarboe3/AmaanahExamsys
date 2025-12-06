@@ -242,8 +242,10 @@ export interface IStorage {
   // Analytics
   getStudentCountBySchool(examYearId: number): Promise<{ schoolId: number; count: number }[]>;
   getStudentCountByRegion(examYearId: number): Promise<{ regionId: number; count: number }[]>;
-  getResultsAggregateBySubject(examYearId: number): Promise<{ subjectId: number; avgScore: number; passRate: number }[]>;
-  getResultsAggregateByGender(examYearId: number): Promise<{ gender: string; avgScore: number; passRate: number }[]>;
+  getResultsAggregateBySubject(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number; grade?: number }): Promise<{ subjectId: number; avgScore: number; passRate: number }[]>;
+  getResultsAggregateByGender(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number; grade?: number }): Promise<{ gender: string; avgScore: number; passRate: number }[]>;
+  getPerformanceByRegion(examYearId: number): Promise<{ regionId: number; regionName: string; studentCount: number; avgScore: number; passRate: number }[]>;
+  getPerformanceByGrade(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number }): Promise<{ grade: number; studentCount: number; avgScore: number; passRate: number }[]>;
   getDashboardStats(): Promise<{
     totalSchools: number;
     totalStudents: number;
@@ -1397,14 +1399,38 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => ({ regionId: r.regionId!, count: Number(r.count) }));
   }
 
-  async getResultsAggregateBySubject(examYearId: number): Promise<{ subjectId: number; avgScore: number; passRate: number }[]> {
+  async getResultsAggregateBySubject(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number; grade?: number }): Promise<{ subjectId: number; avgScore: number; passRate: number }[]> {
+    let conditions: any[] = [eq(studentResults.examYearId, examYearId)];
+    
+    if (filters?.schoolId) {
+      conditions.push(eq(students.schoolId, filters.schoolId));
+    }
+    if (filters?.grade) {
+      conditions.push(eq(students.grade, filters.grade));
+    }
+
     const results = await db
-      .select({ subjectId: studentResults.subjectId, totalScore: studentResults.totalScore })
+      .select({ 
+        subjectId: studentResults.subjectId, 
+        totalScore: studentResults.totalScore,
+        regionId: schools.regionId,
+        clusterId: schools.clusterId 
+      })
       .from(studentResults)
-      .where(eq(studentResults.examYearId, examYearId));
+      .innerJoin(students, eq(studentResults.studentId, students.id))
+      .innerJoin(schools, eq(students.schoolId, schools.id))
+      .where(and(...conditions));
+
+    let filteredResults = results;
+    if (filters?.regionId) {
+      filteredResults = filteredResults.filter(r => r.regionId === filters.regionId);
+    }
+    if (filters?.clusterId) {
+      filteredResults = filteredResults.filter(r => r.clusterId === filters.clusterId);
+    }
 
     const subjectStats: { [key: number]: { total: number; count: number; passed: number } } = {};
-    results.forEach(r => {
+    filteredResults.forEach(r => {
       if (!subjectStats[r.subjectId]) {
         subjectStats[r.subjectId] = { total: 0, count: 0, passed: 0 };
       }
@@ -1421,15 +1447,38 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getResultsAggregateByGender(examYearId: number): Promise<{ gender: string; avgScore: number; passRate: number }[]> {
+  async getResultsAggregateByGender(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number; grade?: number }): Promise<{ gender: string; avgScore: number; passRate: number }[]> {
+    let conditions: any[] = [eq(studentResults.examYearId, examYearId)];
+    
+    if (filters?.schoolId) {
+      conditions.push(eq(students.schoolId, filters.schoolId));
+    }
+    if (filters?.grade) {
+      conditions.push(eq(students.grade, filters.grade));
+    }
+
     const results = await db
-      .select({ gender: students.gender, totalScore: studentResults.totalScore })
+      .select({ 
+        gender: students.gender, 
+        totalScore: studentResults.totalScore,
+        regionId: schools.regionId,
+        clusterId: schools.clusterId 
+      })
       .from(studentResults)
       .innerJoin(students, eq(studentResults.studentId, students.id))
-      .where(eq(studentResults.examYearId, examYearId));
+      .innerJoin(schools, eq(students.schoolId, schools.id))
+      .where(and(...conditions));
+
+    let filteredResults = results;
+    if (filters?.regionId) {
+      filteredResults = filteredResults.filter(r => r.regionId === filters.regionId);
+    }
+    if (filters?.clusterId) {
+      filteredResults = filteredResults.filter(r => r.clusterId === filters.clusterId);
+    }
 
     const genderStats: { [key: string]: { total: number; count: number; passed: number } } = {};
-    results.forEach(r => {
+    filteredResults.forEach(r => {
       if (!genderStats[r.gender]) {
         genderStats[r.gender] = { total: 0, count: 0, passed: 0 };
       }
@@ -1441,6 +1490,86 @@ export class DatabaseStorage implements IStorage {
 
     return Object.entries(genderStats).map(([gender, stats]) => ({
       gender,
+      avgScore: stats.count > 0 ? stats.total / stats.count : 0,
+      passRate: stats.count > 0 ? (stats.passed / stats.count) * 100 : 0,
+    }));
+  }
+
+  async getPerformanceByRegion(examYearId: number): Promise<{ regionId: number; regionName: string; studentCount: number; avgScore: number; passRate: number }[]> {
+    const results = await db
+      .select({ 
+        regionId: schools.regionId, 
+        regionName: regions.name,
+        totalScore: studentResults.totalScore 
+      })
+      .from(studentResults)
+      .innerJoin(students, eq(studentResults.studentId, students.id))
+      .innerJoin(schools, eq(students.schoolId, schools.id))
+      .innerJoin(regions, eq(schools.regionId, regions.id))
+      .where(eq(studentResults.examYearId, examYearId));
+
+    const regionStats: { [key: number]: { name: string; total: number; count: number; passed: number } } = {};
+    results.forEach(r => {
+      if (r.regionId === null) return;
+      if (!regionStats[r.regionId]) {
+        regionStats[r.regionId] = { name: r.regionName, total: 0, count: 0, passed: 0 };
+      }
+      const score = parseFloat(r.totalScore || '0');
+      regionStats[r.regionId].total += score;
+      regionStats[r.regionId].count++;
+      if (score >= 50) regionStats[r.regionId].passed++;
+    });
+
+    return Object.entries(regionStats).map(([id, stats]) => ({
+      regionId: parseInt(id),
+      regionName: stats.name,
+      studentCount: stats.count,
+      avgScore: stats.count > 0 ? stats.total / stats.count : 0,
+      passRate: stats.count > 0 ? (stats.passed / stats.count) * 100 : 0,
+    }));
+  }
+
+  async getPerformanceByGrade(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number }): Promise<{ grade: number; studentCount: number; avgScore: number; passRate: number }[]> {
+    let conditions: any[] = [eq(studentResults.examYearId, examYearId)];
+    
+    if (filters?.schoolId) {
+      conditions.push(eq(students.schoolId, filters.schoolId));
+    }
+
+    const results = await db
+      .select({ 
+        grade: students.grade, 
+        totalScore: studentResults.totalScore,
+        regionId: schools.regionId,
+        clusterId: schools.clusterId 
+      })
+      .from(studentResults)
+      .innerJoin(students, eq(studentResults.studentId, students.id))
+      .innerJoin(schools, eq(students.schoolId, schools.id))
+      .where(and(...conditions));
+
+    let filteredResults = results;
+    if (filters?.regionId) {
+      filteredResults = filteredResults.filter(r => r.regionId === filters.regionId);
+    }
+    if (filters?.clusterId) {
+      filteredResults = filteredResults.filter(r => r.clusterId === filters.clusterId);
+    }
+
+    const gradeStats: { [key: number]: { total: number; count: number; passed: number } } = {};
+    filteredResults.forEach(r => {
+      if (!gradeStats[r.grade]) {
+        gradeStats[r.grade] = { total: 0, count: 0, passed: 0 };
+      }
+      const score = parseFloat(r.totalScore || '0');
+      gradeStats[r.grade].total += score;
+      gradeStats[r.grade].count++;
+      if (score >= 50) gradeStats[r.grade].passed++;
+    });
+
+    return Object.entries(gradeStats).map(([grade, stats]) => ({
+      grade: parseInt(grade),
+      studentCount: stats.count,
       avgScore: stats.count > 0 ? stats.total / stats.count : 0,
       passRate: stats.count > 0 ? (stats.passed / stats.count) * 100 : 0,
     }));
