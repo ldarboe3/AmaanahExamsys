@@ -381,16 +381,16 @@ function generateTranscriptHTML(data: TranscriptData): string {
   <div class="container">
     <table class="header-table">
       <tr>
-        <td class="header-left">
+        <td class="header-right">
           <strong>The General Secretariat for</strong>
           <div>Islamic/Arabic Education in</div>
           <div>The Gambia</div>
           <div style="margin-top: 5px;">Examination affairs unit</div>
         </td>
         <td class="header-center">
-          <img src="file:///home/runner/workspace/generated_transcripts/logo.png" alt="Logo" class="header-logo" style="width: 90px; height: auto;">
+          <img src="file:///home/runner/workspace/generated_transcripts/logo.png" alt="Logo" class="header-logo">
         </td>
-        <td class="header-right">
+        <td class="header-left">
           <strong>الأمانة العامة للتعليم الإسلامي العربي</strong>
           <div>في غامبيا</div>
           <div style="margin-top: 5px;">قسم الامتحانات</div>
