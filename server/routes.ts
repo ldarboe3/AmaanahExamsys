@@ -7457,6 +7457,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const examYearIdStr = req.query.examYearId as string | undefined;
       const schoolIdStr = req.query.schoolId as string | undefined;
       const gradeStr = req.query.grade as string | undefined;
+      const limitStr = req.query.limit as string | undefined;
+      const offsetStr = req.query.offset as string | undefined;
       
       // Safely parse integers, handling empty strings and NaN
       const parseIntSafe = (str: string | undefined): number | undefined => {
@@ -7468,6 +7470,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const examYearId = parseIntSafe(examYearIdStr);
       const schoolId = parseIntSafe(schoolIdStr);
       const grade = parseIntSafe(gradeStr);
+      const limit = parseIntSafe(limitStr) || 10;
+      const offset = parseIntSafe(offsetStr) || 0;
       
       const targetExamYear = examYearId 
         ? await storage.getExamYear(examYearId)
@@ -7543,9 +7547,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         });
       }
       
+      // Apply pagination
+      const totalCount = eligibleStudents.length;
+      const paginatedStudents = eligibleStudents.slice(offset, offset + limit);
+      
       res.json({
         examYear: targetExamYear,
-        students: eligibleStudents,
+        students: paginatedStudents,
+        total: totalCount,
+        limit,
+        offset,
         summary: {
           total: eligibleStudents.length,
           eligible: eligibleStudents.filter(s => s.isEligible).length,
