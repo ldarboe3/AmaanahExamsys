@@ -126,7 +126,6 @@ export interface IStorage {
     middleName: string | null;
     indexNumber: string | null;
     gender: string | null;
-    nationality: string | null;
     schoolId: number;
     schoolName: string;
     resultsCount: number;
@@ -824,7 +823,6 @@ export class DatabaseStorage implements IStorage {
     middleName: string | null;
     indexNumber: string | null;
     gender: string | null;
-    nationality: string | null;
     schoolId: number;
     schoolName: string;
     resultsCount: number;
@@ -839,7 +837,6 @@ export class DatabaseStorage implements IStorage {
         s.middle_name as "middleName",
         s.index_number as "indexNumber",
         s.gender,
-        s.nationality,
         s.school_id as "schoolId",
         sch.name as "schoolName",
         COUNT(sr.id)::int as "resultsCount",
@@ -853,7 +850,7 @@ export class DatabaseStorage implements IStorage {
         AND sr.status = 'published'
         AND sr.exam_year_id = ${examYearId}
       GROUP BY s.id, s.first_name, s.last_name, s.middle_name, s.index_number, 
-               s.gender, s.nationality, s.school_id, sch.name
+               s.gender, s.school_id, sch.name
       ORDER BY sch.name, s.last_name, s.first_name
     `);
     return result.rows as any[];

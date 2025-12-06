@@ -47,10 +47,11 @@ import {
   Users,
   AlertCircle,
   FileCheck2,
+  Printer,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Region, Cluster, School as SchoolType, ExamYear } from "@shared/schema";
+import type { Region, Cluster, School as SchoolType, ExamYear, Certificate } from "@shared/schema";
 
 interface EligibleStudent {
   id: number;
@@ -114,6 +115,9 @@ export default function Certificates() {
     dateOfBirth: '' as string,
     placeOfBirth: '' as string,
   });
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [previewStudent, setPreviewStudent] = useState<EligibleStudent | null>(null);
+  const [previewCertificate, setPreviewCertificate] = useState<Certificate | null>(null);
 
   const { data: examYears } = useQuery<ExamYear[]>({
     queryKey: ["/api/exam-years"],
@@ -179,6 +183,22 @@ export default function Certificates() {
     },
     enabled: !!selectedExamYear,
   });
+
+  // Fetch all certificates for the selected exam year
+  const { data: allCertificates } = useQuery<Certificate[]>({
+    queryKey: ["/api/certificates", selectedExamYear],
+    queryFn: async () => {
+      const response = await fetch(`/api/certificates?examYearId=${selectedExamYear}`, { credentials: 'include' });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!selectedExamYear,
+  });
+
+  // Get certificate for a specific student
+  const getStudentCertificate = (studentId: number): Certificate | undefined => {
+    return allCertificates?.find(c => c.studentId === studentId);
+  };
 
   const { data: detectedGender } = useQuery<GenderDetectionResult>({
     queryKey: ["/api/students/detect-gender", editingStudent?.firstName],
@@ -270,6 +290,46 @@ export default function Certificates() {
     }
   }, [detectedGender, editForm.gender]);
 
+  const handlePreview = (student: EligibleStudent) => {
+    setPreviewStudent(student);
+    const cert = getStudentCertificate(student.id);
+    setPreviewCertificate(cert || null);
+    setShowPreviewDialog(true);
+  };
+
+  const handleDownload = (certificateId: number) => {
+    window.open(`/api/certificates/${certificateId}/download`, '_blank');
+  };
+
+  const handlePrintAll = () => {
+    const studentsWithCerts = eligibleStudentsData?.students?.filter(s => s.hasCertificate) || [];
+    if (studentsWithCerts.length === 0) {
+      toast({
+        title: isRTL ? "لا توجد شهادات للطباعة" : "No Certificates to Print",
+        description: isRTL ? "يرجى إنشاء الشهادات أولاً." : "Please generate certificates first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Open all certificate PDFs
+    studentsWithCerts.forEach((student, index) => {
+      const cert = getStudentCertificate(student.id);
+      if (cert) {
+        setTimeout(() => {
+          window.open(`/api/certificates/${cert.id}/download`, '_blank');
+        }, index * 500);
+      }
+    });
+    
+    toast({
+      title: isRTL ? "جاري الطباعة" : "Printing",
+      description: isRTL 
+        ? `جاري فتح ${studentsWithCerts.length} شهادة للطباعة.`
+        : `Opening ${studentsWithCerts.length} certificates for printing.`,
+    });
+  };
+
   return (
     <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -284,35 +344,48 @@ export default function Certificates() {
               : "Generate official Arabic certificates with automatic gender detection from names"}
           </p>
         </div>
-        <Button
-          onClick={() => {
-            const eligibleIds = eligibleStudentsData?.students
-              ?.filter(s => s.isEligible && !s.hasCertificate)
-              .map(s => s.id) || [];
-            if (eligibleIds.length > 0) {
-              generatePrimaryMutation.mutate(eligibleIds);
-            } else {
-              toast({
-                title: isRTL ? "لا توجد طلاب مؤهلين" : "No Eligible Students",
-                description: isRTL 
-                  ? "يجب أن يكون لدى الطلاب بيانات كاملة ونتائج منشورة." 
-                  : "Students must have complete data and published results.",
-                variant: "destructive",
-              });
-            }
-          }}
-          disabled={generatePrimaryMutation.isPending || !eligibleStudentsData?.summary?.eligible}
-          data-testid="button-generate-all"
-        >
-          {generatePrimaryMutation.isPending ? (
-            <Loader2 className="w-4 h-4 me-2 animate-spin" />
-          ) : (
-            <Award className="w-4 h-4 me-2" />
-          )}
-          {isRTL 
-            ? `إنشاء الشهادات (${eligibleStudentsData?.students?.filter(s => s.isEligible && !s.hasCertificate).length || 0})` 
-            : `Generate All (${eligibleStudentsData?.students?.filter(s => s.isEligible && !s.hasCertificate).length || 0})`}
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={handlePrintAll}
+            disabled={!eligibleStudentsData?.summary?.withCertificate}
+            data-testid="button-print-all"
+          >
+            <Printer className="w-4 h-4 me-2" />
+            {isRTL 
+              ? `طباعة الكل (${eligibleStudentsData?.summary?.withCertificate || 0})` 
+              : `Print All (${eligibleStudentsData?.summary?.withCertificate || 0})`}
+          </Button>
+          <Button
+            onClick={() => {
+              const eligibleIds = eligibleStudentsData?.students
+                ?.filter(s => s.isEligible && !s.hasCertificate)
+                .map(s => s.id) || [];
+              if (eligibleIds.length > 0) {
+                generatePrimaryMutation.mutate(eligibleIds);
+              } else {
+                toast({
+                  title: isRTL ? "لا توجد طلاب مؤهلين" : "No Eligible Students",
+                  description: isRTL 
+                    ? "يجب أن يكون لدى الطلاب بيانات كاملة ونتائج منشورة." 
+                    : "Students must have complete data and published results.",
+                  variant: "destructive",
+                });
+              }
+            }}
+            disabled={generatePrimaryMutation.isPending || !eligibleStudentsData?.summary?.eligible}
+            data-testid="button-generate-all"
+          >
+            {generatePrimaryMutation.isPending ? (
+              <Loader2 className="w-4 h-4 me-2 animate-spin" />
+            ) : (
+              <Award className="w-4 h-4 me-2" />
+            )}
+            {isRTL 
+              ? `إنشاء الشهادات (${eligibleStudentsData?.students?.filter(s => s.isEligible && !s.hasCertificate).length || 0})` 
+              : `Generate All (${eligibleStudentsData?.students?.filter(s => s.isEligible && !s.hasCertificate).length || 0})`}
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -630,14 +703,29 @@ export default function Certificates() {
                             </Button>
                           )}
                           {student.hasCertificate && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => window.open(`/api/certificates/${student.id}/download`, '_blank')}
-                              data-testid={`button-download-${student.id}`}
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handlePreview(student)}
+                                data-testid={`button-preview-${student.id}`}
+                                title={isRTL ? "معاينة" : "Preview"}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  const cert = getStudentCertificate(student.id);
+                                  if (cert) handleDownload(cert.id);
+                                }}
+                                data-testid={`button-download-${student.id}`}
+                                title={isRTL ? "تنزيل" : "Download"}
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>
@@ -760,6 +848,81 @@ export default function Certificates() {
               )}
               {isRTL ? "حفظ" : "Save"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              {isRTL ? "معاينة الشهادة" : "Certificate Preview"}
+            </DialogTitle>
+            <DialogDescription>
+              {previewStudent && (
+                <span>
+                  {previewStudent.firstName} {previewStudent.middleName || ''} {previewStudent.lastName}
+                  {previewStudent.finalGrade && (
+                    <> - {isRTL ? "الدرجة:" : "Grade:"} {previewStudent.finalGrade}</>
+                  )}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {previewCertificate ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                <div>
+                  <p className="text-sm text-muted-foreground">{isRTL ? "رقم الشهادة" : "Certificate Number"}</p>
+                  <p className="font-mono font-medium">{previewCertificate.certificateNumber}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">{isRTL ? "تاريخ الإصدار" : "Issue Date"}</p>
+                  <p className="font-medium">
+                    {previewCertificate.issuedDate 
+                      ? new Date(previewCertificate.issuedDate).toLocaleDateString() 
+                      : '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">{isRTL ? "الصف" : "Grade"}</p>
+                  <p className="font-medium">{previewCertificate.grade}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">{isRTL ? "عدد الطباعات" : "Print Count"}</p>
+                  <p className="font-medium">{previewCertificate.printCount || 0}</p>
+                </div>
+              </div>
+              
+              <div className="border rounded-lg p-4 text-center">
+                <Award className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground mb-4">
+                  {isRTL ? "اضغط على زر التنزيل لعرض الشهادة الكاملة" : "Click download to view the full certificate PDF"}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                {isRTL ? "لم يتم العثور على الشهادة" : "Certificate not found"}
+              </p>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>
+              {t.common.cancel}
+            </Button>
+            {previewCertificate && (
+              <Button onClick={() => handleDownload(previewCertificate.id)}>
+                <Download className="w-4 h-4 me-2" />
+                {isRTL ? "تنزيل PDF" : "Download PDF"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
