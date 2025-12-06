@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -40,10 +41,27 @@ import {
   CheckCircle2,
   Eye,
   Loader2,
+  GraduationCap,
+  Languages,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Region, Cluster, School as SchoolType, Student, ExamYear, Transcript } from "@shared/schema";
+
+interface EligibleG6Student {
+  id: number;
+  firstName: string;
+  lastName: string;
+  middleName?: string | null;
+  indexNumber: string | null;
+  gender: string | null;
+  nationality: string | null;
+  schoolId: number;
+  schoolName: string;
+  resultsCount: number;
+  totalScore: number;
+  percentage: string;
+}
 
 interface StudentWithResults extends Student {
   school?: SchoolType;
@@ -77,11 +95,13 @@ function TranscriptsTableSkeleton() {
 export default function Transcripts() {
   const { toast } = useToast();
   const { t, isRTL } = useLanguage();
+  const [activeTab, setActiveTab] = useState<string>("general");
   const [selectedRegion, setSelectedRegion] = useState<string>("");
   const [selectedCluster, setSelectedCluster] = useState<string>("");
   const [selectedSchool, setSelectedSchool] = useState<string>("");
   const [selectedExamYear, setSelectedExamYear] = useState<string>("");
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
+  const [selectedG6Students, setSelectedG6Students] = useState<number[]>([]);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [previewStudent, setPreviewStudent] = useState<StudentWithResults | null>(null);
 
@@ -115,6 +135,21 @@ export default function Transcripts() {
 
   const activeExamYear = examYears?.find(ey => ey.isActive);
   const currentExamYear = selectedExamYear ? examYears?.find(ey => ey.id === parseInt(selectedExamYear)) : activeExamYear;
+
+  // Grade 6 eligible students query - include examYearId in query key and URL
+  const g6ExamYearId = selectedExamYear || (activeExamYear?.id ? String(activeExamYear.id) : undefined);
+  const { data: eligibleG6Students, isLoading: g6Loading } = useQuery<EligibleG6Student[]>({
+    queryKey: ["/api/transcripts/eligible-g6-students", g6ExamYearId],
+    queryFn: async () => {
+      const url = g6ExamYearId 
+        ? `/api/transcripts/eligible-g6-students?examYearId=${g6ExamYearId}`
+        : '/api/transcripts/eligible-g6-students';
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch eligible students');
+      return response.json();
+    },
+    enabled: activeTab === "grade6",
+  });
 
   const getStudentTranscript = (studentId: number): Transcript | undefined => {
     return allTranscripts?.find(t => t.studentId === studentId && t.examYearId === currentExamYear?.id);
@@ -174,6 +209,75 @@ export default function Transcripts() {
     },
   });
 
+  // Grade 6 Arabic Transcript Generation Mutation
+  const generateG6TranscriptMutation = useMutation({
+    mutationFn: async (studentIds: number[]) => {
+      return apiRequest("POST", "/api/transcripts/generate-g6-arabic", { 
+        studentIds,
+        examYearId: currentExamYear?.id 
+      });
+    },
+    onSuccess: (response: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transcripts/eligible-g6-students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transcripts"] });
+      const generated = response.generated || 0;
+      const errors = response.errors || [];
+      
+      if (errors.length > 0) {
+        toast({
+          title: isRTL ? "تم الإنشاء مع تحذيرات" : "Generated with Warnings",
+          description: isRTL 
+            ? `تم إنشاء ${generated} كشف درجات. ${errors.length} فشل.`
+            : `Generated ${generated} transcripts. ${errors.length} failed.`,
+          variant: errors.length > generated ? "destructive" : "default",
+        });
+      } else {
+        toast({
+          title: isRTL ? "تم إنشاء كشوف الدرجات" : "Transcripts Generated",
+          description: isRTL 
+            ? `تم إنشاء ${generated} كشف درجات للصف السادس بنجاح.`
+            : `${generated} Grade 6 transcript(s) generated successfully.`,
+        });
+      }
+      setSelectedG6Students([]);
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل إنشاء كشوف الدرجات." : "Failed to generate transcripts."),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSelectAllG6 = (checked: boolean) => {
+    if (checked && eligibleG6Students) {
+      setSelectedG6Students(eligibleG6Students.map(s => s.id));
+    } else {
+      setSelectedG6Students([]);
+    }
+  };
+
+  const handleSelectG6Student = (studentId: number, checked: boolean) => {
+    if (checked) {
+      setSelectedG6Students(prev => [...prev, studentId]);
+    } else {
+      setSelectedG6Students(prev => prev.filter(id => id !== studentId));
+    }
+  };
+
+  const handleGenerateG6Transcripts = () => {
+    if (selectedG6Students.length === 0) {
+      toast({
+        title: isRTL ? "لا يوجد اختيار" : "No Selection",
+        description: isRTL ? "يرجى اختيار طالب واحد على الأقل." : "Please select at least one student.",
+        variant: "destructive",
+      });
+      return;
+    }
+    generateG6TranscriptMutation.mutate(selectedG6Students);
+  };
+
   const handleSelectAll = (checked: boolean) => {
     if (checked && students) {
       setSelectedStudents(students.map(s => s.id));
@@ -220,26 +324,40 @@ export default function Transcripts() {
             {isRTL ? "إنشاء وطباعة السجلات الأكاديمية للطلاب" : "Generate and print student academic transcripts"}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handlePrintSelected}
-            disabled={selectedStudents.length === 0 || generateTranscriptMutation.isPending}
-            data-testid="button-print-selected"
-          >
-            <Printer className="w-4 h-4 me-2" />
-            {isRTL ? `طباعة المحدد (${selectedStudents.length})` : `Print Selected (${selectedStudents.length})`}
-          </Button>
-          <Button
-            onClick={() => generateAllMutation.mutate()}
-            disabled={!selectedSchool || generateAllMutation.isPending}
-            data-testid="button-print-all"
-          >
-            <Download className="w-4 h-4 me-2" />
-            {isRTL ? "إنشاء الكل للمدرسة" : "Generate All for School"}
-          </Button>
-        </div>
       </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="general" className="flex items-center gap-2" data-testid="tab-general">
+            <FileText className="w-4 h-4" />
+            {isRTL ? "عام" : "General"}
+          </TabsTrigger>
+          <TabsTrigger value="grade6" className="flex items-center gap-2" data-testid="tab-grade6">
+            <Languages className="w-4 h-4" />
+            {isRTL ? "الصف السادس (عربي)" : "Grade 6 (Arabic)"}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="space-y-6 mt-6">
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={handlePrintSelected}
+              disabled={selectedStudents.length === 0 || generateTranscriptMutation.isPending}
+              data-testid="button-print-selected"
+            >
+              <Printer className="w-4 h-4 me-2" />
+              {isRTL ? `طباعة المحدد (${selectedStudents.length})` : `Print Selected (${selectedStudents.length})`}
+            </Button>
+            <Button
+              onClick={() => generateAllMutation.mutate()}
+              disabled={!selectedSchool || generateAllMutation.isPending}
+              data-testid="button-print-all"
+            >
+              <Download className="w-4 h-4 me-2" />
+              {isRTL ? "إنشاء الكل للمدرسة" : "Generate All for School"}
+            </Button>
+          </div>
 
       <Card>
         <CardHeader className="pb-3">
@@ -559,6 +677,152 @@ export default function Transcripts() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="grade6" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5" />
+                    {isRTL ? "كشوف درجات الصف السادس (عربي)" : "Grade 6 Transcripts (Arabic)"}
+                  </CardTitle>
+                  <CardDescription>
+                    {isRTL 
+                      ? "إنشاء كشوف الدرجات العربية مع بيانات الطالب ثنائية اللغة والنسبة المئوية والتقدير"
+                      : "Generate Arabic transcripts with bilingual student info, percentage, and final grade"}
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={handleGenerateG6Transcripts}
+                  disabled={selectedG6Students.length === 0 || generateG6TranscriptMutation.isPending}
+                  data-testid="button-generate-g6"
+                >
+                  {generateG6TranscriptMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                  ) : (
+                    <Printer className="w-4 h-4 me-2" />
+                  )}
+                  {isRTL 
+                    ? `إنشاء كشوف الدرجات (${selectedG6Students.length})`
+                    : `Generate Transcripts (${selectedG6Students.length})`}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {g6Loading ? (
+                <TranscriptsTableSkeleton />
+              ) : eligibleG6Students && eligibleG6Students.length > 0 ? (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={eligibleG6Students.length > 0 && selectedG6Students.length === eligibleG6Students.length}
+                            onCheckedChange={handleSelectAllG6}
+                            data-testid="checkbox-select-all-g6"
+                          />
+                        </TableHead>
+                        <TableHead>{isRTL ? "الطالب" : "Student"}</TableHead>
+                        <TableHead>{isRTL ? "رقم الفهرس" : "Index Number"}</TableHead>
+                        <TableHead>{isRTL ? "المدرسة" : "School"}</TableHead>
+                        <TableHead>{isRTL ? "المواد" : "Subjects"}</TableHead>
+                        <TableHead>{isRTL ? "المجموع" : "Total"}</TableHead>
+                        <TableHead>{isRTL ? "النسبة" : "Percentage"}</TableHead>
+                        <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {eligibleG6Students.map((student) => (
+                        <TableRow key={student.id} data-testid={`row-g6-student-${student.id}`}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedG6Students.includes(student.id)}
+                              onCheckedChange={(checked) => handleSelectG6Student(student.id, !!checked)}
+                              data-testid={`checkbox-g6-student-${student.id}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                                <User className="w-4 h-4 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-foreground">
+                                  {student.firstName} {student.middleName || ''} {student.lastName}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {student.nationality || (isRTL ? "غامبي" : "Gambian")}
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                              {student.indexNumber || (isRTL ? "قيد الانتظار" : "Pending")}
+                            </code>
+                          </TableCell>
+                          <TableCell className="max-w-[150px] truncate" title={student.schoolName}>
+                            {student.schoolName}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {student.resultsCount} {isRTL ? "مادة" : "subjects"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {student.totalScore}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={parseFloat(student.percentage) >= 50 ? "default" : "destructive"}
+                              className={parseFloat(student.percentage) >= 85 ? "bg-green-500" : 
+                                        parseFloat(student.percentage) >= 75 ? "bg-blue-500" :
+                                        parseFloat(student.percentage) >= 65 ? "bg-yellow-500" :
+                                        parseFloat(student.percentage) >= 50 ? "bg-orange-500" : ""}
+                            >
+                              {student.percentage}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell className={isRTL ? "text-left" : "text-right"}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => generateG6TranscriptMutation.mutate([student.id])}
+                              disabled={generateG6TranscriptMutation.isPending}
+                              data-testid={`button-generate-g6-${student.id}`}
+                            >
+                              {generateG6TranscriptMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Printer className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <GraduationCap className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">
+                    {isRTL ? "لا يوجد طلاب مؤهلون" : "No Eligible Students"}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {isRTL 
+                      ? "لا يوجد طلاب في الصف السادس مع نتائج منشورة لهذه السنة الامتحانية"
+                      : "No Grade 6 students with published results for this exam year"}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
         <DialogContent className="max-w-2xl">
