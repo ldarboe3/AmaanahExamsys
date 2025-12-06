@@ -98,6 +98,37 @@ function CertificatesTableSkeleton() {
   );
 }
 
+function GeneratingOverlay({ isRTL, count }: { isRTL: boolean; count: number }) {
+  return (
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-card p-8 rounded-lg shadow-lg border max-w-md w-full mx-4 text-center">
+        <div className="mb-6">
+          <div className="relative w-20 h-20 mx-auto">
+            <Loader2 className="w-20 h-20 text-primary animate-spin" />
+            <Award className="w-8 h-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+          </div>
+        </div>
+        <h3 className="text-xl font-semibold mb-2">
+          {isRTL ? "جاري إنشاء الشهادات..." : "Generating Certificates..."}
+        </h3>
+        <p className="text-muted-foreground mb-4">
+          {isRTL 
+            ? `يرجى الانتظار، جاري إنشاء ${count} شهادة`
+            : `Please wait, generating ${count} certificate(s)`}
+        </p>
+        <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+          <div className="bg-primary h-full animate-pulse" style={{ width: '60%' }} />
+        </div>
+        <p className="text-xs text-muted-foreground mt-4">
+          {isRTL 
+            ? "قد يستغرق هذا بضع ثوانٍ لكل شهادة"
+            : "This may take a few seconds per certificate"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function Certificates() {
   const { toast } = useToast();
   const { t, isRTL } = useLanguage();
@@ -118,6 +149,7 @@ export default function Certificates() {
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [previewStudent, setPreviewStudent] = useState<EligibleStudent | null>(null);
   const [previewCertificate, setPreviewCertificate] = useState<Certificate | null>(null);
+  const [generatingCount, setGeneratingCount] = useState<number>(0);
 
   const { data: examYears } = useQuery<ExamYear[]>({
     queryKey: ["/api/exam-years"],
@@ -213,6 +245,7 @@ export default function Certificates() {
 
   const generatePrimaryMutation = useMutation({
     mutationFn: async (studentIds: number[]) => {
+      setGeneratingCount(studentIds.length);
       const response = await apiRequest("POST", "/api/certificates/generate-primary", {
         studentIds,
         examYearId: parseInt(selectedExamYear),
@@ -220,15 +253,32 @@ export default function Certificates() {
       return response.json();
     },
     onSuccess: (data) => {
-      toast({
-        title: isRTL ? "تم إنشاء الشهادات" : "Certificates Generated",
-        description: isRTL 
-          ? `تم إنشاء ${data.generated} شهادة بنجاح`
-          : `Successfully generated ${data.generated} certificate(s)`,
-      });
+      setGeneratingCount(0);
+      if (data.generated > 0) {
+        toast({
+          title: isRTL ? "تم إنشاء الشهادات" : "Certificates Generated",
+          description: isRTL 
+            ? `تم إنشاء ${data.generated} شهادة بنجاح`
+            : `Successfully generated ${data.generated} certificate(s)`,
+        });
+      } else if (data.errors && data.errors.length > 0) {
+        const errorMsg = data.errors.map((e: any) => e.studentName ? `${e.studentName}: ${e.error}` : e.error).join(', ');
+        toast({
+          title: isRTL ? "لم يتم إنشاء شهادات" : "No Certificates Generated",
+          description: errorMsg || (isRTL ? "تحقق من بيانات الطلاب" : "Check student data"),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: isRTL ? "لم يتم إنشاء شهادات" : "No Certificates Generated",
+          description: isRTL ? "جميع الطلاب لديهم شهادات بالفعل أو غير مؤهلين" : "All students already have certificates or are not eligible",
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/certificates/eligible-students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/certificates"] });
     },
     onError: (error: Error) => {
+      setGeneratingCount(0);
       toast({
         title: isRTL ? "خطأ في الإنشاء" : "Generation Error",
         description: error.message,
@@ -332,6 +382,9 @@ export default function Certificates() {
 
   return (
     <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+      {generatePrimaryMutation.isPending && generatingCount > 0 && (
+        <GeneratingOverlay isRTL={isRTL} count={generatingCount} />
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold text-foreground flex items-center gap-2">
