@@ -89,15 +89,18 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Scalability**: Designed to manage countrywide examinations with a multi-tenant architecture for schools.
 - **Security**: Token-based workflows for invitations and password resets, bcrypt for password hashing, and role-based access control.
 
-## Recent Changes (December 6, 2025)
-- **Fixed Transcript Header**: Updated header layout to match official format with proper bilingual display (Arabic on right, English on left)
-- **Unified Workflows**: Both certificates and transcripts now follow identical patterns with:
+## Recent Changes (December 6, 2025 - Final)
+- **Fixed Transcript Table Layout**: Corrected RTL column ordering to match official PDF format:
+  - Columns now display right-to-left: م (Serial) → المادة (Subject) → الدرجات الكبرى (Max) → الدرجات الصغرى (Min) → الدرجات المكتسبة (Actual Mark)
+  - Header and data rows properly aligned in RTL
+  - Summary rows (Total, Percentage, Grade) correctly positioned
+- **Unified Workflows**: Both certificates and transcripts follow identical patterns:
   - Eligibility-based student selection from published results
   - Comprehensive filter system (exam year, region, cluster, school)
   - Preview modal system for viewing documents before generation
   - Print All button for bulk printing
   - Generate All button for bulk PDF generation
-- **Grade 6 Arabic Transcripts**: Implemented single unified view with proper table formatting matching official transcript layout
+- **Grade 6 Arabic Transcripts**: Single unified view with proper table formatting and bilingual header (Arabic right, English left)
 
 ## External Dependencies
 - **Database**: PostgreSQL (hosted on Neon)
