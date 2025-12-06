@@ -1,0 +1,155 @@
+System Update Request — Summary of Required Fixes & Enhancements
+
+Please implement the following updates and improvements across the platform:
+
+1. Automatic Index Number Generation
+
+Currently, certificate generation fails because some students do not have index numbers.
+
+Required Fix:
+
+When a student is approved—whether from Result Upload or Student Upload—the system should automatically generate a 6-digit random index number.
+
+This must apply immediately once the student’s status changes to Approved.
+
+2. School List Enhancements
+
+Add the following actions to the School List page:
+
+Send View Credentials
+
+Send Verification Email
+
+Also:
+
+Fix the Export button so it works on the same page without redirecting.
+
+3. Student List Page Updates
+For Super Admin:
+
+Remove the countdown timer from the Student List page.
+
+For Schools:
+
+Remove the timer on the student registration page once payment is successfully submitted.
+
+If payment is approved, display a confirmation message instead of the timer.
+
+If payment is rejected, the timer should reappear.
+
+4. Analytics Page Improvements
+Add/Update the following:
+
+Performance by Region → Convert to Pie Chart.
+
+Performance by Grade → Add filters:
+
+By Region
+
+By Cluster
+
+By School
+
+Subject Performance → Add filters:
+
+By Region
+
+By Cluster
+
+By School
+
+Performance by Gender → Add filters:
+
+By Region
+
+By Cluster
+
+By School
+
+Export Requirements:
+
+All analytics should be exportable as:
+
+PDF
+
+Excel
+
+Printable format
+
+Fix:
+
+Ensure all statistics/analytics display actual accurate data.
+
+5. Dashboard Corrections
+
+Format Total Students to include commas (e.g., 1,754).
+
+Change Total Revenue from $0 to GMD as the default currency.
+
+6. Reports & Exports
+
+Ensure all CSV exports are generated in CSV UTF-8 format.
+
+7. Settings Page Error
+
+Fix the error appearing on the Settings page (screenshot was attached).
+
+📌 Developer Task List
+
+Below is a structured task list for implementation:
+
+A. Student Index Generation
+
+ Add function to automatically assign 6-digit random index numbers.
+
+ Trigger index number generation upon student approval (from any source).
+
+ Prevent duplicate index numbers.
+
+B. School List Actions
+
+ Add “Send View Credentials” action button.
+
+ Add “Send Verification Email” action button.
+
+ Fix Export button to work inline on the same page.
+
+C. Student List / Registration Page Fixes
+
+ Remove timer on Student List (Super Admin).
+
+ Remove timer for schools after successful payment.
+
+ Replace timer with approval confirmation message when approved.
+
+ Restore timer only when payment is rejected.
+
+D. Analytics Page Updates
+
+ Convert Performance by Region to pie chart.
+
+ Add filtering (Region/Cluster/School) to:
+
+ Performance by Grade
+
+ Subject Performance
+
+ Gender Performance
+
+ Make all analytics exportable (PDF, Excel, Print).
+
+ Ensure charts and stats display actual data from database.
+
+E. Dashboard Fixes
+
+ Format Total Students number with commas.
+
+ Set default revenue currency to GMD.
+
+F. Reports & Export Functions
+
+ Ensure all CSV exports use UTF-8 encoding.
+
+G. Settings Page
+
+ Diagnose and fix the Settings page error.

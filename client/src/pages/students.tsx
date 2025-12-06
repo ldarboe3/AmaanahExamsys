@@ -688,7 +688,7 @@ export default function Students() {
 
   const { data: invoicesResponse } = useQuery<any>({
     queryKey: [invoicesQueryUrl],
-    enabled: canApproveStudents && !!invoicesQueryUrl,
+    enabled: (canApproveStudents || isSchoolAdmin) && !!invoicesQueryUrl,
   });
   
   const schoolInvoices = Array.isArray(invoicesResponse) ? invoicesResponse : (invoicesResponse?.data || []);
@@ -703,8 +703,39 @@ export default function Students() {
     );
   }, [schoolInvoices, selectedSchoolId, currentExamYearId]);
 
+  // Check if payment was submitted (pending or paid)
+  const schoolPaymentSubmitted = useMemo(() => {
+    if (!schoolInvoices || !selectedSchoolId || !currentExamYearId) return false;
+    return schoolInvoices.some(
+      (inv: any) => inv.schoolId === selectedSchoolId && 
+                    inv.examYearId === currentExamYearId && 
+                    (inv.status === 'paid' || inv.status === 'pending')
+    );
+  }, [schoolInvoices, selectedSchoolId, currentExamYearId]);
+
+  // Check if payment was rejected
+  const schoolPaymentRejected = useMemo(() => {
+    if (!schoolInvoices || !selectedSchoolId || !currentExamYearId) return false;
+    const latestInvoice = schoolInvoices
+      .filter((inv: any) => inv.schoolId === selectedSchoolId && inv.examYearId === currentExamYearId)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    return latestInvoice?.status === 'rejected';
+  }, [schoolInvoices, selectedSchoolId, currentExamYearId]);
+
   // Can only approve students if payment is approved
   const canApproveWithPayment = canApproveStudents && schoolPaymentApproved;
+
+  // Determine if countdown should be shown based on role and payment status
+  const shouldShowCountdown = useMemo(() => {
+    // Never show countdown for super_admin or examination_admin
+    if (canApproveStudents) return false;
+    
+    // For school admins, hide countdown if payment is approved
+    if (isSchoolAdmin && schoolPaymentApproved) return false;
+    
+    // For school admins, show countdown if no payment or payment rejected
+    return true;
+  }, [canApproveStudents, isSchoolAdmin, schoolPaymentApproved]);
 
   // Filter clusters based on selected region
   const clustersForFilter = clusters?.filter(
@@ -1536,7 +1567,7 @@ export default function Students() {
           </Card>
         )}
 
-        {/* Registration Deadline Countdown or Past Exam Message */}
+        {/* Registration Deadline Countdown, Past Exam Message, or Payment Confirmation */}
         {isPastExamYear ? (
           <Card className="border-2 border-destructive/50 bg-destructive/5">
             <CardContent className="p-6">
@@ -1553,7 +1584,23 @@ export default function Students() {
               </p>
             </CardContent>
           </Card>
-        ) : countdown && (() => {
+        ) : isSchoolAdmin && schoolPaymentApproved ? (
+          <Card className="border-2 border-chart-3/50 bg-chart-3/5">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <CheckCircle className="w-6 h-6 text-chart-3" />
+                <h2 className="text-lg font-bold text-chart-3">
+                  {isRTL ? "تم الموافقة على الدفع" : "Payment Approved"}
+                </h2>
+              </div>
+              <p className="text-center text-sm text-chart-3/80">
+                {isRTL 
+                  ? "تم الموافقة على دفعتكم بنجاح. طلابكم المسجلون معتمدون الآن للامتحان."
+                  : "Your payment has been approved successfully. Your registered students are now approved for the examination."}
+              </p>
+            </CardContent>
+          </Card>
+        ) : shouldShowCountdown && countdown && (() => {
           const isUrgent = countdown.days < 3;
           const cardClass = isUrgent 
             ? "border-2 border-destructive bg-destructive text-white" 

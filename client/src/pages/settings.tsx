@@ -110,6 +110,14 @@ function SettingsSkeleton() {
   );
 }
 
+interface ExamYear {
+  id: number;
+  name: string;
+  year: number;
+  isActive: boolean;
+  examEndDate: string | null;
+}
+
 export default function Settings() {
   const { toast } = useToast();
   const { t, isRTL } = useLanguage();
@@ -119,6 +127,12 @@ export default function Settings() {
   const { data: settings, isLoading } = useQuery<SystemSettings>({
     queryKey: ["/api/settings"],
   });
+
+  const { data: examYears } = useQuery<ExamYear[]>({
+    queryKey: ["/api/exam-years"],
+  });
+
+  const activeExamYear = examYears?.find((ey) => ey.isActive) || null;
 
   const organizationForm = useForm<OrganizationFormData>({
     resolver: zodResolver(organizationSchema),

@@ -230,6 +230,10 @@ export default function Dashboard() {
     }).format(amount);
   };
 
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat(language === 'ar' ? 'ar-EG' : 'en-US').format(num);
+  };
+
   const getTimeRemaining = (dateString: string | null) => {
     if (!dateString) return null;
     const date = new Date(dateString);
@@ -286,8 +290,8 @@ export default function Dashboard() {
             {!isSchoolAdmin && (
               <StatCard
                 title={t.dashboard.totalSchools}
-                value={stats?.totalSchools || 0}
-                subtitle={`${stats?.pendingSchools || 0} ${t.dashboard.pendingApproval}`}
+                value={formatNumber(stats?.totalSchools || 0)}
+                subtitle={`${formatNumber(stats?.pendingSchools || 0)} ${t.dashboard.pendingApproval}`}
                 icon={School}
                 color="bg-primary/10 text-primary"
                 trend="up"
@@ -296,8 +300,8 @@ export default function Dashboard() {
             )}
             <StatCard
               title={isSchoolAdmin ? t.dashboard.yourStudents : t.dashboard.totalStudents}
-              value={stats?.totalStudents || 0}
-              subtitle={`${stats?.pendingStudents || 0} ${t.dashboard.pendingValidation}`}
+              value={formatNumber(stats?.totalStudents || 0)}
+              subtitle={`${formatNumber(stats?.pendingStudents || 0)} ${t.dashboard.pendingValidation}`}
               icon={Users}
               color="bg-chart-2/10 text-chart-2"
               trend="up"

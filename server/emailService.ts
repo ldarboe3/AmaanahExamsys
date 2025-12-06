@@ -183,6 +183,102 @@ export async function sendSchoolVerificationEmail(
   });
 }
 
+// Send school login credentials email
+export async function sendSchoolCredentialsEmail(
+  schoolEmail: string,
+  schoolName: string,
+  username: string,
+  temporaryPassword: string,
+  baseUrl: string
+): Promise<boolean> {
+  const loginUrl = `${baseUrl}/login`;
+  
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1E8F4D, #166534); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .credentials { background: #E0F2FE; border: 2px solid #0EA5E9; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .credentials h3 { margin-top: 0; color: #0369A1; }
+        .credentials table { width: 100%; border-collapse: collapse; }
+        .credentials td { padding: 8px 0; }
+        .credentials .label { font-weight: bold; color: #0369A1; }
+        .credentials .value { font-family: monospace; font-size: 16px; background: white; padding: 8px 12px; border-radius: 4px; }
+        .btn { display: inline-block; background: #1E8F4D; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+        .warning { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+        .arabic { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Amaanah Islamic Education</h1>
+          <p class="arabic">الأمانة للتعليم الإسلامي</p>
+        </div>
+        <div class="content">
+          <h2>Your Login Credentials</h2>
+          <p>Dear ${schoolName},</p>
+          <p>Here are your login credentials to access the Amaanah Examination System:</p>
+          
+          <div class="credentials">
+            <h3>Login Details</h3>
+            <table>
+              <tr>
+                <td class="label">Username:</td>
+                <td><span class="value">${username}</span></td>
+              </tr>
+              <tr>
+                <td class="label">Temporary Password:</td>
+                <td><span class="value">${temporaryPassword}</span></td>
+              </tr>
+            </table>
+          </div>
+          
+          <div class="warning">
+            <strong>Important:</strong> You will be required to change your password upon first login for security purposes. Please keep your new password safe and do not share it with anyone.
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${loginUrl}" class="btn">Login Now</a>
+          </div>
+          
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #1E8F4D;">${loginUrl}</p>
+          
+          <p>After logging in, you can:</p>
+          <ul>
+            <li>Register students for examinations</li>
+            <li>View and manage your school profile</li>
+            <li>Process payments and view invoices</li>
+            <li>Download student index numbers and exam cards</li>
+          </ul>
+          
+          <p>If you have any questions, please contact the Amaanah Examination Office.</p>
+          
+          <p>Best regards,<br>Amaanah Examination Team</p>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} Amaanah Islamic Education - The Gambia</p>
+          <p>This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: schoolEmail,
+    subject: 'Your Login Credentials - Amaanah Exam System',
+    htmlBody: htmlBody
+  });
+}
+
 // Send payment confirmation email
 export async function sendPaymentConfirmationEmail(
   schoolEmail: string,
