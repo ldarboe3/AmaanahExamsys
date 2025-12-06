@@ -341,6 +341,18 @@ function generateTranscriptHTML(data: TranscriptData): string {
     // Logo not available, continue without it
   }
   
+  // Load and embed watermark logo as base64 data URL
+  let watermarkDataUrl = '';
+  try {
+    const watermarkPath = path.join(process.cwd(), 'generated_transcripts', 'watermark_logo.png');
+    if (fs.existsSync(watermarkPath)) {
+      const watermarkBuffer = fs.readFileSync(watermarkPath);
+      watermarkDataUrl = 'data:image/png;base64,' + watermarkBuffer.toString('base64');
+    }
+  } catch (e) {
+    // Watermark not available, continue without it
+  }
+  
   // Build Arabic full name
   const fullNameAr = [student.firstName, student.middleName, student.lastName]
     .filter(Boolean)
@@ -393,11 +405,30 @@ function generateTranscriptHTML(data: TranscriptData): string {
       text-align: right;
       background: white;
       padding: 15px;
+      position: relative;
+    }
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 0;
+      width: 350px;
+      height: 350px;
+    }
+    .watermark img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
     }
     .container {
       width: 100%;
       max-width: 210mm;
       margin: 0 auto;
+      position: relative;
+      z-index: 1;
     }
     .header-table {
       width: 100%;
@@ -580,6 +611,7 @@ function generateTranscriptHTML(data: TranscriptData): string {
   </style>
 </head>
 <body>
+  ${watermarkDataUrl ? `<div class="watermark"><img src="${watermarkDataUrl}" alt="Watermark"></div>` : ''}
   <div class="container">
     <table class="header-table">
       <tr>
