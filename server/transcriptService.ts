@@ -44,7 +44,7 @@ const COMMON_NAME_TRANSLITERATIONS: Record<string, string> = {
   'الإسلامي': 'Islamic', 'العربية': 'Arabic', 'العربي': 'Arabic',
   'العليا': 'Higher', 'الثانوية': 'Secondary', 'الابتدائية': 'Primary',
   'الآثار': 'Al-Athar', 'النور': 'Al-Noor', 'الهدى': 'Al-Huda',
-  'الإنجليزي': 'English', 'محمد': 'Mohammed', 'يدالي': 'Yadali',
+  'الإنجليزي': 'English', 'يدالي': 'Yadali',
 };
 
 // Transliterate a single Arabic word/token to English
