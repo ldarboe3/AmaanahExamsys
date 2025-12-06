@@ -242,14 +242,14 @@ function generateTranscriptHTML(data: TranscriptData): string {
     .header-table td {
       border: none;
       padding: 5px 10px;
-      vertical-align: top;
+      vertical-align: middle;
     }
     .header-left {
       text-align: left;
       direction: ltr;
       width: 30%;
-      font-size: 11px;
-      line-height: 1.5;
+      font-size: 13px;
+      line-height: 1.6;
     }
     .header-center {
       text-align: center;
@@ -257,30 +257,24 @@ function generateTranscriptHTML(data: TranscriptData): string {
       padding: 10px;
     }
     .header-logo {
-      width: 70px;
-      height: 70px;
-      background: #f0f0f0;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 9px;
-      color: #666;
+      max-width: 90px;
+      height: auto;
       margin: 0 auto;
+      display: block;
     }
     .header-right {
       text-align: right;
       direction: rtl;
       width: 30%;
-      font-size: 11px;
-      line-height: 1.5;
+      font-size: 13px;
+      line-height: 1.6;
     }
     .header-left strong,
     .header-right strong {
       display: block;
       font-weight: bold;
       margin-bottom: 3px;
-      font-size: 12px;
+      font-size: 13px;
     }
     .header-left div,
     .header-right div {
@@ -394,7 +388,7 @@ function generateTranscriptHTML(data: TranscriptData): string {
           <div style="margin-top: 5px;">Examination affairs unit</div>
         </td>
         <td class="header-center">
-          <div class="header-logo">LOGO</div>
+          <img src="file:///home/runner/workspace/generated_transcripts/logo.png" alt="Logo" class="header-logo" style="width: 90px; height: auto;">
         </td>
         <td class="header-right">
           <strong>الأمانة العامة للتعليم الإسلامي العربي</strong>
