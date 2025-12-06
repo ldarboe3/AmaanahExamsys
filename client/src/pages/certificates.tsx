@@ -201,10 +201,12 @@ export default function Certificates() {
       failed: number;
     };
   }>({
-    queryKey: ["/api/certificates/eligible-students", selectedExamYear, selectedSchool, selectedGrade, pageSize, currentPage],
+    queryKey: ["/api/certificates/eligible-students", selectedExamYear, selectedRegion, selectedCluster, selectedSchool, selectedGrade, pageSize, currentPage],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedExamYear) params.append("examYearId", selectedExamYear);
+      if (selectedRegion && selectedRegion !== "all") params.append("regionId", selectedRegion);
+      if (selectedCluster && selectedCluster !== "all") params.append("clusterId", selectedCluster);
       if (selectedSchool && selectedSchool !== "all") params.append("schoolId", selectedSchool);
       if (selectedGrade && selectedGrade !== "all") params.append("grade", selectedGrade);
       params.append("limit", pageSize.toString());
