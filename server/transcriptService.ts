@@ -381,19 +381,19 @@ function generateTranscriptHTML(data: TranscriptData): string {
   <div class="container">
     <table class="header-table">
       <tr>
+        <td class="header-left">
+          <strong>الأمانة العامة للتعليم الإسلامي العربي</strong>
+          <div>في غامبيا</div>
+          <div style="margin-top: 5px;">قسم الامتحانات</div>
+        </td>
+        <td class="header-center">
+          <img src="file:///home/runner/workspace/generated_transcripts/logo.png" alt="Logo" class="header-logo">
+        </td>
         <td class="header-right">
           <strong>The General Secretariat for</strong>
           <div>Islamic/Arabic Education in</div>
           <div>The Gambia</div>
           <div style="margin-top: 5px;">Examination affairs unit</div>
-        </td>
-        <td class="header-center">
-          <img src="file:///home/runner/workspace/generated_transcripts/logo.png" alt="Logo" class="header-logo">
-        </td>
-        <td class="header-left">
-          <strong>الأمانة العامة للتعليم الإسلامي العربي</strong>
-          <div>في غامبيا</div>
-          <div style="margin-top: 5px;">قسم الامتحانات</div>
         </td>
       </tr>
     </table>
@@ -401,15 +401,15 @@ function generateTranscriptHTML(data: TranscriptData): string {
     <div class="main-title">كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year}-${examYear.year - 1} م</div>
 
     <div class="identity-section">
-      <div class="identity-ar">
-        <div><span class="identity-label">اسم الطالب/ة:</span> <span class="identity-value">${fullNameAr}</span></div>
-        <div><span class="identity-label">الجنسية:</span> <span class="identity-value">${nationalityAr}</span></div>
-        <div><span class="identity-label">المدرسة:</span> <span class="identity-value">${schoolNameAr}</span></div>
-      </div>
       <div class="identity-en">
         <div><span class="identity-label">Student Name:</span> <span class="identity-value">${fullNameEn}</span></div>
         <div><span class="identity-label">Nationality:</span> <span class="identity-value">${nationalityEn}</span></div>
         <div><span class="identity-label">School:</span> <span class="identity-value">${schoolNameEn}</span></div>
+      </div>
+      <div class="identity-ar">
+        <div><span class="identity-label">اسم الطالب/ة:</span> <span class="identity-value">${fullNameAr}</span></div>
+        <div><span class="identity-label">الجنسية:</span> <span class="identity-value">${nationalityAr}</span></div>
+        <div><span class="identity-label">المدرسة:</span> <span class="identity-value">${schoolNameAr}</span></div>
       </div>
     </div>
 
