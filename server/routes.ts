@@ -7585,7 +7585,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       // Get all schools for filtering by region/cluster
-      const allSchools = await storage.getSchools();
+      const allSchools = await storage.getAllSchools();
       const schoolMap = new Map(allSchools.map(s => [s.id, s]));
       
       // Get school IDs that match region/cluster filters
