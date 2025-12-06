@@ -178,6 +178,16 @@ export default function Schools() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showCredentialsDialog, setShowCredentialsDialog] = useState(false);
+  const [selectedSchoolCredentials, setSelectedSchoolCredentials] = useState<{
+    username: string; 
+    schoolName: string; 
+    schoolId: number;
+    hasCredentials: boolean;
+    mustChangePassword: boolean;
+    defaultPassword: string | null;
+  } | null>(null);
+  const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
   const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
   const [bulkUploadData, setBulkUploadData] = useState<Array<{schoolName: string; address: string; region: string; cluster: string}>>([]);
   const [bulkUploadResults, setBulkUploadResults] = useState<{
@@ -458,6 +468,35 @@ export default function Schools() {
     createSchoolMutation.mutate(data);
   };
 
+  // Fetch credentials from API
+  const fetchSchoolCredentials = async (schoolId: number, schoolName: string) => {
+    setIsLoadingCredentials(true);
+    try {
+      const response = await fetch(`/api/schools/${schoolId}/credentials`, { credentials: 'include' });
+      if (!response.ok) {
+        throw new Error('Failed to fetch credentials');
+      }
+      const data = await response.json();
+      setSelectedSchoolCredentials({
+        username: data.username || '',
+        schoolName: schoolName,
+        schoolId: schoolId,
+        hasCredentials: data.hasCredentials,
+        mustChangePassword: data.mustChangePassword,
+        defaultPassword: data.defaultPassword,
+      });
+      setShowCredentialsDialog(true);
+    } catch (error: any) {
+      toast({
+        title: isRTL ? "خطأ" : "Error",
+        description: error.message || (isRTL ? "فشل في جلب بيانات الدخول" : "Failed to fetch credentials"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingCredentials(false);
+    }
+  };
+
   // CSV parsing function for bulk upload
   const parseCsvFile = (file: File): Promise<Array<{schoolName: string; address: string; region: string; cluster: string}>> => {
     return new Promise((resolve, reject) => {
@@ -694,6 +733,45 @@ export default function Schools() {
     setShowBulkUploadDialog(false);
   };
 
+  // Export schools list to CSV - downloads from backend endpoint
+  const exportSchools = async () => {
+    try {
+      // Build query string for filters (use same filters as current view)
+      const params = new URLSearchParams();
+      if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
+      if (typeFilter && typeFilter !== 'all') params.append('schoolType', typeFilter);
+      if (regionFilter && regionFilter !== 'all') params.append('regionId', regionFilter);
+      if (clusterFilter && clusterFilter !== 'all') params.append('clusterId', clusterFilter);
+      
+      const queryString = params.toString();
+      const exportUrl = `/api/export/schools/csv${queryString ? `?${queryString}` : ''}`;
+      
+      // Fetch CSV from backend
+      const response = await fetch(exportUrl, { credentials: 'include' });
+      if (!response.ok) {
+        throw new Error('Failed to export schools');
+      }
+      
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `schools_export_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      toast({
+        title: isRTL ? "تم تصدير المدارس" : "Schools Exported",
+        description: isRTL ? "تم تصدير المدارس بنجاح" : "Schools exported successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: isRTL ? "فشل التصدير" : "Export Failed",
+        description: error.message || (isRTL ? "فشل في تصدير المدارس" : "Failed to export schools"),
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
@@ -799,7 +877,7 @@ export default function Schools() {
                 {filteredSchools?.length || 0} {t.schools.title.toLowerCase()} {t.common.found}
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={exportSchools} data-testid="button-export-schools">
               <Download className="w-4 h-4 me-2" />
               {t.common.export}
             </Button>
@@ -878,23 +956,36 @@ export default function Schools() {
                               {isRTL ? "تعديل" : "Edit"}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {!school.isEmailVerified && school.status === 'pending' ? (
+                            {school.adminUserId && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    fetchSchoolCredentials(school.id, school.name);
+                                  }}
+                                  disabled={isLoadingCredentials}
+                                  data-testid={`button-view-credentials-${school.id}`}
+                                >
+                                  <Eye className="w-4 h-4 me-2" />
+                                  {isRTL ? "عرض بيانات الدخول" : "View Credentials"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => sendCredentialsMutation.mutate(school.id)}
+                                  className="text-primary"
+                                  data-testid={`button-send-credentials-${school.id}`}
+                                >
+                                  <Key className="w-4 h-4 me-2" />
+                                  {isRTL ? "إرسال بيانات الدخول" : "Send Credentials"}
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {school.status === 'pending' && (
                               <DropdownMenuItem
                                 onClick={() => resendVerificationMutation.mutate(school.id)}
                                 className="text-chart-2"
+                                data-testid={`button-send-verification-${school.id}`}
                               >
                                 <Mail className="w-4 h-4 me-2" />
-                                {isRTL ? "إعادة إرسال البريد" : "Resend Verification Email"}
-                              </DropdownMenuItem>
-                            ) : null}
-                            {school.adminUserId && (
-                              <DropdownMenuItem
-                                onClick={() => sendCredentialsMutation.mutate(school.id)}
-                                className="text-primary"
-                                data-testid={`button-send-credentials-${school.id}`}
-                              >
-                                <Key className="w-4 h-4 me-2" />
-                                {isRTL ? "إرسال بيانات الدخول" : "Send Credentials"}
+                                {isRTL ? "إرسال بريد التحقق" : "Send Verification Email"}
                               </DropdownMenuItem>
                             )}
                             {school.status === 'pending' || school.status === 'verified' ? (
@@ -1570,6 +1661,142 @@ export default function Schools() {
                   {t.common.approve}
                 </Button>
               </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Credentials Dialog */}
+      <Dialog open={showCredentialsDialog} onOpenChange={setShowCredentialsDialog}>
+        <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5" />
+              {isRTL ? "بيانات تسجيل الدخول" : "Login Credentials"}
+            </DialogTitle>
+            <DialogDescription>
+              {isRTL 
+                ? `بيانات الدخول للمدرسة: ${selectedSchoolCredentials?.schoolName || ''}`
+                : `Credentials for school: ${selectedSchoolCredentials?.schoolName || ''}`}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedSchoolCredentials && (
+            <div className="space-y-4 py-4">
+              {selectedSchoolCredentials.hasCredentials && selectedSchoolCredentials.username ? (
+                <>
+                  <div className="p-4 bg-muted rounded-lg space-y-3">
+                    <div>
+                      <Label className="text-muted-foreground text-sm">
+                        {isRTL ? "اسم المستخدم" : "Username"}
+                      </Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <code className="flex-1 bg-background px-3 py-2 rounded border font-mono text-sm">
+                          {selectedSchoolCredentials.username}
+                        </code>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (selectedSchoolCredentials.username) {
+                              navigator.clipboard.writeText(selectedSchoolCredentials.username);
+                              toast({
+                                title: isRTL ? "تم النسخ" : "Copied",
+                                description: isRTL ? "تم نسخ اسم المستخدم" : "Username copied to clipboard",
+                              });
+                            }
+                          }}
+                          disabled={!selectedSchoolCredentials.username}
+                        >
+                          {isRTL ? "نسخ" : "Copy"}
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {selectedSchoolCredentials.mustChangePassword && selectedSchoolCredentials.defaultPassword ? (
+                      <div>
+                        <Label className="text-muted-foreground text-sm">
+                          {isRTL ? "كلمة المرور الافتراضية" : "Default Password"}
+                        </Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="flex-1 bg-background px-3 py-2 rounded border font-mono text-sm">
+                            {selectedSchoolCredentials.defaultPassword}
+                          </code>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(selectedSchoolCredentials.defaultPassword!);
+                              toast({
+                                title: isRTL ? "تم النسخ" : "Copied",
+                                description: isRTL ? "تم نسخ كلمة المرور" : "Password copied to clipboard",
+                              });
+                            }}
+                          >
+                            {isRTL ? "نسخ" : "Copy"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <Label className="text-muted-foreground text-sm">
+                          {isRTL ? "كلمة المرور" : "Password"}
+                        </Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="flex-1 bg-background px-3 py-2 rounded border text-sm text-green-600 dark:text-green-400">
+                            {isRTL ? "تم تغيير كلمة المرور من قبل المستخدم" : "Password has been changed by user"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {selectedSchoolCredentials.mustChangePassword ? (
+                    <Alert>
+                      <AlertCircle className="w-4 h-4" />
+                      <AlertDescription>
+                        {isRTL 
+                          ? "يجب تغيير كلمة المرور عند أول تسجيل دخول"
+                          : "Password must be changed on first login"}
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <Alert className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950">
+                      <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <AlertDescription className="text-green-700 dark:text-green-300">
+                        {isRTL 
+                          ? "تم تفعيل حساب هذه المدرسة وتغيير كلمة المرور"
+                          : "This school account has been activated and password changed"}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </>
+              ) : (
+                <Alert variant="destructive">
+                  <AlertCircle className="w-4 h-4" />
+                  <AlertDescription>
+                    {isRTL 
+                      ? "لم يتم إنشاء بيانات الدخول لهذه المدرسة بعد"
+                      : "No login credentials have been created for this school yet"}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowCredentialsDialog(false)}>
+              {t.common.close}
+            </Button>
+            {selectedSchoolCredentials && selectedSchoolCredentials.hasCredentials && selectedSchoolCredentials.username && (
+              <Button
+                onClick={() => {
+                  sendCredentialsMutation.mutate(selectedSchoolCredentials.schoolId);
+                }}
+              >
+                <Mail className="w-4 h-4 me-2" />
+                {isRTL ? "إرسال عبر البريد" : "Send via Email"}
+              </Button>
             )}
           </DialogFooter>
         </DialogContent>

@@ -974,6 +974,60 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Get school credentials (username and default password info)
+  app.get("/api/schools/:id/credentials", isAuthenticated, async (req, res) => {
+    try {
+      // Verify user role from database (not just session) for security
+      const sessionUserId = req.session?.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      // Check if user has admin privileges from database record
+      if (!['super_admin', 'examination_admin'].includes(sessionUser.role || '')) {
+        return res.status(403).json({ message: "Access denied. Admin privileges required." });
+      }
+      
+      const school = await storage.getSchool(parseInt(req.params.id));
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      
+      // Get the associated user to get the username and password status
+      let username = null;
+      let mustChangePassword = true;
+      let hasCredentials = false;
+      
+      if (school.adminUserId) {
+        const user = await storage.getUser(school.adminUserId);
+        if (user && user.username) {
+          username = user.username;
+          mustChangePassword = user.mustChangePassword ?? true;
+          hasCredentials = true;
+        }
+      }
+      
+      // Return credentials info
+      // Only show default password if user still needs to change it
+      res.json({
+        schoolId: school.id,
+        schoolName: school.name,
+        username: username,
+        defaultPassword: (hasCredentials && mustChangePassword) ? 'Admin@123' : null,
+        mustChangePassword: mustChangePassword,
+        hasCredentials: hasCredentials,
+        passwordChanged: hasCredentials && !mustChangePassword,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/schools", async (req, res) => {
     try {
       const parsed = insertSchoolSchema.safeParse(req.body);
@@ -9038,11 +9092,71 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   
   app.get("/api/export/schools/csv", isAuthenticated, async (req, res) => {
     try {
-      const schools = await storage.getAllSchools();
-      const csvHeader = "ID,Name,Code,Email,Phone,Address,Region,Status,Total Students,Created At\n";
-      const csvRows = schools.map(s => 
-        `${s.id},"${s.name}","${s.code}","${s.email}","${s.phone || ''}","${s.address || ''}",${s.regionId},"${s.status}",${s.totalStudents || 0},"${s.createdAt}"`
-      ).join("\n");
+      let schoolsList = await storage.getAllSchools();
+      
+      // Apply filters from query params
+      const { status, schoolType, regionId, clusterId } = req.query;
+      if (status && status !== 'all') {
+        schoolsList = schoolsList.filter(s => s.status === status);
+      }
+      if (schoolType && schoolType !== 'all') {
+        // Check both schoolType (single value) and schoolTypes (array) for compatibility
+        schoolsList = schoolsList.filter(s => {
+          if (s.schoolTypes && s.schoolTypes.length > 0) {
+            return s.schoolTypes.includes(schoolType as string);
+          }
+          return s.schoolType === schoolType;
+        });
+      }
+      if (regionId) {
+        const parsedRegionId = parseInt(regionId as string);
+        schoolsList = schoolsList.filter(s => s.regionId === parsedRegionId);
+      }
+      if (clusterId) {
+        const parsedClusterId = parseInt(clusterId as string);
+        schoolsList = schoolsList.filter(s => s.clusterId === parsedClusterId);
+      }
+      
+      // Get regions and clusters for names
+      const allRegions = await storage.getAllRegions();
+      const allClusters = await storage.getAllClusters();
+      
+      const getRegionName = (id: number | null) => {
+        if (!id) return '';
+        const region = allRegions.find(r => r.id === id);
+        return region?.name || '';
+      };
+      
+      const getClusterName = (id: number | null) => {
+        if (!id) return '';
+        const cluster = allClusters.find(c => c.id === id);
+        return cluster?.name || '';
+      };
+      
+      // Escape CSV fields properly
+      const escapeCsvField = (field: any): string => {
+        if (field === null || field === undefined) return '';
+        const stringField = String(field);
+        if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+          return `"${stringField.replace(/"/g, '""')}"`;
+        }
+        return stringField;
+      };
+      
+      const csvHeader = "ID,School Name | اسم المدرسة,Email | البريد الإلكتروني,Phone | الهاتف,Address | العنوان,School Type | نوع المدرسة,Region | المنطقة,Cluster | العنقود,Status | الحالة,Registrar Name | اسم المسجل,Created At\n";
+      const csvRows = schoolsList.map(s => [
+        s.id,
+        escapeCsvField(s.name),
+        escapeCsvField(s.email),
+        escapeCsvField(s.phone || ''),
+        escapeCsvField(s.address || ''),
+        escapeCsvField(s.schoolType || ''),
+        escapeCsvField(getRegionName(s.regionId)),
+        escapeCsvField(getClusterName(s.clusterId)),
+        escapeCsvField(s.status || 'pending'),
+        escapeCsvField(s.registrarName || ''),
+        s.createdAt ? new Date(s.createdAt).toISOString().split('T')[0] : '',
+      ].join(',')).join("\n");
       
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename=schools_export.csv');
