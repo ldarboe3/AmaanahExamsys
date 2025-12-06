@@ -587,13 +587,18 @@ export default function Certificates() {
                             <AlertTriangle className="w-3 h-3 me-1" />
                             {isRTL ? "بيانات ناقصة" : "Missing Data"}
                           </Badge>
+                        ) : !student.hasResults ? (
+                          <Badge variant="secondary">
+                            {isRTL ? "بلا نتائج" : "No Results"}
+                          </Badge>
                         ) : !student.passed ? (
                           <Badge variant="destructive">
                             {isRTL ? "راسب" : "Failed"}
                           </Badge>
                         ) : (
-                          <Badge variant="secondary">
-                            {isRTL ? "بلا نتائج" : "No Results"}
+                          <Badge className="bg-chart-2/10 text-chart-2">
+                            <CheckCircle2 className="w-3 h-3 me-1" />
+                            {isRTL ? "ناجح" : "Passed"}
                           </Badge>
                         )}
                       </TableCell>
