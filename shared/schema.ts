@@ -356,9 +356,6 @@ export const transcripts = pgTable("transcripts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export type Transcript = typeof transcripts.$inferSelect;
-export type InsertTranscript = typeof transcripts.$inferInsert;
-
 // Bulk upload tracking
 export const bulkUploadStatusEnum = pgEnum('bulk_upload_status', ['pending', 'processing', 'completed', 'failed']);
 
@@ -426,19 +423,6 @@ export const certificates = pgTable("certificates", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Transcripts table
-export const transcripts = pgTable("transcripts", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  transcriptNumber: varchar("transcript_number", { length: 50 }).notNull().unique(),
-  studentId: integer("student_id").notNull().references(() => students.id),
-  examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
-  grade: integer("grade").notNull(),
-  qrToken: varchar("qr_token", { length: 100 }).unique(),
-  pdfUrl: varchar("pdf_url", { length: 500 }),
-  printCount: integer("print_count").default(0),
-  issuedDate: timestamp("issued_date"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
 
 // Attendance Records
 export const attendanceRecords = pgTable("attendance_records", {
@@ -1027,6 +1011,13 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).pick({
   examYearId: true,
   transcriptNumber: true,
   grade: true,
+  studentNameAr: true,
+  studentNameEn: true,
+  schoolNameAr: true,
+  schoolNameEn: true,
+  totalScore: true,
+  percentage: true,
+  finalGrade: true,
   qrToken: true,
   pdfUrl: true,
   issuedDate: true,

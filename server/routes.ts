@@ -8347,7 +8347,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         generateTranscriptPDF, 
         buildTranscriptData, 
         GRADE_6_SUBJECTS,
-        validateTranscriptRequirements 
+        validateTranscriptRequirements,
+        generateTranscriptNumber,
+        generateQRToken,
+        generateQRCodeDataUrl,
+        transliterateArabicToEnglish
       } = await import('./transcriptService');
 
       const generatedTranscripts = [];
@@ -8440,22 +8444,56 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
         
         try {
+          // Generate unique transcript number (check last sequence in database)
+          const existingTranscripts = await storage.getTranscriptsByExamYear(targetExamYear.id);
+          const sequenceNumber = existingTranscripts.length + 1;
+          const transcriptNumber = generateTranscriptNumber(targetExamYear.year, sequenceNumber);
+          
+          // Generate unique QR token
+          const qrToken = generateQRToken();
+          
+          // Build verification URL for QR code
+          const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+            : 'https://amaanah.repl.co';
+          const verifyUrl = `${baseUrl}/api/verify/transcript/${qrToken}`;
+          
+          // Generate QR code as data URL
+          const qrCodeDataUrl = await generateQRCodeDataUrl(verifyUrl);
+          
+          // Add transcript number and QR code to transcript data
+          transcriptData.transcriptNumber = transcriptNumber;
+          transcriptData.qrCodeDataUrl = qrCodeDataUrl;
+          
           const pdfPath = await generateTranscriptPDF(transcriptData);
           
-          const transcriptNumber = `G6TR-${targetExamYear.year}-${String(student.id).padStart(6, '0')}`;
+          // Get transliterated names for storage
+          const studentNameAr = `${student.firstName} ${student.middleName || ''} ${student.lastName}`.trim();
+          const studentNameEn = transliterateArabicToEnglish(studentNameAr);
+          const schoolNameAr = school.name;
+          const schoolNameEn = transliterateArabicToEnglish(school.name);
           
           const transcript = await storage.createTranscript({
             studentId: student.id,
             examYearId: targetExamYear.id,
             transcriptNumber,
             grade: 6,
+            qrToken,
             pdfUrl: pdfPath,
+            studentNameAr,
+            studentNameEn,
+            schoolNameAr,
+            schoolNameEn,
+            totalScore: transcriptData.totalMarks.toString(),
+            percentage: transcriptData.percentage.toFixed(2),
+            finalGrade: transcriptData.finalGrade.arabic,
             issuedDate: new Date(),
           });
           
           generatedTranscripts.push({
             ...transcript,
-            studentName: `${student.firstName} ${student.lastName}`,
+            studentName: studentNameAr,
+            studentNameEn,
             percentage: transcriptData.percentage.toFixed(1),
             finalGrade: transcriptData.finalGrade.arabic,
           });
@@ -8540,10 +8578,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         valid: true,
         transcript: {
           transcriptNumber: transcript.transcriptNumber,
-          studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown',
+          studentNameAr: transcript.studentNameAr || (student ? `${student.firstName} ${student.lastName}` : 'Unknown'),
+          studentNameEn: transcript.studentNameEn,
+          schoolNameAr: transcript.schoolNameAr,
+          schoolNameEn: transcript.schoolNameEn,
           grade: transcript.grade,
           examYear: examYear?.year,
+          totalScore: transcript.totalScore,
+          percentage: transcript.percentage,
+          finalGrade: transcript.finalGrade,
           issuedDate: transcript.issuedDate,
+          status: transcript.status,
         }
       });
     } catch (error: any) {
