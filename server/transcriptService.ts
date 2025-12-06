@@ -401,15 +401,15 @@ function generateTranscriptHTML(data: TranscriptData): string {
     <div class="main-title">كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year}-${examYear.year - 1} م</div>
 
     <div class="identity-section">
-      <div class="identity-en">
-        <div><span class="identity-label">Student Name:</span> <span class="identity-value">${fullNameEn}</span></div>
-        <div><span class="identity-label">Nationality:</span> <span class="identity-value">${nationalityEn}</span></div>
-        <div><span class="identity-label">School:</span> <span class="identity-value">${schoolNameEn}</span></div>
-      </div>
       <div class="identity-ar">
         <div><span class="identity-label">اسم الطالب/ة:</span> <span class="identity-value">${fullNameAr}</span></div>
         <div><span class="identity-label">الجنسية:</span> <span class="identity-value">${nationalityAr}</span></div>
         <div><span class="identity-label">المدرسة:</span> <span class="identity-value">${schoolNameAr}</span></div>
+      </div>
+      <div class="identity-en">
+        <div><span class="identity-label">Student Name:</span> <span class="identity-value">${fullNameEn}</span></div>
+        <div><span class="identity-label">Nationality:</span> <span class="identity-value">${nationalityEn}</span></div>
+        <div><span class="identity-label">School:</span> <span class="identity-value">${schoolNameEn}</span></div>
       </div>
     </div>
 
