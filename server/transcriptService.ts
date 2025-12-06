@@ -232,52 +232,61 @@ function generateTranscriptHTML(data: TranscriptData): string {
       max-width: 210mm;
       margin: 0 auto;
     }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    .header-table {
+      width: 100%;
+      border-collapse: collapse;
       margin-bottom: 20px;
       padding-bottom: 15px;
       border-bottom: 2px solid #333;
     }
+    .header-table td {
+      border: none;
+      padding: 5px 10px;
+      vertical-align: top;
+    }
     .header-left {
       text-align: left;
       direction: ltr;
-      width: 25%;
+      width: 30%;
       font-size: 11px;
-      line-height: 1.4;
+      line-height: 1.5;
     }
     .header-center {
       text-align: center;
       width: 25%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      padding: 10px;
     }
-    .header-center img {
-      max-width: 80px;
-      height: auto;
+    .header-logo {
+      width: 70px;
+      height: 70px;
+      background: #f0f0f0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      color: #666;
+      margin: 0 auto;
     }
     .header-right {
       text-align: right;
       direction: rtl;
-      width: 25%;
-      line-height: 1.4;
+      width: 30%;
+      font-size: 11px;
+      line-height: 1.5;
     }
-    .org-name {
-      font-size: 13px;
+    .header-left strong,
+    .header-right strong {
+      display: block;
       font-weight: bold;
       margin-bottom: 3px;
+      font-size: 12px;
     }
-    .org-subtitle {
-      font-size: 11px;
-      margin-bottom: 2px;
+    .header-left div,
+    .header-right div {
+      margin: 2px 0;
     }
-    .dept-name {
-      font-size: 11px;
-      color: #333;
-    }
-    .header-title {
+    .main-title {
       text-align: center;
       font-size: 16px;
       font-weight: bold;
@@ -376,26 +385,26 @@ function generateTranscriptHTML(data: TranscriptData): string {
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <div class="header-left">
-        <div class="org-name">The General Secretariat for</div>
-        <div class="org-subtitle">Islamic/Arabic Education in</div>
-        <div class="org-subtitle">The Gambia</div>
-        <div class="dept-name">Examination affairs unit</div>
-      </div>
-      <div class="header-center">
-        <div style="width: 80px; height: 80px; background: #f0f0f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #666; text-align: center;">
-          [LOGO]
-        </div>
-      </div>
-      <div class="header-right">
-        <div class="org-name">الأمانة العامة للتعليم الإسلامي العربي</div>
-        <div class="org-subtitle">في غامبيا</div>
-        <div class="dept-name">قسم الامتحانات</div>
-      </div>
-    </div>
+    <table class="header-table">
+      <tr>
+        <td class="header-left">
+          <strong>The General Secretariat for</strong>
+          <div>Islamic/Arabic Education in</div>
+          <div>The Gambia</div>
+          <div style="margin-top: 5px;">Examination affairs unit</div>
+        </td>
+        <td class="header-center">
+          <div class="header-logo">LOGO</div>
+        </td>
+        <td class="header-right">
+          <strong>الأمانة العامة للتعليم الإسلامي العربي</strong>
+          <div>في غامبيا</div>
+          <div style="margin-top: 5px;">قسم الامتحانات</div>
+        </td>
+      </tr>
+    </table>
 
-    <div class="header-title">كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year}-${examYear.year - 1} م</div>
+    <div class="main-title">كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year}-${examYear.year - 1} م</div>
 
     <div class="identity-section">
       <div class="identity-ar">
