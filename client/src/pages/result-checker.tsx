@@ -1,11 +1,19 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { PublicLayout } from "@/components/public-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { 
   Search, 
   FileCheck, 
@@ -19,10 +27,13 @@ import {
   Calendar,
   Award,
   BookOpen,
-  BarChart3
+  BarChart3,
+  FileText,
+  Printer
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Table,
   TableBody,
@@ -32,19 +43,29 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+interface ExamYear {
+  id: number;
+  name: string;
+  year: number;
+  isActive: boolean;
+}
+
 interface ResultData {
   student: {
+    id: number;
     indexNumber: string;
     firstName: string;
     middleName?: string;
     lastName: string;
     fullName: string;
+    fullNameAr?: string;
     schoolEn: string;
     schoolAr: string;
     grade: number;
     levelEn: string;
     levelAr: string;
     examYear: string;
+    examYearId: number;
     gender: string;
   };
   results: Array<{
@@ -66,17 +87,80 @@ interface ResultData {
   };
   overallStatus: string;
   overallStatusAr: string;
+  hasTranscript: boolean;
+  transcriptId: number | null;
 }
 
 export default function ResultChecker() {
   const { toast } = useToast();
   const { t, language, isRTL } = useLanguage();
   const [indexNumber, setIndexNumber] = useState("");
-  const [searchedIndex, setSearchedIndex] = useState("");
+  const [selectedExamYear, setSelectedExamYear] = useState<string>("");
+  const [selectedGrade, setSelectedGrade] = useState<string>("");
+  const [searchParams, setSearchParams] = useState<{
+    indexNumber: string;
+    examYearId?: string;
+    grade?: string;
+  } | null>(null);
+  const [generatingTranscript, setGeneratingTranscript] = useState(false);
+
+  // Fetch exam years
+  const { data: examYears = [] } = useQuery<ExamYear[]>({
+    queryKey: ['/api/public/exam-years'],
+  });
+
+  // Build search query URL
+  const buildSearchUrl = () => {
+    if (!searchParams) return '';
+    let url = `/api/public/results/search?indexNumber=${encodeURIComponent(searchParams.indexNumber)}`;
+    if (searchParams.examYearId) {
+      url += `&examYearId=${searchParams.examYearId}`;
+    }
+    if (searchParams.grade) {
+      url += `&grade=${searchParams.grade}`;
+    }
+    return url;
+  };
 
   const { data: resultData, isLoading, error, refetch } = useQuery<ResultData>({
-    queryKey: [`/api/public/results/${searchedIndex}`],
-    enabled: !!searchedIndex,
+    queryKey: ['/api/public/results/search', searchParams],
+    queryFn: async () => {
+      if (!searchParams?.indexNumber) return null;
+      const url = buildSearchUrl();
+      const response = await fetch(url);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch results');
+      }
+      return response.json();
+    },
+    enabled: !!searchParams?.indexNumber,
+  });
+
+  // Transcript generation mutation
+  const generateTranscriptMutation = useMutation({
+    mutationFn: async () => {
+      if (!resultData?.student) throw new Error("No student data");
+      return apiRequest('POST', '/api/public/transcripts/generate', {
+        indexNumber: resultData.student.indexNumber,
+        examYearId: resultData.student.examYearId,
+        grade: resultData.student.grade,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: language === 'ar' ? 'تم إنشاء الشهادة' : 'Transcript Generated',
+        description: language === 'ar' ? 'يمكنك الآن تنزيل الشهادة' : 'You can now download your transcript',
+      });
+      refetch();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -89,7 +173,44 @@ export default function ResultChecker() {
       });
       return;
     }
-    setSearchedIndex(indexNumber.trim());
+    setSearchParams({
+      indexNumber: indexNumber.trim(),
+      examYearId: selectedExamYear || undefined,
+      grade: selectedGrade || undefined,
+    });
+  };
+
+  const handleDownloadTranscript = () => {
+    if (resultData?.student?.indexNumber) {
+      window.open(`/api/public/transcripts/${resultData.student.indexNumber}/download`, '_blank');
+    }
+  };
+
+  const handlePrintTranscript = () => {
+    if (resultData?.student?.indexNumber) {
+      const printWindow = window.open(`/api/public/transcripts/${resultData.student.indexNumber}/download`, '_blank');
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      }
+    }
+  };
+
+  const handleGenerateTranscript = async () => {
+    setGeneratingTranscript(true);
+    try {
+      await generateTranscriptMutation.mutateAsync();
+    } finally {
+      setGeneratingTranscript(false);
+    }
+  };
+
+  const handleReset = () => {
+    setSearchParams(null);
+    setIndexNumber("");
+    setSelectedExamYear("");
+    setSelectedGrade("");
   };
 
   const getGradeColor = (grade: string) => {
@@ -111,6 +232,13 @@ export default function ResultChecker() {
     return language === 'ar' ? result.statusAr : result.status;
   };
 
+  const gradeOptions = [
+    { value: "3", labelEn: "Grade 3 - Lower Basic", labelAr: "الصف الثالث - المرحلة الابتدائية الدنيا" },
+    { value: "6", labelEn: "Grade 6 - Upper Basic", labelAr: "الصف السادس - المرحلة الابتدائية" },
+    { value: "9", labelEn: "Grade 9 - Basic Cycle", labelAr: "الصف التاسع - المرحلة الإعدادية" },
+    { value: "12", labelEn: "Grade 12 - Senior Secondary", labelAr: "الصف الثاني عشر - المرحلة الثانوية" },
+  ];
+
   return (
     <PublicLayout>
       {/* Hero Section */}
@@ -125,7 +253,9 @@ export default function ResultChecker() {
               {t.resultChecker.title}
             </h1>
             <p className="text-lg text-muted-foreground">
-              {t.resultChecker.subtitle}
+              {language === 'ar' 
+                ? 'ابحث عن نتائجك وقم بتنزيل الشهادة الأكاديمية الخاصة بك'
+                : 'Search for your results and download your academic transcript'}
             </p>
           </div>
         </div>
@@ -141,32 +271,87 @@ export default function ResultChecker() {
               </div>
               <CardTitle className="text-xl">{t.resultChecker.checkYourResults}</CardTitle>
               <CardDescription>
-                {t.resultChecker.enterIndexNumber}
+                {language === 'ar' 
+                  ? 'اختر سنة الامتحان والصف وأدخل رقم الفهرس للبحث عن نتائجك'
+                  : 'Select examination year, grade, and enter your index number to find your results'}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSearch} className="space-y-4">
-                <div className={`flex gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                  <Input
-                    type="text"
-                    placeholder={t.resultChecker.indexNumberPlaceholder}
-                    value={indexNumber}
-                    onChange={(e) => setIndexNumber(e.target.value.toUpperCase())}
-                    className={`flex-1 ${isRTL ? 'text-right' : ''}`}
-                    dir={isRTL ? 'rtl' : 'ltr'}
-                    data-testid="input-index-number"
-                  />
-                  <Button type="submit" disabled={isLoading} data-testid="button-search-results">
-                    {isLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Search className="w-4 h-4" />
-                    )}
-                  </Button>
+              <form onSubmit={handleSearch} className="space-y-6">
+                {/* Exam Year and Grade Selection Row */}
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${isRTL ? 'text-right' : ''}`}>
+                  <div className="space-y-2">
+                    <Label htmlFor="examYear">
+                      {language === 'ar' ? 'سنة الامتحان' : 'Examination Year'}
+                    </Label>
+                    <Select value={selectedExamYear} onValueChange={setSelectedExamYear}>
+                      <SelectTrigger data-testid="select-exam-year">
+                        <SelectValue placeholder={language === 'ar' ? 'اختر السنة' : 'Select Year'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{language === 'ar' ? 'جميع السنوات' : 'All Years'}</SelectItem>
+                        {examYears.map((year) => (
+                          <SelectItem key={year.id} value={year.id.toString()}>
+                            {year.name} {year.isActive && `(${language === 'ar' ? 'نشط' : 'Active'})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="grade">
+                      {language === 'ar' ? 'الصف / المستوى' : 'Grade / Level'}
+                    </Label>
+                    <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                      <SelectTrigger data-testid="select-grade">
+                        <SelectValue placeholder={language === 'ar' ? 'اختر الصف' : 'Select Grade'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{language === 'ar' ? 'جميع الصفوف' : 'All Grades'}</SelectItem>
+                        {gradeOptions.map((grade) => (
+                          <SelectItem key={grade.value} value={grade.value}>
+                            {language === 'ar' ? grade.labelAr : grade.labelEn}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  {t.resultChecker.indexNumberHint}
-                </p>
+
+                {/* Index Number Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="indexNumber">
+                    {language === 'ar' ? 'رقم الفهرس' : 'Student Index Number'} *
+                  </Label>
+                  <div className={`flex gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <Input
+                      id="indexNumber"
+                      type="text"
+                      placeholder={t.resultChecker.indexNumberPlaceholder}
+                      value={indexNumber}
+                      onChange={(e) => setIndexNumber(e.target.value.toUpperCase())}
+                      className={`flex-1 ${isRTL ? 'text-right' : ''}`}
+                      dir={isRTL ? 'rtl' : 'ltr'}
+                      data-testid="input-index-number"
+                    />
+                    <Button type="submit" disabled={isLoading} data-testid="button-search-results">
+                      {isLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Search className="w-4 h-4 mr-2" />
+                          {language === 'ar' ? 'بحث' : 'Search'}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {language === 'ar' 
+                      ? 'أدخل رقم الفهرس المكون من 6 أرقام (مثال: 123456)'
+                      : 'Enter your 6-digit index number (e.g., 123456)'}
+                  </p>
+                </div>
               </form>
             </CardContent>
           </Card>
@@ -174,7 +359,7 @@ export default function ResultChecker() {
       </section>
 
       {/* Results Section */}
-      {searchedIndex && (
+      {searchParams && (
         <section className="pb-16 md:pb-24">
           <div className="container mx-auto px-4">
             {isLoading ? (
@@ -190,9 +375,16 @@ export default function ResultChecker() {
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      {t.resultChecker.noResultsDescription.replace('{indexNumber}', searchedIndex)}
+                      {language === 'ar' 
+                        ? `لم يتم العثور على نتائج للرقم ${searchParams.indexNumber}. يرجى التحقق من البيانات المدخلة والمحاولة مرة أخرى.`
+                        : `No results found for index number ${searchParams.indexNumber}. Please verify your information and try again.`}
                     </AlertDescription>
                   </Alert>
+                  <div className="mt-6 text-center">
+                    <Button onClick={handleReset} variant="outline" data-testid="button-try-again">
+                      {language === 'ar' ? 'حاول مرة أخرى' : 'Try Again'}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ) : (
@@ -200,7 +392,7 @@ export default function ResultChecker() {
                 {/* Student Info Card */}
                 <Card>
                   <CardHeader>
-                    <div className={`flex items-center justify-between gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <div className={`flex items-center justify-between gap-2 flex-wrap ${isRTL ? 'flex-row-reverse' : ''}`}>
                       <CardTitle className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                         <GraduationCap className="w-5 h-5 text-primary" />
                         {t.resultChecker.studentInformation}
@@ -222,6 +414,9 @@ export default function ResultChecker() {
                         <div>
                           <p className="text-sm text-muted-foreground">{t.resultChecker.fullName}</p>
                           <p className="font-medium">{resultData.student.fullName}</p>
+                          {resultData.student.fullNameAr && (
+                            <p className="text-sm text-muted-foreground" dir="rtl">{resultData.student.fullNameAr}</p>
+                          )}
                         </div>
                       </div>
                       <div className={`flex items-start gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
@@ -299,7 +494,7 @@ export default function ResultChecker() {
                 {/* Results Table */}
                 <Card>
                   <CardHeader>
-                    <div className={`flex items-center justify-between gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <div className={`flex items-center justify-between gap-2 flex-wrap ${isRTL ? 'flex-row-reverse' : ''}`}>
                       <CardTitle className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                         <Award className="w-5 h-5 text-primary" />
                         {t.resultChecker.subjectResults}
@@ -350,7 +545,58 @@ export default function ResultChecker() {
                   </CardContent>
                 </Card>
 
-                {/* Actions */}
+                {/* Transcript Actions Card */}
+                <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+                  <CardHeader>
+                    <CardTitle className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                      <FileText className="w-5 h-5 text-primary" />
+                      {language === 'ar' ? 'الشهادة الأكاديمية' : 'Academic Transcript'}
+                    </CardTitle>
+                    <CardDescription>
+                      {language === 'ar' 
+                        ? 'قم بإنشاء وتنزيل الشهادة الأكاديمية الرسمية الخاصة بك'
+                        : 'Generate and download your official academic transcript'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`flex flex-wrap gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                      {resultData.hasTranscript ? (
+                        <>
+                          <Button 
+                            onClick={handleDownloadTranscript}
+                            data-testid="button-download-transcript"
+                          >
+                            <Download className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                            {language === 'ar' ? 'تنزيل الشهادة' : 'Download Transcript'}
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            onClick={handlePrintTranscript}
+                            data-testid="button-print-transcript"
+                          >
+                            <Printer className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                            {language === 'ar' ? 'طباعة الشهادة' : 'Print Transcript'}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button 
+                          onClick={handleGenerateTranscript}
+                          disabled={generatingTranscript}
+                          data-testid="button-generate-transcript"
+                        >
+                          {generatingTranscript ? (
+                            <Loader2 className={`w-4 h-4 animate-spin ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                          ) : (
+                            <FileText className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                          )}
+                          {language === 'ar' ? 'إنشاء الشهادة' : 'Generate Transcript'}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* General Actions */}
                 <div className={`flex justify-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
                   <Button 
                     variant="outline" 
@@ -365,7 +611,7 @@ export default function ResultChecker() {
                     {t.resultChecker.downloadResultSlip}
                   </Button>
                   <Button 
-                    onClick={() => { setSearchedIndex(""); setIndexNumber(""); }}
+                    onClick={handleReset}
                     data-testid="button-search-another"
                   >
                     {t.resultChecker.searchAnother}
@@ -378,7 +624,7 @@ export default function ResultChecker() {
       )}
 
       {/* Info Section */}
-      {!searchedIndex && (
+      {!searchParams && (
         <section className="pb-16 md:pb-24">
           <div className="container mx-auto px-4">
             <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
@@ -402,10 +648,14 @@ export default function ResultChecker() {
               </Card>
               <Card className="text-center hover-elevate">
                 <CardContent className="pt-6">
-                  <Download className="w-10 h-10 text-chart-3 mx-auto mb-4" />
-                  <h3 className="font-semibold mb-2">{t.resultChecker.downloadPrint}</h3>
+                  <FileText className="w-10 h-10 text-chart-3 mx-auto mb-4" />
+                  <h3 className="font-semibold mb-2">
+                    {language === 'ar' ? 'شهادات أكاديمية' : 'Academic Transcripts'}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
-                    {t.resultChecker.downloadPrintDesc}
+                    {language === 'ar' 
+                      ? 'قم بإنشاء وتنزيل وطباعة الشهادة الأكاديمية الرسمية الخاصة بك'
+                      : 'Generate, download, and print your official academic transcript'}
                   </p>
                 </CardContent>
               </Card>

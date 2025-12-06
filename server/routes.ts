@@ -9625,6 +9625,371 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Public exam years for result checker (only years with published results)
+  app.get("/api/public/exam-years", async (req, res) => {
+    try {
+      const examYears = await storage.getAllExamYears();
+      // Return all exam years sorted by year descending
+      const sortedYears = examYears.sort((a, b) => b.year - a.year);
+      res.json(sortedYears.map(ey => ({
+        id: ey.id,
+        name: ey.name,
+        year: ey.year,
+        isActive: ey.isActive,
+      })));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public results search with exam year and grade filters
+  app.get("/api/public/results/search", async (req, res) => {
+    try {
+      const { indexNumber, examYearId, grade } = req.query;
+
+      if (!indexNumber) {
+        return res.status(400).json({ message: "Index number is required" });
+      }
+
+      // Find student by index number
+      const students = await storage.getStudents();
+      let student = students.find(s => 
+        s.indexNumber?.toUpperCase() === (indexNumber as string).toUpperCase()
+      );
+
+      // Apply additional filters if provided
+      if (student && examYearId) {
+        const yearId = parseInt(examYearId as string);
+        if (student.examYearId !== yearId) {
+          student = undefined;
+        }
+      }
+
+      if (student && grade) {
+        const gradeNum = parseInt(grade as string);
+        if (student.grade !== gradeNum) {
+          student = undefined;
+        }
+      }
+
+      if (!student) {
+        return res.status(404).json({ message: "No results found for this search criteria" });
+      }
+
+      // Get student's school
+      const school = student.schoolId ? await storage.getSchool(student.schoolId) : null;
+
+      // Get student's results
+      const allResults = await storage.getResultsByStudent(student.id) || [];
+      const publishedResults = allResults.filter(r => r.status === 'published');
+
+      if (publishedResults.length === 0) {
+        return res.status(404).json({ message: "No published results found for this student" });
+      }
+
+      // Get subjects
+      const subjects = await storage.getSubjects();
+      const subjectMap = new Map(subjects.map(s => [s.id, s]));
+
+      // Get exam year
+      const examYear = student.examYearId ? await storage.getExamYear(student.examYearId) : null;
+
+      // Grade level names
+      const gradeLevelNames: Record<number, { en: string; ar: string }> = {
+        3: { en: 'Grade 3 - Lower Basic', ar: 'الصف الثالث - المرحلة الابتدائية الدنيا' },
+        6: { en: 'Grade 6 - Upper Basic', ar: 'الصف السادس - المرحلة الابتدائية' },
+        9: { en: 'Grade 9 - Basic Cycle', ar: 'الصف التاسع - المرحلة الإعدادية' },
+        12: { en: 'Grade 12 - Senior Secondary', ar: 'الصف الثاني عشر - المرحلة الثانوية' },
+      };
+
+      const gradeLevel = gradeLevelNames[student.grade] || { en: `Grade ${student.grade}`, ar: `الصف ${student.grade}` };
+
+      // Format results
+      const formattedResults = publishedResults.map(result => {
+        const subject = subjectMap.get(result.subjectId);
+        const passingScore = subject?.passingScore || 50;
+        const score = result.rawScore || 0;
+        return {
+          subjectEn: subject?.name || "Unknown Subject",
+          subjectAr: subject?.arabicName || subject?.name || "مادة غير معروفة",
+          score: score,
+          maxScore: 100,
+          grade: result.grade || 'N/A',
+          status: score >= passingScore ? 'PASSED' : 'FAILED',
+          statusAr: score >= passingScore ? 'ناجح' : 'راسب',
+        };
+      });
+
+      // Calculate summary
+      const totalScore = formattedResults.reduce((sum, r) => sum + r.score, 0);
+      const maxPossibleScore = formattedResults.length * 100;
+      const averageScore = formattedResults.length > 0 ? Math.round(totalScore / formattedResults.length) : 0;
+      const passedCount = formattedResults.filter(r => r.status === 'PASSED').length;
+      const overallStatus = passedCount >= Math.ceil(formattedResults.length * 0.5) ? 'PASSED' : 'FAILED';
+
+      // Check if transcript exists for this student
+      const existingTranscripts = await storage.getTranscriptsByStudent(student.id);
+      const hasTranscript = existingTranscripts.length > 0;
+      const transcriptId = hasTranscript ? existingTranscripts[0].id : null;
+
+      res.json({
+        student: {
+          id: student.id,
+          indexNumber: student.indexNumber,
+          firstName: student.firstName,
+          middleName: student.middleName,
+          lastName: student.lastName,
+          fullName: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+          fullNameAr: student.arabicName || '',
+          schoolEn: school?.name || 'Unknown School',
+          schoolAr: school?.arabicName || school?.name || 'مدرسة غير معروفة',
+          grade: student.grade,
+          levelEn: gradeLevel.en,
+          levelAr: gradeLevel.ar,
+          examYear: examYear?.name || 'N/A',
+          examYearId: student.examYearId,
+          gender: student.gender,
+        },
+        results: formattedResults,
+        summary: {
+          totalScore,
+          maxPossibleScore,
+          averageScore,
+          subjectCount: formattedResults.length,
+          passedCount,
+          failedCount: formattedResults.length - passedCount,
+        },
+        overallStatus,
+        overallStatusAr: overallStatus === 'PASSED' ? 'ناجح' : 'راسب',
+        hasTranscript,
+        transcriptId,
+      });
+    } catch (error: any) {
+      console.error("Result search error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public transcript generation by index number
+  app.post("/api/public/transcripts/generate", async (req, res) => {
+    try {
+      const { indexNumber, examYearId, grade } = req.body;
+
+      if (!indexNumber) {
+        return res.status(400).json({ message: "Index number is required" });
+      }
+
+      // Find student by index number
+      const students = await storage.getStudents();
+      let student = students.find(s => 
+        s.indexNumber?.toUpperCase() === (indexNumber as string).toUpperCase()
+      );
+
+      // Apply additional filters if provided
+      if (student && examYearId) {
+        if (student.examYearId !== examYearId) {
+          student = undefined;
+        }
+      }
+
+      if (student && grade) {
+        if (student.grade !== grade) {
+          student = undefined;
+        }
+      }
+
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      // Check if student has published results
+      const allResults = await storage.getResultsByStudent(student.id) || [];
+      const publishedResults = allResults.filter(r => r.status === 'published');
+
+      if (publishedResults.length === 0) {
+        return res.status(404).json({ message: "No published results found for this student" });
+      }
+
+      // Check if transcript already exists
+      const existingTranscripts = await storage.getTranscriptsByStudent(student.id);
+      if (existingTranscripts.length > 0) {
+        // Return existing transcript
+        const transcript = existingTranscripts[0];
+        return res.json({
+          transcriptId: transcript.id,
+          transcriptNumber: transcript.transcriptNumber,
+          message: "Transcript already exists",
+        });
+      }
+
+      // Get school and exam year
+      const school = await storage.getSchool(student.schoolId);
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+
+      const examYear = student.examYearId ? await storage.getExamYear(student.examYearId) : null;
+      if (!examYear) {
+        return res.status(404).json({ message: "Exam year not found" });
+      }
+
+      // Get subjects
+      const allSubjects = await storage.getAllSubjects();
+      const gradeSubjects = allSubjects.filter(s => s.grade === student.grade);
+
+      // Prepare subjects data
+      const subjects = publishedResults.map(r => {
+        const subject = gradeSubjects.find(s => s.id === r.subjectId) || allSubjects.find(s => s.id === r.subjectId);
+        return {
+          name: subject?.name || 'Unknown Subject',
+          nameAr: subject?.arabicName || subject?.name || 'مادة غير معروفة',
+          score: r.rawScore || 0,
+          maxScore: 100,
+          passingScore: subject?.passingScore || 50,
+        };
+      });
+
+      // Calculate totals
+      const totalScore = subjects.reduce((sum, s) => sum + s.score, 0);
+      const maxScore = subjects.length * 100;
+      const percentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0;
+
+      // Determine final grade
+      let finalGrade = 'F';
+      if (percentage >= 90) finalGrade = 'A+';
+      else if (percentage >= 85) finalGrade = 'A';
+      else if (percentage >= 80) finalGrade = 'B+';
+      else if (percentage >= 75) finalGrade = 'B';
+      else if (percentage >= 70) finalGrade = 'C+';
+      else if (percentage >= 65) finalGrade = 'C';
+      else if (percentage >= 60) finalGrade = 'D+';
+      else if (percentage >= 50) finalGrade = 'D';
+
+      // Generate transcript number
+      const year = examYear.year.toString().slice(-2);
+      const gradeStr = student.grade.toString().padStart(2, '0');
+      const existingCount = await storage.getTranscriptCountForYear(examYear.id);
+      const sequence = (existingCount + 1).toString().padStart(4, '0');
+      const transcriptNumber = `TR/${year}/${gradeStr}/${sequence}`;
+
+      // Generate QR token
+      const { generateQRToken } = await import('./certificateService');
+      const qrToken = generateQRToken();
+
+      // Get the host URL for verification
+      const verifyUrl = `${req.protocol}://${req.get('host')}/verify/transcript/${qrToken}`;
+
+      // Prepare transcript data for PDF generation
+      const { generateTranscriptPDF } = await import('./certificateService');
+      
+      const pdfPath = await generateTranscriptPDF({
+        student: {
+          id: student.id,
+          firstName: student.firstName || '',
+          middleName: student.middleName || '',
+          lastName: student.lastName || '',
+          arabicName: student.arabicName || '',
+          fullNameAr: student.arabicName || '',
+          fullNameEn: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+          indexNumber: student.indexNumber || '',
+          grade: student.grade,
+          gender: student.gender || 'male',
+          dateOfBirth: student.dateOfBirth || new Date().toISOString().split('T')[0],
+          placeOfBirth: student.placeOfBirth || 'The Gambia',
+        },
+        school: {
+          nameEn: school.name,
+          nameAr: school.arabicName || school.name,
+          addressEn: school.address || '',
+          addressAr: school.arabicAddress || school.address || '',
+        },
+        examYear: {
+          name: examYear.name,
+          year: examYear.year,
+        },
+        subjects,
+        totalScore,
+        maxScore,
+        percentage: Math.round(percentage * 100) / 100,
+        finalGrade,
+        transcriptNumber,
+        verifyUrl,
+      });
+
+      // Create transcript record
+      const transcript = await storage.createTranscript({
+        studentId: student.id,
+        examYearId: examYear.id,
+        grade: student.grade,
+        transcriptNumber,
+        studentNameAr: student.arabicName || '',
+        studentNameEn: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+        schoolNameAr: school.arabicName || school.name,
+        schoolNameEn: school.name,
+        subjects: JSON.stringify(subjects),
+        totalScore: totalScore.toString(),
+        percentage: percentage.toFixed(2),
+        finalGrade,
+        pdfUrl: pdfPath,
+        qrToken,
+        status: 'issued',
+        issuedDate: new Date().toISOString().split('T')[0],
+      });
+
+      res.json({
+        transcriptId: transcript.id,
+        transcriptNumber: transcript.transcriptNumber,
+        message: "Transcript generated successfully",
+      });
+    } catch (error: any) {
+      console.error("Public transcript generation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public transcript download by index number
+  app.get("/api/public/transcripts/:indexNumber/download", async (req, res) => {
+    try {
+      const { indexNumber } = req.params;
+
+      // Find student by index number
+      const students = await storage.getStudents();
+      const student = students.find(s => 
+        s.indexNumber?.toUpperCase() === indexNumber.toUpperCase()
+      );
+
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      // Get transcript for this student
+      const transcripts = await storage.getTranscriptsByStudent(student.id);
+      if (transcripts.length === 0) {
+        return res.status(404).json({ message: "No transcript found. Please generate a transcript first." });
+      }
+
+      const transcript = transcripts[0];
+      if (!transcript.pdfUrl) {
+        return res.status(404).json({ message: "Transcript PDF not available" });
+      }
+
+      const fs = await import('fs');
+      if (!fs.existsSync(transcript.pdfUrl)) {
+        return res.status(404).json({ message: "Transcript PDF file not found" });
+      }
+
+      // Increment print count
+      await storage.incrementTranscriptPrintCount(transcript.id);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${transcript.transcriptNumber.replace(/\//g, '-')}.pdf"`);
+      fs.createReadStream(transcript.pdfUrl).pipe(res);
+    } catch (error: any) {
+      console.error("Public transcript download error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Public newsletter subscription
   app.post("/api/public/newsletter/subscribe", async (req, res) => {
     try {
