@@ -8327,6 +8327,177 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Grade 6 Arabic Transcript Generation (with bilingual identity block)
+  app.post("/api/transcripts/generate-g6-arabic", isAuthenticated, async (req, res) => {
+    try {
+      const { studentIds, examYearId } = req.body;
+      if (!Array.isArray(studentIds) || studentIds.length === 0) {
+        return res.status(400).json({ message: "studentIds array is required" });
+      }
+      
+      const targetExamYear = examYearId 
+        ? await storage.getExamYear(examYearId)
+        : await storage.getActiveExamYear();
+        
+      if (!targetExamYear) {
+        return res.status(400).json({ message: "No exam year found" });
+      }
+
+      const { 
+        generateTranscriptPDF, 
+        buildTranscriptData, 
+        GRADE_6_SUBJECTS,
+        validateTranscriptRequirements 
+      } = await import('./transcriptService');
+
+      const generatedTranscripts = [];
+      const errors: any[] = [];
+      
+      for (const studentId of studentIds) {
+        const student = await storage.getStudent(studentId);
+        if (!student) {
+          errors.push({ studentId, error: 'Student not found', errorAr: 'الطالب غير موجود' });
+          continue;
+        }
+        
+        if (student.grade !== 6) {
+          errors.push({ studentId, studentName: `${student.firstName} ${student.lastName}`, error: 'Student is not in Grade 6', errorAr: 'الطالب ليس في الصف السادس' });
+          continue;
+        }
+        
+        const school = await storage.getSchool(student.schoolId);
+        if (!school) {
+          errors.push({ studentId, error: 'School not found', errorAr: 'المدرسة غير موجودة' });
+          continue;
+        }
+        
+        // Get published results for this student
+        const results = await storage.getResultsByStudent(studentId);
+        const publishedResults = results.filter(r => r.status === 'published' && r.examYearId === targetExamYear.id);
+        
+        if (publishedResults.length === 0) {
+          errors.push({ studentId, studentName: `${student.firstName} ${student.lastName}`, error: 'No published results', errorAr: 'لا توجد نتائج منشورة' });
+          continue;
+        }
+        
+        // Get all subjects to map results
+        const allSubjects = await storage.getAllSubjects();
+        
+        // Build marks map from results
+        const marksMap = new Map<string, number | null>();
+        for (const result of publishedResults) {
+          const subject = allSubjects.find(s => s.id === result.subjectId);
+          if (subject) {
+            // Try to match by code or arabicName to GRADE_6_SUBJECTS
+            const g6Subject = GRADE_6_SUBJECTS.find(g6s => 
+              g6s.code.toLowerCase() === subject.code?.toLowerCase() ||
+              g6s.arabicName === subject.arabicName ||
+              g6s.englishName.toLowerCase() === subject.name?.toLowerCase()
+            );
+            if (g6Subject) {
+              marksMap.set(g6Subject.code, parseFloat(result.totalScore || '0'));
+            }
+          }
+        }
+        
+        // Build transcript data
+        const transcriptData = buildTranscriptData(
+          {
+            id: student.id,
+            firstName: student.firstName,
+            lastName: student.lastName,
+            middleName: student.middleName,
+            firstNameEn: null,
+            lastNameEn: null,
+            middleNameEn: null,
+            nationality: student.nationality || 'غامبي',
+            nationalityEn: null,
+            gender: student.gender as 'male' | 'female',
+            indexNumber: student.indexNumber,
+          },
+          {
+            id: school.id,
+            name: school.name,
+            nameEn: null,
+          },
+          {
+            id: targetExamYear.id,
+            year: targetExamYear.year,
+          },
+          marksMap
+        );
+        
+        // Validate
+        const validation = validateTranscriptRequirements(transcriptData);
+        if (!validation.isValid) {
+          errors.push({ 
+            studentId, 
+            studentName: `${student.firstName} ${student.lastName}`,
+            error: validation.errors.join(', '),
+            errorAr: validation.errorsAr.join('، ')
+          });
+          continue;
+        }
+        
+        try {
+          const pdfPath = await generateTranscriptPDF(transcriptData);
+          
+          const transcriptNumber = `G6TR-${targetExamYear.year}-${String(student.id).padStart(6, '0')}`;
+          
+          const transcript = await storage.createTranscript({
+            studentId: student.id,
+            examYearId: targetExamYear.id,
+            transcriptNumber,
+            grade: 6,
+            pdfUrl: pdfPath,
+            issuedDate: new Date(),
+          });
+          
+          generatedTranscripts.push({
+            ...transcript,
+            studentName: `${student.firstName} ${student.lastName}`,
+            percentage: transcriptData.percentage.toFixed(1),
+            finalGrade: transcriptData.finalGrade.arabic,
+          });
+        } catch (e: any) {
+          console.error(`Failed to generate G6 Arabic transcript for student ${studentId}:`, e.message);
+          errors.push({ studentId, studentName: `${student.firstName} ${student.lastName}`, error: e.message, errorAr: 'فشل في إنشاء كشف الدرجات' });
+        }
+      }
+      
+      res.json({ 
+        generated: generatedTranscripts.length, 
+        transcripts: generatedTranscripts,
+        errors: errors.length > 0 ? errors : undefined,
+        total: studentIds.length
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get eligible students for Grade 6 transcripts - optimized with single aggregate query
+  app.get("/api/transcripts/eligible-g6-students", isAuthenticated, async (req, res) => {
+    try {
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      
+      const targetExamYear = examYearId 
+        ? await storage.getExamYear(examYearId)
+        : await storage.getActiveExamYear();
+        
+      if (!targetExamYear) {
+        return res.status(400).json({ message: "No exam year found" });
+      }
+      
+      // Use optimized batch query to get all eligible Grade 6 students with published results
+      const eligibleStudents = await storage.getEligibleG6Students(targetExamYear.id);
+      
+      res.json(eligibleStudents);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Verification Endpoints
   app.get("/api/verify/certificate/:token", async (req, res) => {
     try {
