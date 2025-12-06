@@ -7554,6 +7554,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/certificates/eligible-students", isAuthenticated, async (req, res) => {
     try {
       const examYearIdStr = req.query.examYearId as string | undefined;
+      const regionIdStr = req.query.regionId as string | undefined;
+      const clusterIdStr = req.query.clusterId as string | undefined;
       const schoolIdStr = req.query.schoolId as string | undefined;
       const gradeStr = req.query.grade as string | undefined;
       const limitStr = req.query.limit as string | undefined;
@@ -7567,6 +7569,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       };
       
       const examYearId = parseIntSafe(examYearIdStr);
+      const regionId = parseIntSafe(regionIdStr);
+      const clusterId = parseIntSafe(clusterIdStr);
       const schoolId = parseIntSafe(schoolIdStr);
       const grade = parseIntSafe(gradeStr);
       const limit = parseIntSafe(limitStr) || 10;
@@ -7580,9 +7584,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "No exam year found" });
       }
 
+      // Get all schools for filtering by region/cluster
+      const allSchools = await storage.getSchools();
+      const schoolMap = new Map(allSchools.map(s => [s.id, s]));
+      
+      // Get school IDs that match region/cluster filters
+      let validSchoolIds: Set<number> | null = null;
+      if (regionId || clusterId) {
+        validSchoolIds = new Set(
+          allSchools
+            .filter(s => {
+              if (regionId && s.regionId !== regionId) return false;
+              if (clusterId && s.clusterId !== clusterId) return false;
+              return true;
+            })
+            .map(s => s.id)
+        );
+      }
+
       let students = await storage.getStudentsByExamYear(targetExamYear.id);
       
-      // Filter by school if provided
+      // Filter by region/cluster via school IDs (early filtering to reduce data)
+      if (validSchoolIds) {
+        students = students.filter(s => validSchoolIds!.has(s.schoolId!));
+      }
+      
+      // Filter by specific school if provided
       if (schoolId) {
         students = students.filter(s => s.schoolId === schoolId);
       }
@@ -7595,10 +7622,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Only approved students
       students = students.filter(s => s.status === 'approved');
       
-      // Check each student's eligibility
+      // Get all results and certificates in batch to avoid N+1 queries
+      const studentIds = students.map(s => s.id);
+      
+      // Batch fetch all results for these students
+      const allResults = await Promise.all(
+        studentIds.map(id => storage.getResultsByStudent(id))
+      );
+      const resultsMap = new Map(studentIds.map((id, idx) => [id, allResults[idx]]));
+      
+      // Batch fetch all certificates for the exam year (more efficient)
+      const allCertificates = await storage.getCertificatesByExamYear(targetExamYear.id);
+      const certStudentIds = new Set(allCertificates.map(c => c.studentId));
+      
+      // Check each student's eligibility (now without N+1 queries)
       const eligibleStudents = [];
       for (const student of students) {
-        const results = await storage.getResultsByStudent(student.id);
+        const results = resultsMap.get(student.id) || [];
         const publishedResults = results.filter(r => r.status === 'published');
         
         // Check if student has all required fields
@@ -7621,9 +7661,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           passed = finalGrade !== 'FAIL';
         }
         
-        // Check if already has certificate
-        const existingCert = await storage.getCertificatesByStudent(student.id);
-        const hasCertificate = existingCert.some(c => c.examYearId === targetExamYear.id);
+        // Check if already has certificate (using pre-fetched data)
+        const hasCertificate = certStudentIds.has(student.id);
         
         eligibleStudents.push({
           id: student.id,
