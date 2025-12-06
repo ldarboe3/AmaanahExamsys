@@ -19,32 +19,51 @@ const ARABIC_TO_ENGLISH_MAP: Record<string, string> = {
 
 // Common Arabic name transliterations (name-specific mappings)
 const COMMON_NAME_TRANSLITERATIONS: Record<string, string> = {
+  // Common Arabic first names - Male
   'محمد': 'Mohammed', 'أحمد': 'Ahmed', 'علي': 'Ali', 'عمر': 'Omar',
-  'عبد': 'Abd', 'الله': 'Allah', 'عبدالله': 'Abdullah', 'عبد الله': 'Abdullah',
-  'عبدالرحمن': 'Abdurrahman', 'عبد الرحمن': 'Abdurrahman',
+  'عثمان': 'Uthman', 'أبوبكر': 'Abubakar', 'عبدو': 'Abdou', 'يحي': 'Yahya',
   'إبراهيم': 'Ibrahim', 'إسماعيل': 'Ismail', 'يوسف': 'Yusuf', 'يحيى': 'Yahya',
   'موسى': 'Musa', 'عيسى': 'Isa', 'داود': 'Dawud', 'سليمان': 'Sulaiman',
   'خالد': 'Khalid', 'سعيد': 'Said', 'صالح': 'Saleh', 'حسن': 'Hassan',
-  'حسين': 'Hussein', 'مصطفى': 'Mustafa', 'محمود': 'Mahmoud', 'كريم': 'Karim',
+  'حسين': 'Hussein', 'مصطفى': 'Mustafa', 'مصطفي': 'Mustafa', 'محمود': 'Mahmoud',
+  'كريم': 'Karim', 'حمزة': 'Hamza', 'بشير': 'Bashir', 'تيدا': 'Tida',
+  'لامين': 'Lamin', 'لامن': 'Lamin', 'عبدالرحمن': 'Abdurrahman',
+  // Common Arabic first names - Female  
   'فاطمة': 'Fatima', 'عائشة': 'Aisha', 'خديجة': 'Khadija', 'مريم': 'Mariam',
-  'زينب': 'Zainab', 'أمينة': 'Amina', 'آمنة': 'Amina', 'حليمة': 'Halima',
-  'رقية': 'Ruqayya', 'سارة': 'Sarah', 'هاجر': 'Hajar', 'ليلى': 'Laila',
-  'نور': 'Noor', 'سلمى': 'Salma', 'حواء': 'Hawa', 'ميمونة': 'Maimouna',
-  'بنت': 'Bint', 'بن': 'Bin', 'أبو': 'Abu', 'أم': 'Umm',
-  // Common Gambian/West African names
+  'زينب': 'Zainab', 'أمينة': 'Amina', 'آمنة': 'Amina', 'أمنة': 'Amina',
+  'حليمة': 'Halima', 'رقية': 'Ruqayya', 'سارة': 'Sarah', 'هاجر': 'Hajar',
+  'ليلى': 'Laila', 'نور': 'Noor', 'سلمى': 'Salma', 'حواء': 'Hawa',
+  'ميمونة': 'Maimouna', 'آسية': 'Asiya', 'نفيسة': 'Nafisa', 'صفية': 'Safiya',
+  'خديحة': 'Khadija', 'حوي': 'Hawa', 'أليمة': 'Alima',
+  // Name prefixes/suffixes
+  'عبد': 'Abd', 'الله': 'Allah', 'عبدالله': 'Abdullah', 'عبد الله': 'Abdullah',
+  'عبد الرحمن': 'Abdurrahman',
+  'بنت': 'Bint', 'بن': 'Bin', 'أبو': 'Abu', 'أم': 'Umm', 'ابن': 'Ibn',
+  'العزيز': 'Al-Aziz', 'الكريم': 'Al-Karim', 'الوهاب': 'Al-Wahhab',
+  // Common Gambian/West African family names
   'جالو': 'Jallow', 'سيسي': 'Ceesay', 'سيسى': 'Ceesay', 'جاتا': 'Jatta',
   'كولي': 'Colley', 'باه': 'Bah', 'توري': 'Touray', 'ساني': 'Sanneh',
-  'سانو': 'Sanyang', 'مارون': 'Marong', 'دابو': 'Darboe', 'جوف': 'Joof',
-  'سيك': 'Secka', 'غسام': 'Gassama', 'كمارا': 'Camara', 'دانصو': 'Danso',
-  'انجاي': 'Njie', 'نجاي': 'Njie', 'باجي': 'Bajie', 'ساجو': 'Sajo',
-  'فاتي': 'Fatty', 'منتي': 'Minteh', 'كانتي': 'Kanteh', 'سيدي': 'Sidibeh',
+  'سانو': 'Sanyang', 'سانيا': 'Sanneh', 'مارون': 'Marong', 'دابو': 'Darboe',
+  'جوف': 'Joof', 'سيك': 'Secka', 'غسام': 'Gassama', 'كمارا': 'Camara',
+  'دانصو': 'Danso', 'انجاي': 'Njie', 'نجاي': 'Njie', 'باجي': 'Bajie',
+  'ساجو': 'Sajo', 'فاتي': 'Fatty', 'منتي': 'Minteh', 'كانتي': 'Kanteh',
+  'سيدي': 'Sidibeh', 'باجوا': 'Bajua', 'درامي': 'Drammeh', 'تنكارا': 'Tunkara',
+  'كونتي': 'Conteh', 'سيلا': 'Sillah', 'جام': 'Jeng', 'براجي': 'Baragi',
+  'بوجا': 'Bojang', 'جنم': 'Janneh', 'جوب': 'Jobe', 'نبانغ': 'Nbange',
+  'جيت': 'Jittey', 'دفي': 'Daffeh', 'جايتي': 'Jaity', 'تيام': 'Tiam',
+  'صو': 'Sow', 'سنكو': 'Sanko', 'جوارى': 'Jawara', 'جاجو': 'Jago',
+  'دكوري': 'Dukureh', 'مغرغا': 'Magharqa', 'ساو': 'Sow', 'كيت': 'Kate',
+  'دهب': 'Dahab', 'سواني': 'Sawaneh', 'سافج': 'Savage', 'بلدي': 'Baldeh',
+  // Al- prefixed names
   'الأمين': 'Al-Amin', 'الحسن': 'Al-Hassan', 'الحسين': 'Al-Hussain',
+  'الإمام': 'Al-Imam', 'القاسم': 'Al-Qasim',
   // School-related terms
   'معهد': 'Institute', 'مدرسة': 'School', 'دار': 'Dar', 'الإسلامية': 'Islamic',
   'الإسلامي': 'Islamic', 'العربية': 'Arabic', 'العربي': 'Arabic',
   'العليا': 'Higher', 'الثانوية': 'Secondary', 'الابتدائية': 'Primary',
   'الآثار': 'Al-Athar', 'النور': 'Al-Noor', 'الهدى': 'Al-Huda',
-  'الإنجليزي': 'English', 'يدالي': 'Yadali',
+  'الإنجليزي': 'English', 'يدالي': 'Yadali', 'مالك': 'Malik',
+  'بندن': 'Banden', 'ماسان': 'Masan',
 };
 
 // Transliterate a single Arabic word/token to English
@@ -456,13 +475,14 @@ function generateTranscriptHTML(data: TranscriptData): string {
       text-align: right;
       width: 48%;
       line-height: 2;
+      font-size: 14px;
     }
     .identity-en {
       text-align: left;
       direction: ltr;
       width: 48%;
       line-height: 2;
-      font-size: 11px;
+      font-size: 14px;
     }
     .identity-label {
       font-weight: bold;
@@ -487,7 +507,7 @@ function generateTranscriptHTML(data: TranscriptData): string {
       font-size: 11px;
     }
     .num-cell { width: 8%; }
-    .subject-cell { width: 35%; text-align: right; padding-right: 10px; }
+    .subject-cell { width: 35%; text-align: right; padding-right: 10px; font-weight: bold; }
     .score-cell { width: 12%; }
     .mark-cell { width: 15%; font-weight: bold; color: #1a5276; }
     .summary-row td {
