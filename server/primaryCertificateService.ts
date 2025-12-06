@@ -85,13 +85,11 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
   const gradeLabel = isFemale ? 'تقديرها' : 'تقديره';
 
   return `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<html lang="ar">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&display=swap');
     
     * {
       margin: 0;
@@ -100,152 +98,142 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
     }
     
     @page {
-      size: A4 landscape;
+      size: 3508px 2480px;
       margin: 0;
     }
     
-    body {
-      font-family: 'Amiri', 'Noto Naskh Arabic', 'Times New Roman', serif;
-      width: 297mm;
-      height: 210mm;
+    html, body {
+      width: 3508px;
+      height: 2480px;
       margin: 0;
-      background: white;
-      position: relative;
+      padding: 0;
+      overflow: hidden;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
     
-    .certificate-wrapper {
-      width: 100%;
-      height: 100%;
+    .certificate-container {
+      width: 3508px;
+      height: 2480px;
       position: relative;
+      background-image: url('data:image/png;base64,${templateBase64}');
+      background-size: 100% 100%;
+      background-position: center;
+      background-repeat: no-repeat;
+      font-family: 'Amiri', 'Traditional Arabic', 'Times New Roman', serif;
     }
     
-    .border-layer {
+    .overlay {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      z-index: 1;
-      pointer-events: none;
-    }
-    
-    .content-layer {
-      position: absolute;
-      top: 12mm;
-      left: 12mm;
-      right: 12mm;
-      bottom: 12mm;
-      background: white;
-      z-index: 2;
-      display: flex;
-      flex-direction: column;
-      padding: 6mm 10mm;
-      border: 1.5px solid #0C2B64;
-    }
-    
-    .watermark {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 120mm;
-      height: auto;
-      opacity: 0.15;
-      z-index: 0;
-      pointer-events: none;
     }
     
     .bismillah {
+      position: absolute;
+      top: 200px;
+      left: 0;
+      width: 100%;
       text-align: center;
-      font-size: 16pt;
+      font-size: 52px;
       font-weight: normal;
       color: #000;
-      margin-bottom: 3mm;
-      font-family: 'Amiri', serif;
-    }
-    
-    .header-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 3mm;
-      direction: ltr;
+      direction: rtl;
     }
     
     .header-english {
-      flex: 1;
+      position: absolute;
+      top: 320px;
+      left: 340px;
+      width: 700px;
+      font-size: 28px;
+      line-height: 1.25;
       text-align: left;
-      font-size: 7.5pt;
-      line-height: 1.2;
-      font-family: 'Times New Roman', serif;
       color: #000;
+      font-family: 'Times New Roman', serif;
       text-transform: uppercase;
     }
     
-    .header-english em {
-      text-transform: none;
+    .header-english .italic-text {
       font-style: italic;
+      text-transform: none;
     }
     
     .header-logo {
-      flex: 0 0 auto;
+      position: absolute;
+      top: 300px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 380px;
       text-align: center;
-      padding: 0 5mm;
     }
     
     .header-logo img {
-      width: 30mm;
-      height: auto;
-      max-height: 22mm;
+      max-width: 100%;
+      max-height: 280px;
       object-fit: contain;
     }
     
-    .header-arabic {
-      flex: 1;
-      text-align: right;
-      font-size: 9pt;
-      line-height: 1.3;
-      font-family: 'Amiri', serif;
-      direction: rtl;
-      color: #000;
+    .header-logo .logo-text {
+      font-size: 20px;
+      margin-top: 8px;
+      font-weight: bold;
+      letter-spacing: 2px;
     }
     
-    .title-section {
-      text-align: center;
-      margin: 2mm 0 4mm 0;
+    .header-arabic {
+      position: absolute;
+      top: 320px;
+      right: 340px;
+      width: 700px;
+      font-size: 34px;
+      line-height: 1.35;
+      text-align: right;
+      color: #000;
+      direction: rtl;
     }
     
     .title-english {
-      font-size: 12pt;
+      position: absolute;
+      top: 620px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 46px;
       font-weight: bold;
-      letter-spacing: 1px;
+      letter-spacing: 3px;
       color: #000;
       font-family: 'Times New Roman', serif;
-      margin-bottom: 1mm;
     }
     
     .title-arabic {
-      font-size: 14pt;
+      position: absolute;
+      top: 690px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 52px;
       font-weight: bold;
       color: #000;
-      font-family: 'Amiri', serif;
+      direction: rtl;
     }
     
-    .body-text {
+    .body-content {
+      position: absolute;
+      top: 800px;
+      left: 380px;
+      right: 380px;
       direction: rtl;
       text-align: right;
-      font-size: 10.5pt;
+      font-size: 38px;
       line-height: 1.9;
       color: #000;
-      font-family: 'Amiri', serif;
-      padding: 0 8mm;
-      flex: 1;
     }
     
-    .body-text p {
-      margin-bottom: 0;
+    .body-content p {
+      margin-bottom: 10px;
     }
     
     .highlight {
@@ -254,170 +242,95 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       font-style: italic;
     }
     
-    .registration-info {
+    .registration-line {
+      position: absolute;
+      top: 1180px;
+      left: 380px;
+      right: 380px;
       direction: rtl;
       text-align: right;
-      font-size: 10pt;
-      line-height: 1.6;
-      padding: 0 8mm;
-      margin-top: 2mm;
+      font-size: 36px;
+      line-height: 1.7;
+      color: #000;
     }
     
     .signature-section {
+      position: absolute;
+      top: 1380px;
+      left: 380px;
+      right: 380px;
       display: flex;
       justify-content: space-between;
-      margin-top: 6mm;
-      padding: 0 15mm;
       direction: rtl;
     }
     
     .signature-block {
+      width: 700px;
       text-align: center;
-      width: 28%;
     }
     
     .signature-title {
-      font-size: 8pt;
+      font-size: 32px;
       color: #000;
-      margin-bottom: 8mm;
+      margin-bottom: 100px;
     }
     
     .signature-line {
-      border-top: 1px dotted #000;
-      margin-top: 8mm;
-      font-size: 8pt;
-      letter-spacing: 2px;
+      font-size: 28px;
+      letter-spacing: 6px;
+      margin-bottom: 20px;
     }
     
     .stamp-label {
-      font-size: 7pt;
+      font-size: 28px;
       color: #333;
-      margin-top: 2mm;
+      margin-top: 10px;
+    }
+    
+    .watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 900px;
+      opacity: 0.12;
+      pointer-events: none;
     }
   </style>
 </head>
 <body>
-  <div class="certificate-wrapper">
-    <svg class="border-layer" viewBox="0 0 297 210" preserveAspectRatio="none">
-      <defs>
-        <pattern id="yellowTriangles" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
-          <rect width="10" height="10" fill="#F5B800"/>
-          <polygon points="0,0 5,5 0,10" fill="#F5B800"/>
-          <polygon points="10,0 5,5 10,10" fill="#F5B800"/>
-        </pattern>
-      </defs>
-      
-      <rect x="0" y="0" width="297" height="210" fill="#F5B800"/>
-      
-      <g id="top-border">
-        ${Array.from({length: 30}, (_, i) => {
-          const x = i * 10;
-          return `<polygon points="${x},0 ${x+5},10 ${x+10},0" fill="white"/>`;
-        }).join('')}
-      </g>
-      
-      <g id="bottom-border">
-        ${Array.from({length: 30}, (_, i) => {
-          const x = i * 10;
-          return `<polygon points="${x},210 ${x+5},200 ${x+10},210" fill="white"/>`;
-        }).join('')}
-      </g>
-      
-      <g id="left-border">
-        ${Array.from({length: 21}, (_, i) => {
-          const y = i * 10;
-          return `<polygon points="0,${y} 10,${y+5} 0,${y+10}" fill="white"/>`;
-        }).join('')}
-      </g>
-      
-      <g id="right-border">
-        ${Array.from({length: 21}, (_, i) => {
-          const y = i * 10;
-          return `<polygon points="297,${y} 287,${y+5} 297,${y+10}" fill="white"/>`;
-        }).join('')}
-      </g>
-      
-      <g id="top-diamonds">
-        ${Array.from({length: 15}, (_, i) => {
-          const x = 10 + i * 19;
-          return `
-            <polygon points="${x},0 ${x+5},5 ${x},10 ${x-5},5" fill="#0C2B64"/>
-            <polygon points="${x},1.5 ${x+3.5},5 ${x},8.5 ${x-3.5},5" fill="white"/>
-            <polygon points="${x},3 ${x+2},5 ${x},7 ${x-2},5" fill="#0C2B64"/>
-          `;
-        }).join('')}
-      </g>
-      
-      <g id="bottom-diamonds">
-        ${Array.from({length: 15}, (_, i) => {
-          const x = 10 + i * 19;
-          return `
-            <polygon points="${x},200 ${x+5},205 ${x},210 ${x-5},205" fill="#0C2B64"/>
-            <polygon points="${x},201.5 ${x+3.5},205 ${x},208.5 ${x-3.5},205" fill="white"/>
-            <polygon points="${x},203 ${x+2},205 ${x},207 ${x-2},205" fill="#0C2B64"/>
-          `;
-        }).join('')}
-      </g>
-      
-      <g id="left-diamonds">
-        ${Array.from({length: 11}, (_, i) => {
-          const y = 10 + i * 19;
-          return `
-            <polygon points="0,${y} 5,${y+5} 0,${y+10} -5,${y+5}" fill="#0C2B64"/>
-            <polygon points="1.5,${y+5} 5,${y+1.5} 8.5,${y+5} 5,${y+8.5}" fill="white" transform="translate(-3.5,0)"/>
-            <polygon points="3,${y+5} 5,${y+3} 7,${y+5} 5,${y+7}" fill="#0C2B64" transform="translate(-3.5,0)"/>
-          `;
-        }).join('')}
-      </g>
-      
-      <g id="right-diamonds">
-        ${Array.from({length: 11}, (_, i) => {
-          const y = 10 + i * 19;
-          return `
-            <polygon points="297,${y} 302,${y+5} 297,${y+10} 292,${y+5}" fill="#0C2B64"/>
-            <polygon points="295.5,${y+5} 297,${y+1.5} 298.5,${y+5} 297,${y+8.5}" fill="white"/>
-            <polygon points="296,${y+5} 297,${y+4} 298,${y+5} 297,${y+6}" fill="#0C2B64"/>
-          `;
-        }).join('')}
-      </g>
-      
-      <rect x="10" y="10" width="277" height="190" fill="white"/>
-    </svg>
-    
+  <div class="certificate-container">
     ${logoBase64 ? `<img class="watermark" src="data:image/png;base64,${logoBase64}" alt="" />` : ''}
     
-    <div class="content-layer">
+    <div class="overlay">
       <div class="bismillah">بسم الله الرحمن الرحيم</div>
       
-      <div class="header-row">
-        <div class="header-english">
-          THE REPUBLIC OF THE GAMBIA<br/>
-          DEPARTMENT OF STATE FOR<br/>
-          BASIC AND SECONDARY<br/>
-          EDUCATION<br/>
-          <em>The General Secretariat for Islamic/<br/>
-          Arabic Education<br/>
-          In The Gambia</em>
-        </div>
-        
-        <div class="header-logo">
-          ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" alt="Logo" />` : ''}
-        </div>
-        
-        <div class="header-arabic">
-          جمهوريـــــــــة غامبيـــــــا<br/>
-          وزارة التربية و التعليم الأساسي<br/>
-          الأمانة العامة للتعليم الاسلامي العربي<br/>
-          في غامبيا
-        </div>
+      <div class="header-english">
+        THE REPUBLIC OF THE GAMBIA<br/>
+        DEPARTMENT OF STATE FOR<br/>
+        BASIC AND SECONDARY<br/>
+        EDUCATION<br/>
+        <span class="italic-text">The General Secretariat for Islamic/<br/>
+        Arabic Education<br/>
+        In The Gambia</span>
       </div>
       
-      <div class="title-section">
-        <div class="title-english">GAMBIA MADRASSAH PRIMARY CERTIFICATE</div>
-        <div class="title-arabic">شهادة إتمام دراسة المرحلة الابتدائية</div>
+      <div class="header-logo">
+        ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" alt="Logo" />` : ''}
+        <div class="logo-text">EDUCATION FOR DEVELOPMENT</div>
       </div>
       
-      <div class="body-text">
+      <div class="header-arabic">
+        جمهوريـــــــــة غامبيـــــــا<br/>
+        وزارة التربية و التعليم الأساسي<br/>
+        الأمانة العامة للتعليم الاسلامي العربي<br/>
+        في غامبيا
+      </div>
+      
+      <div class="title-english">GAMBIA MADRASSAH PRIMARY CERTIFICATE</div>
+      <div class="title-arabic">شهادة إتمام دراسة المرحلة الابتدائية</div>
+      
+      <div class="body-content">
         <p>
           تشهد الأمانة العامّة بأنّ ${studentLabel}/ <span class="highlight">{${fullName}}</span> ${bornLabel} في <span class="highlight">{${student.placeOfBirth || ''}}</span> بتاريخ :
           <span class="highlight">{${dobFormatted}}</span> م قد ${completedLabel} دراسة المرحلة الابتدائية في <span class="highlight">{${schoolWithAddress}}</span> بعد أن ${passedLabel}
@@ -428,11 +341,9 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         </p>
       </div>
       
-      <div class="registration-info">
-        <p>
-          سُجّلت هذه الشّهادة تحت رقم ( <span class="highlight">{${certificateNumber}}</span> ) بتاريخ : <span class="highlight">{${issueDateHijri}}</span> هـ الموافق
-          <span class="highlight">{${issueDateGreg}}</span> م
-        </p>
+      <div class="registration-line">
+        سُجّلت هذه الشّهادة تحت رقم ( <span class="highlight">{${certificateNumber}}</span> ) بتاريخ : <span class="highlight">{${issueDateHijri}}</span> هـ الموافق
+        <span class="highlight">{${issueDateGreg}}</span> م
       </div>
       
       <div class="signature-section">
@@ -444,7 +355,7 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         
         <div class="signature-block">
           <div class="signature-title">الختم الرسمي</div>
-          <div style="height: 12mm;"></div>
+          <div style="height: 100px;"></div>
         </div>
         
         <div class="signature-block">
@@ -470,7 +381,7 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
   }
   
   let templateBase64 = '';
-  const templatePath = path.join(process.cwd(), 'public', 'templates', 'primary_certificate_template.png');
+  const templatePath = path.join(process.cwd(), 'attached_assets', 'approved_designs_1765063884505.png');
   if (fs.existsSync(templatePath)) {
     const templateBuffer = fs.readFileSync(templatePath);
     templateBase64 = templateBuffer.toString('base64');
@@ -492,6 +403,12 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
   try {
     const page = await browser.newPage();
     
+    await page.setViewport({
+      width: 3508,
+      height: 2480,
+      deviceScaleFactor: 1
+    });
+    
     await page.setContent(html, { 
       waitUntil: ['networkidle0', 'domcontentloaded'],
       timeout: 60000
@@ -499,18 +416,18 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
     
     await page.evaluateHandle('document.fonts.ready');
     
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     const filename = `primary_cert_${student.id}_${certificateNumber.replace(/\//g, '-')}_${Date.now()}.pdf`;
     const pdfPath = path.join(outputDir, filename);
     
     await page.pdf({
       path: pdfPath,
-      format: 'A4',
-      landscape: true,
+      width: '3508px',
+      height: '2480px',
       printBackground: true,
-      preferCSSPageSize: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      scale: 1
     });
     
     return pdfPath;
