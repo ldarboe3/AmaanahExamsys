@@ -546,7 +546,7 @@ function generateTranscriptHTML(data: TranscriptData): string {
       </tr>
     </table>
 
-    <div class="main-title">كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year}-${examYear.year - 1} م</div>
+    <div class="main-title">كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year - 1}-${examYear.year} م</div>
     
     ${transcriptNumber ? `<div style="text-align: center; margin-bottom: 15px; font-size: 12px; color: #555;">
       <span style="font-weight: bold;">Transcript No. / رقم الكشف:</span> ${transcriptNumber}
