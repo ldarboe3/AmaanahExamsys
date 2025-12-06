@@ -139,10 +139,10 @@ export function generateQRToken(): string {
 export async function generateQRCodeDataUrl(verificationUrl: string): Promise<string> {
   try {
     return await QRCode.toDataURL(verificationUrl, {
-      errorCorrectionLevel: 'M',
+      errorCorrectionLevel: 'H',
       type: 'image/png',
       margin: 2,
-      width: 120,
+      width: 200,
       color: { dark: '#000000', light: '#FFFFFF' }
     });
   } catch (error) {
@@ -598,15 +598,15 @@ function generateTranscriptHTML(data: TranscriptData): string {
       text-align: center;
     }
     .qr-code-container img {
-      width: 55px;
-      height: 55px;
+      width: 85px;
+      height: 85px;
       border: 1px solid #ddd;
-      padding: 2px;
+      padding: 3px;
     }
     .qr-code-container .transcript-num {
-      font-size: 7px;
-      color: #888;
-      margin-top: 2px;
+      font-size: 8px;
+      color: #666;
+      margin-top: 3px;
     }
   </style>
 </head>
