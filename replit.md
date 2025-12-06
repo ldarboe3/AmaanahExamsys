@@ -105,6 +105,14 @@ The system is built on a robust architecture featuring a React-based frontend, a
   - `/api/public/transcripts/:indexNumber/download` - Download transcript PDF
 - **Fixed Transcript Table Layout**: Corrected RTL column ordering to match official PDF format
 - **Grade 6 Arabic Transcripts**: Single unified view with proper table formatting and bilingual header
+- **School List Export**: Backend API endpoint `/api/export/schools/csv` fetches all matching schools (not paginated), supports filters (search, status, schoolType/schoolTypes, region, cluster), and uses UTF-8 BOM for proper Arabic text rendering in Excel
+- **View School Credentials**: Secure `/api/schools/:id/credentials` endpoint with database role verification (prevents privilege escalation), displays school admin username and password (shows default only if not changed), with copy and email functionality
+- **Student List Countdown Timer**: Intelligent visibility based on role and payment status:
+  - Hidden for super_admin and examination_admin users
+  - Hidden when payment is approved (shows green confirmation message)
+  - Hidden when payment is pending/processing (shows yellow "Payment Under Review" message)
+  - Shown when payment is rejected/failed (shows red rejection alert with countdown timer)
+  - Priority logic ensures rejected status always takes precedence over pending status
 
 ## External Dependencies
 - **Database**: PostgreSQL (hosted on Neon)
