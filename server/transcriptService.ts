@@ -198,16 +198,16 @@ function generateTranscriptHTML(data: TranscriptData): string {
   const nationalityAr = student.nationality || '';
   const nationalityEn = student.nationalityEn || translateNationality(nationalityAr);
   
-  // Generate subject rows HTML
+  // Generate subject rows HTML (RTL order: م, المادة, الكبرى, الصغرى, المكتسبة)
   const subjectRowsHTML = subjectMarks.map((subject, index) => {
     const markDisplay = subject.mark !== null && subject.mark !== undefined ? subject.mark.toString() : '';
     return `
       <tr>
-        <td class="mark-cell">${markDisplay}</td>
-        <td class="score-cell">${subject.minScore}</td>
-        <td class="score-cell">${subject.maxScore}</td>
-        <td class="subject-cell">${subject.arabicName}</td>
         <td class="num-cell">${index + 1}</td>
+        <td class="subject-cell">${subject.arabicName}</td>
+        <td class="score-cell">${subject.maxScore}</td>
+        <td class="score-cell">${subject.minScore}</td>
+        <td class="mark-cell">${markDisplay}</td>
       </tr>
     `;
   }).join('');
@@ -395,26 +395,26 @@ function generateTranscriptHTML(data: TranscriptData): string {
     <table class="marks-table">
       <thead>
         <tr>
-          <th>الدرجة المكتسبة<br>رقماً</th>
-          <th>الدرجات<br>الصغرى</th>
-          <th>الدرجات<br>الكبرى</th>
-          <th>المادة</th>
           <th>م</th>
+          <th>المادة</th>
+          <th>الدرجات<br>الكبرى</th>
+          <th>الدرجات<br>الصغرى</th>
+          <th>الدرجة المكتسبة<br>رقماً</th>
         </tr>
       </thead>
       <tbody>
         ${subjectRowsHTML}
         <tr class="summary-row total-row">
-          <td colspan="2" style="text-align:center; font-size:14px;">${totalMarks}</td>
-          <td colspan="3" style="text-align:right;">مجموع الدرجات</td>
+          <td colspan="3" style="text-align:center; font-size:14px;">مجموع الدرجات</td>
+          <td colspan="2" style="text-align:center;">${totalMarks}</td>
         </tr>
         <tr class="summary-row">
+          <td colspan="3" style="text-align:center;">النسبة</td>
           <td colspan="2" style="text-align:center;">${percentage.toFixed(1)}%</td>
-          <td colspan="3" style="text-align:right;">النسبة</td>
         </tr>
         <tr class="summary-row grade-row">
+          <td colspan="3" style="text-align:center;">التقدير</td>
           <td colspan="2" style="text-align:center; font-size:16px;">${finalGrade.arabic}</td>
-          <td colspan="3" style="text-align:right;">التقدير</td>
         </tr>
       </tbody>
     </table>
