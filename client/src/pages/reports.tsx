@@ -187,10 +187,10 @@ export default function Reports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-schools">
-              {(summaryReport as any)?.summary?.totalSchools || 0}
+              {((summaryReport as any)?.summary?.totalSchools || 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              Approved: {(summaryReport as any)?.schoolsByStatus?.approved || 0}
+              Approved: {((summaryReport as any)?.schoolsByStatus?.approved || 0).toLocaleString()}
             </p>
           </CardContent>
         </Card>
@@ -201,7 +201,7 @@ export default function Reports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-students">
-              {(summaryReport as any)?.summary?.totalStudents || 0}
+              {((summaryReport as any)?.summary?.totalStudents || 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">Enrolled students</p>
           </CardContent>
@@ -213,7 +213,7 @@ export default function Reports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-examiners">
-              {(summaryReport as any)?.summary?.totalExaminers || 0}
+              {((summaryReport as any)?.summary?.totalExaminers || 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">Registered examiners</p>
           </CardContent>
@@ -225,7 +225,7 @@ export default function Reports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-revenue">
-              ${parseFloat((summaryReport as any)?.summary?.totalRevenue || '0').toLocaleString()}
+              GMD {parseFloat((summaryReport as any)?.summary?.totalRevenue || '0').toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">Collected payments</p>
           </CardContent>

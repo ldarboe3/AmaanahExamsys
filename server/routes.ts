@@ -8982,21 +8982,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // CSV Template endpoints for downloads
   app.get("/api/templates/students", (req, res) => {
+    const BOM = '\uFEFF';
     const csvContent = `firstName,lastName,middleName,dateOfBirth,placeOfBirth,gender,grade
 John,Doe,Michael,2008-05-15,City Name,male,9
 Jane,Smith,,2009-03-22,Town Name,female,10`;
-    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=students_template.csv');
-    res.send(csvContent);
+    res.send(BOM + csvContent);
   });
 
   app.get("/api/templates/results", (req, res) => {
+    const BOM = '\uFEFF';
     const csvContent = `indexNumber,subjectCode,firstTermScore,examScore
 100001,ARABIC,25,50
 100001,ISLAMIC,30,55`;
-    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename=results_template.csv');
-    res.send(csvContent);
+    res.send(BOM + csvContent);
   });
 
   // ============ Audit Logs API ============
