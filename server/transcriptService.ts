@@ -178,6 +178,18 @@ if (!fs.existsSync(outputDir)) {
 function generateTranscriptHTML(data: TranscriptData): string {
   const { student, school, examYear, subjectMarks, totalMarks, percentage, finalGrade } = data;
   
+  // Load and embed logo as base64 data URL
+  let logoDataUrl = '';
+  try {
+    const logoPath = path.join(process.cwd(), 'generated_transcripts', 'logo.png');
+    if (fs.existsSync(logoPath)) {
+      const logoBuffer = fs.readFileSync(logoPath);
+      logoDataUrl = 'data:image/png;base64,' + logoBuffer.toString('base64');
+    }
+  } catch (e) {
+    // Logo not available, continue without it
+  }
+  
   // Build Arabic full name
   const fullNameAr = [student.firstName, student.middleName, student.lastName]
     .filter(Boolean)
@@ -387,7 +399,7 @@ function generateTranscriptHTML(data: TranscriptData): string {
           <div style="margin-top: 5px;">قسم الامتحانات</div>
         </td>
         <td class="header-center">
-          <img src="file:///home/runner/workspace/generated_transcripts/logo.png" alt="Logo" class="header-logo">
+          <img src="${logoDataUrl}" alt="Logo" class="header-logo">
         </td>
         <td class="header-right">
           <strong>The General Secretariat for</strong>
