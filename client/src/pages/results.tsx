@@ -203,6 +203,33 @@ export default function Results() {
     return { total: Math.round(total), percentage: Math.round(percentage * 100) / 100 };
   };
 
+  // Publish results mutation
+  const publishResultsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/results/publish", {
+        examYearId: selectedExamYear,
+        grade: selectedGrade,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: isRTL ? "تم نشر النتائج" : "Results Published",
+        description: isRTL 
+          ? `تم نشر ${data.published} نتيجة بنجاح`
+          : `Successfully published ${data.published} result(s)`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/results"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: isRTL ? "فشل نشر النتائج" : "Failed to publish results",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Save marks mutation
   const saveMutation = useMutation({
     mutationFn: async (data: { studentId: number; subjectId: number; mark: number }) => {
@@ -651,13 +678,25 @@ export default function Results() {
         {/* Results Table */}
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center flex-wrap gap-4">
               <div>
                 <CardTitle>{isRTL ? "جدول الدرجات" : "Marks Table"}</CardTitle>
                 <CardDescription>
                   {resultRows.length} {isRTL ? "طالب" : "students"} - {isRTL ? "صفحة" : "Page"} {currentPage} {isRTL ? "من" : "of"} {totalPages}
                 </CardDescription>
               </div>
+              <Button
+                onClick={() => publishResultsMutation.mutate()}
+                disabled={publishResultsMutation.isPending || resultRows.length === 0}
+                data-testid="button-publish-results"
+              >
+                {publishResultsMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 me-2" />
+                )}
+                {isRTL ? "نشر النتائج" : "Publish Results"}
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -726,7 +765,7 @@ export default function Results() {
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="flex justify-center gap-2">
+          <div className="flex justify-center items-center gap-2">
             <Button 
               variant="outline" 
               size="sm"
@@ -736,18 +775,35 @@ export default function Results() {
               {isRTL ? "السابق" : "Previous"}
             </Button>
             <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <Button
-                  key={page}
-                  variant={page === currentPage ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCurrentPage(page)}
-                  className="w-8 h-8 p-0"
-                >
-                  {page}
-                </Button>
-              ))}
+              {currentPage > 2 && (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} className="w-8 h-8 p-0">1</Button>
+                  {currentPage > 3 && <span className="px-1">...</span>}
+                </>
+              )}
+              {[currentPage - 1, currentPage, currentPage + 1]
+                .filter(p => p >= 1 && p <= totalPages)
+                .map(page => (
+                  <Button
+                    key={page}
+                    variant={page === currentPage ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className="w-8 h-8 p-0"
+                  >
+                    {page}
+                  </Button>
+                ))}
+              {currentPage < totalPages - 1 && (
+                <>
+                  {currentPage < totalPages - 2 && <span className="px-1">...</span>}
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} className="w-8 h-8 p-0">{totalPages}</Button>
+                </>
+              )}
             </div>
+            <span className="text-sm text-muted-foreground">
+              {isRTL ? `الصفحة ${currentPage} من ${totalPages}` : `Page ${currentPage} of ${totalPages}`}
+            </span>
             <Button 
               variant="outline" 
               size="sm"
