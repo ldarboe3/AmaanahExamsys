@@ -703,24 +703,30 @@ export default function Students() {
     );
   }, [schoolInvoices, selectedSchoolId, currentExamYearId]);
 
-  // Check if payment was submitted (pending or paid)
-  const schoolPaymentSubmitted = useMemo(() => {
-    if (!schoolInvoices || !selectedSchoolId || !currentExamYearId) return false;
-    return schoolInvoices.some(
-      (inv: any) => inv.schoolId === selectedSchoolId && 
-                    inv.examYearId === currentExamYearId && 
-                    (inv.status === 'paid' || inv.status === 'pending')
-    );
+  // Get the latest invoice for the selected school and exam year
+  const latestInvoice = useMemo(() => {
+    if (!schoolInvoices || !selectedSchoolId || !currentExamYearId) return null;
+    const matchingInvoices = schoolInvoices
+      .filter((inv: any) => inv.schoolId === selectedSchoolId && inv.examYearId === currentExamYearId)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return matchingInvoices[0] || null;
   }, [schoolInvoices, selectedSchoolId, currentExamYearId]);
 
-  // Check if payment was rejected
+  // Check if payment was rejected or failed (check this first as it takes priority)
   const schoolPaymentRejected = useMemo(() => {
-    if (!schoolInvoices || !selectedSchoolId || !currentExamYearId) return false;
-    const latestInvoice = schoolInvoices
-      .filter((inv: any) => inv.schoolId === selectedSchoolId && inv.examYearId === currentExamYearId)
-      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-    return latestInvoice?.status === 'rejected';
-  }, [schoolInvoices, selectedSchoolId, currentExamYearId]);
+    if (!latestInvoice) return false;
+    return latestInvoice.status === 'rejected' || latestInvoice.status === 'failed';
+  }, [latestInvoice]);
+
+  // Check if payment is submitted and pending processing (pending or processing status)
+  // This explicitly excludes rejected/failed status to ensure rejected takes priority
+  const schoolPaymentPendingProcessing = useMemo(() => {
+    if (!latestInvoice) return false;
+    // Only return true if status is exactly pending or processing, NOT rejected/failed
+    const status = latestInvoice.status;
+    return (status === 'pending' || status === 'processing') && 
+           status !== 'rejected' && status !== 'failed';
+  }, [latestInvoice]);
 
   // Can only approve students if payment is approved
   const canApproveWithPayment = canApproveStudents && schoolPaymentApproved;
@@ -733,9 +739,17 @@ export default function Students() {
     // For school admins, hide countdown if payment is approved
     if (isSchoolAdmin && schoolPaymentApproved) return false;
     
-    // For school admins, show countdown if no payment or payment rejected
+    // For school admins, SHOW countdown if payment was rejected/failed (need to resubmit)
+    // This takes priority over pending/processing check to handle stale data scenarios
+    if (isSchoolAdmin && schoolPaymentRejected) return true;
+    
+    // For school admins, hide countdown if payment is submitted and pending processing
+    // This check comes after rejected check to ensure rejected takes priority
+    if (isSchoolAdmin && schoolPaymentPendingProcessing) return false;
+    
+    // For school admins with no invoice or other cases, show countdown
     return true;
-  }, [canApproveStudents, isSchoolAdmin, schoolPaymentApproved]);
+  }, [canApproveStudents, isSchoolAdmin, schoolPaymentApproved, schoolPaymentRejected, schoolPaymentPendingProcessing]);
 
   // Filter clusters based on selected region
   const clustersForFilter = clusters?.filter(
@@ -1567,6 +1581,38 @@ export default function Students() {
           </Card>
         )}
 
+        {/* Payment Rejected Alert - shown alongside countdown when payment was rejected */}
+        {isSchoolAdmin && schoolPaymentRejected && !isPastExamYear && (
+          <Card className="border-2 border-destructive/50 bg-destructive/5">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-destructive text-white flex items-center justify-center shrink-0">
+                  <XCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-destructive">
+                    {isRTL ? "تم رفض الدفع" : "Payment Rejected"}
+                  </h3>
+                  <p className="text-sm text-destructive/80 mt-1">
+                    {isRTL 
+                      ? "تم رفض دفعتكم. يرجى مراجعة تفاصيل الدفع وإعادة التقديم قبل انتهاء فترة التسجيل."
+                      : "Your payment has been rejected. Please review your payment details and resubmit before the registration deadline."}
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-3 border-destructive text-destructive hover:bg-destructive/10"
+                    onClick={() => window.location.href = '/dashboard/payments'}
+                    data-testid="button-go-to-payments-rejected"
+                  >
+                    {isRTL ? "انتقل إلى المدفوعات" : "Go to Payments"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Registration Deadline Countdown, Past Exam Message, or Payment Confirmation */}
         {isPastExamYear ? (
           <Card className="border-2 border-destructive/50 bg-destructive/5">
@@ -1597,6 +1643,22 @@ export default function Students() {
                 {isRTL 
                   ? "تم الموافقة على دفعتكم بنجاح. طلابكم المسجلون معتمدون الآن للامتحان."
                   : "Your payment has been approved successfully. Your registered students are now approved for the examination."}
+              </p>
+            </CardContent>
+          </Card>
+        ) : isSchoolAdmin && schoolPaymentPendingProcessing && !schoolPaymentRejected ? (
+          <Card className="border-2 border-chart-2/50 bg-chart-2/5">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <Clock className="w-6 h-6 text-chart-2" />
+                <h2 className="text-lg font-bold text-chart-2">
+                  {isRTL ? "الدفع قيد المراجعة" : "Payment Under Review"}
+                </h2>
+              </div>
+              <p className="text-center text-sm text-chart-2/80">
+                {isRTL 
+                  ? "تم تقديم دفعتكم وهي قيد المراجعة. ستتلقون إشعاراً فور الموافقة على الدفع."
+                  : "Your payment has been submitted and is under review. You will be notified once the payment is approved."}
               </p>
             </CardContent>
           </Card>
