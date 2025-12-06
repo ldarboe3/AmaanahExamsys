@@ -529,5 +529,46 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
   }
 }
 
+// Validate certificate requirements
+export function validateCertificateRequirements(student: StudentData): { 
+  isValid: boolean; 
+  errors: string[]; 
+  errorsAr: string[];
+} {
+  const errors: string[] = [];
+  const errorsAr: string[] = [];
+
+  if (!student.firstName || !student.lastName) {
+    errors.push('Student name is required');
+    errorsAr.push('اسم الطالب مطلوب');
+  }
+  if (!student.gender || !['male', 'female'].includes(student.gender)) {
+    errors.push('Valid gender is required');
+    errorsAr.push('الجنس صحيح مطلوب');
+  }
+  if (!student.grade) {
+    errors.push('Grade is required');
+    errorsAr.push('الصف مطلوب');
+  }
+  if (!student.dateOfBirth) {
+    errors.push('Date of birth is required');
+    errorsAr.push('تاريخ الميلاد مطلوب');
+  }
+  if (!student.placeOfBirth) {
+    errors.push('Place of birth is required');
+    errorsAr.push('مكان الميلاد مطلوب');
+  }
+  if (!student.indexNumber) {
+    errors.push('Index number is required');
+    errorsAr.push('رقم الفهرس مطلوب');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    errorsAr
+  };
+}
+
 // Export for compatibility
 export { generateCertificateHTML };
