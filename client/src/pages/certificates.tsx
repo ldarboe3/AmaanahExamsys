@@ -107,6 +107,8 @@ export default function Certificates() {
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingStudent, setEditingStudent] = useState<EligibleStudent | null>(null);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [editForm, setEditForm] = useState({
     gender: '' as string,
     dateOfBirth: '' as string,
@@ -151,6 +153,9 @@ export default function Certificates() {
 
   const { data: eligibleStudentsData, isLoading: eligibleLoading } = useQuery<{
     students: EligibleStudent[];
+    total: number;
+    limit: number;
+    offset: number;
     summary: {
       total: number;
       eligible: number;
@@ -160,12 +165,14 @@ export default function Certificates() {
       failed: number;
     };
   }>({
-    queryKey: ["/api/certificates/eligible-students", selectedExamYear, selectedSchool, selectedGrade],
+    queryKey: ["/api/certificates/eligible-students", selectedExamYear, selectedSchool, selectedGrade, pageSize, currentPage],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedExamYear) params.append("examYearId", selectedExamYear);
       if (selectedSchool && selectedSchool !== "all") params.append("schoolId", selectedSchool);
       if (selectedGrade && selectedGrade !== "all") params.append("grade", selectedGrade);
+      params.append("limit", pageSize.toString());
+      params.append("offset", ((currentPage - 1) * pageSize).toString());
       const response = await fetch(`/api/certificates/eligible-students?${params}`);
       if (!response.ok) throw new Error("Failed to fetch eligible students");
       return response.json();
@@ -485,21 +492,44 @@ export default function Certificates() {
           ) : eligibleLoading ? (
             <CertificatesTableSkeleton />
           ) : eligibleStudentsData?.students && eligibleStudentsData.students.length > 0 ? (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{isRTL ? "الطالب" : "Student"}</TableHead>
-                    <TableHead>{isRTL ? "رقم الفهرس" : "Index"}</TableHead>
-                    <TableHead>{isRTL ? "الصف" : "Grade"}</TableHead>
-                    <TableHead>{isRTL ? "الجنس" : "Gender"}</TableHead>
-                    <TableHead>{isRTL ? "النتيجة" : "Result"}</TableHead>
-                    <TableHead>{isRTL ? "الحالة" : "Status"}</TableHead>
-                    <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {eligibleStudentsData.students.map((student) => (
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="text-sm text-muted-foreground">
+                    {isRTL 
+                      ? `عرض ${eligibleStudentsData.students.length} من ${eligibleStudentsData.total} (الصفحة ${currentPage})`
+                      : `Showing ${eligibleStudentsData.students.length} of ${eligibleStudentsData.total} (Page ${currentPage})`}
+                  </div>
+                  <Select value={pageSize.toString()} onValueChange={(val) => {
+                    setPageSize(parseInt(val));
+                    setCurrentPage(1);
+                  }}>
+                    <SelectTrigger className="w-32" data-testid="select-page-size">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">{isRTL ? "10 الصفات" : "10 Items"}</SelectItem>
+                      <SelectItem value="50">{isRTL ? "50 الصفات" : "50 Items"}</SelectItem>
+                      <SelectItem value="100">{isRTL ? "100 الصفات" : "100 Items"}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{isRTL ? "الطالب" : "Student"}</TableHead>
+                      <TableHead>{isRTL ? "رقم الفهرس" : "Index"}</TableHead>
+                      <TableHead>{isRTL ? "الصف" : "Grade"}</TableHead>
+                      <TableHead>{isRTL ? "الجنس" : "Gender"}</TableHead>
+                      <TableHead>{isRTL ? "النتيجة" : "Result"}</TableHead>
+                      <TableHead>{isRTL ? "الحالة" : "Status"}</TableHead>
+                      <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {eligibleStudentsData.students.map((student) => (
                     <TableRow key={student.id} data-testid={`row-student-${student.id}`}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -607,9 +637,33 @@ export default function Certificates() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex items-center justify-between gap-2 flex-wrap mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  data-testid="button-prev-page"
+                >
+                  {isRTL ? "السابق" : "Previous"}
+                </Button>
+                <div className="text-sm text-muted-foreground">
+                  {isRTL ? `الصفحة ${currentPage}` : `Page ${currentPage}`}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  disabled={!eligibleStudentsData?.students || eligibleStudentsData.students.length < pageSize}
+                  data-testid="button-next-page"
+                >
+                  {isRTL ? "التالي" : "Next"}
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="text-center py-12">
