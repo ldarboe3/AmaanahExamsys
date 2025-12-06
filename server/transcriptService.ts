@@ -233,43 +233,58 @@ function generateTranscriptHTML(data: TranscriptData): string {
       margin: 0 auto;
     }
     .header {
-      display: table;
-      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-bottom: 20px;
-      border-bottom: 2px solid #333;
       padding-bottom: 15px;
+      border-bottom: 2px solid #333;
     }
-    .header-row {
-      display: table-row;
-    }
-    .header-cell {
-      display: table-cell;
-      padding: 0 10px;
-      vertical-align: top;
-    }
-    .header-ar {
-      text-align: right;
-      width: 50%;
-      direction: rtl;
-    }
-    .header-en {
+    .header-left {
       text-align: left;
       direction: ltr;
-      width: 50%;
+      width: 25%;
       font-size: 11px;
+      line-height: 1.4;
+    }
+    .header-center {
+      text-align: center;
+      width: 25%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .header-center img {
+      max-width: 80px;
+      height: auto;
+    }
+    .header-right {
+      text-align: right;
+      direction: rtl;
+      width: 25%;
+      line-height: 1.4;
     }
     .org-name {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: bold;
-      margin-bottom: 5px;
+      margin-bottom: 3px;
     }
     .org-subtitle {
-      font-size: 12px;
-      margin-bottom: 3px;
+      font-size: 11px;
+      margin-bottom: 2px;
     }
     .dept-name {
       font-size: 11px;
       color: #333;
+    }
+    .header-title {
+      text-align: center;
+      font-size: 16px;
+      font-weight: bold;
+      color: #000;
+      margin: 15px 0;
+      direction: rtl;
+      line-height: 1.6;
     }
     .title {
       text-align: center;
@@ -362,22 +377,25 @@ function generateTranscriptHTML(data: TranscriptData): string {
 <body>
   <div class="container">
     <div class="header">
-      <div class="header-row">
-        <div class="header-cell header-ar">
-          <div class="org-name">الأمانة العامة للتعليم الإسلامي العربي</div>
-          <div class="org-subtitle">في غامبيا</div>
-          <div class="dept-name">قسم الامتحانات</div>
+      <div class="header-left">
+        <div class="org-name">The General Secretariat for</div>
+        <div class="org-subtitle">Islamic/Arabic Education in</div>
+        <div class="org-subtitle">The Gambia</div>
+        <div class="dept-name">Examination affairs unit</div>
+      </div>
+      <div class="header-center">
+        <div style="width: 80px; height: 80px; background: #f0f0f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #666; text-align: center;">
+          [LOGO]
         </div>
-        <div class="header-cell header-en">
-          <div class="org-name">The General Secretariat for</div>
-          <div class="org-subtitle">Islamic/Arabic Education in</div>
-          <div class="org-subtitle">The Gambia</div>
-          <div class="dept-name">Examination Affairs Unit</div>
-        </div>
+      </div>
+      <div class="header-right">
+        <div class="org-name">الأمانة العامة للتعليم الإسلامي العربي</div>
+        <div class="org-subtitle">في غامبيا</div>
+        <div class="dept-name">قسم الامتحانات</div>
       </div>
     </div>
 
-    <div class="title">كشف درجات الصف السادس - ${examYear.year}</div>
+    <div class="header-title">كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year}-${examYear.year - 1} م</div>
 
     <div class="identity-section">
       <div class="identity-ar">
