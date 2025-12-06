@@ -70,6 +70,14 @@ The system is built on a robust architecture featuring a React-based frontend, a
     - Error downloads: unmatched schools, unmatched students, no marks rows, invalid marks
     - Error files include raw + normalized values for diagnosis
     - UTF-8-SIG encoding for Excel compatibility
+  - **Unified Certificate/Transcript Workflow**: Both certificates and transcripts follow identical patterns:
+    - Eligibility-based student selection from published results
+    - Filter system (exam year, region, cluster, school) with summary statistics
+    - Checkbox selection for individual or bulk generation
+    - View/Preview button (Eye icon) showing document details before download
+    - Print All button for bulk printing selected documents
+    - Generate All button for bulk certificate/transcript generation
+  - **Grade 6 Arabic Transcripts**: Single unified view (no tabs) for Arabic transcript generation
   - Public result checker, PDF certificate and transcript generation with gender-specific templates and QR verification
 - **Administrative Tools**: Comprehensive audit logging, advanced export functionalities (CSV), and role-based access control.
 - **Exam Management**: Examiner, subject, timetable, and exam center management.
