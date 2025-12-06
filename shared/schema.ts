@@ -409,7 +409,7 @@ export const certificates = pgTable("certificates", {
   templateType: varchar("template_type", { length: 20 }),
   finalResult: varchar("final_result", { length: 50 }),
   finalGradeWord: varchar("final_grade_word", { length: 50 }),
-  totalScore: decimal("total_score", { precision: 5, scale: 2 }),
+  totalScore: decimal("total_score", { precision: 7, scale: 2 }),
   rank: integer("rank"),
   qrToken: varchar("qr_token", { length: 100 }).unique(),
   issuedDate: timestamp("issued_date"),
