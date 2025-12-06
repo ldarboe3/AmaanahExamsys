@@ -58,12 +58,10 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
   
   const isFemale = student.gender === 'female';
   
-  // Get the student's full name
   const fullName = student.arabicName || [student.firstName, student.middleName, student.lastName]
     .filter(Boolean)
     .join(' ');
 
-  // Format dates
   const dobFormatted = student.dateOfBirth 
     ? formatArabicDate(new Date(student.dateOfBirth))
     : '';
@@ -72,18 +70,14 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
   const issueDateGreg = formatArabicDate(issueDate);
   const issueDateHijri = formatHijriDate(issueDate);
 
-  // Academic year format
   const academicYear = `${examYear.year - 1}/${examYear.year}`;
   
-  // Get grade word in Arabic
   const gradeWordAr = getGradeWord(finalGrade);
   
-  // School info
   const schoolNameAr = school.arabicName || school.name;
   const schoolAddressAr = school.arabicAddress || school.address || '';
   const schoolWithAddress = schoolAddressAr ? `${schoolNameAr} - ${schoolAddressAr}` : schoolNameAr;
 
-  // Gender-specific labels
   const studentLabel = isFemale ? 'الطالبة' : 'الطالب';
   const bornLabel = isFemale ? 'المولودة' : 'المولود';
   const completedLabel = isFemale ? 'أتمّت' : 'أتمّ';
@@ -117,7 +111,6 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       margin: 0;
       background: white;
       position: relative;
-      overflow: hidden;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -128,264 +121,274 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       position: relative;
     }
     
-    /* Decorative border - yellow diamonds with blue accents */
-    .outer-border {
+    .border-layer {
       position: absolute;
       top: 0;
       left: 0;
-      right: 0;
-      bottom: 0;
-      background: 
-        repeating-linear-gradient(
-          0deg,
-          #c9a227 0px, #c9a227 8px,
-          transparent 8px, transparent 16px
-        ),
-        repeating-linear-gradient(
-          90deg,
-          #c9a227 0px, #c9a227 8px,
-          transparent 8px, transparent 16px
-        );
-      border: 8mm solid transparent;
-      border-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><rect fill="%23c9a227" x="0" y="0" width="40" height="40"/><polygon fill="%231a4d7c" points="20,5 35,20 20,35 5,20"/><polygon fill="%23fff" points="20,10 30,20 20,30 10,20"/><polygon fill="%231a4d7c" points="20,13 27,20 20,27 13,20"/></svg>') 40 round;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
     }
     
-    /* Diamond border pattern */
-    .diamond-border {
+    .content-layer {
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      border: 10mm solid;
-      border-image: repeating-linear-gradient(
-        45deg,
-        #c9a227 0,
-        #c9a227 10px,
-        #1a4d7c 10px,
-        #1a4d7c 12px,
-        #fff 12px,
-        #fff 18px,
-        #1a4d7c 18px,
-        #1a4d7c 20px
-      ) 20;
-    }
-    
-    /* Main certificate area */
-    .certificate-content {
-      position: absolute;
-      top: 10mm;
-      left: 10mm;
-      right: 10mm;
-      bottom: 10mm;
+      top: 12mm;
+      left: 12mm;
+      right: 12mm;
+      bottom: 12mm;
       background: white;
-      border: 2px solid #1a4d7c;
+      z-index: 2;
       display: flex;
       flex-direction: column;
-      padding: 8mm;
+      padding: 6mm 10mm;
+      border: 1.5px solid #0C2B64;
     }
     
-    /* Bismillah at top */
+    .watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 120mm;
+      height: auto;
+      opacity: 0.15;
+      z-index: 0;
+      pointer-events: none;
+    }
+    
     .bismillah {
       text-align: center;
-      font-size: 18pt;
-      font-weight: bold;
+      font-size: 16pt;
+      font-weight: normal;
       color: #000;
-      margin-bottom: 4mm;
+      margin-bottom: 3mm;
       font-family: 'Amiri', serif;
     }
     
-    /* Header with logos and text */
     .header-row {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 4mm;
+      margin-bottom: 3mm;
       direction: ltr;
     }
     
     .header-english {
       flex: 1;
       text-align: left;
-      font-size: 8pt;
-      line-height: 1.3;
+      font-size: 7.5pt;
+      line-height: 1.2;
       font-family: 'Times New Roman', serif;
       color: #000;
-      padding-right: 5mm;
+      text-transform: uppercase;
+    }
+    
+    .header-english em {
+      text-transform: none;
+      font-style: italic;
     }
     
     .header-logo {
       flex: 0 0 auto;
       text-align: center;
-      padding: 0 8mm;
+      padding: 0 5mm;
     }
     
     .header-logo img {
-      width: 40mm;
+      width: 30mm;
       height: auto;
-      max-height: 28mm;
+      max-height: 22mm;
       object-fit: contain;
     }
     
     .header-arabic {
       flex: 1;
       text-align: right;
-      font-size: 10pt;
-      line-height: 1.4;
+      font-size: 9pt;
+      line-height: 1.3;
       font-family: 'Amiri', serif;
       direction: rtl;
       color: #000;
-      padding-left: 5mm;
     }
     
-    /* Certificate title section */
     .title-section {
       text-align: center;
-      margin: 3mm 0 5mm 0;
+      margin: 2mm 0 4mm 0;
     }
     
     .title-english {
-      font-size: 14pt;
+      font-size: 12pt;
       font-weight: bold;
-      letter-spacing: 2px;
-      color: #1a4d7c;
+      letter-spacing: 1px;
+      color: #000;
       font-family: 'Times New Roman', serif;
-      margin-bottom: 2mm;
+      margin-bottom: 1mm;
     }
     
     .title-arabic {
-      font-size: 16pt;
+      font-size: 14pt;
       font-weight: bold;
-      color: #1a4d7c;
+      color: #000;
       font-family: 'Amiri', serif;
     }
     
-    /* Certificate body text */
     .body-text {
       direction: rtl;
       text-align: right;
-      font-size: 11pt;
-      line-height: 2.0;
+      font-size: 10.5pt;
+      line-height: 1.9;
       color: #000;
       font-family: 'Amiri', serif;
-      padding: 0 15mm;
+      padding: 0 8mm;
       flex: 1;
     }
     
     .body-text p {
       margin-bottom: 0;
-      text-indent: 10mm;
     }
     
     .highlight {
-      color: #1a237e;
+      color: #C00000;
       font-weight: bold;
       font-style: italic;
     }
     
-    /* Registration info */
     .registration-info {
       direction: rtl;
       text-align: right;
       font-size: 10pt;
-      line-height: 1.8;
-      padding: 0 15mm;
-      margin-top: 3mm;
+      line-height: 1.6;
+      padding: 0 8mm;
+      margin-top: 2mm;
     }
     
-    /* Signature section */
     .signature-section {
       display: flex;
       justify-content: space-between;
-      margin-top: 8mm;
-      padding: 0 20mm;
+      margin-top: 6mm;
+      padding: 0 15mm;
       direction: rtl;
     }
     
     .signature-block {
       text-align: center;
-      width: 30%;
+      width: 28%;
     }
     
     .signature-title {
-      font-size: 9pt;
+      font-size: 8pt;
       color: #000;
-      margin-bottom: 12mm;
+      margin-bottom: 8mm;
     }
     
     .signature-line {
       border-top: 1px dotted #000;
-      margin-top: 10mm;
+      margin-top: 8mm;
+      font-size: 8pt;
+      letter-spacing: 2px;
     }
     
     .stamp-label {
-      font-size: 8pt;
-      color: #666;
+      font-size: 7pt;
+      color: #333;
       margin-top: 2mm;
     }
   </style>
 </head>
 <body>
   <div class="certificate-wrapper">
-    <!-- Decorative diamond border pattern -->
-    <svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;" viewBox="0 0 297 210" preserveAspectRatio="none">
-      <!-- Yellow background for border area -->
-      <rect x="0" y="0" width="297" height="210" fill="#c9a227"/>
+    <svg class="border-layer" viewBox="0 0 297 210" preserveAspectRatio="none">
+      <defs>
+        <pattern id="yellowTriangles" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+          <rect width="10" height="10" fill="#F5B800"/>
+          <polygon points="0,0 5,5 0,10" fill="#F5B800"/>
+          <polygon points="10,0 5,5 10,10" fill="#F5B800"/>
+        </pattern>
+      </defs>
       
-      <!-- Diamond pattern - top row -->
-      <g>
-        ${Array.from({length: 20}, (_, i) => `
-          <g transform="translate(${7 + i * 14.5}, 5)">
-            <polygon points="7,0 14,7 7,14 0,7" fill="#1a4d7c"/>
-            <polygon points="7,2 12,7 7,12 2,7" fill="white"/>
-            <polygon points="7,4 10,7 7,10 4,7" fill="#1a4d7c"/>
-          </g>
-        `).join('')}
+      <rect x="0" y="0" width="297" height="210" fill="#F5B800"/>
+      
+      <g id="top-border">
+        ${Array.from({length: 30}, (_, i) => {
+          const x = i * 10;
+          return `<polygon points="${x},0 ${x+5},10 ${x+10},0" fill="white"/>`;
+        }).join('')}
       </g>
       
-      <!-- Diamond pattern - bottom row -->
-      <g>
-        ${Array.from({length: 20}, (_, i) => `
-          <g transform="translate(${7 + i * 14.5}, 191)">
-            <polygon points="7,0 14,7 7,14 0,7" fill="#1a4d7c"/>
-            <polygon points="7,2 12,7 7,12 2,7" fill="white"/>
-            <polygon points="7,4 10,7 7,10 4,7" fill="#1a4d7c"/>
-          </g>
-        `).join('')}
+      <g id="bottom-border">
+        ${Array.from({length: 30}, (_, i) => {
+          const x = i * 10;
+          return `<polygon points="${x},210 ${x+5},200 ${x+10},210" fill="white"/>`;
+        }).join('')}
       </g>
       
-      <!-- Diamond pattern - left column -->
-      <g>
-        ${Array.from({length: 13}, (_, i) => `
-          <g transform="translate(0, ${12 + i * 14.5})">
-            <polygon points="7,0 14,7 7,14 0,7" fill="#1a4d7c"/>
-            <polygon points="7,2 12,7 7,12 2,7" fill="white"/>
-            <polygon points="7,4 10,7 7,10 4,7" fill="#1a4d7c"/>
-          </g>
-        `).join('')}
+      <g id="left-border">
+        ${Array.from({length: 21}, (_, i) => {
+          const y = i * 10;
+          return `<polygon points="0,${y} 10,${y+5} 0,${y+10}" fill="white"/>`;
+        }).join('')}
       </g>
       
-      <!-- Diamond pattern - right column -->
-      <g>
-        ${Array.from({length: 13}, (_, i) => `
-          <g transform="translate(283, ${12 + i * 14.5})">
-            <polygon points="7,0 14,7 7,14 0,7" fill="#1a4d7c"/>
-            <polygon points="7,2 12,7 7,12 2,7" fill="white"/>
-            <polygon points="7,4 10,7 7,10 4,7" fill="#1a4d7c"/>
-          </g>
-        `).join('')}
+      <g id="right-border">
+        ${Array.from({length: 21}, (_, i) => {
+          const y = i * 10;
+          return `<polygon points="297,${y} 287,${y+5} 297,${y+10}" fill="white"/>`;
+        }).join('')}
       </g>
       
-      <!-- Inner white area with blue border -->
-      <rect x="14" y="14" width="269" height="182" fill="white" stroke="#1a4d7c" stroke-width="0.5"/>
+      <g id="top-diamonds">
+        ${Array.from({length: 15}, (_, i) => {
+          const x = 10 + i * 19;
+          return `
+            <polygon points="${x},0 ${x+5},5 ${x},10 ${x-5},5" fill="#0C2B64"/>
+            <polygon points="${x},1.5 ${x+3.5},5 ${x},8.5 ${x-3.5},5" fill="white"/>
+            <polygon points="${x},3 ${x+2},5 ${x},7 ${x-2},5" fill="#0C2B64"/>
+          `;
+        }).join('')}
+      </g>
+      
+      <g id="bottom-diamonds">
+        ${Array.from({length: 15}, (_, i) => {
+          const x = 10 + i * 19;
+          return `
+            <polygon points="${x},200 ${x+5},205 ${x},210 ${x-5},205" fill="#0C2B64"/>
+            <polygon points="${x},201.5 ${x+3.5},205 ${x},208.5 ${x-3.5},205" fill="white"/>
+            <polygon points="${x},203 ${x+2},205 ${x},207 ${x-2},205" fill="#0C2B64"/>
+          `;
+        }).join('')}
+      </g>
+      
+      <g id="left-diamonds">
+        ${Array.from({length: 11}, (_, i) => {
+          const y = 10 + i * 19;
+          return `
+            <polygon points="0,${y} 5,${y+5} 0,${y+10} -5,${y+5}" fill="#0C2B64"/>
+            <polygon points="1.5,${y+5} 5,${y+1.5} 8.5,${y+5} 5,${y+8.5}" fill="white" transform="translate(-3.5,0)"/>
+            <polygon points="3,${y+5} 5,${y+3} 7,${y+5} 5,${y+7}" fill="#0C2B64" transform="translate(-3.5,0)"/>
+          `;
+        }).join('')}
+      </g>
+      
+      <g id="right-diamonds">
+        ${Array.from({length: 11}, (_, i) => {
+          const y = 10 + i * 19;
+          return `
+            <polygon points="297,${y} 302,${y+5} 297,${y+10} 292,${y+5}" fill="#0C2B64"/>
+            <polygon points="295.5,${y+5} 297,${y+1.5} 298.5,${y+5} 297,${y+8.5}" fill="white"/>
+            <polygon points="296,${y+5} 297,${y+4} 298,${y+5} 297,${y+6}" fill="#0C2B64"/>
+          `;
+        }).join('')}
+      </g>
+      
+      <rect x="10" y="10" width="277" height="190" fill="white"/>
     </svg>
     
-    <!-- Certificate content -->
-    <div class="certificate-content">
-      <!-- Bismillah -->
+    ${logoBase64 ? `<img class="watermark" src="data:image/png;base64,${logoBase64}" alt="" />` : ''}
+    
+    <div class="content-layer">
       <div class="bismillah">بسم الله الرحمن الرحيم</div>
       
-      <!-- Header row with logos -->
       <div class="header-row">
         <div class="header-english">
           THE REPUBLIC OF THE GAMBIA<br/>
@@ -398,7 +401,7 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         </div>
         
         <div class="header-logo">
-          ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" alt="Coat of Arms" />` : ''}
+          ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" alt="Logo" />` : ''}
         </div>
         
         <div class="header-arabic">
@@ -409,33 +412,29 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         </div>
       </div>
       
-      <!-- Certificate titles -->
       <div class="title-section">
         <div class="title-english">GAMBIA MADRASSAH PRIMARY CERTIFICATE</div>
         <div class="title-arabic">شهادة إتمام دراسة المرحلة الابتدائية</div>
       </div>
       
-      <!-- Certificate body text -->
       <div class="body-text">
         <p>
-          تشهد الأمانة العامّة بأنّ ${studentLabel}/ <span class="highlight">${fullName}</span> ${bornLabel} في <span class="highlight">${student.placeOfBirth || ''}</span> بتاريخ :
-          <span class="highlight">${dobFormatted}</span> م قد ${completedLabel} دراسة المرحلة الابتدائية في <span class="highlight">${schoolWithAddress}</span> بعد أن ${passedLabel}
+          تشهد الأمانة العامّة بأنّ ${studentLabel}/ <span class="highlight">{${fullName}}</span> ${bornLabel} في <span class="highlight">{${student.placeOfBirth || ''}}</span> بتاريخ :
+          <span class="highlight">{${dobFormatted}}</span> م قد ${completedLabel} دراسة المرحلة الابتدائية في <span class="highlight">{${schoolWithAddress}}</span> بعد أن ${passedLabel}
           في الامتحان النهائي الذي أشرفت عليه الأمانة العامّة بالتنسيق مع وزارة التربية والتعليم في غامبيا.
         </p>
         <p>
-          في الفترة: <span class="highlight">${academicYear}</span> , وكان ${gradeLabel} فيه ( <span class="highlight">${gradeWordAr}</span> ).
+          في الفترة: <span class="highlight">{${academicYear}}</span> , وكان ${gradeLabel} فيه ( <span class="highlight">{${gradeWordAr}}</span> ).
         </p>
       </div>
       
-      <!-- Registration info -->
       <div class="registration-info">
         <p>
-          سُجّلت هذه الشّهادة تحت رقم ( <span class="highlight">${certificateNumber}</span> ) بتاريخ : <span class="highlight">${issueDateHijri}</span> هـ الموافق
-          <span class="highlight">${issueDateGreg}</span> م
+          سُجّلت هذه الشّهادة تحت رقم ( <span class="highlight">{${certificateNumber}}</span> ) بتاريخ : <span class="highlight">{${issueDateHijri}}</span> هـ الموافق
+          <span class="highlight">{${issueDateGreg}}</span> م
         </p>
       </div>
       
-      <!-- Signature section -->
       <div class="signature-section">
         <div class="signature-block">
           <div class="signature-title">توقيع مدير المدرسة</div>
@@ -445,7 +444,7 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         
         <div class="signature-block">
           <div class="signature-title">الختم الرسمي</div>
-          <div style="height: 15mm;"></div>
+          <div style="height: 12mm;"></div>
         </div>
         
         <div class="signature-block">
@@ -463,7 +462,6 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
 export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData): Promise<string> {
   const { student, certificateNumber } = data;
   
-  // Read logo image if exists
   let logoBase64 = '';
   const logoPath = path.join(process.cwd(), 'attached_assets', 'Amana_Logo_1765049398386.png');
   if (fs.existsSync(logoPath)) {
@@ -471,7 +469,6 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
     logoBase64 = logoBuffer.toString('base64');
   }
   
-  // Read template if it exists (for future use with blank template)
   let templateBase64 = '';
   const templatePath = path.join(process.cwd(), 'public', 'templates', 'primary_certificate_template.png');
   if (fs.existsSync(templatePath)) {
@@ -479,10 +476,8 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
     templateBase64 = templateBuffer.toString('base64');
   }
   
-  // Generate the HTML
   const html = generateCertificateHTML(data, templateBase64, logoBase64);
   
-  // Generate PDF using Puppeteer
   const browser = await puppeteer.launch({
     headless: true,
     args: [
@@ -497,23 +492,18 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
   try {
     const page = await browser.newPage();
     
-    // Set content and wait for fonts to load
     await page.setContent(html, { 
       waitUntil: ['networkidle0', 'domcontentloaded'],
       timeout: 60000
     });
     
-    // Wait for fonts to load
     await page.evaluateHandle('document.fonts.ready');
     
-    // Additional wait to ensure everything is rendered
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // Generate unique filename
     const filename = `primary_cert_${student.id}_${certificateNumber.replace(/\//g, '-')}_${Date.now()}.pdf`;
     const pdfPath = path.join(outputDir, filename);
     
-    // Generate high-quality PDF
     await page.pdf({
       path: pdfPath,
       format: 'A4',
@@ -529,7 +519,6 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
   }
 }
 
-// Validate certificate requirements
 export function validateCertificateRequirements(student: StudentData): { 
   isValid: boolean; 
   errors: string[]; 
@@ -570,5 +559,4 @@ export function validateCertificateRequirements(student: StudentData): {
   };
 }
 
-// Export for compatibility
 export { generateCertificateHTML };
