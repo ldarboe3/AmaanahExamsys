@@ -9020,6 +9020,9 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   });
 
   // ============ Export API ============
+  // UTF-8 BOM constant for proper Arabic text in Excel
+  const UTF8_BOM = '\uFEFF';
+  
   app.get("/api/export/schools/csv", isAuthenticated, async (req, res) => {
     try {
       const schools = await storage.getAllSchools();
@@ -9028,9 +9031,9 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         `${s.id},"${s.name}","${s.code}","${s.email}","${s.phone || ''}","${s.address || ''}",${s.regionId},"${s.status}",${s.totalStudents || 0},"${s.createdAt}"`
       ).join("\n");
       
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename=schools_export.csv');
-      res.send(csvHeader + csvRows);
+      res.send(UTF8_BOM + csvHeader + csvRows);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -9050,9 +9053,9 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         `"${s.indexNumber || ''}","${s.firstName}","${s.lastName}","${s.middleName || ''}","${s.gender}","${s.dateOfBirth}",${s.grade},${s.schoolId},"${s.status}","${s.createdAt}"`
       ).join("\n");
       
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename=students_export.csv');
-      res.send(csvHeader + csvRows);
+      res.send(UTF8_BOM + csvHeader + csvRows);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -9079,9 +9082,9 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         `${r.studentId},${r.subjectId},${r.firstTermScore || 0},${r.examScore || 0},"${r.totalScore || ''}","${r.grade || ''}","${r.status}","${r.validatedBy || ''}","${r.createdAt}"`
       ).join("\n");
       
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename=results_export.csv');
-      res.send(csvHeader + csvRows);
+      res.send(UTF8_BOM + csvHeader + csvRows);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -9099,9 +9102,9 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         `"${i.invoiceNumber}",${i.schoolId},${i.examYearId},"${i.totalAmount}","${i.paidAmount || '0'}","${i.dueDate}","${i.status}","${i.paymentMethod || ''}","${i.createdAt}"`
       ).join("\n");
       
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename=invoices_export.csv');
-      res.send(csvHeader + csvRows);
+      res.send(UTF8_BOM + csvHeader + csvRows);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -9116,9 +9119,9 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         `${e.id},"${e.firstName}","${e.lastName}","${e.email}","${e.phone || ''}","${e.qualification || ''}","${(e.expertise || []).join('; ')}",${e.regionId || ''},"${e.status}","${e.createdAt}"`
       ).join("\n");
       
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename=examiners_export.csv');
-      res.send(csvHeader + csvRows);
+      res.send(UTF8_BOM + csvHeader + csvRows);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

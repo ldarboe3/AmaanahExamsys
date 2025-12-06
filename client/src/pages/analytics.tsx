@@ -21,41 +21,41 @@ import {
   Filter,
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import type { ExamYear, Region, Cluster } from "@shared/schema";
 
-interface AnalyticsData {
-  overview: {
-    totalStudents: number;
-    totalSchools: number;
-    passRate: number;
-    avgScore: number;
-    trends: {
-      students: number;
-      passRate: number;
-    };
-  };
-  byRegion: Array<{
-    name: string;
-    students: number;
-    passRate: number;
-    avgScore: number;
-  }>;
-  byGrade: Array<{
-    grade: number;
-    students: number;
-    passRate: number;
-    avgScore: number;
-  }>;
-  bySubject: Array<{
-    name: string;
-    avgScore: number;
-    passRate: number;
-  }>;
-  byGender: {
-    male: { count: number; passRate: number };
-    female: { count: number; passRate: number };
-  };
+interface StudentsBySchool {
+  schoolId: number;
+  schoolName: string;
+  studentCount: number;
+  regionId: number | null;
+  clusterId: number | null;
 }
+
+interface StudentsByRegion {
+  regionId: number;
+  regionName: string;
+  studentCount: number;
+}
+
+interface SubjectResult {
+  subject: string;
+  averageScore: number;
+  totalStudents: number;
+  passCount: number;
+  failCount: number;
+}
+
+interface GenderResult {
+  gender: string;
+  studentCount: number;
+  averageScore: number;
+  passCount: number;
+  failCount: number;
+}
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B6B'];
 
 function StatCard({
   title,
@@ -106,285 +106,473 @@ function StatCard({
   );
 }
 
-function RegionPerformanceBar({ name, passRate, students }: { name: string; passRate: number; students: number }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium">{name}</span>
-        <span className="text-muted-foreground">{passRate.toFixed(1)}% pass rate</span>
+function CustomTooltip({ active, payload, label }: any) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-background border rounded-md p-3 shadow-lg">
+        <p className="font-medium">{payload[0].name || label}</p>
+        <p className="text-sm text-muted-foreground">
+          {payload[0].value.toLocaleString()} students
+        </p>
+        {payload[0].payload.passRate !== undefined && (
+          <p className="text-sm text-chart-3">
+            Pass Rate: {payload[0].payload.passRate.toFixed(1)}%
+          </p>
+        )}
       </div>
-      <div className="flex items-center gap-2">
-        <Progress value={passRate} className="h-2 flex-1" />
-        <span className="text-xs text-muted-foreground w-16 text-right">{students} students</span>
-      </div>
-    </div>
-  );
-}
-
-function SubjectCard({ name, avgScore, passRate }: { name: string; avgScore: number; passRate: number }) {
-  const getScoreColor = (score: number) => {
-    if (score >= 70) return "text-chart-3";
-    if (score >= 50) return "text-chart-2";
-    return "text-chart-5";
-  };
-
-  return (
-    <div className="p-4 border rounded-md">
-      <h4 className="font-medium text-sm mb-2">{name}</h4>
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="text-xs text-muted-foreground">Avg Score</p>
-          <p className={`text-xl font-semibold ${getScoreColor(avgScore)}`}>{avgScore.toFixed(1)}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">Pass Rate</p>
-          <p className="text-sm font-medium">{passRate.toFixed(1)}%</p>
-        </div>
-      </div>
-    </div>
-  );
+    );
+  }
+  return null;
 }
 
 export default function Analytics() {
   const { t, isRTL } = useLanguage();
-  const [yearFilter, setYearFilter] = useState<string>("current");
-  const [gradeFilter, setGradeFilter] = useState<string>("all");
+  const [selectedExamYear, setSelectedExamYear] = useState<string>("");
+  const [selectedGrade, setSelectedGrade] = useState<string>("all");
+  const [selectedRegion, setSelectedRegion] = useState<string>("all");
+  const [selectedCluster, setSelectedCluster] = useState<string>("all");
 
-  const { data: analytics, isLoading } = useQuery<AnalyticsData>({
-    queryKey: ["/api/analytics", yearFilter, gradeFilter],
+  const { data: examYears } = useQuery<ExamYear[]>({
+    queryKey: ["/api/exam-years"],
   });
 
-  const mockData: AnalyticsData = {
-    overview: {
-      totalStudents: 12450,
-      totalSchools: 387,
-      passRate: 78.5,
-      avgScore: 64.2,
-      trends: {
-        students: 8.5,
-        passRate: 2.3,
-      },
+  const { data: regions } = useQuery<Region[]>({
+    queryKey: ["/api/regions"],
+  });
+
+  const { data: clusters } = useQuery<Cluster[]>({
+    queryKey: ["/api/clusters"],
+  });
+
+  const activeExamYear = useMemo(() => {
+    if (examYears?.length) {
+      const active = examYears.find(y => y.isActive);
+      return active || examYears[0];
+    }
+    return null;
+  }, [examYears]);
+
+  const currentExamYearId = selectedExamYear ? parseInt(selectedExamYear) : activeExamYear?.id;
+
+  const { data: studentsBySchool, isLoading: schoolLoading } = useQuery<StudentsBySchool[]>({
+    queryKey: ["/api/analytics/students-by-school", currentExamYearId],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/students-by-school?examYearId=${currentExamYearId}`);
+      if (!res.ok) throw new Error('Failed to fetch students by school');
+      return res.json();
     },
-    byRegion: [
-      { name: "Western Region", students: 4520, passRate: 82.3, avgScore: 68.5 },
-      { name: "Central Region", students: 3280, passRate: 76.8, avgScore: 62.1 },
-      { name: "Northern Region", students: 2450, passRate: 79.1, avgScore: 65.3 },
-      { name: "Eastern Region", students: 2200, passRate: 74.5, avgScore: 61.8 },
-    ],
-    byGrade: [
-      { grade: 3, students: 3200, passRate: 85.2, avgScore: 72.1 },
-      { grade: 6, students: 3800, passRate: 79.8, avgScore: 65.4 },
-      { grade: 9, students: 3150, passRate: 74.3, avgScore: 60.2 },
-      { grade: 12, students: 2300, passRate: 71.5, avgScore: 58.7 },
-    ],
-    bySubject: [
-      { name: "Arabic Reading", avgScore: 72.5, passRate: 85.2 },
-      { name: "Arabic Writing", avgScore: 68.3, passRate: 79.8 },
-      { name: "Quran", avgScore: 78.9, passRate: 88.5 },
-      { name: "Islamic Studies", avgScore: 65.4, passRate: 76.3 },
-      { name: "Fiqh", avgScore: 62.1, passRate: 72.5 },
-      { name: "Hadith", avgScore: 70.8, passRate: 82.1 },
-    ],
-    byGender: {
-      male: { count: 6120, passRate: 75.8 },
-      female: { count: 6330, passRate: 81.2 },
+    enabled: !!currentExamYearId,
+  });
+
+  const { data: studentsByRegion, isLoading: regionLoading } = useQuery<StudentsByRegion[]>({
+    queryKey: ["/api/analytics/students-by-region", currentExamYearId],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/students-by-region?examYearId=${currentExamYearId}`);
+      if (!res.ok) throw new Error('Failed to fetch students by region');
+      return res.json();
     },
+    enabled: !!currentExamYearId,
+  });
+
+  const { data: resultsBySubject, isLoading: subjectLoading } = useQuery<SubjectResult[]>({
+    queryKey: ["/api/analytics/results-by-subject", currentExamYearId],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/results-by-subject?examYearId=${currentExamYearId}`);
+      if (!res.ok) throw new Error('Failed to fetch results by subject');
+      return res.json();
+    },
+    enabled: !!currentExamYearId,
+  });
+
+  const { data: resultsByGender, isLoading: genderLoading } = useQuery<GenderResult[]>({
+    queryKey: ["/api/analytics/results-by-gender", currentExamYearId],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/results-by-gender?examYearId=${currentExamYearId}`);
+      if (!res.ok) throw new Error('Failed to fetch results by gender');
+      return res.json();
+    },
+    enabled: !!currentExamYearId,
+  });
+
+  const filteredClusters = useMemo(() => {
+    if (!clusters || selectedRegion === "all") return clusters;
+    return clusters.filter(c => c.regionId === parseInt(selectedRegion));
+  }, [clusters, selectedRegion]);
+
+  const filteredSchoolData = useMemo(() => {
+    if (!studentsBySchool) return [];
+    let data = [...studentsBySchool];
+    if (selectedRegion !== "all") {
+      data = data.filter(s => s.regionId === parseInt(selectedRegion));
+    }
+    if (selectedCluster !== "all") {
+      data = data.filter(s => s.clusterId === parseInt(selectedCluster));
+    }
+    return data;
+  }, [studentsBySchool, selectedRegion, selectedCluster]);
+
+  const totalStudents = useMemo(() => {
+    return filteredSchoolData.reduce((sum, s) => sum + s.studentCount, 0);
+  }, [filteredSchoolData]);
+
+  const totalSchools = filteredSchoolData.length;
+
+  const overallPassRate = useMemo(() => {
+    if (!resultsBySubject || resultsBySubject.length === 0) return 0;
+    const totalPass = resultsBySubject.reduce((sum, s) => sum + s.passCount, 0);
+    const totalStudents = resultsBySubject.reduce((sum, s) => sum + s.totalStudents, 0);
+    return totalStudents > 0 ? (totalPass / totalStudents) * 100 : 0;
+  }, [resultsBySubject]);
+
+  const avgScore = useMemo(() => {
+    if (!resultsBySubject || resultsBySubject.length === 0) return 0;
+    const totalScore = resultsBySubject.reduce((sum, s) => sum + (s.averageScore * s.totalStudents), 0);
+    const totalStudents = resultsBySubject.reduce((sum, s) => sum + s.totalStudents, 0);
+    return totalStudents > 0 ? totalScore / totalStudents : 0;
+  }, [resultsBySubject]);
+
+  const regionPieData = useMemo(() => {
+    if (!studentsByRegion) return [];
+    return studentsByRegion.map(r => ({
+      name: r.regionName,
+      value: r.studentCount,
+    }));
+  }, [studentsByRegion]);
+
+  const genderPieData = useMemo(() => {
+    if (!resultsByGender) return [];
+    return resultsByGender.map(g => ({
+      name: g.gender === 'male' ? (isRTL ? 'ذكر' : 'Male') : (isRTL ? 'أنثى' : 'Female'),
+      value: g.studentCount,
+      passRate: g.passCount / (g.passCount + g.failCount) * 100 || 0,
+      avgScore: g.averageScore,
+    }));
+  }, [resultsByGender, isRTL]);
+
+  const subjectBarData = useMemo(() => {
+    if (!resultsBySubject) return [];
+    return resultsBySubject.map(s => ({
+      name: s.subject.length > 15 ? s.subject.slice(0, 12) + '...' : s.subject,
+      fullName: s.subject,
+      avgScore: s.averageScore,
+      passRate: (s.passCount / s.totalStudents) * 100 || 0,
+      students: s.totalStudents,
+    }));
+  }, [resultsBySubject]);
+
+  const exportData = () => {
+    const BOM = '\uFEFF';
+    let csvContent = BOM;
+    
+    csvContent += isRTL ? "تقرير تحليلات الامتحانات\n" : "Examination Analytics Report\n";
+    csvContent += `${isRTL ? "سنة الامتحان" : "Examination Year"}: ${activeExamYear?.year || ''}\n\n`;
+    
+    csvContent += `${isRTL ? "الملخص" : "Summary"}\n`;
+    csvContent += `${isRTL ? "إجمالي الطلاب" : "Total Students"},${totalStudents}\n`;
+    csvContent += `${isRTL ? "إجمالي المدارس" : "Total Schools"},${totalSchools}\n`;
+    csvContent += `${isRTL ? "نسبة النجاح" : "Pass Rate"},${overallPassRate.toFixed(1)}%\n`;
+    csvContent += `${isRTL ? "متوسط الدرجات" : "Average Score"},${avgScore.toFixed(1)}\n\n`;
+    
+    csvContent += `${isRTL ? "التوزيع حسب المنطقة" : "Distribution by Region"}\n`;
+    csvContent += `${isRTL ? "المنطقة" : "Region"},${isRTL ? "عدد الطلاب" : "Student Count"}\n`;
+    studentsByRegion?.forEach(r => {
+      csvContent += `"${r.regionName}",${r.studentCount}\n`;
+    });
+    csvContent += "\n";
+    
+    csvContent += `${isRTL ? "الأداء حسب المادة" : "Performance by Subject"}\n`;
+    csvContent += `${isRTL ? "المادة" : "Subject"},${isRTL ? "متوسط الدرجات" : "Avg Score"},${isRTL ? "نسبة النجاح" : "Pass Rate"},${isRTL ? "عدد الطلاب" : "Students"}\n`;
+    resultsBySubject?.forEach(s => {
+      const passRate = (s.passCount / s.totalStudents) * 100 || 0;
+      csvContent += `"${s.subject}",${s.averageScore.toFixed(1)},${passRate.toFixed(1)}%,${s.totalStudents}\n`;
+    });
+    csvContent += "\n";
+    
+    csvContent += `${isRTL ? "التوزيع حسب الجنس" : "Distribution by Gender"}\n`;
+    csvContent += `${isRTL ? "الجنس" : "Gender"},${isRTL ? "عدد الطلاب" : "Count"},${isRTL ? "متوسط الدرجات" : "Avg Score"},${isRTL ? "نسبة النجاح" : "Pass Rate"}\n`;
+    resultsByGender?.forEach(g => {
+      const passRate = g.passCount / (g.passCount + g.failCount) * 100 || 0;
+      const genderLabel = g.gender === 'male' ? (isRTL ? 'ذكر' : 'Male') : (isRTL ? 'أنثى' : 'Female');
+      csvContent += `"${genderLabel}",${g.studentCount},${g.averageScore.toFixed(1)},${passRate.toFixed(1)}%\n`;
+    });
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `analytics_report_${activeExamYear?.year || 'current'}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
-  const data = analytics || mockData;
+  const isLoading = schoolLoading || regionLoading || subjectLoading || genderLoading;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Analytics</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
+            {isRTL ? "التحليلات" : "Analytics"}
+          </h1>
           <p className="text-muted-foreground mt-1">
-            Performance insights and examination statistics
+            {isRTL ? "رؤى الأداء وإحصائيات الامتحانات" : "Performance insights and examination statistics"}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Select value={yearFilter} onValueChange={setYearFilter}>
-            <SelectTrigger className="w-[150px]" data-testid="select-year-filter">
-              <SelectValue placeholder="Year" />
+        <div className="flex flex-wrap gap-2">
+          <Select value={selectedExamYear || (activeExamYear?.id?.toString() || "")} onValueChange={setSelectedExamYear}>
+            <SelectTrigger className="w-[150px]" data-testid="select-exam-year">
+              <SelectValue placeholder={isRTL ? "السنة" : "Year"} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="current">Current Year</SelectItem>
-              <SelectItem value="2024">2024</SelectItem>
-              <SelectItem value="2023">2023</SelectItem>
-              <SelectItem value="2022">2022</SelectItem>
+              {examYears?.map(year => (
+                <SelectItem key={year.id} value={year.id.toString()}>
+                  {year.year} {year.isActive && (isRTL ? "(حالي)" : "(Current)")}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
-          <Select value={gradeFilter} onValueChange={setGradeFilter}>
-            <SelectTrigger className="w-[140px]" data-testid="select-grade-filter">
-              <SelectValue placeholder="Grade" />
+          <Select value={selectedRegion} onValueChange={(v) => { setSelectedRegion(v); setSelectedCluster("all"); }}>
+            <SelectTrigger className="w-[150px]" data-testid="select-region-filter">
+              <SelectValue placeholder={isRTL ? "المنطقة" : "Region"} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Grades</SelectItem>
-              <SelectItem value="3">Grade 3</SelectItem>
-              <SelectItem value="6">Grade 6</SelectItem>
-              <SelectItem value="9">Grade 9</SelectItem>
-              <SelectItem value="12">Grade 12</SelectItem>
+              <SelectItem value="all">{isRTL ? "جميع المناطق" : "All Regions"}</SelectItem>
+              {regions?.map(r => (
+                <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" data-testid="button-export">
+          <Select value={selectedCluster} onValueChange={setSelectedCluster}>
+            <SelectTrigger className="w-[150px]" data-testid="select-cluster-filter">
+              <SelectValue placeholder={isRTL ? "المجموعة" : "Cluster"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{isRTL ? "جميع المجموعات" : "All Clusters"}</SelectItem>
+              {filteredClusters?.map(c => (
+                <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={exportData} data-testid="button-export">
             <Download className="w-4 h-4 mr-2" />
-            Export
+            {isRTL ? "تصدير" : "Export"}
           </Button>
         </div>
       </div>
 
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Students"
-          value={data.overview.totalStudents.toLocaleString()}
-          icon={Users}
-          color="bg-primary/10 text-primary"
-          trend="up"
-          trendValue={`+${data.overview.trends.students}% from last year`}
-        />
-        <StatCard
-          title="Registered Schools"
-          value={data.overview.totalSchools}
-          icon={School}
-          color="bg-chart-2/10 text-chart-2"
-        />
-        <StatCard
-          title="Pass Rate"
-          value={`${data.overview.passRate}%`}
-          icon={Award}
-          color="bg-chart-3/10 text-chart-3"
-          trend="up"
-          trendValue={`+${data.overview.trends.passRate}% from last year`}
-        />
-        <StatCard
-          title="Average Score"
-          value={data.overview.avgScore.toFixed(1)}
-          subtitle="out of 100"
-          icon={BarChart3}
-          color="bg-chart-4/10 text-chart-4"
-        />
-      </div>
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-24" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            title={isRTL ? "إجمالي الطلاب" : "Total Students"}
+            value={totalStudents.toLocaleString()}
+            icon={Users}
+            color="bg-primary/10 text-primary"
+          />
+          <StatCard
+            title={isRTL ? "المدارس المسجلة" : "Registered Schools"}
+            value={totalSchools.toLocaleString()}
+            icon={School}
+            color="bg-chart-2/10 text-chart-2"
+          />
+          <StatCard
+            title={isRTL ? "نسبة النجاح" : "Pass Rate"}
+            value={`${overallPassRate.toFixed(1)}%`}
+            icon={Award}
+            color="bg-chart-3/10 text-chart-3"
+          />
+          <StatCard
+            title={isRTL ? "متوسط الدرجات" : "Average Score"}
+            value={avgScore.toFixed(1)}
+            subtitle={isRTL ? "من 100" : "out of 100"}
+            icon={BarChart3}
+            color="bg-chart-4/10 text-chart-4"
+          />
+        </div>
+      )}
 
-      {/* Charts Row */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Performance by Region */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Performance by Region</CardTitle>
+            <CardTitle className="text-lg">{isRTL ? "التوزيع حسب المنطقة" : "Distribution by Region"}</CardTitle>
             <CardDescription>
-              Pass rates and student counts across regions
+              {isRTL ? "عدد الطلاب في كل منطقة" : "Student count across regions"}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {data.byRegion.map((region) => (
-                <RegionPerformanceBar
-                  key={region.name}
-                  name={region.name}
-                  passRate={region.passRate}
-                  students={region.students}
-                />
-              ))}
-            </div>
+            {regionPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={regionPieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {regionPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                {isRTL ? "لا توجد بيانات متاحة" : "No data available"}
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Performance by Grade */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Performance by Grade</CardTitle>
+            <CardTitle className="text-lg">{isRTL ? "التوزيع حسب الجنس" : "Distribution by Gender"}</CardTitle>
             <CardDescription>
-              Breakdown of results by grade level
+              {isRTL ? "مقارنة أداء الطلاب والطالبات" : "Comparison of male and female student performance"}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              {data.byGrade.map((grade) => (
-                <div key={grade.grade} className="p-4 border rounded-md">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-lg font-semibold">Grade {grade.grade}</span>
-                    <span className="text-sm text-muted-foreground">{grade.students} students</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Pass Rate</span>
-                      <span className="font-medium text-chart-3">{grade.passRate.toFixed(1)}%</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Avg Score</span>
-                      <span className="font-medium">{grade.avgScore.toFixed(1)}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {genderPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={genderPieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    <Cell fill="#0088FE" />
+                    <Cell fill="#FF69B4" />
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                {isRTL ? "لا توجد بيانات متاحة" : "No data available"}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Subject Performance */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Subject Performance</CardTitle>
+          <CardTitle className="text-lg">{isRTL ? "أداء المواد" : "Subject Performance"}</CardTitle>
           <CardDescription>
-            Average scores and pass rates by subject
+            {isRTL ? "متوسط الدرجات ونسب النجاح حسب المادة" : "Average scores and pass rates by subject"}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.bySubject.map((subject) => (
-              <SubjectCard
-                key={subject.name}
-                name={subject.name}
-                avgScore={subject.avgScore}
-                passRate={subject.passRate}
-              />
-            ))}
-          </div>
+          {subjectBarData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={subjectBarData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="name" 
+                  angle={-45} 
+                  textAnchor="end" 
+                  height={80}
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis />
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-background border rounded-md p-3 shadow-lg">
+                          <p className="font-medium">{data.fullName}</p>
+                          <p className="text-sm">
+                            {isRTL ? "متوسط الدرجات" : "Avg Score"}: {data.avgScore.toFixed(1)}
+                          </p>
+                          <p className="text-sm text-chart-3">
+                            {isRTL ? "نسبة النجاح" : "Pass Rate"}: {data.passRate.toFixed(1)}%
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {isRTL ? "عدد الطلاب" : "Students"}: {data.students.toLocaleString()}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="avgScore" fill="#8884d8" name={isRTL ? "متوسط الدرجات" : "Avg Score"} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+              {isRTL ? "لا توجد بيانات متاحة" : "No data available"}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Gender Distribution */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Performance by Gender</CardTitle>
-          <CardDescription>
-            Comparison of male and female student performance
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid sm:grid-cols-2 gap-6">
-            <div className="p-6 border rounded-md bg-chart-2/5">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-lg font-semibold">Male Students</h4>
-                <span className="text-2xl font-semibold">{data.byGender.male.count.toLocaleString()}</span>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Pass Rate</span>
-                  <span className="font-medium">{data.byGender.male.passRate}%</span>
+      {genderPieData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">{isRTL ? "تفاصيل الأداء حسب الجنس" : "Performance Details by Gender"}</CardTitle>
+            <CardDescription>
+              {isRTL ? "مقارنة مفصلة بين الذكور والإناث" : "Detailed comparison between male and female students"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-2 gap-6">
+              {resultsByGender?.map((g, index) => (
+                <div key={g.gender} className={`p-6 border rounded-md ${index === 0 ? 'bg-chart-2/5' : 'bg-chart-4/5'}`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold">
+                      {g.gender === 'male' ? (isRTL ? 'الطلاب الذكور' : 'Male Students') : (isRTL ? 'الطالبات' : 'Female Students')}
+                    </h4>
+                    <span className="text-2xl font-semibold">{g.studentCount.toLocaleString()}</span>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">{isRTL ? "متوسط الدرجات" : "Avg Score"}</span>
+                      <span className="font-medium">{g.averageScore.toFixed(1)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">{isRTL ? "نسبة النجاح" : "Pass Rate"}</span>
+                      <span className="font-medium text-chart-3">
+                        {((g.passCount / (g.passCount + g.failCount)) * 100 || 0).toFixed(1)}%
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(g.passCount / (g.passCount + g.failCount)) * 100 || 0} 
+                      className="h-2" 
+                    />
+                  </div>
                 </div>
-                <Progress value={data.byGender.male.passRate} className="h-2" />
-              </div>
+              ))}
             </div>
-            <div className="p-6 border rounded-md bg-chart-4/5">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-lg font-semibold">Female Students</h4>
-                <span className="text-2xl font-semibold">{data.byGender.female.count.toLocaleString()}</span>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Pass Rate</span>
-                  <span className="font-medium">{data.byGender.female.passRate}%</span>
-                </div>
-                <Progress value={data.byGender.female.passRate} className="h-2" />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
