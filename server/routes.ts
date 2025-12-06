@@ -19,6 +19,7 @@ import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import {
   sendSchoolVerificationEmail,
+  sendSchoolCredentialsEmail,
   sendPaymentConfirmationEmail,
   sendResultsPublishedEmail,
   sendCenterAllocationEmail,
@@ -2039,6 +2040,50 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (error: any) {
       console.error('Resend verification error:', error);
       res.status(500).json({ message: error.message || "Failed to resend verification email" });
+    }
+  });
+
+  // Send school credentials via email
+  app.post("/api/schools/:id/send-credentials", isAuthenticated, async (req, res) => {
+    try {
+      const school = await storage.getSchool(parseInt(req.params.id));
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      
+      // Get the school admin user
+      if (!school.adminUserId) {
+        return res.status(400).json({ message: "This school does not have an admin user yet. Please complete the verification process first." });
+      }
+      
+      const adminUser = await storage.getUser(school.adminUserId);
+      if (!adminUser) {
+        return res.status(404).json({ message: "School admin user not found" });
+      }
+      
+      // Send credentials email
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      
+      // For schools created via upload, password is Admin@123
+      // For schools created via verification, we can't retrieve the password
+      const temporaryPassword = adminUser.mustChangePassword ? 'Admin@123' : 'Please use your existing password or reset it';
+      
+      const emailSent = await sendSchoolCredentialsEmail(
+        school.email,
+        school.name,
+        adminUser.username,
+        temporaryPassword,
+        baseUrl
+      );
+      
+      if (!emailSent) {
+        return res.status(500).json({ message: "Failed to send credentials email. Please try again later." });
+      }
+      
+      res.json({ message: "Credentials email sent successfully" });
+    } catch (error: any) {
+      console.error('Send credentials error:', error);
+      res.status(500).json({ message: error.message || "Failed to send credentials email" });
     }
   });
 

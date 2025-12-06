@@ -82,6 +82,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Info,
+  Key,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -368,6 +369,25 @@ export default function Schools() {
       toast({
         title: t.common.error,
         description: error.message || (isRTL ? "فشل في إرسال البريد" : "Failed to send email"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendCredentialsMutation = useMutation({
+    mutationFn: async (schoolId: number) => {
+      return apiRequest("POST", `/api/schools/${schoolId}/send-credentials`);
+    },
+    onSuccess: () => {
+      toast({
+        title: t.common.success,
+        description: isRTL ? "تم إرسال بيانات تسجيل الدخول بنجاح" : "Login credentials sent successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل في إرسال بيانات الدخول" : "Failed to send credentials"),
         variant: "destructive",
       });
     },
@@ -867,6 +887,16 @@ export default function Schools() {
                                 {isRTL ? "إعادة إرسال البريد" : "Resend Verification Email"}
                               </DropdownMenuItem>
                             ) : null}
+                            {school.adminUserId && (
+                              <DropdownMenuItem
+                                onClick={() => sendCredentialsMutation.mutate(school.id)}
+                                className="text-primary"
+                                data-testid={`button-send-credentials-${school.id}`}
+                              >
+                                <Key className="w-4 h-4 me-2" />
+                                {isRTL ? "إرسال بيانات الدخول" : "Send Credentials"}
+                              </DropdownMenuItem>
+                            )}
                             {school.status === 'pending' || school.status === 'verified' ? (
                               <>
                                 <DropdownMenuItem
