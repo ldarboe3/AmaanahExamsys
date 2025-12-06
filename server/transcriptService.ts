@@ -195,7 +195,7 @@ function generateTranscriptHTML(data: TranscriptData): string {
     .filter(Boolean)
     .join(' ');
   
-  // Build English full name (transliteration or provided)
+  // Build English full name (transliteration or provided, with fallback to Arabic)
   const fullNameEn = [
     student.firstNameEn || student.firstName,
     student.middleNameEn || student.middleName,
