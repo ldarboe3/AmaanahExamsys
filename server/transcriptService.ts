@@ -233,18 +233,26 @@ function generateTranscriptHTML(data: TranscriptData): string {
       margin: 0 auto;
     }
     .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
+      display: table;
+      width: 100%;
       margin-bottom: 20px;
       border-bottom: 2px solid #333;
       padding-bottom: 15px;
     }
-    .header-right {
+    .header-row {
+      display: table-row;
+    }
+    .header-cell {
+      display: table-cell;
+      padding: 0 10px;
+      vertical-align: top;
+    }
+    .header-ar {
       text-align: right;
       width: 50%;
+      direction: rtl;
     }
-    .header-left {
+    .header-en {
       text-align: left;
       direction: ltr;
       width: 50%;
@@ -354,16 +362,18 @@ function generateTranscriptHTML(data: TranscriptData): string {
 <body>
   <div class="container">
     <div class="header">
-      <div class="header-right">
-        <div class="org-name">الأمانة العامة للتعليم الإسلامي العربي</div>
-        <div class="org-subtitle">في غامبيا</div>
-        <div class="dept-name">قسم الامتحانات</div>
-      </div>
-      <div class="header-left">
-        <div class="org-name">The General Secretariat for</div>
-        <div class="org-subtitle">Islamic/Arabic Education in</div>
-        <div class="org-subtitle">The Gambia</div>
-        <div class="dept-name">Examination Affairs Unit</div>
+      <div class="header-row">
+        <div class="header-cell header-ar">
+          <div class="org-name">الأمانة العامة للتعليم الإسلامي العربي</div>
+          <div class="org-subtitle">في غامبيا</div>
+          <div class="dept-name">قسم الامتحانات</div>
+        </div>
+        <div class="header-cell header-en">
+          <div class="org-name">The General Secretariat for</div>
+          <div class="org-subtitle">Islamic/Arabic Education in</div>
+          <div class="org-subtitle">The Gambia</div>
+          <div class="dept-name">Examination Affairs Unit</div>
+        </div>
       </div>
     </div>
 
