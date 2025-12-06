@@ -76,7 +76,9 @@ import {
   MapPin,
   FileSearch,
   Plus,
+  Edit,
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -185,6 +187,8 @@ export default function Students() {
   const [schoolFilter, setSchoolFilter] = useState<string>("all");
   const [selectedStudent, setSelectedStudent] = useState<StudentWithRelations | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<StudentWithRelations | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -767,6 +771,28 @@ export default function Students() {
       },
     });
   };
+
+  const updateStudentMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest('PATCH', `/api/students/${data.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/students'] });
+      setShowEditDialog(false);
+      setEditingStudent(null);
+      toast({
+        title: isRTL ? "نجح" : "Success",
+        description: isRTL ? "تم تحديث بيانات الطالب" : "Student updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: isRTL ? "خطأ" : "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const approveStudentMutation = useMutation({
     mutationFn: async (studentId: number) => {
@@ -2246,9 +2272,87 @@ export default function Students() {
             <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
               {t.common.close}
             </Button>
+            <Button 
+              variant="outline"
+              onClick={() => {
+                setEditingStudent(selectedStudent);
+                setShowEditDialog(true);
+              }}
+              data-testid="button-edit-student"
+            >
+              <Edit className="w-4 h-4 me-2" />
+              {isRTL ? "تعديل" : "Edit"}
+            </Button>
             <Button variant="outline">
               <Printer className="w-4 h-4 me-2" />
               {isRTL ? "طباعة البطاقة" : "Print Card"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Student Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-lg" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle>{isRTL ? "تعديل بيانات الطالب" : "Edit Student Details"}</DialogTitle>
+            <DialogDescription>
+              {isRTL ? "تعديل تاريخ الميلاد والجنس" : "Update date of birth and gender"}
+            </DialogDescription>
+          </DialogHeader>
+          {editingStudent && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-dob">{isRTL ? "تاريخ الميلاد" : "Date of Birth"}</Label>
+                <Input
+                  id="edit-dob"
+                  type="date"
+                  value={editingStudent.dateOfBirth || ''}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, dateOfBirth: e.target.value })}
+                  data-testid="input-edit-dob"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-gender">{isRTL ? "الجنس" : "Gender"}</Label>
+                <Select 
+                  value={(editingStudent.gender as string) || 'male'}
+                  onValueChange={(value) => setEditingStudent({ ...editingStudent, gender: value as 'male' | 'female' })}
+                >
+                  <SelectTrigger id="edit-gender" data-testid="select-edit-gender">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">{isRTL ? "ذكر" : "Male"}</SelectItem>
+                    <SelectItem value="female">{isRTL ? "أنثى" : "Female"}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-pob">{isRTL ? "مكان الميلاد" : "Place of Birth"}</Label>
+                <Input
+                  id="edit-pob"
+                  value={editingStudent.placeOfBirth || ''}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, placeOfBirth: e.target.value })}
+                  data-testid="input-edit-pob"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowEditDialog(false)}
+            >
+              {t.common.cancel}
+            </Button>
+            <Button 
+              onClick={() => editingStudent && updateStudentMutation.mutate(editingStudent)}
+              disabled={updateStudentMutation.isPending}
+            >
+              {updateStudentMutation.isPending ? (
+                <Loader2 className="w-4 h-4 me-2 animate-spin" />
+              ) : null}
+              {isRTL ? "حفظ" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
