@@ -506,10 +506,11 @@ function generateTranscriptHTML(data: TranscriptData): string {
       font-weight: bold;
       font-size: 11px;
     }
-    .num-cell { width: 8%; }
-    .subject-cell { width: 35%; text-align: right; padding-right: 10px; font-weight: bold; }
-    .score-cell { width: 12%; }
-    .mark-cell { width: 15%; font-weight: bold; color: #1a5276; }
+    .num-cell { width: 8%; text-align: center; }
+    .subject-cell { width: 35%; text-align: right !important; padding-right: 12px; font-weight: bold; }
+    .subject-header { text-align: right !important; padding-right: 12px; }
+    .score-cell { width: 12%; text-align: center; }
+    .mark-cell { width: 15%; font-weight: bold; color: #1a5276; text-align: center; }
     .summary-row td {
       background: #f5f5f5;
       font-weight: bold;
@@ -538,10 +539,11 @@ function generateTranscriptHTML(data: TranscriptData): string {
       margin-bottom: 15px;
     }
     .signature-line {
-      border-top: 1px dotted #333;
-      width: 150px;
+      width: 180px;
       margin: 0 auto;
-      padding-top: 3px;
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: #555;
     }
     .qr-section {
       margin-top: 10px;
@@ -620,11 +622,11 @@ function generateTranscriptHTML(data: TranscriptData): string {
     <table class="marks-table">
       <thead>
         <tr>
-          <th>م</th>
-          <th>المادة</th>
-          <th>الدرجات<br>الكبرى</th>
-          <th>الدرجات<br>الصغرى</th>
-          <th>الدرجة المكتسبة<br>رقماً</th>
+          <th class="num-cell">م</th>
+          <th class="subject-header">المادة</th>
+          <th class="score-cell">الدرجات<br>الكبرى</th>
+          <th class="score-cell">الدرجات<br>الصغرى</th>
+          <th class="mark-cell">الدرجة المكتسبة<br>رقماً</th>
         </tr>
       </thead>
       <tbody>
@@ -647,11 +649,11 @@ function generateTranscriptHTML(data: TranscriptData): string {
     <div class="signatures">
       <div class="signature-block">
         <div class="signature-label">توقيع رئيس لجنة الامتحانات</div>
-        <div class="signature-line">........................</div>
+        <div class="signature-line">............................</div>
       </div>
       <div class="signature-block">
         <div class="signature-label">توقيع إدارة الأمانة</div>
-        <div class="signature-line">........................</div>
+        <div class="signature-line">............................</div>
       </div>
     </div>
     
