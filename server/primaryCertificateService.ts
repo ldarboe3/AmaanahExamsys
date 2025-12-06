@@ -84,8 +84,13 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
   const passedLabel = isFemale ? 'نجحت' : 'نجح';
   const gradeLabel = isFemale ? 'تقديرها' : 'تقديره';
 
-  // STRICT 60px inner margin from the patterned border (scaled to 300dpi = 180px)
-  const safeMargin = 180;
+  // PNG template dimensions: 3508x2480
+  // Inner white area starts at approximately X=270px, Y=272px from edges
+  // Adding 60px buffer = 330px from each edge to stay FULLY inside the white area
+  const safeTop = 332;
+  const safeBottom = 332;
+  const safeLeft = 330;
+  const safeRight = 330;
 
   return `<!DOCTYPE html>
 <html lang="ar">
@@ -126,55 +131,58 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       font-family: 'Amiri', 'Traditional Arabic', 'Times New Roman', serif;
     }
     
-    /* STRICT SAFE AREA - 60px margin (180px at 300dpi) from border on ALL sides */
+    /* SAFE AREA - positioned INSIDE the inner white area of the PNG template */
+    /* PNG inner white area starts at ~270px from edges, plus 60px buffer = 330px */
     .safe-area {
       position: absolute;
-      top: ${safeMargin}px;
-      left: ${safeMargin}px;
-      right: ${safeMargin}px;
-      bottom: ${safeMargin}px;
+      top: ${safeTop}px;
+      bottom: ${safeBottom}px;
+      left: ${safeLeft}px;
+      right: ${safeRight}px;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
     
-    /* Watermark centered */
+    /* Watermark centered in the white area */
     .watermark {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 600px;
+      width: 500px;
       opacity: 0.10;
       pointer-events: none;
       z-index: 0;
     }
     
-    /* Bismillah - 18-20pt = 54-60px at 300dpi, centered, bold, INSIDE safe area */
+    /* Bismillah - centered, bold, inside safe area */
     .bismillah {
       width: 100%;
       text-align: center;
-      font-size: 58px;
+      font-size: 52px;
       font-weight: bold;
       color: #000;
       direction: rtl;
-      margin-bottom: 25px;
+      margin-bottom: 15px;
+      flex-shrink: 0;
     }
     
-    /* Header row - MOVED DOWN to give space for Bismillah */
+    /* Header row with ministry blocks and logo */
     .header-row {
       width: 100%;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 20px;
-      padding: 0 40px;
+      margin-bottom: 15px;
+      flex-shrink: 0;
     }
     
-    /* English ministry block - shifted DOWN */
+    /* English ministry block */
     .header-english {
-      width: 560px;
-      font-size: 22px;
-      line-height: 1.25;
+      width: 520px;
+      font-size: 20px;
+      line-height: 1.2;
       text-align: left;
       color: #000;
       font-family: 'Times New Roman', serif;
@@ -186,31 +194,30 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       text-transform: none;
     }
     
-    /* Logo - MOVED DOWN by 45-60px */
+    /* Logo in center */
     .header-logo {
-      width: 300px;
+      width: 280px;
       text-align: center;
-      margin-top: 15px;
     }
     
     .header-logo img {
       max-width: 100%;
-      max-height: 180px;
+      max-height: 160px;
       object-fit: contain;
     }
     
     .header-logo .logo-text {
-      font-size: 14px;
-      margin-top: 5px;
+      font-size: 12px;
+      margin-top: 4px;
       font-weight: bold;
       letter-spacing: 1px;
     }
     
-    /* Arabic ministry block - shifted DOWN */
+    /* Arabic ministry block */
     .header-arabic {
-      width: 560px;
-      font-size: 26px;
-      line-height: 1.35;
+      width: 520px;
+      font-size: 24px;
+      line-height: 1.3;
       text-align: right;
       color: #000;
       direction: rtl;
@@ -220,26 +227,27 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
     .titles-section {
       width: 100%;
       text-align: center;
-      margin: 10px 0 20px 0;
+      margin: 10px 0 15px 0;
+      flex-shrink: 0;
     }
     
     .title-english {
-      font-size: 38px;
+      font-size: 34px;
       font-weight: bold;
       letter-spacing: 2px;
       color: #000;
       font-family: 'Times New Roman', serif;
-      margin-bottom: 6px;
+      margin-bottom: 5px;
     }
     
     .title-arabic {
-      font-size: 44px;
+      font-size: 40px;
       font-weight: bold;
       color: #000;
       direction: rtl;
     }
     
-    /* Main paragraph - 14-15pt = 42-45px at 300dpi, centered block, moved DOWN */
+    /* Main paragraph - centered block */
     .body-content {
       width: 100%;
       flex: 1;
@@ -249,16 +257,15 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       align-items: center;
       direction: rtl;
       text-align: center;
-      font-size: 44px;
-      line-height: 1.75;
+      font-size: 38px;
+      line-height: 1.7;
       color: #000;
-      padding: 15px 60px;
     }
     
     .body-content p {
-      margin-bottom: 6px;
+      margin-bottom: 5px;
       text-align: center;
-      max-width: 2800px;
+      max-width: 100%;
     }
     
     .highlight {
@@ -267,49 +274,49 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       font-style: italic;
     }
     
-    /* Registration line - centered, inside safe area */
+    /* Registration line */
     .registration-line {
       width: 100%;
       text-align: center;
       direction: rtl;
-      font-size: 38px;
-      line-height: 1.6;
+      font-size: 34px;
+      line-height: 1.5;
       color: #000;
       margin: 10px 0;
-      padding: 0 60px;
+      flex-shrink: 0;
     }
     
-    /* Signature section - inside safe area, properly spaced */
+    /* Signature section */
     .signature-section {
       width: 100%;
       display: flex;
       justify-content: space-between;
       direction: rtl;
-      padding: 0 80px;
-      margin-top: 15px;
+      margin-top: 10px;
+      flex-shrink: 0;
     }
     
     .signature-block {
-      width: 480px;
+      width: 420px;
       text-align: center;
     }
     
     .signature-title {
-      font-size: 26px;
+      font-size: 24px;
       color: #000;
-      margin-bottom: 50px;
+      margin-bottom: 40px;
     }
     
     .signature-line {
-      font-size: 22px;
-      letter-spacing: 4px;
-      margin-bottom: 12px;
+      font-size: 20px;
+      letter-spacing: 3px;
+      margin-bottom: 10px;
     }
     
     .stamp-label {
-      font-size: 22px;
+      font-size: 20px;
       color: #333;
-      margin-top: 6px;
+      margin-top: 5px;
     }
   </style>
 </head>
@@ -318,10 +325,10 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
     ${logoBase64 ? `<img class="watermark" src="data:image/png;base64,${logoBase64}" alt="" />` : ''}
     
     <div class="safe-area">
-      <!-- Bismillah - centered, bold, 18-20pt, INSIDE safe area -->
+      <!-- Bismillah -->
       <div class="bismillah">بسم الله الرحمن الرحيم</div>
       
-      <!-- Header row - ministry blocks shifted DOWN below Bismillah -->
+      <!-- Header row -->
       <div class="header-row">
         <div class="header-english">
           THE REPUBLIC OF THE GAMBIA<br/>
@@ -352,7 +359,7 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         <div class="title-arabic">شهادة إتمام دراسة المرحلة الابتدائية</div>
       </div>
       
-      <!-- Main paragraph - 14-15pt, centered block, moved down with equal spacing -->
+      <!-- Main paragraph -->
       <div class="body-content">
         <p>
           تشهد الأمانة العامّة بأنّ ${studentLabel}/ <span class="highlight">{${fullName}}</span> ${bornLabel} في <span class="highlight">{${student.placeOfBirth || ''}}</span> بتاريخ :
@@ -364,13 +371,13 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         </p>
       </div>
       
-      <!-- Registration info - inside safe area -->
+      <!-- Registration info -->
       <div class="registration-line">
         سُجّلت هذه الشّهادة تحت رقم ( <span class="highlight">{${certificateNumber}}</span> ) بتاريخ : <span class="highlight">{${issueDateHijri}}</span> هـ الموافق
         <span class="highlight">{${issueDateGreg}}</span> م
       </div>
       
-      <!-- Signatures - inside safe area, aligned like PNG template -->
+      <!-- Signatures -->
       <div class="signature-section">
         <div class="signature-block">
           <div class="signature-title">توقيع مدير المدرسة</div>
@@ -380,7 +387,7 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         
         <div class="signature-block">
           <div class="signature-title">الختم الرسمي</div>
-          <div style="height: 50px;"></div>
+          <div style="height: 40px;"></div>
         </div>
         
         <div class="signature-block">
