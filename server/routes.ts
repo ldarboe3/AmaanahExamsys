@@ -7759,6 +7759,337 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Primary Certificate Generation - Arabic certificates with auto-gender detection
+  app.post("/api/certificates/generate-primary", isAuthenticated, async (req, res) => {
+    try {
+      const { studentIds, examYearId } = req.body;
+      if (!Array.isArray(studentIds) || studentIds.length === 0) {
+        return res.status(400).json({ message: "studentIds array is required" });
+      }
+      
+      const targetExamYear = examYearId 
+        ? await storage.getExamYear(examYearId)
+        : await storage.getActiveExamYear();
+        
+      if (!targetExamYear) {
+        return res.status(400).json({ message: "No exam year found" });
+      }
+
+      const { generatePrimaryCertificatePDF, validateCertificateRequirements } = await import('./primaryCertificateService');
+      const { generateCertificateNumber, generateQRToken } = await import('./certificateTemplates');
+
+      const generatedCerts = [];
+      const errors = [];
+      
+      for (const studentId of studentIds) {
+        const student = await storage.getStudent(studentId);
+        if (!student) {
+          errors.push({ studentId, error: 'Student not found', errorAr: 'الطالب غير موجود' });
+          continue;
+        }
+        
+        // Validate required fields
+        const validation = validateCertificateRequirements({
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          middleName: student.middleName,
+          gender: student.gender as 'male' | 'female',
+          dateOfBirth: student.dateOfBirth,
+          placeOfBirth: student.placeOfBirth,
+          grade: student.grade,
+          indexNumber: student.indexNumber,
+        });
+        
+        if (!validation.isValid) {
+          errors.push({ 
+            studentId, 
+            studentName: `${student.firstName} ${student.lastName}`,
+            error: validation.errors.join(', '),
+            errorAr: validation.errorsAr.join('، ')
+          });
+          continue;
+        }
+        
+        const school = await storage.getSchool(student.schoolId);
+        if (!school) {
+          errors.push({ studentId, error: 'School not found', errorAr: 'المدرسة غير موجودة' });
+          continue;
+        }
+        
+        // Get results and calculate final grade
+        const results = await storage.getResultsByStudent(studentId);
+        const passedResults = results.filter(r => r.status === 'published');
+        
+        if (passedResults.length === 0) {
+          errors.push({ studentId, studentName: `${student.firstName} ${student.lastName}`, error: 'No published results', errorAr: 'لا توجد نتائج منشورة' });
+          continue;
+        }
+        
+        const totalScore = passedResults.reduce((sum, r) => sum + parseFloat(r.totalScore || '0'), 0);
+        const average = totalScore / passedResults.length;
+        let finalGrade = 'PASS';
+        if (average >= 80) finalGrade = 'A';
+        else if (average >= 70) finalGrade = 'B';
+        else if (average >= 60) finalGrade = 'C';
+        else if (average >= 50) finalGrade = 'D';
+        else finalGrade = 'FAIL';
+        
+        if (finalGrade === 'FAIL') {
+          errors.push({ studentId, studentName: `${student.firstName} ${student.lastName}`, error: 'Student did not pass', errorAr: 'الطالب لم ينجح' });
+          continue;
+        }
+        
+        const qrToken = generateQRToken();
+        const certNumber = generateCertificateNumber(targetExamYear.year, student.id);
+        const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/${qrToken}`;
+        
+        try {
+          const pdfPath = await generatePrimaryCertificatePDF({
+            student: {
+              id: student.id,
+              firstName: student.firstName,
+              lastName: student.lastName,
+              middleName: student.middleName,
+              gender: student.gender as 'male' | 'female',
+              dateOfBirth: student.dateOfBirth,
+              placeOfBirth: student.placeOfBirth,
+              grade: student.grade,
+              indexNumber: student.indexNumber,
+            },
+            school: { id: school.id, name: school.name, address: school.address },
+            examYear: {
+              id: targetExamYear.id,
+              year: targetExamYear.year,
+              hijriYear: targetExamYear.hijriYear,
+              examStartDate: targetExamYear.examStartDate,
+              examEndDate: targetExamYear.examEndDate,
+            },
+            finalGrade,
+            qrToken,
+            certificateNumber: certNumber,
+            verifyUrl,
+          });
+          
+          const cert = await storage.createCertificate({
+            studentId: student.id,
+            examYearId: targetExamYear.id,
+            certificateNumber: certNumber,
+            grade: student.grade,
+            templateType: student.gender,
+            finalResult: finalGrade,
+            finalGradeWord: finalGrade,
+            totalScore: String(totalScore),
+            qrToken,
+            issuedDate: new Date(),
+            pdfUrl: pdfPath,
+            status: 'generated',
+          });
+          generatedCerts.push({
+            ...cert,
+            studentName: `${student.firstName} ${student.lastName}`,
+          });
+        } catch (e: any) {
+          console.error(`Failed to generate primary certificate for student ${studentId}:`, e.message);
+          errors.push({ studentId, studentName: `${student.firstName} ${student.lastName}`, error: e.message, errorAr: 'فشل في إنشاء الشهادة' });
+        }
+      }
+      
+      res.json({ 
+        generated: generatedCerts.length, 
+        certificates: generatedCerts,
+        errors: errors.length > 0 ? errors : undefined,
+        total: studentIds.length
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Gender detection endpoint
+  app.post("/api/students/detect-gender", isAuthenticated, async (req, res) => {
+    try {
+      const { names } = req.body;
+      
+      if (Array.isArray(names)) {
+        const { detectGenderBatch } = await import('./genderDetection');
+        const results = detectGenderBatch(names);
+        const response: Record<string, any> = {};
+        results.forEach((result, name) => {
+          response[name] = result;
+        });
+        res.json(response);
+      } else if (typeof names === 'string') {
+        const { detectGender } = await import('./genderDetection');
+        res.json(detectGender(names));
+      } else {
+        return res.status(400).json({ message: "names (string or array) is required" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update student gender and birth info
+  app.patch("/api/students/:id/certificate-info", isAuthenticated, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.id);
+      const { gender, dateOfBirth, placeOfBirth } = req.body;
+      
+      const updateData: any = {};
+      if (gender && (gender === 'male' || gender === 'female')) {
+        updateData.gender = gender;
+      }
+      if (dateOfBirth) {
+        updateData.dateOfBirth = dateOfBirth;
+      }
+      if (placeOfBirth) {
+        updateData.placeOfBirth = placeOfBirth;
+      }
+      
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+      
+      const student = await storage.updateStudent(studentId, updateData);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      res.json(student);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get students eligible for certificate generation
+  app.get("/api/certificates/eligible-students", isAuthenticated, async (req, res) => {
+    try {
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      const schoolId = req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined;
+      const grade = req.query.grade ? parseInt(req.query.grade as string) : undefined;
+      
+      const targetExamYear = examYearId 
+        ? await storage.getExamYear(examYearId)
+        : await storage.getActiveExamYear();
+        
+      if (!targetExamYear) {
+        return res.status(400).json({ message: "No exam year found" });
+      }
+
+      let students = await storage.getStudentsByExamYear(targetExamYear.id);
+      
+      // Filter by school if provided
+      if (schoolId) {
+        students = students.filter(s => s.schoolId === schoolId);
+      }
+      
+      // Filter by grade if provided
+      if (grade) {
+        students = students.filter(s => s.grade === grade);
+      }
+      
+      // Only approved students
+      students = students.filter(s => s.status === 'approved');
+      
+      // Check each student's eligibility
+      const eligibleStudents = [];
+      for (const student of students) {
+        const results = await storage.getResultsByStudent(student.id);
+        const publishedResults = results.filter(r => r.status === 'published');
+        
+        // Check if student has all required fields
+        const missingFields = [];
+        if (!student.gender) missingFields.push('gender');
+        if (!student.dateOfBirth) missingFields.push('dateOfBirth');
+        if (!student.placeOfBirth) missingFields.push('placeOfBirth');
+        
+        // Calculate grade
+        let finalGrade = null;
+        let passed = false;
+        if (publishedResults.length > 0) {
+          const totalScore = publishedResults.reduce((sum, r) => sum + parseFloat(r.totalScore || '0'), 0);
+          const average = totalScore / publishedResults.length;
+          if (average >= 80) finalGrade = 'A';
+          else if (average >= 70) finalGrade = 'B';
+          else if (average >= 60) finalGrade = 'C';
+          else if (average >= 50) finalGrade = 'D';
+          else finalGrade = 'FAIL';
+          passed = finalGrade !== 'FAIL';
+        }
+        
+        // Check if already has certificate
+        const existingCert = await storage.getCertificatesByStudent(student.id);
+        const hasCertificate = existingCert.some(c => c.examYearId === targetExamYear.id);
+        
+        eligibleStudents.push({
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          middleName: student.middleName,
+          indexNumber: student.indexNumber,
+          grade: student.grade,
+          gender: student.gender,
+          dateOfBirth: student.dateOfBirth,
+          placeOfBirth: student.placeOfBirth,
+          schoolId: student.schoolId,
+          hasResults: publishedResults.length > 0,
+          resultCount: publishedResults.length,
+          finalGrade,
+          passed,
+          missingFields,
+          isEligible: missingFields.length === 0 && passed && !hasCertificate,
+          hasCertificate,
+        });
+      }
+      
+      res.json({
+        examYear: targetExamYear,
+        students: eligibleStudents,
+        summary: {
+          total: eligibleStudents.length,
+          eligible: eligibleStudents.filter(s => s.isEligible).length,
+          withCertificate: eligibleStudents.filter(s => s.hasCertificate).length,
+          missingData: eligibleStudents.filter(s => s.missingFields.length > 0).length,
+          noResults: eligibleStudents.filter(s => !s.hasResults).length,
+          failed: eligibleStudents.filter(s => !s.passed && s.hasResults).length,
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Download certificate PDF
+  app.get("/api/certificates/:id/download", async (req, res) => {
+    try {
+      const certificate = await storage.getCertificate(parseInt(req.params.id));
+      if (!certificate) {
+        return res.status(404).json({ message: "Certificate not found" });
+      }
+      
+      if (!certificate.pdfUrl) {
+        return res.status(404).json({ message: "Certificate PDF not generated yet" });
+      }
+      
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      if (!fs.existsSync(certificate.pdfUrl)) {
+        return res.status(404).json({ message: "Certificate PDF file not found" });
+      }
+      
+      const fileName = path.basename(certificate.pdfUrl);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      
+      const fileStream = fs.createReadStream(certificate.pdfUrl);
+      fileStream.pipe(res);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Transcripts API
   app.get("/api/transcripts", async (req, res) => {
     try {
