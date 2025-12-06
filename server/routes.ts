@@ -8010,6 +8010,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           continue;
         }
         
+        // Check if certificate already exists for this student and exam year
+        const existingCerts = await storage.getCertificatesByExamYear(targetExamYear.id);
+        const existingCert = existingCerts.find(c => c.studentId === studentId);
+        if (existingCert) {
+          // Certificate already exists - skip and return it as already generated
+          generatedCerts.push({
+            ...existingCert,
+            studentName: `${student.firstName} ${student.lastName}`,
+            alreadyExists: true,
+          });
+          continue;
+        }
+        
         const qrToken = generateQRToken();
         const certNumber = generateCertificateNumber(targetExamYear.year, student.id);
         const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/${qrToken}`;
