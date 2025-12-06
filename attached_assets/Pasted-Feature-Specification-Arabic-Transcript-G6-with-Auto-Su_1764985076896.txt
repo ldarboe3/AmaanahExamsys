@@ -1,0 +1,216 @@
+Feature Specification: Arabic Transcript (G6) with Auto Subject Marks + Bilingual Identity Block + Final Result Logic
+
+Goal:
+Generate an official Arabic-only Grade 6 transcript using the provided template:
+
+📄 Transcript Template:
+/mnt/data/Transcript for G6.pdf
+(Use layout, tables, and Arabic wording exactly as shown.)
+
+The system must automatically insert marks for each subject (under “رقماً”), compute totals, compute percentage, determine final grade (التقدير), and fill in identity details in Arabic + English.
+
+✅ A) Data Sources
+
+For each student:
+
+From results database:
+
+All subject marks (13 subjects from the template).
+
+From student profile:
+
+Arabic:
+
+اسم الطالب/ة (Student name)
+
+الجنسية (Nationality)
+
+المدرسة (School)
+
+English:
+
+Student name (EN) → transliteration
+
+Nationality (EN) → translation to adjective (Gambian, Nigerian, etc.)
+
+School (EN) → official English school name or transliteration
+
+Computed:
+
+Total Marks (مجموع الدرجات)
+
+Percentage (النسبة)
+
+Final Result (التقدير)
+
+✅ B) Subject Rows
+
+Use the subjects exactly as listed in the Arabic template (13 rows).
+The system must place each mark under the “رقماً” column:
+
+القرآن الكريم
+
+الحديث
+
+التوحيد
+
+الفقه
+
+السيرة
+
+القراءة والمحفوظات
+
+الكتابة (الإملاء والخط)
+
+التعبير
+
+القواعد
+
+Science
+
+Mathematics
+
+S.E.S
+
+English
+
+For each subject:
+
+Insert the numeric mark under “رقماً”
+
+Leave empty if mark is missing
+
+✅ C) Total Marks (مجموع الدرجات)
+
+System must compute:
+
+Total Marks = Sum of all available subject marks
+
+
+Insert the computed total in the field under مجموع الدرجات exactly as shown in the template.
+
+✅ D) Percentage (النسبة)
+
+Calculate:
+
+Percentage = (Total Marks ÷ Total Maximum Marks) × 100
+
+
+The “Total Maximum Marks” = Sum of maximum marks of every subject
+(Use the maxima printed on the transcript template for consistency.)
+
+Insert the percentage value in the field for النسبة.
+
+✅ E) Final Result (Grade) التقدير
+
+Use these exact logic rules:
+
+Percentage Range	Final Result (التقدير)
+85% – 100%	ممتاز
+75% – 84%	جيد جدا
+65% – 74%	جيد
+50% – 64%	مقبول
+Below 50%	راسب (if applicable)
+
+System must:
+
+Compare percentage to ranges.
+
+Determine Final Result.
+
+Insert التقدير automatically in the template field.
+
+✅ F) Identity Section (Arabic + English Side-by-Side)
+
+Right side (Arabic — from template):
+
+اسم الطالب/ة
+
+الجنسية
+
+المدرسة
+
+Left side (English — new requirement):
+
+Student Name (EN)
+
+Nationality (EN)
+
+School (EN)
+
+The English block must be aligned next to the Arabic block in the same row.
+
+Names in English must be transliterated, not translated.
+Arabic nationality → English adjective.
+
+✅ G) Arabic Text Cleaner (Pre-processing)
+
+Apply to:
+
+Student name
+
+School name
+
+Nationality
+
+Subject labels (for matching)
+
+Rules:
+
+Remove extra spaces
+
+Remove tatweel “ـ”
+
+Normalize Alef → ا
+
+Normalize ة → ه
+
+Normalize ى → ي
+
+Remove dots/punctuation inside names
+
+Normalize Arabic digits → English digits
+
+This ensures clean matching and clean printing on the transcript.
+
+✅ H) Rendering Requirements
+
+The transcript MUST stay Arabic-only except for the three English identity fields.
+
+Use coordinate-based rendering to place:
+
+Subject marks under “رقماً”
+
+Total marks, percentage, final grade
+
+Arabic & English identity fields
+
+Use Arabic-capable fonts (Amiri / Noto Naskh Arabic)
+
+Output a single PDF per student.
+
+✅ I) Validation Rules
+
+Block transcript generation if:
+
+No subject marks exist
+
+Missing Arabic student name / nationality / school
+
+Missing English translation fields
+
+Missing total marks or percentage cannot be computed
+
+Provide errors in Arabic.
+
+🎯 Acceptance Criteria
+
+The system must generate a transcript PDF that:
+
+✔ Matches the Arabic layout & wording exactly
+✔ Fills all subject marks under “رقماً”
+✔ Computes total marks, percentage, and final result using the exact logic above
+✔ Shows identity block in Arabic and English
+✔ Keeps the document fully Arabic except the left-side English identity
+✔ Normalizes Arabic text before rendering
+✔ Supports batch generation
