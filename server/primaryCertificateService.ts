@@ -84,6 +84,13 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
   const passedLabel = isFemale ? 'نجحت' : 'نجح';
   const gradeLabel = isFemale ? 'تقديرها' : 'تقديره';
 
+  // Safe area margins (140px on each side = ~4% of 3508px width, well inside the border)
+  const safeLeft = 140;
+  const safeRight = 140;
+  const safeTop = 120;
+  const safeBottom = 100;
+  const contentWidth = 3508 - safeLeft - safeRight; // ~3228px
+
   return `<!DOCTYPE html>
 <html lang="ar">
 <head>
@@ -123,33 +130,56 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       font-family: 'Amiri', 'Traditional Arabic', 'Times New Roman', serif;
     }
     
-    .overlay {
+    /* Safe content area - all content must stay within this box */
+    .safe-area {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: ${safeTop}px;
+      left: ${safeLeft}px;
+      right: ${safeRight}px;
+      bottom: ${safeBottom}px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     
-    .bismillah {
+    /* Watermark in center */
+    .watermark {
       position: absolute;
-      top: 200px;
-      left: 0;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 700px;
+      opacity: 0.10;
+      pointer-events: none;
+      z-index: 0;
+    }
+    
+    /* Bismillah - Header size (~16pt = 48px at 300dpi) */
+    .bismillah {
       width: 100%;
       text-align: center;
-      font-size: 52px;
-      font-weight: normal;
+      font-size: 48px;
+      font-weight: bold;
       color: #000;
       direction: rtl;
+      margin-top: 80px;
+      margin-bottom: 20px;
+    }
+    
+    /* Header row with English, Logo, Arabic */
+    .header-row {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      padding: 0 60px;
     }
     
     .header-english {
-      position: absolute;
-      top: 320px;
-      left: 340px;
-      width: 700px;
-      font-size: 28px;
-      line-height: 1.25;
+      width: 600px;
+      font-size: 24px;
+      line-height: 1.3;
       text-align: left;
       color: #000;
       font-family: 'Times New Roman', serif;
@@ -162,78 +192,73 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
     }
     
     .header-logo {
-      position: absolute;
-      top: 300px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 380px;
+      width: 320px;
       text-align: center;
     }
     
     .header-logo img {
       max-width: 100%;
-      max-height: 280px;
+      max-height: 200px;
       object-fit: contain;
     }
     
     .header-logo .logo-text {
-      font-size: 20px;
-      margin-top: 8px;
+      font-size: 16px;
+      margin-top: 6px;
       font-weight: bold;
-      letter-spacing: 2px;
+      letter-spacing: 1px;
     }
     
     .header-arabic {
-      position: absolute;
-      top: 320px;
-      right: 340px;
-      width: 700px;
-      font-size: 34px;
-      line-height: 1.35;
+      width: 600px;
+      font-size: 28px;
+      line-height: 1.4;
       text-align: right;
       color: #000;
       direction: rtl;
     }
     
-    .title-english {
-      position: absolute;
-      top: 620px;
-      left: 0;
+    /* Titles section */
+    .titles-section {
       width: 100%;
       text-align: center;
-      font-size: 46px;
+      margin: 15px 0 25px 0;
+    }
+    
+    /* English title - Header size (~16pt = 48px), bold, centered */
+    .title-english {
+      font-size: 42px;
       font-weight: bold;
-      letter-spacing: 3px;
+      letter-spacing: 2px;
       color: #000;
       font-family: 'Times New Roman', serif;
+      margin-bottom: 8px;
     }
     
+    /* Arabic title - Header size (~16pt = 48px), bold, centered */
     .title-arabic {
-      position: absolute;
-      top: 690px;
-      left: 0;
-      width: 100%;
-      text-align: center;
-      font-size: 52px;
+      font-size: 48px;
       font-weight: bold;
       color: #000;
       direction: rtl;
     }
     
+    /* Main paragraph body - centered block, ~14pt = 42px */
     .body-content {
-      position: absolute;
-      top: 800px;
-      left: 380px;
-      right: 380px;
+      width: 90%;
+      max-width: 2800px;
+      margin: 0 auto;
       direction: rtl;
-      text-align: right;
-      font-size: 38px;
-      line-height: 1.9;
+      text-align: center;
+      font-size: 36px;
+      line-height: 1.8;
       color: #000;
+      padding: 20px 40px;
     }
     
     .body-content p {
-      margin-bottom: 10px;
+      margin-bottom: 8px;
+      text-align: center;
     }
     
     .highlight {
@@ -242,59 +267,49 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       font-style: italic;
     }
     
+    /* Registration line - centered, inside safe area */
     .registration-line {
-      position: absolute;
-      top: 1180px;
-      left: 380px;
-      right: 380px;
+      width: 90%;
+      max-width: 2800px;
+      margin: 15px auto;
       direction: rtl;
-      text-align: right;
-      font-size: 36px;
-      line-height: 1.7;
+      text-align: center;
+      font-size: 32px;
+      line-height: 1.6;
       color: #000;
     }
     
+    /* Signature section - inside safe area */
     .signature-section {
-      position: absolute;
-      top: 1380px;
-      left: 380px;
-      right: 380px;
+      width: 90%;
+      max-width: 2600px;
+      margin: 30px auto 0 auto;
       display: flex;
       justify-content: space-between;
       direction: rtl;
     }
     
     .signature-block {
-      width: 700px;
+      width: 550px;
       text-align: center;
     }
     
     .signature-title {
-      font-size: 32px;
+      font-size: 28px;
       color: #000;
-      margin-bottom: 100px;
+      margin-bottom: 60px;
     }
     
     .signature-line {
-      font-size: 28px;
-      letter-spacing: 6px;
-      margin-bottom: 20px;
+      font-size: 24px;
+      letter-spacing: 4px;
+      margin-bottom: 15px;
     }
     
     .stamp-label {
-      font-size: 28px;
+      font-size: 24px;
       color: #333;
-      margin-top: 10px;
-    }
-    
-    .watermark {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 900px;
-      opacity: 0.12;
-      pointer-events: none;
+      margin-top: 8px;
     }
   </style>
 </head>
@@ -302,34 +317,42 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
   <div class="certificate-container">
     ${logoBase64 ? `<img class="watermark" src="data:image/png;base64,${logoBase64}" alt="" />` : ''}
     
-    <div class="overlay">
+    <div class="safe-area">
+      <!-- Bismillah - Bold, Header size, centered -->
       <div class="bismillah">بسم الله الرحمن الرحيم</div>
       
-      <div class="header-english">
-        THE REPUBLIC OF THE GAMBIA<br/>
-        DEPARTMENT OF STATE FOR<br/>
-        BASIC AND SECONDARY<br/>
-        EDUCATION<br/>
-        <span class="italic-text">The General Secretariat for Islamic/<br/>
-        Arabic Education<br/>
-        In The Gambia</span>
+      <!-- Header row: English left, Logo center, Arabic right -->
+      <div class="header-row">
+        <div class="header-english">
+          THE REPUBLIC OF THE GAMBIA<br/>
+          DEPARTMENT OF STATE FOR<br/>
+          BASIC AND SECONDARY<br/>
+          EDUCATION<br/>
+          <span class="italic-text">The General Secretariat for Islamic/<br/>
+          Arabic Education<br/>
+          In The Gambia</span>
+        </div>
+        
+        <div class="header-logo">
+          ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" alt="Logo" />` : ''}
+          <div class="logo-text">EDUCATION FOR DEVELOPMENT</div>
+        </div>
+        
+        <div class="header-arabic">
+          جمهوريـــــــــة غامبيـــــــا<br/>
+          وزارة التربية و التعليم الأساسي<br/>
+          الأمانة العامة للتعليم الاسلامي العربي<br/>
+          في غامبيا
+        </div>
       </div>
       
-      <div class="header-logo">
-        ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" alt="Logo" />` : ''}
-        <div class="logo-text">EDUCATION FOR DEVELOPMENT</div>
+      <!-- Titles - Bold, Header size, centered -->
+      <div class="titles-section">
+        <div class="title-english">GAMBIA MADRASSAH PRIMARY CERTIFICATE</div>
+        <div class="title-arabic">شهادة إتمام دراسة المرحلة الابتدائية</div>
       </div>
       
-      <div class="header-arabic">
-        جمهوريـــــــــة غامبيـــــــا<br/>
-        وزارة التربية و التعليم الأساسي<br/>
-        الأمانة العامة للتعليم الاسلامي العربي<br/>
-        في غامبيا
-      </div>
-      
-      <div class="title-english">GAMBIA MADRASSAH PRIMARY CERTIFICATE</div>
-      <div class="title-arabic">شهادة إتمام دراسة المرحلة الابتدائية</div>
-      
+      <!-- Main paragraph - Body size, centered block -->
       <div class="body-content">
         <p>
           تشهد الأمانة العامّة بأنّ ${studentLabel}/ <span class="highlight">{${fullName}}</span> ${bornLabel} في <span class="highlight">{${student.placeOfBirth || ''}}</span> بتاريخ :
@@ -341,11 +364,13 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         </p>
       </div>
       
+      <!-- Registration info - centered, inside safe area -->
       <div class="registration-line">
         سُجّلت هذه الشّهادة تحت رقم ( <span class="highlight">{${certificateNumber}}</span> ) بتاريخ : <span class="highlight">{${issueDateHijri}}</span> هـ الموافق
         <span class="highlight">{${issueDateGreg}}</span> م
       </div>
       
+      <!-- Signatures - inside safe area -->
       <div class="signature-section">
         <div class="signature-block">
           <div class="signature-title">توقيع مدير المدرسة</div>
@@ -355,7 +380,7 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         
         <div class="signature-block">
           <div class="signature-title">الختم الرسمي</div>
-          <div style="height: 100px;"></div>
+          <div style="height: 60px;"></div>
         </div>
         
         <div class="signature-block">

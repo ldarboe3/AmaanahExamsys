@@ -1,0 +1,35 @@
+Certificate Layout — Final Fit & Typography Fix
+Issue: In the generated certificate, several text blocks extend into the patterned border. The header hierarchy and text sizes don’t match the required spec, and the main paragraph isn’t centered enough. Verified on the latest PDF. 
+Goal: All content must sit cleanly inside the inner frame, with correct header sizes/weights and centered body text—matching the PNG template exactly.
+________________________________________
+Required Fixes (no code, layout only)
+1.	Define a safe content area
+o	Create an inner margin/inset so no text can cross into the border.
+o	Recommended safe area: at least 35–45 px (or equivalent) inside the inner gold frame on all sides.
+o	Reflow all overlays to sit fully inside this safe area. (Border overlap was visible in the latest PDF.) 
+2.	Header hierarchy & alignment
+o	Top Arabic line “بسم الله الرحمن الرحيم”: centered, bold, larger than body (target ≈ header size).
+o	English title “GAMBIA MADRASSAH PRIMARY CERTIFICATE”: centered, bold, Header size.
+o	Arabic subtitle “شهادة إتمام دراسة المرحلة الابتدائية”: centered, Header size.
+3.	Font sizes (visual targets)
+o	Headers: ~16 pt equivalent.
+o	Body/paragraph: ~14 pt equivalent (all Arabic narrative lines).
+o	Ensure consistent line-height so the paragraph sits compactly without drifting toward the border.
+4.	Center the main paragraph block
+o	The multi-line Arabic paragraph should be centered horizontally as a block (not left/right hugging), and vertically positioned so there’s clear whitespace above and below—well inside the safe area.
+5.	Keep RTL & Arabic shaping correct
+o	Maintain proper RTL rendering and Arabic shaping for all fields (names, places, dates), with consistent weight for emphasized red tokens.
+6.	Position the signatures & numbers inside the frame
+o	Reposition the certificate number, dates (Hijri & Gregorian), and signature lines so they are well within the inner frame and aligned to the safe area guides, not the border.
+7.	No page scaling
+o	Ensure the export does not scale the page content; the border should remain at full bleed, and all text should respect the safe area.
+________________________________________
+Acceptance Checklist
+•	No text touches or crosses the decorative border; everything sits within the safe area. 
+•	Top header (Bismillah) and main English title are centered, bold, and visually prominent (≈16 pt).
+•	Arabic subtitle is centered and treated as a header (≈16 pt).
+•	The paragraph body is centered and uses ≈14 pt, with balanced spacing above/below.
+•	Certificate number, dates, and signature lines are fully inside the frame, aligned to the safe area.
+•	Final output matches the PNG layout exactly (only text changes).
+If you want, I can mark up the safe-area margins and a suggested baseline grid on a screenshot of the PNG for pixel-perfect placement.
+
