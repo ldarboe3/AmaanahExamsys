@@ -7449,6 +7449,117 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Certificates API
+  
+  // Get students eligible for certificate generation
+  // IMPORTANT: This route MUST be defined BEFORE /api/certificates/:id to prevent route matching issues
+  app.get("/api/certificates/eligible-students", isAuthenticated, async (req, res) => {
+    try {
+      const examYearIdStr = req.query.examYearId as string | undefined;
+      const schoolIdStr = req.query.schoolId as string | undefined;
+      const gradeStr = req.query.grade as string | undefined;
+      
+      // Safely parse integers, handling empty strings and NaN
+      const parseIntSafe = (str: string | undefined): number | undefined => {
+        if (!str || str.trim() === '') return undefined;
+        const parsed = parseInt(str, 10);
+        return isNaN(parsed) ? undefined : parsed;
+      };
+      
+      const examYearId = parseIntSafe(examYearIdStr);
+      const schoolId = parseIntSafe(schoolIdStr);
+      const grade = parseIntSafe(gradeStr);
+      
+      const targetExamYear = examYearId 
+        ? await storage.getExamYear(examYearId)
+        : await storage.getActiveExamYear();
+        
+      if (!targetExamYear) {
+        return res.status(400).json({ message: "No exam year found" });
+      }
+
+      let students = await storage.getStudentsByExamYear(targetExamYear.id);
+      
+      // Filter by school if provided
+      if (schoolId) {
+        students = students.filter(s => s.schoolId === schoolId);
+      }
+      
+      // Filter by grade if provided
+      if (grade) {
+        students = students.filter(s => s.grade === grade);
+      }
+      
+      // Only approved students
+      students = students.filter(s => s.status === 'approved');
+      
+      // Check each student's eligibility
+      const eligibleStudents = [];
+      for (const student of students) {
+        const results = await storage.getResultsByStudent(student.id);
+        const publishedResults = results.filter(r => r.status === 'published');
+        
+        // Check if student has all required fields
+        const missingFields = [];
+        if (!student.gender) missingFields.push('gender');
+        if (!student.dateOfBirth) missingFields.push('dateOfBirth');
+        if (!student.placeOfBirth) missingFields.push('placeOfBirth');
+        
+        // Calculate grade
+        let finalGrade = null;
+        let passed = false;
+        if (publishedResults.length > 0) {
+          const totalScore = publishedResults.reduce((sum, r) => sum + parseFloat(r.totalScore || '0'), 0);
+          const average = totalScore / publishedResults.length;
+          if (average >= 80) finalGrade = 'A';
+          else if (average >= 70) finalGrade = 'B';
+          else if (average >= 60) finalGrade = 'C';
+          else if (average >= 50) finalGrade = 'D';
+          else finalGrade = 'FAIL';
+          passed = finalGrade !== 'FAIL';
+        }
+        
+        // Check if already has certificate
+        const existingCert = await storage.getCertificatesByStudent(student.id);
+        const hasCertificate = existingCert.some(c => c.examYearId === targetExamYear.id);
+        
+        eligibleStudents.push({
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          middleName: student.middleName,
+          indexNumber: student.indexNumber,
+          grade: student.grade,
+          gender: student.gender,
+          dateOfBirth: student.dateOfBirth,
+          placeOfBirth: student.placeOfBirth,
+          schoolId: student.schoolId,
+          hasResults: publishedResults.length > 0,
+          resultCount: publishedResults.length,
+          finalGrade,
+          passed,
+          missingFields,
+          isEligible: missingFields.length === 0 && passed && !hasCertificate,
+          hasCertificate,
+        });
+      }
+      
+      res.json({
+        examYear: targetExamYear,
+        students: eligibleStudents,
+        summary: {
+          total: eligibleStudents.length,
+          eligible: eligibleStudents.filter(s => s.isEligible).length,
+          withCertificate: eligibleStudents.filter(s => s.hasCertificate).length,
+          missingData: eligibleStudents.filter(s => s.missingFields.length > 0).length,
+          noResults: eligibleStudents.filter(s => !s.hasResults).length,
+          failed: eligibleStudents.filter(s => !s.passed && s.hasResults).length,
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/certificates", async (req, res) => {
     try {
       const studentId = req.query.studentId ? parseInt(req.query.studentId as string) : undefined;
@@ -7957,134 +8068,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       res.json(student);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Get students eligible for certificate generation
-  app.get("/api/certificates/eligible-students", isAuthenticated, async (req, res) => {
-    try {
-      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
-      const schoolId = req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined;
-      const grade = req.query.grade ? parseInt(req.query.grade as string) : undefined;
-      
-      const targetExamYear = examYearId 
-        ? await storage.getExamYear(examYearId)
-        : await storage.getActiveExamYear();
-        
-      if (!targetExamYear) {
-        return res.status(400).json({ message: "No exam year found" });
-      }
-
-      let students = await storage.getStudentsByExamYear(targetExamYear.id);
-      
-      // Filter by school if provided
-      if (schoolId) {
-        students = students.filter(s => s.schoolId === schoolId);
-      }
-      
-      // Filter by grade if provided
-      if (grade) {
-        students = students.filter(s => s.grade === grade);
-      }
-      
-      // Only approved students
-      students = students.filter(s => s.status === 'approved');
-      
-      // Check each student's eligibility
-      const eligibleStudents = [];
-      for (const student of students) {
-        const results = await storage.getResultsByStudent(student.id);
-        const publishedResults = results.filter(r => r.status === 'published');
-        
-        // Check if student has all required fields
-        const missingFields = [];
-        if (!student.gender) missingFields.push('gender');
-        if (!student.dateOfBirth) missingFields.push('dateOfBirth');
-        if (!student.placeOfBirth) missingFields.push('placeOfBirth');
-        
-        // Calculate grade
-        let finalGrade = null;
-        let passed = false;
-        if (publishedResults.length > 0) {
-          const totalScore = publishedResults.reduce((sum, r) => sum + parseFloat(r.totalScore || '0'), 0);
-          const average = totalScore / publishedResults.length;
-          if (average >= 80) finalGrade = 'A';
-          else if (average >= 70) finalGrade = 'B';
-          else if (average >= 60) finalGrade = 'C';
-          else if (average >= 50) finalGrade = 'D';
-          else finalGrade = 'FAIL';
-          passed = finalGrade !== 'FAIL';
-        }
-        
-        // Check if already has certificate
-        const existingCert = await storage.getCertificatesByStudent(student.id);
-        const hasCertificate = existingCert.some(c => c.examYearId === targetExamYear.id);
-        
-        eligibleStudents.push({
-          id: student.id,
-          firstName: student.firstName,
-          lastName: student.lastName,
-          middleName: student.middleName,
-          indexNumber: student.indexNumber,
-          grade: student.grade,
-          gender: student.gender,
-          dateOfBirth: student.dateOfBirth,
-          placeOfBirth: student.placeOfBirth,
-          schoolId: student.schoolId,
-          hasResults: publishedResults.length > 0,
-          resultCount: publishedResults.length,
-          finalGrade,
-          passed,
-          missingFields,
-          isEligible: missingFields.length === 0 && passed && !hasCertificate,
-          hasCertificate,
-        });
-      }
-      
-      res.json({
-        examYear: targetExamYear,
-        students: eligibleStudents,
-        summary: {
-          total: eligibleStudents.length,
-          eligible: eligibleStudents.filter(s => s.isEligible).length,
-          withCertificate: eligibleStudents.filter(s => s.hasCertificate).length,
-          missingData: eligibleStudents.filter(s => s.missingFields.length > 0).length,
-          noResults: eligibleStudents.filter(s => !s.hasResults).length,
-          failed: eligibleStudents.filter(s => !s.passed && s.hasResults).length,
-        }
-      });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Download certificate PDF
-  app.get("/api/certificates/:id/download", async (req, res) => {
-    try {
-      const certificate = await storage.getCertificate(parseInt(req.params.id));
-      if (!certificate) {
-        return res.status(404).json({ message: "Certificate not found" });
-      }
-      
-      if (!certificate.pdfUrl) {
-        return res.status(404).json({ message: "Certificate PDF not generated yet" });
-      }
-      
-      const fs = await import('fs');
-      const path = await import('path');
-      
-      if (!fs.existsSync(certificate.pdfUrl)) {
-        return res.status(404).json({ message: "Certificate PDF file not found" });
-      }
-      
-      const fileName = path.basename(certificate.pdfUrl);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-      
-      const fileStream = fs.createReadStream(certificate.pdfUrl);
-      fileStream.pipe(res);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
