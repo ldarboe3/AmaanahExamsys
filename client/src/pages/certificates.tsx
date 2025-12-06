@@ -254,14 +254,24 @@ export default function Certificates() {
     },
     onSuccess: (data) => {
       setGeneratingCount(0);
-      if (data.generated > 0) {
+      const errorCount = data.errors?.length || 0;
+      
+      if (data.generated > 0 && errorCount > 0) {
+        const errorNames = data.errors.slice(0, 3).map((e: any) => e.studentName || 'Unknown').join(', ');
+        toast({
+          title: isRTL ? "تم إنشاء بعض الشهادات" : "Some Certificates Generated",
+          description: isRTL 
+            ? `تم إنشاء ${data.generated} شهادة، فشل ${errorCount}: ${errorNames}${errorCount > 3 ? '...' : ''}`
+            : `Generated ${data.generated}, failed ${errorCount}: ${errorNames}${errorCount > 3 ? '...' : ''}`,
+        });
+      } else if (data.generated > 0) {
         toast({
           title: isRTL ? "تم إنشاء الشهادات" : "Certificates Generated",
           description: isRTL 
             ? `تم إنشاء ${data.generated} شهادة بنجاح`
             : `Successfully generated ${data.generated} certificate(s)`,
         });
-      } else if (data.errors && data.errors.length > 0) {
+      } else if (errorCount > 0) {
         const errorMsg = data.errors.map((e: any) => e.studentName ? `${e.studentName}: ${e.error}` : e.error).join(', ');
         toast({
           title: isRTL ? "لم يتم إنشاء شهادات" : "No Certificates Generated",
@@ -274,7 +284,12 @@ export default function Certificates() {
           description: isRTL ? "جميع الطلاب لديهم شهادات بالفعل أو غير مؤهلين" : "All students already have certificates or are not eligible",
         });
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/certificates/eligible-students"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && key[0] === "/api/certificates/eligible-students";
+        }
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/certificates"] });
     },
     onError: (error: Error) => {
