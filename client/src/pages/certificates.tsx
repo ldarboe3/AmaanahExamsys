@@ -287,10 +287,12 @@ export default function Certificates() {
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey;
-          return Array.isArray(key) && key[0] === "/api/certificates/eligible-students";
+          return Array.isArray(key) && (
+            key[0] === "/api/certificates/eligible-students" ||
+            key[0] === "/api/certificates"
+          );
         }
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/certificates"] });
     },
     onError: (error: Error) => {
       setGeneratingCount(0);
