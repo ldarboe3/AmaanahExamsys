@@ -1,0 +1,99 @@
+Please fix the certificate generation system so that it produces the exact same design as the official certificates Lamin will upload.
+
+The current system tries to recreate the design using HTML/CSS, but that approach can never match the real certificate because the official template has:
+
+a detailed security-pattern background
+
+a unique border frame
+
+exact spacing and typography
+
+specific Arabic formatting
+
+high-resolution print design
+
+This means the system must stop trying to build the certificate layout from scratch, and instead use the official certificate image as the background, then place text on top of it.
+
+📌 What You Must Do
+1. Use the original certificate design as a background image
+
+Lamin will upload two certificates (Primary & Secondary).
+
+These images must be used as the full background of the generated certificate.
+
+This is the only way to match the exact design.
+
+2. Overlay the student information on top
+
+You will place the text in specific positions above the background, including:
+
+Student Name
+
+Date of Birth
+
+Place of Birth
+
+School Name
+
+Address
+
+Academic Year
+
+Final Result
+
+Certificate Number
+
+Islamic Date
+
+Gregorian Date
+
+Signatures
+
+The goal is for the text to appear in the exact right location on the template.
+
+3. Use proper Arabic rendering
+
+The certificate has Arabic text, so you must ensure:
+
+The text is right-to-left
+
+An Arabic font is used (such as Amiri or Noto Naskh)
+
+Spacing and shaping follow real Arabic formatting
+
+Without proper Arabic settings, the text will not look like the original.
+
+4. Output a high-quality, print-ready PDF
+
+Use the background image at full resolution
+
+Create the PDF at 300 DPI
+
+No white borders or scaling
+
+Must look exactly like a professionally printed certificate
+
+5. Make a separate settings file for text positions
+
+The positions of the text fields should be stored in a simple configuration file (or JSON).
+This makes it easy to adjust the text alignment without editing the main system.
+
+6. There will be two templates
+
+Gambia Madrassah Primary Certificate
+
+Gambia Madrassah Secondary Certificate
+
+The system should choose the correct background based on the student’s level.
+
+🎯 Expected Result
+
+When a certificate is generated:
+
+It should look exactly like the government-approved certificate Lamin uploaded.
+
+No differences in borders, patterns, spacing, or colors.
+
+Only the dynamic text changes.
+
+The final PDF must be clean, sharp, and ready for printing.
