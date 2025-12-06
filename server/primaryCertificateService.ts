@@ -68,7 +68,7 @@ function transliterateArabicToEnglish(arabic: string): string {
   return result.replace(/\s+/g, ' ').trim();
 }
 
-function generateCertificateHTML(data: PrimaryCertificateData, qrDataUrl: string, logoBase64: string): string {
+function generateCertificateHTML(data: PrimaryCertificateData, qrDataUrl: string, logoBase64: string, watermarkBase64: string): string {
   const { student, school, examYear, finalGrade, certificateNumber } = data;
   
   const isFemale = student.gender === 'female';
@@ -127,6 +127,23 @@ function generateCertificateHTML(data: PrimaryCertificateData, qrDataUrl: string
       margin: 0 auto;
       background: white;
       position: relative;
+    }
+    
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 0;
+      width: 300px;
+      height: 300px;
+    }
+    .watermark img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
     }
     
     .certificate-container {
@@ -329,6 +346,7 @@ function generateCertificateHTML(data: PrimaryCertificateData, qrDataUrl: string
   </style>
 </head>
 <body>
+  ${watermarkBase64 ? `<div class="watermark"><img src="${watermarkBase64}" alt="Watermark"></div>` : ''}
   <div class="certificate-container">
     <div class="inner-border"></div>
     
@@ -440,7 +458,16 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
     logoBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
   }
 
-  const htmlContent = generateCertificateHTML(data, qrDataUrl, logoBase64);
+  // Load watermark logo
+  const watermarkPath = path.join(outputDir, 'watermark_logo.png');
+  let watermarkBase64 = '';
+  
+  if (fs.existsSync(watermarkPath)) {
+    const watermarkBuffer = fs.readFileSync(watermarkPath);
+    watermarkBase64 = `data:image/png;base64,${watermarkBuffer.toString('base64')}`;
+  }
+
+  const htmlContent = generateCertificateHTML(data, qrDataUrl, logoBase64, watermarkBase64);
 
   const browser = await puppeteer.launch({
     headless: 'new' as any,
