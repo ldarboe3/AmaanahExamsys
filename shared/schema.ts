@@ -331,6 +331,34 @@ export const invoiceItems = pgTable("invoice_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Transcripts (for Grade 6 Arabic transcripts with security features)
+export const transcriptStatusEnum = pgEnum('transcript_status', ['pending', 'generated', 'printed', 'cancelled']);
+
+export const transcripts = pgTable("transcripts", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  transcriptNumber: varchar("transcript_number", { length: 50 }).notNull().unique(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
+  grade: integer("grade").notNull(),
+  studentNameAr: varchar("student_name_ar", { length: 500 }),
+  studentNameEn: varchar("student_name_en", { length: 500 }),
+  schoolNameAr: varchar("school_name_ar", { length: 500 }),
+  schoolNameEn: varchar("school_name_en", { length: 500 }),
+  totalScore: decimal("total_score", { precision: 10, scale: 2 }),
+  percentage: decimal("percentage", { precision: 5, scale: 2 }),
+  finalGrade: varchar("final_grade", { length: 50 }),
+  qrToken: varchar("qr_token", { length: 100 }).notNull().unique(),
+  pdfUrl: varchar("pdf_url", { length: 500 }),
+  printCount: integer("print_count").default(0),
+  status: transcriptStatusEnum("status").default('generated'),
+  issuedDate: timestamp("issued_date").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type Transcript = typeof transcripts.$inferSelect;
+export type InsertTranscript = typeof transcripts.$inferInsert;
+
 // Bulk upload tracking
 export const bulkUploadStatusEnum = pgEnum('bulk_upload_status', ['pending', 'processing', 'completed', 'failed']);
 
