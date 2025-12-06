@@ -47,38 +47,62 @@ const COMMON_NAME_TRANSLITERATIONS: Record<string, string> = {
   'الإنجليزي': 'English', 'محمد': 'Mohammed', 'يدالي': 'Yadali',
 };
 
-// Transliterate Arabic text to English
-export function transliterateArabicToEnglish(arabicText: string): string {
-  if (!arabicText) return '';
+// Transliterate a single Arabic word/token to English
+function transliterateWord(word: string): string {
+  if (!word) return '';
   
-  // First, check for common name/word matches
-  let result = arabicText;
-  for (const [arabic, english] of Object.entries(COMMON_NAME_TRANSLITERATIONS)) {
-    result = result.replace(new RegExp(arabic, 'g'), english);
+  // Check if the entire word is in the common names dictionary
+  if (COMMON_NAME_TRANSLITERATIONS[word]) {
+    return COMMON_NAME_TRANSLITERATIONS[word];
   }
   
-  // If result still contains Arabic characters, transliterate them
+  // Character-by-character transliteration
   let transliterated = '';
-  for (const char of result) {
+  for (const char of word) {
     if (ARABIC_TO_ENGLISH_MAP[char] !== undefined) {
       transliterated += ARABIC_TO_ENGLISH_MAP[char];
     } else if (/[\u0600-\u06FF]/.test(char)) {
-      // Unknown Arabic character - try basic mapping
-      transliterated += char;
+      // Unknown Arabic character - skip diacritics, use placeholder for others
+      transliterated += '';
     } else {
       transliterated += char;
     }
   }
   
-  // Clean up the result
-  return transliterated
-    .replace(/\s+/g, ' ')           // Normalize spaces
-    .replace(/'+/g, "'")            // Normalize apostrophes
-    .replace(/^'+|'+$/g, '')        // Remove leading/trailing apostrophes
-    .split(' ')                     // Capitalize each word
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ')
-    .trim();
+  // Capitalize first letter
+  if (transliterated.length > 0) {
+    return transliterated.charAt(0).toUpperCase() + transliterated.slice(1).toLowerCase();
+  }
+  return transliterated;
+}
+
+// Transliterate Arabic text to English (tokenized approach)
+export function transliterateArabicToEnglish(arabicText: string): string {
+  if (!arabicText) return '';
+  
+  // Split into tokens (words)
+  const words = arabicText.trim().split(/\s+/);
+  
+  // Transliterate each word separately
+  const transliteratedWords = words.map(word => {
+    // Check for compound name patterns first (e.g., عبدالله, عبدالرحمن)
+    if (COMMON_NAME_TRANSLITERATIONS[word]) {
+      return COMMON_NAME_TRANSLITERATIONS[word];
+    }
+    
+    // Try to find matching substrings for compound names
+    let matched = false;
+    for (const [arabic, english] of Object.entries(COMMON_NAME_TRANSLITERATIONS)) {
+      if (word === arabic) {
+        return english;
+      }
+    }
+    
+    // Transliterate character by character
+    return transliterateWord(word);
+  });
+  
+  return transliteratedWords.filter(w => w.length > 0).join(' ');
 }
 
 // Generate unique transcript number

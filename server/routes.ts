@@ -8444,10 +8444,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
         
         try {
-          // Generate unique transcript number (check last sequence in database)
-          const existingTranscripts = await storage.getTranscriptsByExamYear(targetExamYear.id);
-          const sequenceNumber = existingTranscripts.length + 1;
-          const transcriptNumber = generateTranscriptNumber(targetExamYear.year, sequenceNumber);
+          // Generate unique transcript number using student ID for uniqueness
+          // This ensures idempotent generation - same student always gets same number
+          const existingTranscript = await storage.getTranscriptByStudentAndExamYear(studentId, targetExamYear.id);
+          if (existingTranscript) {
+            // Transcript already exists for this student - return it
+            generatedTranscripts.push({
+              ...existingTranscript,
+              studentName: `${student.firstName} ${student.middleName || ''} ${student.lastName}`.trim(),
+              percentage: transcriptData.percentage.toFixed(1),
+              finalGrade: transcriptData.finalGrade.arabic,
+            });
+            continue;
+          }
+          
+          // Generate unique transcript number using timestamp + student ID
+          const timestamp = Date.now().toString().slice(-6);
+          const transcriptNumber = `G6TR-${targetExamYear.year}-${String(studentId).padStart(4, '0')}${timestamp.slice(-2)}`;
           
           // Generate unique QR token
           const qrToken = generateQRToken();
