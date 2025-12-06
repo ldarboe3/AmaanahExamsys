@@ -452,9 +452,9 @@ function generateTranscriptHTML(data: TranscriptData): string {
       font-size: 16px;
       font-weight: bold;
       color: #000;
-      margin: 15px 0;
+      margin: 10px 0;
       direction: rtl;
-      line-height: 1.6;
+      line-height: 1.4;
     }
     .title {
       text-align: center;
@@ -466,8 +466,8 @@ function generateTranscriptHTML(data: TranscriptData): string {
     .identity-section {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 20px;
-      padding: 10px;
+      margin-bottom: 12px;
+      padding: 8px;
       background: #f9f9f9;
       border: 1px solid #ddd;
     }
@@ -493,12 +493,12 @@ function generateTranscriptHTML(data: TranscriptData): string {
     table.marks-table {
       width: 100%;
       border-collapse: collapse;
-      margin: 15px 0;
+      margin: 10px 0;
     }
     table.marks-table th,
     table.marks-table td {
       border: 1px solid #333;
-      padding: 8px 5px;
+      padding: 6px 4px;
       text-align: center;
     }
     table.marks-table th {
@@ -526,8 +526,8 @@ function generateTranscriptHTML(data: TranscriptData): string {
     .signatures {
       display: flex;
       justify-content: space-between;
-      margin-top: 40px;
-      padding-top: 20px;
+      margin-top: 15px;
+      padding-top: 10px;
     }
     .signature-block {
       text-align: center;
@@ -535,13 +535,45 @@ function generateTranscriptHTML(data: TranscriptData): string {
     }
     .signature-label {
       font-weight: bold;
-      margin-bottom: 30px;
+      margin-bottom: 15px;
     }
     .signature-line {
       border-top: 1px dotted #333;
       width: 150px;
       margin: 0 auto;
-      padding-top: 5px;
+      padding-top: 3px;
+    }
+    .qr-section {
+      margin-top: 10px;
+      padding: 8px;
+      border-top: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .qr-text {
+      text-align: right;
+      direction: rtl;
+      flex: 1;
+    }
+    .qr-text div {
+      font-size: 9px;
+      color: #666;
+      margin-bottom: 2px;
+    }
+    .qr-code-container {
+      text-align: center;
+    }
+    .qr-code-container img {
+      width: 55px;
+      height: 55px;
+      border: 1px solid #ddd;
+      padding: 2px;
+    }
+    .qr-code-container .transcript-num {
+      font-size: 7px;
+      color: #888;
+      margin-top: 2px;
     }
   </style>
 </head>
@@ -624,14 +656,14 @@ function generateTranscriptHTML(data: TranscriptData): string {
     </div>
     
     ${qrCodeDataUrl ? `
-    <div style="margin-top: 30px; padding: 15px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-      <div style="text-align: right; direction: rtl; flex: 1;">
-        <div style="font-size: 10px; color: #666; margin-bottom: 5px;">للتحقق من صحة هذا الكشف، امسح رمز QR</div>
-        <div style="font-size: 10px; color: #666;">To verify this transcript, scan the QR code</div>
+    <div class="qr-section">
+      <div class="qr-text">
+        <div>للتحقق من صحة هذا الكشف، امسح رمز QR</div>
+        <div>To verify this transcript, scan the QR code</div>
       </div>
-      <div style="text-align: center;">
-        <img src="${qrCodeDataUrl}" alt="QR Code" style="width: 80px; height: 80px; border: 1px solid #ddd; padding: 3px;">
-        <div style="font-size: 8px; color: #888; margin-top: 3px;">${transcriptNumber}</div>
+      <div class="qr-code-container">
+        <img src="${qrCodeDataUrl}" alt="QR Code">
+        <div class="transcript-num">${transcriptNumber}</div>
       </div>
     </div>
     ` : ''}
