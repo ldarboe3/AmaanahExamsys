@@ -1,0 +1,84 @@
+FINAL FIX INSTRUCTIONS (CLEAR, SIMPLE, AND COMPLETE)
+
+Give this exact instruction to your developer:
+
+1. Create a Safe Inner Margin (MANDATORY)
+
+All text must stay inside a clean white zone, NOT touching the patterned border.
+
+Tell the developer:
+
+“Add a fixed inner margin of at least 60px from the patterned border on ALL sides. No text should ever enter the border area.”
+
+This alone fixes:
+
+Bismillah spilling into the border
+
+Paragraph too close
+
+Ministry text touching the border
+
+Signatures touching the frame
+
+ALL crowding issues
+
+2. Move the Logo DOWN to free space for Bismillah
+
+Right now, the logo is too high → Bismillah is forced into the border.
+Tell the developer:
+
+“Move the main logo down by about 45–60px so the Bismillah can sit comfortably inside the safe area.”
+
+After this:
+
+Bismillah can sit properly
+
+Ministry text can space correctly
+
+The header section will breathe
+
+3. Resize & Reposition the Bismillah
+
+Tell them:
+
+“Keep بسم الله الرحمن الرحيم inside the safe area, center it, bold it, and increase its font to around 18–20pt.”
+
+This matches your template exactly.
+
+4. Increase the Main Certificate Paragraph Size
+
+Your paragraph is currently too small.
+Tell them:
+
+“Increase the entire certificate Arabic paragraph to font size 14–15pt and center the whole paragraph block.”
+
+This makes it readable and matches your official layout.
+
+5. Center the Paragraph Block and Pull It Slightly Down
+
+Right now, the paragraph sits too high.
+Tell them:
+
+“Center the paragraph horizontally, and move it down so it sits fully inside the safe margin, leaving equal top and bottom spacing.”
+
+6. Reposition the Ministry Text Blocks
+
+Tell them:
+
+“Shift the left English ministry block and right Arabic ministry block DOWN so they sit below the Bismillah and inside the safe area. They must not touch or overlap the border.”
+
+7. Reposition Certificate Number, Dates, and Signatures
+
+Tell them:
+
+“Place the certificate number, dates, and all signature lines inside the safe area and align them horizontally just like the PNG template.”
+
+🎯 Summary (Copy this text EXACTLY to your developer)
+
+“Please apply a strict 60px inner margin inside the patterned border so NO text touches the border.
+Move the main logo DOWN by 45–60px.
+Place بسم الله الرحمن الرحيم inside the safe margin, centered, bold, and around 18–20pt.
+Increase the certificate paragraph to 14–15pt, center the entire block, and move it down slightly.
+Shift the English and Arabic ministry blocks downward so they stay clear of the safe margin.
+Reposition the certificate number, dates, and signatures fully inside the margin.
+ALL text must fit inside the inner white space exactly like the PNG template.”
