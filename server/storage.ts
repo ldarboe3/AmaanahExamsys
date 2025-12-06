@@ -186,7 +186,7 @@ export interface IStorage {
   updateStudentResult(id: number, result: Partial<InsertStudentResult>): Promise<StudentResult | undefined>;
   upsertStudentResult(studentId: number, subjectId: number, examYearId: number, result: Partial<InsertStudentResult>): Promise<StudentResult>;
   validateResult(id: number, validatorId: string): Promise<StudentResult | undefined>;
-  publishResults(examYearId: number): Promise<number>;
+  publishResults(examYearId: number, grade?: number): Promise<number>;
   deleteStudentResult(id: number): Promise<boolean>;
   getStudentsForResultEntry(filters: { schoolId?: number; clusterId?: number; regionId?: number; grade?: number; examYearId?: number }): Promise<Student[]>;
 
@@ -1109,9 +1109,33 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async publishResults(examYearId: number): Promise<number> {
-    const result = await db.update(studentResults).set({ status: 'published' as any, updatedAt: new Date() }).where(and(eq(studentResults.examYearId, examYearId), eq(studentResults.status, 'validated')));
-    return 0;
+  async publishResults(examYearId: number, grade?: number): Promise<number> {
+    const conditions = [
+      eq(studentResults.examYearId, examYearId),
+      or(eq(studentResults.status, 'validated'), eq(studentResults.status, 'pending'))
+    ];
+    
+    if (grade) {
+      const studentIdsInGrade = await db.select({ id: students.id })
+        .from(students)
+        .where(and(eq(students.examYearId, examYearId), eq(students.grade, grade)));
+      
+      if (studentIdsInGrade.length === 0) {
+        return 0;
+      }
+      
+      conditions.push(inArray(studentResults.studentId, studentIdsInGrade.map(s => s.id)));
+    }
+    
+    const resultsBefore = await db.select({ id: studentResults.id })
+      .from(studentResults)
+      .where(and(...conditions));
+    
+    await db.update(studentResults)
+      .set({ status: 'published' as any, updatedAt: new Date() })
+      .where(and(...conditions));
+    
+    return resultsBefore.length;
   }
 
   async deleteStudentResult(id: number): Promise<boolean> {

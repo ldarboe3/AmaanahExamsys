@@ -7132,12 +7132,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.post("/api/results/publish", isAuthenticated, async (req, res) => {
     try {
-      const { examYearId } = req.body;
+      const { examYearId, grade } = req.body;
       if (!examYearId) {
         return res.status(400).json({ message: "examYearId is required" });
       }
-      const count = await storage.publishResults(examYearId);
-      res.json({ message: "Results published", count });
+      const count = await storage.publishResults(examYearId, grade);
+      res.json({ message: "Results published", published: count });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
