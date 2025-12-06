@@ -8465,11 +8465,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           // Generate unique QR token
           const qrToken = generateQRToken();
           
-          // Build verification URL for QR code
+          // Build verification URL for QR code (frontend page, not API)
           const baseUrl = process.env.REPLIT_DEV_DOMAIN 
             ? `https://${process.env.REPLIT_DEV_DOMAIN}`
             : 'https://amaanah.repl.co';
-          const verifyUrl = `${baseUrl}/api/verify/transcript/${qrToken}`;
+          const verifyUrl = `${baseUrl}/verify/transcript/${qrToken}`;
           
           // Generate QR code as data URL
           const qrCodeDataUrl = await generateQRCodeDataUrl(verifyUrl);
