@@ -184,7 +184,7 @@ export default function Certificates() {
     queryKey: ["/api/students/detect-gender", editingStudent?.firstName],
     queryFn: async () => {
       const response = await apiRequest("POST", "/api/students/detect-gender", {
-        name: editingStudent?.firstName + " " + (editingStudent?.middleName || ""),
+        names: editingStudent?.firstName + " " + (editingStudent?.middleName || ""),
       });
       return response.json();
     },
