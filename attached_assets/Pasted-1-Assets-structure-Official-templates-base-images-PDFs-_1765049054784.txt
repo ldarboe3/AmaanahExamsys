@@ -1,0 +1,243 @@
+1) Assets & structure
+
+Official templates (base images/PDFs)
+
+Male: certificate for men for G6.pdf
+
+Female: same layout with feminine phrasing (if text differs)
+
+Fonts (embed)
+
+Arabic: Amiri-Regular.ttf, Amiri-Bold.ttf (or Noto Naskh Arabic)
+
+English: Times New Roman or Noto Serif
+
+Security
+
+QR code (PNG/SVG), generated at runtime
+
+Transcript/Certificate No. text (matches QR payload)
+
+Render method: either (a) place text over a high-res PDF page template using a PDF library, or (b) export the first page as a background image and draw everything on a single A4 page (595×842 pt).
+
+2) Page grid & anchor zones (A4 portrait, 595×842 pt)
+
+Use a simple, reliable grid so placement is consistent and easy to tweak:
+
+Page: 595 x 842 pt
+Margin: 36 pt (all sides)
+
+Header Row (y ≈ 70–200 pt):
+- Left (Arabic gov header)   : x=36,   width=180, align=right,  rtl
+- Center (Logo)              : x=208,  width=180, centered (exact size ~ 90×90 pt)
+- Right (English gov header) : x=380,  width=180, align=left
+
+Body Text Block (core certificate paragraph):
+- Start x=72, width=451, y≈260–480, justify (Arabic RTL), 16–18 pt leading 1.3
+
+Signature Row:
+- Left signature caption + dotted line
+- Right signature caption + dotted line
+- Lines use only `......................` (no tick marks)
+
+QR & Serial (bottom-left, one page only):
+- QR box: 100×100 pt, bottom-left within margin (x=54, y=72)
+- Serial text under QR: 9–10 pt
+
+
+You’ll fine-tune y positions once with the live template open. The spec above ensures “one-pass” alignment.
+
+3) Field map (exact Arabic/English)
+Header (must match official)
+
+Arabic (left) – 3 lines, right-aligned, RTL
+
+الأمانة العامة للتعليم الإسلامي العربي
+
+في غامبيا
+
+قسم الامتحانات
+
+Logo (centered)
+
+English (right) – 3 lines, left-aligned
+
+The General Secretariat for
+
+Islamic/Arabic Education in
+
+The Gambia
+
+Examination Affairs Unit (on its own line if the official template shows four)
+
+If the official shows 3 vs 4 lines, mirror exactly.
+
+Core Arabic certificate paragraph (sample placeholders)
+
+اسم الطالب/ة {student_ar}
+
+المولود/ة في {place_of_birth_ar}
+
+بتاريخ {dob_hijri_ar} هـ / {dob_greg_ar} م
+
+قد أتم/أتمت دراسة المرحلة الابتدائية في {school_ar} – {address_ar}
+
+للسنة الدراسية {academic_year_ar}
+
+ونتيجته/ا {final_result_ar}
+
+Use feminine/masculine automatically from stored gender.
+
+Identity (bilingual block)
+
+Arabic on the right, English mirror on the left, row-aligned:
+
+اسم الطالب/ة — Student name (EN) (transliteration only)
+
+الجنسية — Nationality (EN) (english adjective)
+
+المدرسة — School (EN) (official EN name or transliteration)
+
+Grading logic (already agreed)
+
+Compute Total Marks, Percentage, then Final Result (التقدير):
+
+85–100% → ممتاز
+
+75–84% → جيد جدا
+
+65–74% → جيد
+
+50–64% → مقبول
+
+<50% → راسب (if needed)
+
+4) Arabic text cleaner (apply before matching/printing)
+
+Trim & collapse spaces
+
+Remove tatweel ـ
+
+Normalize أ/إ/آ→ا, ة→ه, ى→ي
+
+Strip internal dots/punctuation (أ . م سيسي → ا م سيسي)
+
+Convert Arabic digits → ASCII when parsing dates/codes
+
+Use the same cleaner for student, school, address, nationality.
+
+5) Transliteration & English fields
+
+Student name (EN): transliterate Arabic name; do NOT translate.
+
+School (EN): use official English name if available, else transliteration.
+
+Nationality (EN): “Gambian”, “Senegalese”, etc. (use a small map).
+
+Provide manual override in UI for any ambiguous transliteration.
+
+6) QR & Serial (one page only)
+
+QR payload: signed JSON or opaque token (e.g., g6cert:{certificate_id}:{hash})
+
+Serial format: G6CR-{year}-{6..8 digit seq}
+
+Placement: bottom-left, inside page margin (does NOT create page 2).
+
+Size: 100×100 pt max; scale down if body text approaches overflow.
+
+No page overflow rule: If content approaches bottom margin, auto-reduce QR to 80×80 or 72×72 pt and tighten vertical gaps by 2–3 pt to guarantee single page.
+
+7) Rendering engine hints (choose one)
+JavaScript (pdf-lib or pdfkit)
+
+Load base template page 1 as background
+
+Use HarfBuzz-enabled text shaping (e.g., pdfkit with fontkit) for Arabic ligatures
+
+Set direction: rtl where supported; otherwise pre-shape text or use pdfmake
+
+Python (ReportLab + rtl shaping)
+
+Use arabic_reshaper + python-bidi to shape Arabic before drawing
+
+Draw strings with drawRightString for Arabic alignment
+
+8) Performance & UX
+
+Batch generation: stream per student, zip results
+
+Add loader for generate/download actions
+
+Preview (eye icon) and Print All buttons
+
+Guarantee one-page output; never spill to page 2
+
+9) Acceptance checklist (pass/fail)
+
+Pixel-accurate match to official template (headers, border, spacing)
+
+Arabic header on left, English header on right, logo visible in center
+
+Body Arabic text flows/aligns like the official; correct gender grammar
+
+Identity block bilingual, aligned row-wise (AR right, EN left)
+
+QR + Serial render, stay on one page, scannable
+
+Dotted signature lines only (......................), no tick marks
+
+Subject names bold, right-aligned; table order correct
+
+Download works; preview works; print all works
+
+Arabic cleaner applied; transliteration shows; manual override works
+
+No visual overflow at any point size set; no extra blank pages
+
+10) Minimal code sketch (JS/pdf-lib style)
+// pseudo-code
+const page = doc.addPage([595, 842]);
+drawBackgroundTemplate(page, 'certificate_male_page1.pdf');
+
+const fonts = {
+  arReg: await doc.embedFont('Amiri-Regular.ttf'),
+  arBold: await doc.embedFont('Amiri-Bold.ttf'),
+  enSerif: await doc.embedFont('NotoSerif-Regular.ttf')
+};
+
+// Headers
+drawArabicRightAligned(page, arHeaderLines, { x: 36+180, y: 190, width: 180, font: fonts.arBold, size: 12 });
+drawCenteredLogo(page, logoPng, { x: 297.5, y: 185, size: 90 });
+drawEnglishLeft(page, enHeaderLines, { x: 380, y: 190, width: 180, font: fonts.enSerif, size: 12 });
+
+// Body paragraph (RTL shaped)
+drawArabicJustified(page, shapedCertificateParagraph, { x: 72, y: 480, width: 451, font: fonts.arReg, size: 14 });
+
+// Identity bilingual rows
+drawArabicRightAligned(page, studentNameAr, { x: 560, y: 520, width: 250 });
+drawEnglishLeft(page, studentNameEn, { x: 36,  y: 520, width: 250 });
+
+// Signatures with dotted lines only
+drawCentered(page, '............................', { x: 150, y: 700 });
+drawCentered(page, '............................', { x: 445, y: 700 });
+
+// QR + Serial (one page guarantee)
+const qrSize = 100; // reduce if needed to avoid overflow
+drawImage(page, qrPng, { x: 54, y: 72, width: qrSize, height: qrSize });
+drawText(page, serial, { x: 54, y: 62, font: fonts.enSerif, size: 9 });
+
+
+If you want, I can extract exact coordinates from your official PDF (per field) and deliver a JSON template like:
+
+{
+  "page": { "w": 595, "h": 842 },
+  "zones": {
+    "ar_header": { "x": 36, "y": 190, "w": 180, "align": "right", "font": "arBold", "size": 12 },
+    "logo": { "x": 297.5, "y": 185, "w": 90, "h": 90 },
+    "en_header": { "x": 380, "y": 190, "w": 180, "align": "left", "font": "enSerif", "size": 12 },
+    "body_ar": { "x": 72, "y": 480, "w": 451, "font": "arReg", "size": 14, "leading": 1.3 },
+    "qr": { "x": 54, "y": 72, "size": 100 },
+    "serial": { "x": 54, "y": 62, "size": 9 }
+  }
+}

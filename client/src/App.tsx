@@ -57,6 +57,8 @@ import ForgotPassword from "@/pages/forgot-password";
 import ChangePassword from "@/pages/change-password";
 import WebsiteManagement from "@/pages/website-management";
 import Documentation from "@/pages/documentation";
+import VerifyTranscript from "@/pages/verify-transcript";
+import VerifyCertificate from "@/pages/verify-certificate";
 
 function LoadingScreen() {
   return (
@@ -113,6 +115,8 @@ function PublicRoutes() {
       <Switch>
         <Route path="/login" component={Login} />
       <Route path="/verify" component={Verify} />
+      <Route path="/verify/transcript/:token" component={VerifyTranscript} />
+      <Route path="/verify/:token" component={VerifyCertificate} />
       <Route path="/about" component={About} />
       <Route path="/about/organisation-structure" component={OrganisationStructure} />
       <Route path="/about/senior-executives" component={SeniorExecutives} />
