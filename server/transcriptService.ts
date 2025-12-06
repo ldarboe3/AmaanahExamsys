@@ -1,6 +1,112 @@
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
+import QRCode from 'qrcode';
+import crypto from 'crypto';
+
+// Arabic to English Transliteration Map
+const ARABIC_TO_ENGLISH_MAP: Record<string, string> = {
+  'ا': 'a', 'أ': 'a', 'إ': 'i', 'آ': 'aa', 'ب': 'b', 'ت': 't', 'ث': 'th',
+  'ج': 'j', 'ح': 'h', 'خ': 'kh', 'د': 'd', 'ذ': 'dh', 'ر': 'r', 'ز': 'z',
+  'س': 's', 'ش': 'sh', 'ص': 's', 'ض': 'd', 'ط': 't', 'ظ': 'z', 'ع': 'a',
+  'غ': 'gh', 'ف': 'f', 'ق': 'q', 'ك': 'k', 'ل': 'l', 'م': 'm', 'ن': 'n',
+  'ه': 'h', 'ة': 'a', 'و': 'w', 'ي': 'y', 'ى': 'a', 'ء': "'", 'ئ': 'e',
+  'ؤ': 'o', 'ـ': '', ' ': ' ',
+  // Short vowels (diacritics) - usually not written but included for completeness
+  'َ': 'a', 'ِ': 'i', 'ُ': 'u', 'ً': 'an', 'ٍ': 'in', 'ٌ': 'un',
+  'ّ': '', 'ْ': '',
+};
+
+// Common Arabic name transliterations (name-specific mappings)
+const COMMON_NAME_TRANSLITERATIONS: Record<string, string> = {
+  'محمد': 'Mohammed', 'أحمد': 'Ahmed', 'علي': 'Ali', 'عمر': 'Omar',
+  'عبد': 'Abd', 'الله': 'Allah', 'عبدالله': 'Abdullah', 'عبد الله': 'Abdullah',
+  'عبدالرحمن': 'Abdurrahman', 'عبد الرحمن': 'Abdurrahman',
+  'إبراهيم': 'Ibrahim', 'إسماعيل': 'Ismail', 'يوسف': 'Yusuf', 'يحيى': 'Yahya',
+  'موسى': 'Musa', 'عيسى': 'Isa', 'داود': 'Dawud', 'سليمان': 'Sulaiman',
+  'خالد': 'Khalid', 'سعيد': 'Said', 'صالح': 'Saleh', 'حسن': 'Hassan',
+  'حسين': 'Hussein', 'مصطفى': 'Mustafa', 'محمود': 'Mahmoud', 'كريم': 'Karim',
+  'فاطمة': 'Fatima', 'عائشة': 'Aisha', 'خديجة': 'Khadija', 'مريم': 'Mariam',
+  'زينب': 'Zainab', 'أمينة': 'Amina', 'آمنة': 'Amina', 'حليمة': 'Halima',
+  'رقية': 'Ruqayya', 'سارة': 'Sarah', 'هاجر': 'Hajar', 'ليلى': 'Laila',
+  'نور': 'Noor', 'سلمى': 'Salma', 'حواء': 'Hawa', 'ميمونة': 'Maimouna',
+  'بنت': 'Bint', 'بن': 'Bin', 'أبو': 'Abu', 'أم': 'Umm',
+  // Common Gambian/West African names
+  'جالو': 'Jallow', 'سيسي': 'Ceesay', 'سيسى': 'Ceesay', 'جاتا': 'Jatta',
+  'كولي': 'Colley', 'باه': 'Bah', 'توري': 'Touray', 'ساني': 'Sanneh',
+  'سانو': 'Sanyang', 'مارون': 'Marong', 'دابو': 'Darboe', 'جوف': 'Joof',
+  'سيك': 'Secka', 'غسام': 'Gassama', 'كمارا': 'Camara', 'دانصو': 'Danso',
+  'انجاي': 'Njie', 'نجاي': 'Njie', 'باجي': 'Bajie', 'ساجو': 'Sajo',
+  'فاتي': 'Fatty', 'منتي': 'Minteh', 'كانتي': 'Kanteh', 'سيدي': 'Sidibeh',
+  'الأمين': 'Al-Amin', 'الحسن': 'Al-Hassan', 'الحسين': 'Al-Hussain',
+  // School-related terms
+  'معهد': 'Institute', 'مدرسة': 'School', 'دار': 'Dar', 'الإسلامية': 'Islamic',
+  'الإسلامي': 'Islamic', 'العربية': 'Arabic', 'العربي': 'Arabic',
+  'العليا': 'Higher', 'الثانوية': 'Secondary', 'الابتدائية': 'Primary',
+  'الآثار': 'Al-Athar', 'النور': 'Al-Noor', 'الهدى': 'Al-Huda',
+  'الإنجليزي': 'English', 'محمد': 'Mohammed', 'يدالي': 'Yadali',
+};
+
+// Transliterate Arabic text to English
+export function transliterateArabicToEnglish(arabicText: string): string {
+  if (!arabicText) return '';
+  
+  // First, check for common name/word matches
+  let result = arabicText;
+  for (const [arabic, english] of Object.entries(COMMON_NAME_TRANSLITERATIONS)) {
+    result = result.replace(new RegExp(arabic, 'g'), english);
+  }
+  
+  // If result still contains Arabic characters, transliterate them
+  let transliterated = '';
+  for (const char of result) {
+    if (ARABIC_TO_ENGLISH_MAP[char] !== undefined) {
+      transliterated += ARABIC_TO_ENGLISH_MAP[char];
+    } else if (/[\u0600-\u06FF]/.test(char)) {
+      // Unknown Arabic character - try basic mapping
+      transliterated += char;
+    } else {
+      transliterated += char;
+    }
+  }
+  
+  // Clean up the result
+  return transliterated
+    .replace(/\s+/g, ' ')           // Normalize spaces
+    .replace(/'+/g, "'")            // Normalize apostrophes
+    .replace(/^'+|'+$/g, '')        // Remove leading/trailing apostrophes
+    .split(' ')                     // Capitalize each word
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+    .trim();
+}
+
+// Generate unique transcript number
+export function generateTranscriptNumber(examYear: number, sequenceNumber: number): string {
+  const paddedSequence = sequenceNumber.toString().padStart(6, '0');
+  return `G6TR-${examYear}-${paddedSequence}`;
+}
+
+// Generate secure QR token
+export function generateQRToken(): string {
+  return crypto.randomBytes(24).toString('base64url');
+}
+
+// Generate QR code as data URL
+export async function generateQRCodeDataUrl(verificationUrl: string): Promise<string> {
+  try {
+    return await QRCode.toDataURL(verificationUrl, {
+      errorCorrectionLevel: 'M',
+      type: 'image/png',
+      margin: 2,
+      width: 120,
+      color: { dark: '#000000', light: '#FFFFFF' }
+    });
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    return '';
+  }
+}
 
 // Grade 6 Subject Definitions (13 subjects as per template)
 export const GRADE_6_SUBJECTS = [
@@ -117,6 +223,8 @@ export interface TranscriptData {
   totalMaxMarks: number;
   percentage: number;
   finalGrade: { arabic: string; english: string };
+  transcriptNumber?: string;
+  qrCodeDataUrl?: string;
 }
 
 export interface TranscriptValidationResult {
@@ -195,16 +303,20 @@ function generateTranscriptHTML(data: TranscriptData): string {
     .filter(Boolean)
     .join(' ');
   
-  // Build English full name (transliteration or provided, with fallback to Arabic)
+  // Build English full name using transliteration
   const fullNameEn = [
-    student.firstNameEn || student.firstName,
-    student.middleNameEn || student.middleName,
-    student.lastNameEn || student.lastName
+    student.firstNameEn || transliterateArabicToEnglish(student.firstName),
+    student.middleNameEn || (student.middleName ? transliterateArabicToEnglish(student.middleName) : null),
+    student.lastNameEn || transliterateArabicToEnglish(student.lastName)
   ].filter(Boolean).join(' ');
   
-  // School names
+  // School names with transliteration
   const schoolNameAr = school.name;
-  const schoolNameEn = school.nameEn || school.name;
+  const schoolNameEn = school.nameEn || transliterateArabicToEnglish(school.name);
+  
+  // Get transcript number and QR code from data
+  const transcriptNumber = data.transcriptNumber || '';
+  const qrCodeDataUrl = data.qrCodeDataUrl || '';
   
   // Nationality
   const nationalityAr = student.nationality || '';
@@ -411,6 +523,10 @@ function generateTranscriptHTML(data: TranscriptData): string {
     </table>
 
     <div class="main-title">كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year}-${examYear.year - 1} م</div>
+    
+    ${transcriptNumber ? `<div style="text-align: center; margin-bottom: 15px; font-size: 12px; color: #555;">
+      <span style="font-weight: bold;">Transcript No. / رقم الكشف:</span> ${transcriptNumber}
+    </div>` : ''}
 
     <div class="identity-section">
       <div class="identity-ar">
@@ -462,6 +578,19 @@ function generateTranscriptHTML(data: TranscriptData): string {
         <div class="signature-line">........................</div>
       </div>
     </div>
+    
+    ${qrCodeDataUrl ? `
+    <div style="margin-top: 30px; padding: 15px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+      <div style="text-align: right; direction: rtl; flex: 1;">
+        <div style="font-size: 10px; color: #666; margin-bottom: 5px;">للتحقق من صحة هذا الكشف، امسح رمز QR</div>
+        <div style="font-size: 10px; color: #666;">To verify this transcript, scan the QR code</div>
+      </div>
+      <div style="text-align: center;">
+        <img src="${qrCodeDataUrl}" alt="QR Code" style="width: 80px; height: 80px; border: 1px solid #ddd; padding: 3px;">
+        <div style="font-size: 8px; color: #888; margin-top: 3px;">${transcriptNumber}</div>
+      </div>
+    </div>
+    ` : ''}
   </div>
 </body>
 </html>`;
