@@ -77,8 +77,6 @@ function generateMaleCertificateHTML(data: PrimaryCertificateData, qrDataUrl: st
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
-        @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&display=swap');
-        
         * {
           margin: 0;
           padding: 0;
@@ -86,7 +84,7 @@ function generateMaleCertificateHTML(data: PrimaryCertificateData, qrDataUrl: st
         }
         
         body {
-          font-family: 'Amiri', 'Noto Naskh Arabic', serif;
+          font-family: Arial, sans-serif;
           direction: rtl;
           text-align: right;
           background: white;
@@ -344,8 +342,6 @@ function generateFemaleCertificateHTML(data: PrimaryCertificateData, qrDataUrl: 
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
-        @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&display=swap');
-        
         * {
           margin: 0;
           padding: 0;
@@ -353,7 +349,7 @@ function generateFemaleCertificateHTML(data: PrimaryCertificateData, qrDataUrl: 
         }
         
         body {
-          font-family: 'Amiri', 'Noto Naskh Arabic', serif;
+          font-family: Arial, sans-serif;
           direction: rtl;
           text-align: right;
           background: white;
@@ -599,14 +595,14 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
     : generateMaleCertificateHTML(data, qrDataUrl);
 
   const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    headless: 'new' as any,
+    executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-web-resources']
   });
 
   try {
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
     
     const fileName = `primary_cert_${student.indexNumber || student.id}_${Date.now()}.pdf`;
     const filePath = path.join(outputDir, fileName);
@@ -616,10 +612,15 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
       format: 'A4',
       landscape: true,
       printBackground: true,
-      margin: { top: '0', right: '0', bottom: '0', left: '0' }
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      scale: 1,
+      displayHeaderFooter: false
     });
     
     return filePath;
+  } catch (error) {
+    console.error(`PDF generation error for student ${student.id}:`, error);
+    throw error;
   } finally {
     await browser.close();
   }
