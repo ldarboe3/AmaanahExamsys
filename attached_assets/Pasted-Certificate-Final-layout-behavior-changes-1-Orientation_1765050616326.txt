@@ -1,0 +1,47 @@
+Certificate — Final layout & behavior changes
+1.	Orientation
+•	Render the certificate in A4 landscape (not portrait).
+2.	Border must match the official template exactly
+•	Use the diamond yellow/blue outer border and the inner double blue frame exactly as seen in the official template. Do not approximate, redraw it pixel-for-pixel. 
+•	Keep all content inside that frame (no clipping or overflow).
+3.	Remove barcode/QR from the certificate
+•	Do not display any QR code, barcode, or verification block on the certificate (transcripts may keep QR; certificates should not).
+4.	Header block (keep the exact header composition)
+•	Top center: “بسم الله الرحمن الرحيم” (centered).
+•	Left column (English header):
+o	THE REPUBLIC OF THE GAMBIA
+o	DEPARTMENT OF STATE FOR BASIC AND SECONDARY EDUCATION
+o	The General Secretariat for Islamic/Arabic Education In The Gambia
+•	Center: official crest/logo (same size and placement as template).
+•	Right column (Arabic header):
+o	جمهورية غامبيا
+o	وزارة التربية والتعليم الأساسي
+o	الأمانة العامة للتعليم الإسلامي العربي في غامبيا
+•	Follow the line breaks, weights, and spacing shown in the template. 
+5.	Title & body copy (match template wording/placement)
+•	English title: “GAMBIA MADRASSAH PRIMARY CERTIFICATE” (uppercase, centered).
+•	Arabic title: “شهادة إتمام دراسة المرحلة الابتدائية” (centered, bold).
+•	Arabic body paragraph structure (student name, place of birth, date of birth, school & address, academic year, final result, registration number, Hijri/Gregorian dates) must follow the same phrasing and line order used in the template. Keep the same punctuation and spacing. 
+6.	Signatures & stamps (bottom area)
+•	Left: توقيع رئيس الأمانة — dotted line only (.............................)
+•	Center: الختم الرسمي — dotted line only
+•	Right: توقيع مدير المدرسة — dotted line only
+•	Below: تصديق جهة الإشراف على المدرسة / تصديق وزارة التربية والتعليم (as laid out in the template).
+•	No decorative tick marks; only dotted lines. 
+25-00010449
+7.	Certificate number & dates
+•	Show the registration line exactly like the template (e.g., “سُجلت هذه الشهادة تحت رقم … بتاريخ … هـ الموافق … م”).
+•	Place the certificate number near the bottom area in the same position as the template; do not attach any barcode/QR to it. 
+25-00010449
+8.	Typography
+•	Use traditional Arabic serif for Arabic (e.g., Amiri/Noto Naskh) and a matching serif for English.
+•	Match sizes/weights so the page visually mirrors the template (titles bold, body regular, headers balanced). 
+9.	One-page guarantee (landscape)
+•	Ensure the entire certificate (all text, lines, signatures) fits on one landscape page within the inner frame; no second page.
+10.	Do not alter the official Arabic wording
+•	Keep the certificate in Arabic with the embedded English headers exactly as shown in the template; do not translate or rephrase Arabic body text.
+________________________________________
+Visual reference
+•	Official template (female G6) — use this for the border, header layout, titles, body lines, signatures, and overall spacing. 
+•	Recent issued sample — see how the registration line and dotted signatures are positioned. Use the layout cues but follow the template for final look/feel.
+
