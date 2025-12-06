@@ -1,0 +1,105 @@
+Transcript & Certificate System Fix – Required Updates (Clear Developer Specification)
+1. Apply the correct official header on the Transcript
+
+Replace the current transcript header with the exact official header shown in the file G6TR-2025-010743.pdf (page 1) 
+
+G6TR-2025-010743
+
+:
+
+Arabic (right side):
+
+الأمانة العامة للتعليم الإسلامي العربي
+في غامبيا
+قسم الامتحانات
+
+English (left side):
+
+The General Secretariat for
+Islamic/Arabic Education in
+The Gambia
+Examination Affairs Unit
+
+This header must be displayed exactly as in the sample transcript, including spacing and formatting.
+
+2. Fix Transcript Table Layout (must match the official format)
+
+The layout must follow the exact order shown in the transcript sample:
+(See subject table on page 1 of the sample PDF) 
+
+G6TR-2025-010743
+
+Correct table column order (from RIGHT → LEFT):
+
+م (Serial number)
+
+المادة (Subject name)
+
+الدرجات الكبرى (Maximum mark)
+
+الدرجات الصغرى (Minimum mark)
+
+الدرجة المكتسبة رقماً (Actual mark)
+
+The current system displays these columns in the wrong order.
+You must correct this to match the sample transcript.
+
+3. Certificate is not displaying – must fix immediately
+
+There is a system issue where:
+
+Certificates do not show
+
+Some eligible students cannot generate a certificate
+
+Generated certificates cannot be downloaded
+
+You must fix the certificate module so that:
+
+✓ Eligible students appear in the list
+✓ Certificates generate successfully
+✓ Every generated certificate can be viewed and downloaded
+✓ No blank or broken certificates
+
+The logic must match the transcript and certificate integration described earlier.
+
+4. Add “View” icon (Preview) for both Transcript & Certificate
+
+Like the sample transcript and certificate, add a View (eye) icon next to each generated document:
+
+View Transcript
+
+View Certificate
+
+This allows the admin to preview the PDF before printing or downloading.
+
+5. Add “Print All” button for both Transcript & Certificate
+
+Add:
+
+Print All Transcripts
+
+Print All Certificates
+
+These must open all generated PDFs in a combined, printable window.
+
+6. Fix why Transcript & Certificate are not showing
+
+You must investigate and resolve all issues causing:
+
+Transcript page not showing
+
+Certificate page not showing
+
+Students not loading
+
+Templates not loading
+
+Missing assets or mismatched routing
+
+Everything must work perfectly and smoothly.
+
+7. Make this implementation complete and correct
+
+Please complete the entire fix properly.
+This needs to be fully functional, as we have limited developer credits and cannot repeat corrections.
