@@ -9589,14 +9589,14 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       }
 
       // Check if email already exists
-      const existingSchools = await storage.getSchools();
+      const existingSchools = await storage.getAllSchools();
       const emailExists = existingSchools.some(s => s.email?.toLowerCase() === email.toLowerCase());
       if (emailExists) {
         return res.status(400).json({ message: "A school with this email already exists" });
       }
 
       // Find existing region only (do not create new regions for security)
-      const regions = await storage.getRegions();
+      const regions = await storage.getAllRegions();
       const regionRecord = regions.find(r => r.name === region);
       if (!regionRecord) {
         return res.status(400).json({ message: "Invalid region selected. Please select a valid region." });
@@ -9645,7 +9645,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   app.get("/api/public/verify-email/:token", async (req, res) => {
     try {
       const { token } = req.params;
-      const schools = await storage.getSchools();
+      const schools = await storage.getAllSchools();
       const school = schools.find(s => s.verificationToken === token);
 
       if (!school) {
