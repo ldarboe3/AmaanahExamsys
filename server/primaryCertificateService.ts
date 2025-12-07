@@ -349,19 +349,19 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       <!-- Main paragraph - 60px -->
       <div class="body-content">
         <p>
-          تشهد الأمانة العامّة بأنّ ${studentLabel}/ <span class="highlight">{${fullName}}</span> ${bornLabel} في <span class="highlight">{${student.placeOfBirth || ''}}</span> بتاريخ :
-          <span class="highlight">{${dobFormatted}}</span> م قد ${completedLabel} دراسة المرحلة الابتدائية في <span class="highlight">{${schoolWithAddress}}</span> بعد أن ${passedLabel}
+          تشهد الأمانة العامّة بأنّ ${studentLabel}/ <span class="highlight">${fullName}</span> ${bornLabel} في <span class="highlight">${student.placeOfBirth || ''}</span> بتاريخ :
+          <span class="highlight">${dobFormatted}</span> م قد ${completedLabel} دراسة المرحلة الابتدائية في <span class="highlight">${schoolWithAddress}</span> بعد أن ${passedLabel}
           في الامتحان النهائي الذي أشرفت عليه الأمانة العامّة بالتنسيق مع وزارة التربية والتعليم في غامبيا.
         </p>
         <p>
-          في الفترة: <span class="highlight">{${academicYear}}</span> , وكان ${gradeLabel} فيه ( <span class="highlight">{${gradeWordAr}}</span> ).
+          في الفترة: <span class="highlight">${academicYear}</span> , وكان ${gradeLabel} فيه ( <span class="highlight">${gradeWordAr}</span> ).
         </p>
       </div>
       
       <!-- Registration info - 54px -->
       <div class="registration-line">
-        سُجّلت هذه الشّهادة تحت رقم ( <span class="highlight">{${certificateNumber}}</span> ) بتاريخ : <span class="highlight">{${issueDateHijri}}</span> هـ الموافق
-        <span class="highlight">{${issueDateGreg}}</span> م
+        سُجّلت هذه الشّهادة تحت رقم ( <span class="highlight">${certificateNumber}</span> ) بتاريخ : <span class="highlight">${issueDateHijri}</span> هـ الموافق
+        <span class="highlight">${issueDateGreg}</span> م
       </div>
       
       <!-- Signatures -->
