@@ -287,48 +287,25 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       text-align: center;
     }
     
-    /* Signature title - 52px (increased) */
+    /* Signature title - 42px */
     .signature-title {
-      font-size: 52px;
+      font-size: 42px;
       color: #000;
       margin-bottom: 60px;
     }
     
-    /* Signature lines - 44px (increased) */
+    /* Signature lines - 36px */
     .signature-line {
-      font-size: 44px;
+      font-size: 36px;
       letter-spacing: 5px;
       margin-bottom: 18px;
     }
     
-    /* Stamp labels - 44px (increased) */
+    /* Stamp labels - 34px */
     .stamp-label {
-      font-size: 44px;
+      font-size: 34px;
       color: #333;
       margin-top: 10px;
-    }
-    
-    /* School badge area */
-    .school-badge-area {
-      width: 200px;
-      height: 200px;
-      border: 3px solid #666;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-    }
-    
-    .school-badge-area img {
-      max-width: 180px;
-      max-height: 180px;
-      object-fit: contain;
-    }
-    
-    .school-badge-placeholder {
-      font-size: 28px;
-      color: #999;
-      text-align: center;
     }
   </style>
 </head>
@@ -341,9 +318,6 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       <!-- Header row - 3 columns -->
       <div class="header-row">
         <div class="header-english">
-          <div class="school-badge-area">
-            <div class="school-badge-placeholder">School<br/>Badge</div>
-          </div>
           THE REPUBLIC OF THE GAMBIA<br/>
           DEPARTMENT OF STATE FOR<br/>
           BASIC AND SECONDARY<br/>
@@ -375,19 +349,19 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       <!-- Main paragraph - 60px -->
       <div class="body-content">
         <p>
-          تشهد الأمانة العامّة بأنّ ${studentLabel}/ <span class="highlight">${fullName}</span> ${bornLabel} في <span class="highlight">${student.placeOfBirth || ''}</span> بتاريخ :
-          <span class="highlight">${dobFormatted}</span> م قد ${completedLabel} دراسة المرحلة الابتدائية في <span class="highlight">${schoolWithAddress}</span> بعد أن ${passedLabel}
+          تشهد الأمانة العامّة بأنّ ${studentLabel}/ <span class="highlight">{${fullName}}</span> ${bornLabel} في <span class="highlight">{${student.placeOfBirth || ''}}</span> بتاريخ :
+          <span class="highlight">{${dobFormatted}}</span> م قد ${completedLabel} دراسة المرحلة الابتدائية في <span class="highlight">{${schoolWithAddress}}</span> بعد أن ${passedLabel}
           في الامتحان النهائي الذي أشرفت عليه الأمانة العامّة بالتنسيق مع وزارة التربية والتعليم في غامبيا.
         </p>
         <p>
-          في الفترة: <span class="highlight">${academicYear}</span> , وكان ${gradeLabel} فيه ( <span class="highlight">${gradeWordAr}</span> ).
+          في الفترة: <span class="highlight">{${academicYear}}</span> , وكان ${gradeLabel} فيه ( <span class="highlight">{${gradeWordAr}}</span> ).
         </p>
       </div>
       
       <!-- Registration info - 54px -->
       <div class="registration-line">
-        سُجّلت هذه الشّهادة تحت رقم ( <span class="highlight">${certificateNumber}</span> ) بتاريخ : <span class="highlight">${issueDateHijri}</span> هـ الموافق
-        <span class="highlight">${issueDateGreg}</span> م
+        سُجّلت هذه الشّهادة تحت رقم ( <span class="highlight">{${certificateNumber}}</span> ) بتاريخ : <span class="highlight">{${issueDateHijri}}</span> هـ الموافق
+        <span class="highlight">{${issueDateGreg}}</span> م
       </div>
       
       <!-- Signatures -->
