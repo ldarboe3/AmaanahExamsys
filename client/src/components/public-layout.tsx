@@ -381,7 +381,7 @@ export function PublicFooter() {
         
         <div className="border-t border-white/5 mt-6 pt-4 text-center">
           <p className="text-xs text-white/40">
-            {isRTL ? 'تم التطوير بواسطة مركز حكمة للابتكار' : 'Developed by Hikama Innovation Hub'}
+            {isRTL ? 'تم التطوير بواسطة ' : 'Developed by '}<span className="font-bold text-white/60">{isRTL ? 'مركز سكاي نت للابتكار' : 'SkyNet Innovation Hub'}</span>
           </p>
         </div>
       </div>

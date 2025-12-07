@@ -169,7 +169,7 @@ function AuthenticatedLayout() {
           </main>
           <footer className="border-t bg-muted/30 py-3 text-center">
             <p className="text-xs text-muted-foreground">
-              Developed by Hikama Innovation Hub
+              Developed by <span className="font-bold">SkyNet Innovation Hub</span>
             </p>
           </footer>
         </div>
