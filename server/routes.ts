@@ -9658,13 +9658,19 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  // Public result checker
-  app.get("/api/public/results/:indexNumber", async (req, res) => {
+  // Public result checker - NOTE: this must come AFTER /api/public/results/search
+  // Express matches routes in order, so we need to skip reserved paths
+  app.get("/api/public/results/:indexNumber", async (req, res, next) => {
+    const { indexNumber } = req.params;
+    
+    // Skip to next route if this is a reserved path (handled by other routes)
+    if (indexNumber === 'search') {
+      return next();
+    }
+    
     try {
-      const { indexNumber } = req.params;
-
       // Find student by index number using dedicated method if available
-      const students = await storage.getStudents();
+      const students = await storage.getAllStudents();
       const student = students.find(s => s.indexNumber?.toUpperCase() === indexNumber.toUpperCase());
 
       if (!student) {
@@ -9685,11 +9691,11 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       }
 
       // Get subjects for result details (include Arabic names)
-      const subjects = await storage.getSubjects();
+      const subjects = await storage.getAllSubjects();
       const subjectMap = new Map(subjects.map(s => [s.id, s]));
 
       // Get exam year
-      const examYears = await storage.getExamYears();
+      const examYears = await storage.getAllExamYears();
       const examYear = examYears.find(ey => ey.id === student.examYearId);
 
       // Grade level names for bilingual display
@@ -9712,7 +9718,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const formattedResults = publishedResults.map(result => {
         const subject = subjectMap.get(result.subjectId);
         const passingScore = subject?.passingScore || 50;
-        const score = result.rawScore || 0;
+        const score = parseFloat(result.totalScore || result.examScore || '0');
         return {
           subjectEn: subject?.name || "Unknown Subject",
           subjectAr: subject?.arabicName || subject?.name || "مادة غير معروفة",
@@ -9774,7 +9780,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const { indexNumber } = req.params;
 
       // Find student by index number
-      const students = await storage.getStudents();
+      const students = await storage.getAllStudents();
       const student = students.find(s => s.indexNumber?.toUpperCase() === indexNumber.toUpperCase());
 
       if (!student) {
@@ -9793,11 +9799,11 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       }
 
       // Get subjects
-      const subjects = await storage.getSubjects();
+      const subjects = await storage.getAllSubjects();
       const subjectMap = new Map(subjects.map(s => [s.id, s]));
 
       // Get exam year
-      const examYears = await storage.getExamYears();
+      const examYears = await storage.getAllExamYears();
       const examYear = examYears.find(ey => ey.id === student.examYearId);
 
       // Grade level names
@@ -9820,7 +9826,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const formattedResults = publishedResults.map(result => {
         const subject = subjectMap.get(result.subjectId);
         const passingScore = subject?.passingScore || 50;
-        const score = result.rawScore || 0;
+        const score = parseFloat(result.totalScore || result.examScore || '0');
         return {
           subjectEn: subject?.name || "Unknown Subject",
           subjectAr: subject?.arabicName || subject?.name || "مادة غير معروفة",
@@ -9911,7 +9917,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       }
 
       // Find student by index number
-      const students = await storage.getStudents();
+      const students = await storage.getAllStudents();
+      
       let student = students.find(s => 
         s.indexNumber?.toUpperCase() === (indexNumber as string).toUpperCase()
       );
@@ -9947,7 +9954,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       }
 
       // Get subjects
-      const subjects = await storage.getSubjects();
+      const subjects = await storage.getAllSubjects();
       const subjectMap = new Map(subjects.map(s => [s.id, s]));
 
       // Get exam year
@@ -9967,7 +9974,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const formattedResults = publishedResults.map(result => {
         const subject = subjectMap.get(result.subjectId);
         const passingScore = subject?.passingScore || 50;
-        const score = result.rawScore || 0;
+        const score = parseFloat(result.totalScore || result.examScore || '0');
         return {
           subjectEn: subject?.name || "Unknown Subject",
           subjectAr: subject?.arabicName || subject?.name || "مادة غير معروفة",
@@ -10039,7 +10046,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       }
 
       // Find student by index number
-      const students = await storage.getStudents();
+      const students = await storage.getAllStudents();
       let student = students.find(s => 
         s.indexNumber?.toUpperCase() === (indexNumber as string).toUpperCase()
       );
@@ -10212,7 +10219,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const { indexNumber } = req.params;
 
       // Find student by index number
-      const students = await storage.getStudents();
+      const students = await storage.getAllStudents();
       const student = students.find(s => 
         s.indexNumber?.toUpperCase() === indexNumber.toUpperCase()
       );
@@ -11598,6 +11605,73 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         center,
         assignment,
         timetable: enrichedTimetable,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // BULK INDEX NUMBER GENERATION - Admin only
+  // Generates sequential index numbers for all students without one
+  app.post("/api/admin/generate-index-numbers", isAuthenticated, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      if (!currentUser || !['super_admin', 'examination_admin'].includes(currentUser.role || '')) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Get active exam year
+      const activeExamYear = await storage.getActiveExamYear();
+      if (!activeExamYear) {
+        return res.status(400).json({ message: "No active exam year found" });
+      }
+
+      const yearPrefix = String(activeExamYear.year).slice(-2); // e.g., "25" for 2025
+
+      // Get all students without index numbers
+      const allStudents = await storage.getAllStudents();
+      const studentsWithoutIndex = allStudents.filter(
+        s => !s.indexNumber || s.indexNumber.trim() === ''
+      );
+
+      if (studentsWithoutIndex.length === 0) {
+        return res.json({ 
+          message: "All students already have index numbers", 
+          generated: 0 
+        });
+      }
+
+      // Find the highest existing index number to continue from
+      const existingIndexNumbers = allStudents
+        .filter(s => s.indexNumber && /^\d{6}$/.test(s.indexNumber))
+        .map(s => parseInt(s.indexNumber!, 10));
+      
+      let nextNumber = existingIndexNumbers.length > 0 
+        ? Math.max(...existingIndexNumbers) + 1 
+        : 1;
+
+      // Generate index numbers for all students without one
+      let generatedCount = 0;
+      const errors: string[] = [];
+
+      for (const student of studentsWithoutIndex) {
+        try {
+          // Format: 6-digit padded number (e.g., 000001, 000002, etc.)
+          const indexNumber = String(nextNumber).padStart(6, '0');
+          
+          await storage.updateStudent(student.id, { indexNumber });
+          nextNumber++;
+          generatedCount++;
+        } catch (err: any) {
+          errors.push(`Student ${student.id}: ${err.message}`);
+        }
+      }
+
+      res.json({
+        message: `Successfully generated ${generatedCount} index numbers`,
+        generated: generatedCount,
+        total: studentsWithoutIndex.length,
+        errors: errors.length > 0 ? errors.slice(0, 10) : undefined
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
