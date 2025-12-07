@@ -112,14 +112,14 @@ export default function Results() {
   // Fetch regions, clusters, schools, subjects
   const { data: regions } = useQuery<Region[]>({ queryKey: ["/api/regions"] });
   const { data: clusters } = useQuery<Cluster[]>({ queryKey: ["/api/clusters"] });
-  const { data: schoolsList } = useQuery<School[]>({ queryKey: ["/api/schools"] });
+  const { data: schoolsResponse } = useQuery<{ data: School[], total: number }>({ queryKey: ["/api/schools"] });
   const { data: subjects, isLoading: subjectsLoading } = useQuery<Subject[]>({
     queryKey: selectedGrade ? ["/api/subjects", selectedGrade] : null,
     queryFn: () => fetch(`/api/subjects?grade=${selectedGrade}`).then(r => r.json()),
     enabled: !!selectedGrade,
   });
 
-  const schools = Array.isArray(schoolsList) ? schoolsList : [];
+  const schools = schoolsResponse?.data || [];
 
   // Fetch students based on filters
   const { data: studentListResponse, isLoading: studentsLoading } = useQuery<{ data: StudentWithResults[] }>({
