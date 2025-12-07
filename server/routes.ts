@@ -8038,7 +8038,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "No exam year found" });
       }
 
-      const { generatePrimaryCertificatePDF, validateCertificateRequirements } = await import('./primaryCertificateService');
+      const { generatePrimaryCertificatePDF, validateCertificateRequirements, generateCertificateQRCodeDataUrl } = await import('./primaryCertificateService');
       const { generateCertificateNumber, generateQRToken } = await import('./certificateTemplates');
 
       const generatedCerts = [];
@@ -8119,6 +8119,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const qrToken = generateQRToken();
         const certNumber = generateCertificateNumber(targetExamYear.year, student.id);
         const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/${qrToken}`;
+        const qrCodeDataUrl = await generateCertificateQRCodeDataUrl(verifyUrl);
         
         try {
           const pdfPath = await generatePrimaryCertificatePDF({
@@ -8133,7 +8134,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               grade: student.grade,
               indexNumber: student.indexNumber,
             },
-            school: { id: school.id, name: school.name, address: school.address },
+            school: { id: school.id, name: school.name, address: school.address, arabicName: school.arabicName, arabicAddress: school.arabicAddress },
             examYear: {
               id: targetExamYear.id,
               year: targetExamYear.year,
@@ -8145,6 +8146,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             qrToken,
             certificateNumber: certNumber,
             verifyUrl,
+            qrCodeDataUrl,
           });
           
           const cert = await storage.createCertificate({
