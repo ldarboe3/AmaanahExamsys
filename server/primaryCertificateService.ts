@@ -76,7 +76,7 @@ if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }
 
-function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: string, logoBase64: string, watermarkBase64: string): string {
+function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: string, logoBase64: string): string {
   const { student, school, examYear, finalGrade, certificateNumber, qrCodeDataUrl, verifyUrl } = data;
   
   const isFemale = student.gender === 'female';
@@ -331,58 +331,36 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       margin-top: 10px;
     }
     
-    /* Watermark - centered, low opacity */
-    .watermark {
+    /* QR Code sections - top left and top right corners */
+    .qr-section-left {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      opacity: 0.12;
-      z-index: 0;
-      pointer-events: none;
-    }
-    
-    .watermark img {
-      width: 900px;
-      height: auto;
-    }
-    
-    /* QR Code section - bottom left */
-    .qr-section {
-      position: absolute;
-      bottom: 460px;
-      left: 460px;
+      top: 60px;
+      left: 60px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 12px;
+      z-index: 10;
+    }
+    
+    .qr-section-right {
+      position: absolute;
+      top: 60px;
+      right: 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       z-index: 10;
     }
     
     .qr-code-container {
-      background: white;
-      padding: 12px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      background: rgba(255,255,255,0.95);
+      padding: 10px;
+      border-radius: 6px;
     }
     
     .qr-code-container img {
-      width: 140px;
-      height: 140px;
-    }
-    
-    .qr-text {
-      font-size: 22px;
-      color: #333;
-      text-align: center;
-      direction: rtl;
-      line-height: 1.4;
-    }
-    
-    .qr-text .en {
-      direction: ltr;
-      font-size: 18px;
-      color: #555;
+      width: 120px;
+      height: 120px;
     }
     
     .security-text {
@@ -404,7 +382,18 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
 </head>
 <body>
   <div class="certificate-container">
-    ${watermarkBase64 ? `<div class="watermark"><img src="data:image/png;base64,${watermarkBase64}" alt="Watermark" /></div>` : ''}
+    ${qrCodeDataUrl ? `
+    <div class="qr-section-left">
+      <div class="qr-code-container">
+        <img src="${qrCodeDataUrl}" alt="QR Code" />
+      </div>
+    </div>
+    <div class="qr-section-right">
+      <div class="qr-code-container">
+        <img src="${qrCodeDataUrl}" alt="QR Code" />
+      </div>
+    </div>
+    ` : ''}
     <div class="safe-area">
       <!-- Bismillah - 96px -->
       <div class="bismillah">بسم الله الرحمن الرحيم</div>
@@ -479,18 +468,6 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       </div>
     </div>
     
-    ${qrCodeDataUrl ? `
-    <div class="qr-section">
-      <div class="qr-text">
-        <div>للتحقق من صحة الشهادة</div>
-        <div class="en">Scan to verify</div>
-      </div>
-      <div class="qr-code-container">
-        <img src="${qrCodeDataUrl}" alt="QR Code" />
-      </div>
-    </div>
-    ` : ''}
-    
     <div class="security-text">
       <div>رقم الشهادة: <span class="cert-num">${certificateNumber}</span></div>
       <div class="en" style="direction: ltr; font-size: 18px;">Certificate No: ${certificateNumber}</div>
@@ -519,10 +496,7 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
     templateBase64 = templateBuffer.toString('base64');
   }
   
-  // Load watermark (same as logo for authenticity)
-  let watermarkBase64 = logoBase64;
-  
-  const html = generateCertificateHTML(data, templateBase64, logoBase64, watermarkBase64);
+  const html = generateCertificateHTML(data, templateBase64, logoBase64);
   
   const browser = await puppeteer.launch({
     headless: true,
