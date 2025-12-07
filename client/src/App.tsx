@@ -167,6 +167,11 @@ function AuthenticatedLayout() {
               <AuthenticatedRoutes />
             </div>
           </main>
+          <footer className="border-t bg-muted/30 py-3 text-center">
+            <p className="text-xs text-muted-foreground">
+              Developed by Hikama Innovation Hub
+            </p>
+          </footer>
         </div>
       </div>
     </SidebarProvider>

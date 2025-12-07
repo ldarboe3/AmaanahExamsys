@@ -8,7 +8,6 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
-  SidebarFooter,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -151,14 +150,6 @@ export function AppSidebar({ side = "left" }: AppSidebarProps) {
           </SidebarGroup>
         )}
       </SidebarContent>
-      
-      <SidebarFooter className="border-t border-sidebar-border">
-        <div className="px-2 py-3 text-center">
-          <p className="text-xs text-muted-foreground">
-            Developed by Hikama Innovation Hub
-          </p>
-        </div>
-      </SidebarFooter>
     </Sidebar>
   );
 }
