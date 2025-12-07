@@ -12,8 +12,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import amanahLogo from "@assets/Amana_Logo_1765125084736.png";
 import {
-  GraduationCap,
   LayoutDashboard,
   School,
   Users,
@@ -93,9 +93,11 @@ export function AppSidebar({ side = "left" }: AppSidebarProps) {
     <Sidebar side={side}>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-3">
-          <div className="w-9 h-9 rounded-md bg-primary flex items-center justify-center">
-            <GraduationCap className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <img 
+            src={amanahLogo} 
+            alt="AMAANAH Logo" 
+            className="w-10 h-10 object-contain"
+          />
           <div className="flex flex-col">
             <span className="text-base font-semibold text-sidebar-foreground">{t.app.name}</span>
             <span className="text-xs text-muted-foreground">{t.app.tagline}</span>
