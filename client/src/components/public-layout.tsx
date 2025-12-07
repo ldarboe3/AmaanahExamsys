@@ -378,6 +378,12 @@ export function PublicFooter() {
             </Link>
           </div>
         </div>
+        
+        <div className="border-t border-white/5 mt-6 pt-4 text-center">
+          <p className="text-xs text-white/40">
+            {isRTL ? 'تم التطوير بواسطة مركز حكمة للابتكار' : 'Developed by Hikama Innovation Hub'}
+          </p>
+        </div>
       </div>
     </footer>
   );
