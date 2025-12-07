@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import amanahLogo from "@assets/Amana_Logo_1765129635267.png";
 
 const setupSchema = z.object({
   username: z.string()
@@ -130,9 +131,7 @@ export default function SchoolVerify() {
           <div className="container mx-auto px-4 py-4 flex items-center gap-3">
             <Link href="/">
               <div className="flex items-center gap-3 cursor-pointer">
-                <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
-                  <GraduationCap className="w-6 h-6 text-primary-foreground" />
-                </div>
+                <img src={amanahLogo} alt="AMAANAH Logo" className="w-12 h-12 object-contain" />
                 <div>
                   <h1 className="text-xl font-semibold text-foreground">Amaanah</h1>
                   <p className="text-xs text-muted-foreground">School Verification</p>
@@ -181,9 +180,7 @@ export default function SchoolVerify() {
           <div className="container mx-auto px-4 py-4 flex items-center gap-3">
             <Link href="/">
               <div className="flex items-center gap-3 cursor-pointer">
-                <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
-                  <GraduationCap className="w-6 h-6 text-primary-foreground" />
-                </div>
+                <img src={amanahLogo} alt="AMAANAH Logo" className="w-12 h-12 object-contain" />
                 <div>
                   <h1 className="text-xl font-semibold text-foreground">Amaanah</h1>
                   <p className="text-xs text-muted-foreground">School Verification</p>
@@ -235,9 +232,7 @@ export default function SchoolVerify() {
           <div className="container mx-auto px-4 py-4 flex items-center gap-3">
             <Link href="/">
               <div className="flex items-center gap-3 cursor-pointer">
-                <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
-                  <GraduationCap className="w-6 h-6 text-primary-foreground" />
-                </div>
+                <img src={amanahLogo} alt="AMAANAH Logo" className="w-12 h-12 object-contain" />
                 <div>
                   <h1 className="text-xl font-semibold text-foreground">Amaanah</h1>
                   <p className="text-xs text-muted-foreground">School Verification</p>
