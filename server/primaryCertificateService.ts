@@ -331,69 +331,65 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       margin-top: 10px;
     }
     
-    /* QR Code sections - top left and top right corners */
-    .qr-section-left {
-      position: absolute;
-      top: 60px;
-      left: 60px;
+    /* Security section - inside border at school badge location */
+    .security-section {
+      width: 100%;
       display: flex;
-      flex-direction: column;
+      justify-content: space-between;
       align-items: center;
-      z-index: 10;
-    }
-    
-    .qr-section-right {
-      position: absolute;
-      top: 60px;
-      right: 60px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      z-index: 10;
+      margin-top: 40px;
+      padding-top: 30px;
+      flex-shrink: 0;
     }
     
     .qr-code-container {
-      background: rgba(255,255,255,0.95);
-      padding: 10px;
-      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
     }
     
     .qr-code-container img {
-      width: 120px;
-      height: 120px;
+      width: 140px;
+      height: 140px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      padding: 8px;
+      background: white;
+    }
+    
+    .qr-label {
+      font-size: 24px;
+      color: #555;
+      text-align: center;
     }
     
     .security-text {
-      position: absolute;
-      bottom: 460px;
-      right: 460px;
-      font-size: 20px;
-      color: #666;
-      text-align: right;
-      direction: rtl;
-      line-height: 1.5;
+      text-align: left;
+      direction: ltr;
+      line-height: 1.6;
+    }
+    
+    .security-text .cert-num-label {
+      font-size: 28px;
+      color: #333;
     }
     
     .security-text .cert-num {
+      font-size: 32px;
       font-weight: bold;
-      color: #333;
+      color: #C00000;
+    }
+    
+    .security-text .verify-url {
+      font-size: 22px;
+      color: #666;
+      margin-top: 8px;
     }
   </style>
 </head>
 <body>
   <div class="certificate-container">
-    ${qrCodeDataUrl ? `
-    <div class="qr-section-left">
-      <div class="qr-code-container">
-        <img src="${qrCodeDataUrl}" alt="QR Code" />
-      </div>
-    </div>
-    <div class="qr-section-right">
-      <div class="qr-code-container">
-        <img src="${qrCodeDataUrl}" alt="QR Code" />
-      </div>
-    </div>
-    ` : ''}
     <div class="safe-area">
       <!-- Bismillah - 96px -->
       <div class="bismillah">بسم الله الرحمن الرحيم</div>
@@ -466,12 +462,22 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
           <div class="stamp-label">تصديق وزارة التربية والتعليم</div>
         </div>
       </div>
-    </div>
-    
-    <div class="security-text">
-      <div>رقم الشهادة: <span class="cert-num">${certificateNumber}</span></div>
-      <div class="en" style="direction: ltr; font-size: 18px;">Certificate No: ${certificateNumber}</div>
-      ${verifyUrl ? `<div class="en" style="direction: ltr; font-size: 16px; margin-top: 8px; color: #888;">Verify at: amaanah.gm/verify</div>` : ''}
+      
+      <!-- Security Section - QR on left, Certificate info on right -->
+      <div class="security-section">
+        ${qrCodeDataUrl ? `
+        <div class="qr-code-container">
+          <img src="${qrCodeDataUrl}" alt="QR Code" />
+          <div class="qr-label">Scan to verify / امسح للتحقق</div>
+        </div>
+        ` : '<div></div>'}
+        
+        <div class="security-text">
+          <div class="cert-num-label">Certificate No. / رقم الشهادة:</div>
+          <div class="cert-num">${certificateNumber}</div>
+          ${verifyUrl ? `<div class="verify-url">Verify at: amaanah.gm/verify</div>` : ''}
+        </div>
+      </div>
     </div>
   </div>
 </body>
