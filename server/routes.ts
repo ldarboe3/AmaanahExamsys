@@ -9602,10 +9602,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return res.status(400).json({ message: "Invalid region selected. Please select a valid region." });
       }
 
-      // Generate verification token
-      const verificationToken = `verify-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      // Create school with pending status
+      // Create school with pending status (storage.createSchool generates its own verification token)
       const school = await storage.createSchool({
         name: schoolName,
         registrarName: principalName,
@@ -9617,7 +9614,6 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         regionId: regionRecord.id,
         status: "pending",
         isEmailVerified: false,
-        verificationToken,
         notes: JSON.stringify({
           principalEmail,
           principalPhone,
@@ -9628,14 +9624,14 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         }),
       });
 
-      // Send verification email
+      // Send verification email using the token that was actually stored
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       try {
         await sendSchoolVerificationEmail(
           email,
           schoolName,
           principalName,
-          verificationToken,
+          school.verificationToken!, // Use the token from the created school
           baseUrl
         );
         console.log(`School registration: ${schoolName} - Verification email sent to ${email}`);
@@ -9687,8 +9683,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       }
 
       // Find school by email
-      const schools = await storage.getAllSchools();
-      const school = schools.find(s => s.email?.toLowerCase() === email.toLowerCase());
+      const allSchools = await storage.getAllSchools();
+      const school = allSchools.find(s => s.email?.toLowerCase() === email.toLowerCase());
 
       if (!school) {
         return res.status(404).json({ message: "No registration found with this email" });
@@ -9698,12 +9694,15 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return res.status(400).json({ message: "This email has already been verified" });
       }
 
-      // Generate new verification token
-      const verificationToken = `verify-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // Generate new verification token (same format as storage.createSchool uses)
+      const { randomBytes } = await import('crypto');
+      const newVerificationToken = randomBytes(32).toString('hex');
+      const newVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       // Update school with new token
       await storage.updateSchool(school.id, {
-        verificationToken,
+        verificationToken: newVerificationToken,
+        verificationExpiry: newVerificationExpiry,
       });
 
       // Parse notes to get principal name
@@ -9713,13 +9712,13 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         principalName = notes.principalName || school.registrarName || "School Administrator";
       } catch (e) {}
 
-      // Send verification email
+      // Send verification email with the new token
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       await sendSchoolVerificationEmail(
         email,
         school.name,
         principalName,
-        verificationToken,
+        newVerificationToken,
         baseUrl
       );
 
