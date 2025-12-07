@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   School, 
   Mail, 
@@ -46,7 +47,7 @@ import { Link } from "wouter";
 
 const registrationSchema = z.object({
   schoolName: z.string().min(3, "School name must be at least 3 characters"),
-  schoolType: z.string().min(1, "Please select school type"),
+  schoolTypes: z.array(z.string()).min(1, "Please select at least one school type"),
   region: z.string().min(1, "Please select region"),
   address: z.string().min(5, "Address is required"),
   email: z.string().email("Please enter a valid email address"),
@@ -95,7 +96,7 @@ export default function SchoolRegistration() {
     resolver: zodResolver(registrationSchema),
     defaultValues: {
       schoolName: "",
-      schoolType: "",
+      schoolTypes: [],
       region: "",
       address: "",
       email: "",
@@ -258,22 +259,41 @@ export default function SchoolRegistration() {
                       />
                       <FormField
                         control={form.control}
-                        name="schoolType"
-                        render={({ field }) => (
+                        name="schoolTypes"
+                        render={() => (
                           <FormItem>
-                            <FormLabel>School Type *</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-school-type">
-                                  <SelectValue placeholder="Select school type" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {schoolTypes.map((type) => (
-                                  <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <FormLabel>School Type(s) *</FormLabel>
+                            <FormDescription>Select all that apply</FormDescription>
+                            <div className="grid grid-cols-1 gap-2 mt-2">
+                              {schoolTypes.map((type) => (
+                                <FormField
+                                  key={type.value}
+                                  control={form.control}
+                                  name="schoolTypes"
+                                  render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                                      <FormControl>
+                                        <Checkbox
+                                          data-testid={`checkbox-school-type-${type.value}`}
+                                          checked={field.value?.includes(type.value)}
+                                          onCheckedChange={(checked) => {
+                                            const currentValue = field.value || [];
+                                            if (checked) {
+                                              field.onChange([...currentValue, type.value]);
+                                            } else {
+                                              field.onChange(currentValue.filter((val: string) => val !== type.value));
+                                            }
+                                          }}
+                                        />
+                                      </FormControl>
+                                      <FormLabel className="font-normal cursor-pointer">
+                                        {type.label}
+                                      </FormLabel>
+                                    </FormItem>
+                                  )}
+                                />
+                              ))}
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}
