@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, ilike, or, gte, lte, inArray, count } from "drizzle-orm";
+import { eq, and, desc, asc, sql, ilike, or, gte, lte, inArray, count, isNotNull } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, regions, clusters, examYears, examCenters, schools, students,
@@ -801,8 +801,23 @@ export class DatabaseStorage implements IStorage {
 
   async generateIndexNumbers(studentIds: number[], prefix: string): Promise<Student[]> {
     const results: Student[] = [];
+    const usedIndexNumbers = new Set<string>();
+    
+    // Get all existing index numbers to avoid duplicates
+    const existingStudents = await db.select({ indexNumber: students.indexNumber }).from(students).where(isNotNull(students.indexNumber));
+    existingStudents.forEach(s => {
+      if (s.indexNumber) usedIndexNumbers.add(s.indexNumber);
+    });
+    
     for (let i = 0; i < studentIds.length; i++) {
-      const indexNumber = `${prefix}${String(i + 1).padStart(4, '0')}`;
+      // Generate random 6-digit number (100000-999999)
+      let indexNumber: string;
+      do {
+        const randomNum = Math.floor(100000 + Math.random() * 900000);
+        indexNumber = String(randomNum);
+      } while (usedIndexNumbers.has(indexNumber));
+      
+      usedIndexNumbers.add(indexNumber);
       const confirmationCode = randomBytes(5).toString('hex').toUpperCase().slice(0, 10);
       const [updated] = await db
         .update(students)
