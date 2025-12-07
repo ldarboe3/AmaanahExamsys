@@ -217,7 +217,7 @@ export function PublicFooter() {
         }} />
       </div>
       
-      <div className="relative container mx-auto px-4 py-16">
+      <div className="relative container mx-auto px-4 py-10">
         <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 ${isRTL ? 'text-right' : 'text-left'}`}>
           <div className="lg:col-span-1">
             <div className="flex items-center gap-3 mb-6">
@@ -362,7 +362,7 @@ export function PublicFooter() {
           </div>
         </div>
 
-        <div className={`border-t border-white/10 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 ${isRTL ? 'text-right' : 'text-left'}`}>
+        <div className={`border-t border-white/10 mt-8 pt-6 flex flex-col md:flex-row justify-between items-center gap-4 ${isRTL ? 'text-right' : 'text-left'}`}>
           <p className="text-sm text-white/50">
             &copy; {new Date().getFullYear()} AMAANAH - {isRTL ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
           </p>
