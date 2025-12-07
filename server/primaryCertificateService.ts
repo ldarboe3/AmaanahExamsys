@@ -84,13 +84,12 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
   const passedLabel = isFemale ? 'نجحت' : 'نجح';
   const gradeLabel = isFemale ? 'تقديرها' : 'تقديره';
 
-  // PNG template dimensions: 3508x2480
-  // Inner white area starts at approximately X=270px, Y=272px from edges
-  // Adding 60px buffer = 330px from each edge to stay FULLY inside the white area
-  const safeTop = 332;
-  const safeBottom = 332;
-  const safeLeft = 330;
-  const safeRight = 330;
+  // FINAL MEASUREMENTS - Safe area INSIDE white frame with 60px buffer
+  // Template inner white area starts at ~300px, plus buffer = 360px margins
+  const safeTop = 360;
+  const safeBottom = 360;
+  const safeLeft = 358;
+  const safeRight = 358;
 
   return `<!DOCTYPE html>
 <html lang="ar">
@@ -131,8 +130,7 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       font-family: 'Amiri', 'Traditional Arabic', 'Times New Roman', serif;
     }
     
-    /* SAFE AREA - positioned INSIDE the inner white area of the PNG template */
-    /* PNG inner white area starts at ~270px from edges, plus 60px buffer = 330px */
+    /* SAFE AREA - INSIDE the white frame with proper margins */
     .safe-area {
       position: absolute;
       top: ${safeTop}px;
@@ -144,27 +142,15 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       overflow: hidden;
     }
     
-    /* Watermark centered in the white area */
-    .watermark {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 500px;
-      opacity: 0.10;
-      pointer-events: none;
-      z-index: 0;
-    }
-    
-    /* Bismillah - centered, bold, inside safe area */
+    /* Bismillah - LARGER 66px, centered, bold */
     .bismillah {
       width: 100%;
       text-align: center;
-      font-size: 52px;
+      font-size: 66px;
       font-weight: bold;
       color: #000;
       direction: rtl;
-      margin-bottom: 15px;
+      margin-bottom: 24px;
       flex-shrink: 0;
     }
     
@@ -174,15 +160,15 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 15px;
+      margin-bottom: 20px;
       flex-shrink: 0;
     }
     
-    /* English ministry block */
+    /* English ministry block - LARGER 28px */
     .header-english {
-      width: 520px;
-      font-size: 20px;
-      line-height: 1.2;
+      width: 600px;
+      font-size: 28px;
+      line-height: 1.25;
       text-align: left;
       color: #000;
       font-family: 'Times New Roman', serif;
@@ -194,60 +180,62 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       text-transform: none;
     }
     
-    /* Logo in center */
+    /* Logo in center - 260px tall */
     .header-logo {
-      width: 280px;
+      width: 320px;
       text-align: center;
     }
     
     .header-logo img {
       max-width: 100%;
-      max-height: 160px;
+      max-height: 260px;
       object-fit: contain;
     }
     
     .header-logo .logo-text {
-      font-size: 12px;
-      margin-top: 4px;
+      font-size: 18px;
+      margin-top: 8px;
       font-weight: bold;
-      letter-spacing: 1px;
+      letter-spacing: 2px;
     }
     
-    /* Arabic ministry block */
+    /* Arabic ministry block - LARGER 34px */
     .header-arabic {
-      width: 520px;
-      font-size: 24px;
-      line-height: 1.3;
+      width: 600px;
+      font-size: 34px;
+      line-height: 1.35;
       text-align: right;
       color: #000;
       direction: rtl;
     }
     
-    /* Titles section */
+    /* Titles section - LARGER */
     .titles-section {
       width: 100%;
       text-align: center;
-      margin: 10px 0 15px 0;
+      margin: 15px 0 20px 0;
       flex-shrink: 0;
     }
     
+    /* English title - 46px */
     .title-english {
-      font-size: 34px;
+      font-size: 46px;
       font-weight: bold;
-      letter-spacing: 2px;
+      letter-spacing: 3px;
       color: #000;
       font-family: 'Times New Roman', serif;
-      margin-bottom: 5px;
+      margin-bottom: 8px;
     }
     
+    /* Arabic title - 54px */
     .title-arabic {
-      font-size: 40px;
+      font-size: 54px;
       font-weight: bold;
       color: #000;
       direction: rtl;
     }
     
-    /* Main paragraph - centered block */
+    /* Main paragraph - LARGER 50px, fills space */
     .body-content {
       width: 100%;
       flex: 1;
@@ -257,13 +245,13 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       align-items: center;
       direction: rtl;
       text-align: center;
-      font-size: 38px;
-      line-height: 1.7;
+      font-size: 50px;
+      line-height: 1.6;
       color: #000;
     }
     
     .body-content p {
-      margin-bottom: 5px;
+      margin-bottom: 12px;
       text-align: center;
       max-width: 100%;
     }
@@ -274,58 +262,61 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       font-style: italic;
     }
     
-    /* Registration line */
+    /* Registration line - LARGER 44px */
     .registration-line {
       width: 100%;
       text-align: center;
       direction: rtl;
-      font-size: 34px;
+      font-size: 44px;
       line-height: 1.5;
       color: #000;
-      margin: 10px 0;
+      margin: 15px 0;
       flex-shrink: 0;
     }
     
-    /* Signature section */
+    /* Signature section - LARGER fonts */
     .signature-section {
       width: 100%;
       display: flex;
       justify-content: space-between;
       direction: rtl;
-      margin-top: 10px;
+      margin-top: 20px;
       flex-shrink: 0;
     }
     
     .signature-block {
-      width: 420px;
+      width: 500px;
       text-align: center;
     }
     
+    /* Signature title - 32px */
     .signature-title {
-      font-size: 24px;
+      font-size: 32px;
       color: #000;
-      margin-bottom: 40px;
+      margin-bottom: 50px;
     }
     
+    /* Dotted lines - 28px */
     .signature-line {
-      font-size: 20px;
-      letter-spacing: 3px;
-      margin-bottom: 10px;
+      font-size: 28px;
+      letter-spacing: 4px;
+      margin-bottom: 15px;
     }
     
+    /* Stamp labels - 26px */
     .stamp-label {
-      font-size: 20px;
+      font-size: 26px;
       color: #333;
-      margin-top: 5px;
+      margin-top: 8px;
     }
   </style>
 </head>
 <body>
   <div class="certificate-container">
-    ${logoBase64 ? `<img class="watermark" src="data:image/png;base64,${logoBase64}" alt="" />` : ''}
+    <!-- NO WATERMARK - REMOVED -->
     
     <div class="safe-area">
-      <!-- Bismillah -->
+      <!-- Bismillah - 66px, centered, bold -->
       <div class="bismillah">بسم الله الرحمن الرحيم</div>
       
       <!-- Header row -->
@@ -353,13 +344,13 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         </div>
       </div>
       
-      <!-- Titles -->
+      <!-- Titles - LARGER -->
       <div class="titles-section">
         <div class="title-english">GAMBIA MADRASSAH PRIMARY CERTIFICATE</div>
         <div class="title-arabic">شهادة إتمام دراسة المرحلة الابتدائية</div>
       </div>
       
-      <!-- Main paragraph -->
+      <!-- Main paragraph - 50px, fills space -->
       <div class="body-content">
         <p>
           تشهد الأمانة العامّة بأنّ ${studentLabel}/ <span class="highlight">{${fullName}}</span> ${bornLabel} في <span class="highlight">{${student.placeOfBirth || ''}}</span> بتاريخ :
@@ -371,13 +362,13 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         </p>
       </div>
       
-      <!-- Registration info -->
+      <!-- Registration info - 44px -->
       <div class="registration-line">
         سُجّلت هذه الشّهادة تحت رقم ( <span class="highlight">{${certificateNumber}}</span> ) بتاريخ : <span class="highlight">{${issueDateHijri}}</span> هـ الموافق
         <span class="highlight">{${issueDateGreg}}</span> م
       </div>
       
-      <!-- Signatures -->
+      <!-- Signatures - LARGER fonts -->
       <div class="signature-section">
         <div class="signature-block">
           <div class="signature-title">توقيع مدير المدرسة</div>
@@ -387,7 +378,7 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         
         <div class="signature-block">
           <div class="signature-title">الختم الرسمي</div>
-          <div style="height: 40px;"></div>
+          <div style="height: 50px;"></div>
         </div>
         
         <div class="signature-block">
@@ -413,7 +404,8 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
   }
   
   let templateBase64 = '';
-  const templatePath = path.join(process.cwd(), 'attached_assets', 'approved_designs_1765063884505.png');
+  // USE THE CORRECT FINAL TEMPLATE
+  const templatePath = path.join(process.cwd(), 'attached_assets', 'approved_designs_1765065820035.png');
   if (fs.existsSync(templatePath)) {
     const templateBuffer = fs.readFileSync(templatePath);
     templateBase64 = templateBuffer.toString('base64');
