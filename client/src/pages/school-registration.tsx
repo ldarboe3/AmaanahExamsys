@@ -131,6 +131,25 @@ export default function SchoolRegistration() {
     },
   });
 
+  const resendMutation = useMutation({
+    mutationFn: async (email: string) => {
+      return apiRequest("POST", "/api/public/resend-verification", { email });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Email Sent!",
+        description: "Verification email has been resent. Please check your inbox.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Resend",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: RegistrationFormData) => {
     registerMutation.mutate(data);
   };
@@ -167,10 +186,18 @@ export default function SchoolRegistration() {
                   </p>
                   <Button 
                     variant="outline" 
-                    onClick={() => registerMutation.mutate(form.getValues())}
-                    disabled={registerMutation.isPending}
+                    onClick={() => resendMutation.mutate(submittedEmail)}
+                    disabled={resendMutation.isPending}
+                    data-testid="button-resend-verification"
                   >
-                    Resend Verification Email
+                    {resendMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      "Resend Verification Email"
+                    )}
                   </Button>
                 </div>
               </CardContent>
