@@ -520,7 +520,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.delete("/api/regions/:id", isAuthenticated, async (req, res) => {
     try {
-      await storage.deleteRegion(parseInt(req.params.id));
+      const regionId = parseInt(req.params.id);
+      
+      // Check if region has any associated clusters
+      const clusters = await storage.getClustersByRegion(regionId);
+      if (clusters.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete region. It has associated clusters. Please remove all clusters first." 
+        });
+      }
+      
+      // Check if region has any associated schools
+      const allSchools = await storage.getAllSchools();
+      const schoolsInRegion = allSchools.filter(s => s.regionId === regionId);
+      if (schoolsInRegion.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete region. It has associated schools. Please remove all schools first." 
+        });
+      }
+      
+      await storage.deleteRegion(regionId);
       res.json({ message: "Deleted" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -579,7 +598,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.delete("/api/clusters/:id", isAuthenticated, async (req, res) => {
     try {
-      await storage.deleteCluster(parseInt(req.params.id));
+      const clusterId = parseInt(req.params.id);
+      
+      // Check if cluster has any associated schools
+      const allSchools = await storage.getAllSchools();
+      const schoolsInCluster = allSchools.filter(s => s.clusterId === clusterId);
+      if (schoolsInCluster.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete cluster. It has associated schools. Please remove all schools first." 
+        });
+      }
+      
+      // Check if cluster has any associated exam centers
+      const centersInCluster = await storage.getExamCentersByCluster(clusterId);
+      if (centersInCluster.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete cluster. It has associated exam centers. Please remove all exam centers first." 
+        });
+      }
+      
+      await storage.deleteCluster(clusterId);
       res.json({ message: "Deleted" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -5367,7 +5405,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.delete("/api/subjects/:id", isAuthenticated, async (req, res) => {
     try {
-      await storage.deleteSubject(parseInt(req.params.id));
+      const subjectId = parseInt(req.params.id);
+      
+      // Check if subject has any associated results
+      const resultsForSubject = await storage.getResultsBySubject(subjectId);
+      if (resultsForSubject.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete subject. It has associated student results. Subjects with results cannot be deleted." 
+        });
+      }
+      
+      await storage.deleteSubject(subjectId);
       res.json({ message: "Deleted" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -9562,7 +9610,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const { 
         schoolName, 
         schoolTypes, 
-        region, 
+        regionId, 
+        clusterId,
         address, 
         email, 
         phone, 
@@ -9575,7 +9624,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       } = req.body;
 
       // Basic validation
-      if (!schoolName || !schoolTypes || !Array.isArray(schoolTypes) || schoolTypes.length === 0 || !region || !email || !phone || !principalName) {
+      if (!schoolName || !schoolTypes || !Array.isArray(schoolTypes) || schoolTypes.length === 0 || !regionId || !clusterId || !email || !phone || !principalName) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
@@ -9586,6 +9635,23 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
         return res.status(400).json({ message: "Invalid email format" });
+      }
+
+      // Validate region exists
+      const parsedRegionId = parseInt(regionId);
+      const regionRecord = await storage.getRegion(parsedRegionId);
+      if (!regionRecord) {
+        return res.status(400).json({ message: "Invalid region selected. Please select a valid region." });
+      }
+
+      // Validate cluster exists and belongs to the selected region
+      const parsedClusterId = parseInt(clusterId);
+      const clusterRecord = await storage.getCluster(parsedClusterId);
+      if (!clusterRecord) {
+        return res.status(400).json({ message: "Invalid cluster selected. Please select a valid cluster." });
+      }
+      if (clusterRecord.regionId !== parsedRegionId) {
+        return res.status(400).json({ message: "Selected cluster does not belong to the selected region." });
       }
 
       // Check if email already exists
@@ -9604,13 +9670,6 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         console.log(`Deleted unverified school registration for re-registration: ${existingSchool.name} (${email})`);
       }
 
-      // Find existing region only (do not create new regions for security)
-      const regions = await storage.getAllRegions();
-      const regionRecord = regions.find(r => r.name === region);
-      if (!regionRecord) {
-        return res.status(400).json({ message: "Invalid region selected. Please select a valid region." });
-      }
-
       // Create school with pending status (storage.createSchool generates its own verification token)
       const school = await storage.createSchool({
         name: schoolName,
@@ -9620,7 +9679,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         address,
         schoolType: primarySchoolType.toUpperCase() as any,
         schoolTypes: schoolTypes,
-        regionId: regionRecord.id,
+        regionId: parsedRegionId,
+        clusterId: parsedClusterId,
         status: "pending",
         isEmailVerified: false,
         notes: JSON.stringify({

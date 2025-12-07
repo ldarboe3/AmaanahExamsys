@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useMemo } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { PublicLayout } from "@/components/public-layout";
+import type { Region, Cluster } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +49,8 @@ import { Link } from "wouter";
 const registrationSchema = z.object({
   schoolName: z.string().min(3, "School name must be at least 3 characters"),
   schoolTypes: z.array(z.string()).min(1, "Please select at least one school type"),
-  region: z.string().min(1, "Please select region"),
+  regionId: z.string().min(1, "Please select region"),
+  clusterId: z.string().min(1, "Please select cluster"),
   address: z.string().min(5, "Address is required"),
   email: z.string().email("Please enter a valid email address"),
   phone: z.string().min(7, "Phone number is required"),
@@ -61,15 +63,6 @@ const registrationSchema = z.object({
 });
 
 type RegistrationFormData = z.infer<typeof registrationSchema>;
-
-const regions = [
-  "Region 1",
-  "Region 2",
-  "Region 3",
-  "Region 4",
-  "Region 5",
-  "Region 6",
-];
 
 const schoolTypes = [
   { value: "LBS", label: "Lower Basic School – ابتدائي" },
@@ -92,12 +85,21 @@ export default function SchoolRegistration() {
   const [submitted, setSubmitted] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState("");
 
+  const { data: regions = [] } = useQuery<Region[]>({
+    queryKey: ["/api/regions"],
+  });
+
+  const { data: allClusters = [] } = useQuery<Cluster[]>({
+    queryKey: ["/api/clusters"],
+  });
+
   const form = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
     defaultValues: {
       schoolName: "",
       schoolTypes: [],
-      region: "",
+      regionId: "",
+      clusterId: "",
       address: "",
       email: "",
       phone: "",
@@ -109,6 +111,13 @@ export default function SchoolRegistration() {
       additionalInfo: "",
     },
   });
+
+  const selectedRegionId = form.watch("regionId");
+  
+  const filteredClusters = useMemo(() => {
+    if (!selectedRegionId) return [];
+    return allClusters.filter(c => c.regionId === parseInt(selectedRegionId));
+  }, [allClusters, selectedRegionId]);
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegistrationFormData) => {
@@ -330,11 +339,17 @@ export default function SchoolRegistration() {
                     <div className="grid md:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
-                        name="region"
+                        name="regionId"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Region *</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <Select 
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                form.setValue("clusterId", "");
+                              }} 
+                              value={field.value}
+                            >
                               <FormControl>
                                 <SelectTrigger data-testid="select-region">
                                   <SelectValue placeholder="Select region" />
@@ -342,7 +357,7 @@ export default function SchoolRegistration() {
                               </FormControl>
                               <SelectContent>
                                 {regions.map((region) => (
-                                  <SelectItem key={region} value={region}>{region}</SelectItem>
+                                  <SelectItem key={region.id} value={String(region.id)}>{region.name}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -352,18 +367,45 @@ export default function SchoolRegistration() {
                       />
                       <FormField
                         control={form.control}
-                        name="studentCount"
+                        name="clusterId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Approximate Student Count *</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g., 250" {...field} data-testid="input-student-count" />
-                            </FormControl>
+                            <FormLabel>Cluster *</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              value={field.value}
+                              disabled={!selectedRegionId || filteredClusters.length === 0}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-cluster">
+                                  <SelectValue placeholder={!selectedRegionId ? "Select region first" : "Select cluster"} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {filteredClusters.map((cluster) => (
+                                  <SelectItem key={cluster.id} value={String(cluster.id)}>{cluster.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
+
+                    <FormField
+                      control={form.control}
+                      name="studentCount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Approximate Student Count *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., 250" {...field} data-testid="input-student-count" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                     <FormField
                       control={form.control}
