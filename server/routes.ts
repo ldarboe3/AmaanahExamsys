@@ -9590,9 +9590,18 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
 
       // Check if email already exists
       const existingSchools = await storage.getAllSchools();
-      const emailExists = existingSchools.some(s => s.email?.toLowerCase() === email.toLowerCase());
-      if (emailExists) {
-        return res.status(400).json({ message: "A school with this email already exists" });
+      const existingSchool = existingSchools.find(s => s.email?.toLowerCase() === email.toLowerCase());
+      
+      if (existingSchool) {
+        // If the school has already been verified and has an admin, don't allow re-registration
+        if (existingSchool.isEmailVerified && existingSchool.adminUserId) {
+          return res.status(400).json({ message: "A verified school with this email already exists. Please login or contact support." });
+        }
+        
+        // Allow re-registration for unverified schools - delete the old entry
+        // This allows users to restart registration if they didn't complete verification
+        await storage.deleteSchool(existingSchool.id);
+        console.log(`Deleted unverified school registration for re-registration: ${existingSchool.name} (${email})`);
       }
 
       // Find existing region only (do not create new regions for security)
