@@ -9628,8 +9628,21 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         }),
       });
 
-      // In production, send verification email here
-      console.log(`School registration: ${schoolName} - Verification token: ${verificationToken}`);
+      // Send verification email
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      try {
+        await sendSchoolVerificationEmail(
+          email,
+          schoolName,
+          principalName,
+          verificationToken,
+          baseUrl
+        );
+        console.log(`School registration: ${schoolName} - Verification email sent to ${email}`);
+      } catch (emailError: any) {
+        console.error(`Failed to send verification email to ${email}:`, emailError?.message);
+        // Continue with registration even if email fails - they can use resend
+      }
 
       res.json({ 
         message: "Registration submitted successfully. Please check your email for verification.",
@@ -9661,6 +9674,61 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       res.json({ message: "Email verified successfully. Your registration is now pending approval." });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Resend verification email endpoint
+  app.post("/api/public/resend-verification", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Find school by email
+      const schools = await storage.getAllSchools();
+      const school = schools.find(s => s.email?.toLowerCase() === email.toLowerCase());
+
+      if (!school) {
+        return res.status(404).json({ message: "No registration found with this email" });
+      }
+
+      if (school.isEmailVerified) {
+        return res.status(400).json({ message: "This email has already been verified" });
+      }
+
+      // Generate new verification token
+      const verificationToken = `verify-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Update school with new token
+      await storage.updateSchool(school.id, {
+        verificationToken,
+      });
+
+      // Parse notes to get principal name
+      let principalName = school.registrarName || "School Administrator";
+      try {
+        const notes = JSON.parse(school.notes || "{}");
+        principalName = notes.principalName || school.registrarName || "School Administrator";
+      } catch (e) {}
+
+      // Send verification email
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      await sendSchoolVerificationEmail(
+        email,
+        school.name,
+        principalName,
+        verificationToken,
+        baseUrl
+      );
+
+      console.log(`Resent verification email to ${email} for school: ${school.name}`);
+
+      res.json({ message: "Verification email sent successfully. Please check your inbox." });
+    } catch (error: any) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ message: error.message || "Failed to resend verification email" });
     }
   });
 
