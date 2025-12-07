@@ -405,7 +405,8 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
   
   let templateBase64 = '';
   // USE THE CORRECT FINAL TEMPLATE
-  const templatePath = path.join(process.cwd(), 'attached_assets', 'approved_designs_1765065820035.png');
+  // USE BLANK BORDER TEMPLATE (no sample text - only decorative border)
+  const templatePath = path.join(process.cwd(), 'attached_assets', 'approved_designs_1765063884505.png');
   if (fs.existsSync(templatePath)) {
     const templateBuffer = fs.readFileSync(templatePath);
     templateBase64 = templateBuffer.toString('base64');
