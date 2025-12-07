@@ -1,11 +1,33 @@
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
+import QRCode from 'qrcode';
 import {
   formatArabicDate,
   formatHijriDate,
   getGradeWord,
 } from './certificateTemplates';
+
+// Generate secure verification token
+export function generateCertificateQRToken(): string {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+// Generate QR code as data URL
+export async function generateCertificateQRCodeDataUrl(verificationUrl: string): Promise<string> {
+  try {
+    return await QRCode.toDataURL(verificationUrl, {
+      width: 150,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+      errorCorrectionLevel: 'H'
+    });
+  } catch (error) {
+    console.error('Error generating certificate QR code:', error);
+    return '';
+  }
+}
 
 interface StudentData {
   id: number;
@@ -44,6 +66,7 @@ interface PrimaryCertificateData {
   qrToken: string;
   certificateNumber: string;
   verifyUrl: string;
+  qrCodeDataUrl?: string;
   isReprint?: boolean;
 }
 
@@ -53,8 +76,8 @@ if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }
 
-function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: string, logoBase64: string): string {
-  const { student, school, examYear, finalGrade, certificateNumber } = data;
+function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: string, logoBase64: string, watermarkBase64: string): string {
+  const { student, school, examYear, finalGrade, certificateNumber, qrCodeDataUrl, verifyUrl } = data;
   
   const isFemale = student.gender === 'female';
   
@@ -307,10 +330,81 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       color: #333;
       margin-top: 10px;
     }
+    
+    /* Watermark - centered, low opacity */
+    .watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.12;
+      z-index: 0;
+      pointer-events: none;
+    }
+    
+    .watermark img {
+      width: 900px;
+      height: auto;
+    }
+    
+    /* QR Code section - bottom left */
+    .qr-section {
+      position: absolute;
+      bottom: 460px;
+      left: 460px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      z-index: 10;
+    }
+    
+    .qr-code-container {
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .qr-code-container img {
+      width: 140px;
+      height: 140px;
+    }
+    
+    .qr-text {
+      font-size: 22px;
+      color: #333;
+      text-align: center;
+      direction: rtl;
+      line-height: 1.4;
+    }
+    
+    .qr-text .en {
+      direction: ltr;
+      font-size: 18px;
+      color: #555;
+    }
+    
+    .security-text {
+      position: absolute;
+      bottom: 460px;
+      right: 460px;
+      font-size: 20px;
+      color: #666;
+      text-align: right;
+      direction: rtl;
+      line-height: 1.5;
+    }
+    
+    .security-text .cert-num {
+      font-weight: bold;
+      color: #333;
+    }
   </style>
 </head>
 <body>
   <div class="certificate-container">
+    ${watermarkBase64 ? `<div class="watermark"><img src="data:image/png;base64,${watermarkBase64}" alt="Watermark" /></div>` : ''}
     <div class="safe-area">
       <!-- Bismillah - 96px -->
       <div class="bismillah">بسم الله الرحمن الرحيم</div>
@@ -384,6 +478,24 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
         </div>
       </div>
     </div>
+    
+    ${qrCodeDataUrl ? `
+    <div class="qr-section">
+      <div class="qr-text">
+        <div>للتحقق من صحة الشهادة</div>
+        <div class="en">Scan to verify</div>
+      </div>
+      <div class="qr-code-container">
+        <img src="${qrCodeDataUrl}" alt="QR Code" />
+      </div>
+    </div>
+    ` : ''}
+    
+    <div class="security-text">
+      <div>رقم الشهادة: <span class="cert-num">${certificateNumber}</span></div>
+      <div class="en" style="direction: ltr; font-size: 18px;">Certificate No: ${certificateNumber}</div>
+      ${verifyUrl ? `<div class="en" style="direction: ltr; font-size: 16px; margin-top: 8px; color: #888;">Verify at: amaanah.gm/verify</div>` : ''}
+    </div>
   </div>
 </body>
 </html>`;
@@ -407,7 +519,10 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
     templateBase64 = templateBuffer.toString('base64');
   }
   
-  const html = generateCertificateHTML(data, templateBase64, logoBase64);
+  // Load watermark (same as logo for authenticity)
+  let watermarkBase64 = logoBase64;
+  
+  const html = generateCertificateHTML(data, templateBase64, logoBase64, watermarkBase64);
   
   const browser = await puppeteer.launch({
     headless: true,
