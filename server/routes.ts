@@ -9561,7 +9561,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     try {
       const { 
         schoolName, 
-        schoolType, 
+        schoolTypes, 
         region, 
         address, 
         email, 
@@ -9575,9 +9575,12 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       } = req.body;
 
       // Basic validation
-      if (!schoolName || !schoolType || !region || !email || !phone || !principalName) {
+      if (!schoolName || !schoolTypes || !Array.isArray(schoolTypes) || schoolTypes.length === 0 || !region || !email || !phone || !principalName) {
         return res.status(400).json({ message: "Missing required fields" });
       }
+
+      // Use the first school type as the primary type for backward compatibility
+      const primarySchoolType = schoolTypes[0];
 
       // Email format validation
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -9609,7 +9612,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         email,
         phone,
         address,
-        schoolType: schoolType.toLowerCase().replace(/\s+/g, '_'),
+        schoolType: primarySchoolType.toUpperCase() as any,
+        schoolTypes: schoolTypes,
         regionId: regionRecord.id,
         status: "pending",
         isEmailVerified: false,
