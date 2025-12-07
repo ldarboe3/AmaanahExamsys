@@ -676,7 +676,10 @@ export default function Transcripts() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  onClick={() => {
+                    setCurrentPage(p => Math.max(1, p - 1));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   disabled={currentPage === 1}
                   data-testid="button-prev-page"
                 >
@@ -688,7 +691,10 @@ export default function Transcripts() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(p => p + 1)}
+                  onClick={() => {
+                    setCurrentPage(p => p + 1);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   disabled={currentPage >= totalPages}
                   data-testid="button-next-page"
                 >
