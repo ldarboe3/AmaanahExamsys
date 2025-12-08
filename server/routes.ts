@@ -44,6 +44,35 @@ import bcrypt from "bcrypt";
 import multer from "multer";
 import { randomBytes } from "crypto";
 import * as XLSX from "xlsx";
+import { execSync } from "child_process";
+
+// Helper to find Chromium executable for Puppeteer
+let cachedChromiumPath: string | null = null;
+function getChromiumExecutable(): string {
+  if (cachedChromiumPath) return cachedChromiumPath;
+  
+  // Check environment variable first
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    cachedChromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    return cachedChromiumPath;
+  }
+  
+  // Try to find chromium in PATH
+  const candidates = ['chromium', 'chromium-browser', 'google-chrome', 'chrome'];
+  for (const cmd of candidates) {
+    try {
+      const path = execSync(`which ${cmd}`, { encoding: 'utf8' }).trim();
+      if (path) {
+        cachedChromiumPath = path;
+        return cachedChromiumPath;
+      }
+    } catch {
+      // Command not found, try next
+    }
+  }
+  
+  throw new Error('Could not find Chromium executable. Set PUPPETEER_EXECUTABLE_PATH environment variable.');
+}
 
 const schoolDocUploadConfig = multer({
   storage: multer.memoryStorage(),
@@ -4562,6 +4591,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const browser = await puppeteer.launch({
         headless: true,
+        executablePath: getChromiumExecutable(),
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
@@ -5030,6 +5060,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const browser = await puppeteer.launch({
         headless: true,
+        executablePath: getChromiumExecutable(),
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
@@ -12827,8 +12858,9 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
 
       // Generate PDF using Puppeteer
       const browser = await puppeteer.launch({ 
-        headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        headless: true,
+        executablePath: getChromiumExecutable(),
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       const page = await browser.newPage();
       await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
