@@ -400,7 +400,7 @@ export default function Certificates() {
   };
 
   return (
-    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       {generatePrimaryMutation.isPending && generatingCount > 0 && (
         <GeneratingOverlay isRTL={isRTL} count={generatingCount} />
       )}

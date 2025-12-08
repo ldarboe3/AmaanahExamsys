@@ -46,7 +46,7 @@ export default function Landing() {
           </div>
         </nav>
 
-        <div className="container mx-auto px-4 py-16 md:py-24">
+        <div className="container mx-auto px-4 py-12 md:py-12">
           <div className="max-w-3xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-6 rounded-md bg-primary/10 text-primary text-sm font-medium">
               <Shield className="w-4 h-4" />
@@ -82,9 +82,9 @@ export default function Landing() {
       </header>
 
       {/* Features Section */}
-      <section className="py-16 md:py-24 bg-card/50">
+      <section className="py-12 md:py-12 bg-card/50">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <h3 className="text-2xl md:text-3xl font-semibold text-foreground mb-4">
               Everything You Need to Manage Examinations
             </h3>
@@ -182,7 +182,7 @@ export default function Landing() {
       </section>
 
       {/* Stats Section */}
-      <section className="py-16 md:py-20 bg-background">
+      <section className="py-12 md:py-20 bg-background">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="text-center">
@@ -206,9 +206,9 @@ export default function Landing() {
       </section>
 
       {/* User Types Section */}
-      <section className="py-16 md:py-24 bg-card/50">
+      <section className="py-12 md:py-12 bg-card/50">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <h3 className="text-2xl md:text-3xl font-semibold text-foreground mb-4">
               Designed for Every User
             </h3>
@@ -309,7 +309,7 @@ export default function Landing() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 md:py-20 bg-primary/5">
+      <section className="py-12 md:py-20 bg-primary/5">
         <div className="container mx-auto px-4 text-center">
           <h3 className="text-2xl md:text-3xl font-semibold text-foreground mb-4">
             Ready to Transform Your Examination Process?

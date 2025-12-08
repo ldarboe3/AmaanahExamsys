@@ -226,7 +226,7 @@ export default function SeniorExecutives() {
 
   return (
     <PublicLayout>
-      <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-16 md:py-24">
+      <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-12 md:py-12">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <Badge className="mb-4" data-testid="badge-page-type">
@@ -244,9 +244,9 @@ export default function SeniorExecutives() {
         </div>
       </section>
 
-      <section className="py-16 md:py-24">
+      <section className="py-12 md:py-12">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <Badge variant="outline" className="mb-4">
               {isRTL ? "اللجنة التنفيذية" : "Executive Committee"}
             </Badge>
@@ -280,9 +280,9 @@ export default function SeniorExecutives() {
         </div>
       </section>
 
-      <section className="py-16 md:py-24 bg-muted/50">
+      <section className="py-12 md:py-12 bg-muted/50">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <Badge variant="outline" className="mb-4">
               {isRTL ? "المكتب التنفيذي" : "Executive Bureau"}
             </Badge>
@@ -345,7 +345,7 @@ export default function SeniorExecutives() {
         </div>
       </section>
 
-      <section className="py-16 md:py-24 bg-primary text-primary-foreground">
+      <section className="py-12 md:py-12 bg-primary text-primary-foreground">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <Users className="w-12 h-12 mx-auto mb-6 opacity-80" />

@@ -100,7 +100,7 @@ export default function AuditLogs() {
   const uniqueActions = Array.from(new Set(logs?.map(l => l.action) || []));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Audit Logs</h1>

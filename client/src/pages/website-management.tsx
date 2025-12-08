@@ -1737,7 +1737,7 @@ function CategoriesTab() {
 
 export default function WebsiteManagement() {
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 p-6">
       <div>
         <h1 className="text-3xl font-bold">Website Management</h1>
         <p className="text-muted-foreground">Manage public website content, news, resources, and announcements</p>
@@ -1745,7 +1745,7 @@ export default function WebsiteManagement() {
 
       <Card>
         <CardContent className="p-6">
-          <Tabs defaultValue="news" className="space-y-6">
+          <Tabs defaultValue="news" className="space-y-4">
             <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
               <TabsTrigger value="news" className="gap-2" data-testid="tab-news">
                 <Newspaper className="h-4 w-4" />

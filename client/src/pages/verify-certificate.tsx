@@ -161,7 +161,7 @@ export default function VerifyCertificate() {
                     </span>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-4">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-full bg-background flex items-center justify-center">
                       <User className="w-7 h-7 text-muted-foreground" />

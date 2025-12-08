@@ -773,7 +773,7 @@ export default function Schools() {
   };
 
   return (
-    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1560,7 +1560,7 @@ export default function Schools() {
             </DialogDescription>
           </DialogHeader>
           {selectedSchool && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="flex items-start gap-4">
                 <div className="w-14 h-14 rounded-md bg-primary/10 flex items-center justify-center">
                   <SchoolIcon className="w-7 h-7 text-primary" />
@@ -1824,7 +1824,7 @@ export default function Schools() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto space-y-6">
+          <div className="flex-1 overflow-y-auto space-y-4">
             {/* CSV Format Info */}
             <Alert>
               <Info className="w-4 h-4" />

@@ -75,7 +75,7 @@ export default function Contact() {
   return (
     <PublicLayout>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-16 md:py-24">
+      <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-12 md:py-12">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <Badge className="mb-4">Get in Touch</Badge>
@@ -91,9 +91,9 @@ export default function Contact() {
       </section>
 
       {/* Contact Section */}
-      <section className="py-16 md:py-24">
+      <section className="py-12 md:py-12">
         <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-3 gap-12">
+          <div className="grid lg:grid-cols-3 gap-8">
             {/* Contact Form */}
             <div className="lg:col-span-2">
               <Card>
@@ -105,7 +105,7 @@ export default function Contact() {
                 </CardHeader>
                 <CardContent>
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                       <div className="grid md:grid-cols-2 gap-6">
                         <FormField
                           control={form.control}
@@ -198,7 +198,7 @@ export default function Contact() {
             </div>
 
             {/* Contact Info */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Contact Information</CardTitle>
@@ -206,7 +206,7 @@ export default function Contact() {
                     Reach out to us through any of these channels
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-4">
                   {contactInfo.map((item, i) => (
                     <div key={i} className="flex items-start gap-4">
                       <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">

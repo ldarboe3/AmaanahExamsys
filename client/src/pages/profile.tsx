@@ -179,7 +179,7 @@ export default function Profile() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold">{t.user.profileSettings}</h1>
         <p className="text-muted-foreground">Manage your account settings and preferences</p>
@@ -229,7 +229,7 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        <div className="md:col-span-2 space-y-6">
+        <div className="md:col-span-2 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

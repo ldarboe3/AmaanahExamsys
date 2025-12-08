@@ -266,7 +266,7 @@ export default function Subjects() {
   }, {} as Record<number, Subject[]>);
 
   return (
-    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{t.subjects.title}</h1>
@@ -361,7 +361,7 @@ export default function Subjects() {
               )}
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {Object.entries(subjectsByGrade || {})
                 .sort(([a], [b]) => parseInt(a) - parseInt(b))
                 .map(([grade, gradeSubjects]) => (

@@ -1007,7 +1007,7 @@ export default function Students() {
 
   // TIER 1: Exam Year Dashboard View
   const renderExamYearDashboard = () => (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1210,7 +1210,7 @@ export default function Students() {
     const isReadOnly = isSchoolAdmin && isPastExamYear;
     
     return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Read-only warning for past exam years */}
       {isReadOnly && (
         <Card className="border-2 border-destructive/30 bg-destructive/5">
@@ -1473,7 +1473,7 @@ export default function Students() {
     const isReadOnly = isSchoolAdmin && isPastExamYear;
     
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Read-only warning for past exam years */}
         {isReadOnly && (
           <Card className="border-2 border-destructive/30 bg-destructive/5">
@@ -2353,7 +2353,7 @@ export default function Students() {
   };
 
   return (
-    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       {selectedExamYear === null 
         ? renderExamYearDashboard() 
         : selectedGrade === null 
@@ -2370,7 +2370,7 @@ export default function Students() {
             </DialogDescription>
           </DialogHeader>
           {selectedStudent && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                   <User className="w-8 h-8 text-primary" />

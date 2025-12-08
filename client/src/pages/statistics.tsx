@@ -138,7 +138,7 @@ export default function Statistics() {
     }
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="pt-6">
@@ -275,7 +275,7 @@ export default function Statistics() {
 
   return (
     <PublicLayout>
-      <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-16 md:py-24">
+      <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-12 md:py-12">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <Badge className="mb-4" data-testid="badge-page-type">
@@ -293,7 +293,7 @@ export default function Statistics() {
         </div>
       </section>
 
-      <section className="py-16 md:py-24">
+      <section className="py-12 md:py-12">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-8">
@@ -371,10 +371,10 @@ export default function Statistics() {
         </div>
       </section>
 
-      <section className="py-16 md:py-24 bg-muted/50">
+      <section className="py-12 md:py-12 bg-muted/50">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
+            <div className="text-center mb-8">
               <Badge variant="outline" className="mb-4">
                 {isRTL ? "ملاحظة" : "Note"}
               </Badge>
