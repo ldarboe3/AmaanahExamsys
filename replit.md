@@ -43,6 +43,7 @@ The system is built on a robust architecture featuring a React-based frontend, a
   - **Unified Certificate/Transcript Workflow**: Eligibility-based student selection, filtering, bulk generation, preview, and print functionalities. Includes gender-specific templates and QR verification.
   - **Online Result Checker**: Public checker for candidates to search results and generate/download transcripts.
   - **School Results Dashboard**: Read-only results view with no edit/upload capabilities. Shows student results in table format with examination ranking. Schools can download PDF reports with official Amaanah logo and address.
+  - **Result Publication Notifications**: When results are published, automatic email and in-dashboard notifications are sent to all schools with registered students for that examination. Schools without registered students are excluded from notifications.
 - **Administrative Tools**: Comprehensive audit logging, advanced CSV export functionalities, and role-based access control.
 - **Exam Management**: Examiner, subject, timetable, and exam center management.
 - **Website Management**: Public-facing website content management system.
