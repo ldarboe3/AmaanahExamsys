@@ -36,6 +36,7 @@ import Timetable from "@/pages/timetable";
 import Settings from "@/pages/settings";
 import Profile from "@/pages/profile";
 import SchoolProfile from "@/pages/school-profile";
+import SchoolResults from "@/pages/school-results";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -101,6 +102,7 @@ function AuthenticatedRoutes() {
       <Route path="/settings" component={Settings} />
       <Route path="/profile" component={Profile} />
       <Route path="/school-profile" component={SchoolProfile} />
+      <Route path="/school-results" component={SchoolResults} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/" component={Dashboard} />
       <Route component={NotFound} />
