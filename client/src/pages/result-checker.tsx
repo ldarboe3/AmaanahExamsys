@@ -182,18 +182,18 @@ export default function ResultChecker() {
 
   const handleDownloadTranscript = () => {
     if (resultData?.student?.indexNumber) {
-      window.open(`/api/public/transcripts/${resultData.student.indexNumber}/download`, '_blank');
+      const link = document.createElement('a');
+      link.href = `/api/public/transcripts/${resultData.student.indexNumber}/download`;
+      link.download = `transcript-${resultData.student.indexNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
   const handlePrintTranscript = () => {
     if (resultData?.student?.indexNumber) {
-      const printWindow = window.open(`/api/public/transcripts/${resultData.student.indexNumber}/download`, '_blank');
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.print();
-        };
-      }
+      window.open(`/api/public/transcripts/${resultData.student.indexNumber}/download?print=true`, '_blank');
     }
   };
 
