@@ -7840,6 +7840,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Publish results
       const count = await storage.publishResults(examYearId, grade);
+      let schoolIds: number[] = [];
 
       // Send notifications to schools with registered students
       if (count > 0) {
@@ -7851,7 +7852,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             : allStudents;
 
           // Get unique school IDs
-          const schoolIds = [...new Set(filteredStudents.map(s => s.schoolId).filter(Boolean))];
+          schoolIds = [...new Set(filteredStudents.map(s => s.schoolId).filter(Boolean))] as number[];
 
           if (schoolIds.length > 0) {
             // Get schools and their admin users
@@ -7941,7 +7942,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json({ 
         message: "Results published", 
         published: count,
-        notificationsCount: Math.min(count, schoolIds?.length || 0) 
+        notificationsCount: Math.min(count, schoolIds.length || 0) 
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
