@@ -716,15 +716,20 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
 
   const htmlContent = generateTranscriptHTML(data);
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: getChromiumExecutable(),
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
-  });
-
+  let browser;
   try {
+    const chromiumPath = getChromiumExecutable();
+    console.log(`[Transcript PDF] Launching Chromium from: ${chromiumPath}`);
+    
+    browser = await puppeteer.launch({
+      headless: true,
+      executablePath: chromiumPath,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
+      timeout: 30000
+    });
+
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
+    await page.setContent(htmlContent, { waitUntil: 'domcontentloaded', timeout: 30000 });
     
     const fileName = `transcript_g6_${data.student.indexNumber || data.student.id}_${Date.now()}.pdf`;
     const filePath = path.join(outputDir, fileName);
@@ -736,12 +741,20 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
     });
     
+    console.log(`[Transcript PDF] Successfully generated: ${filePath}`);
     return filePath;
-  } catch (error) {
-    console.error(`Transcript PDF generation error for student ${data.student.id}:`, error);
-    throw error;
+  } catch (error: any) {
+    const studentInfo = `${data.student.firstName} ${data.student.lastName} (${data.student.id})`;
+    console.error(`[Transcript PDF] Generation error for student ${studentInfo}:`, error.message);
+    throw new Error(`Failed to generate transcript PDF: ${error.message}`);
   } finally {
-    await browser.close();
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (e) {
+        console.warn('[Transcript PDF] Error closing browser:', e);
+      }
+    }
   }
 }
 
