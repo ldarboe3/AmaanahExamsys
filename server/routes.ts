@@ -4230,12 +4230,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const fs = (await import('fs')).default;
       const path = (await import('path')).default;
       
-      // Read logo and convert to base64
+      // Read logo and convert to base64 - find the most recent Amana_Logo file
       let logoBase64 = '';
       try {
-        const logoPath = path.join(process.cwd(), 'attached_assets/Amana_Logo_1764714323051.PNG');
-        const logoBuffer = fs.readFileSync(logoPath);
-        logoBase64 = logoBuffer.toString('base64');
+        const assetsDir = path.join(process.cwd(), 'attached_assets');
+        const files = fs.readdirSync(assetsDir);
+        const logoFiles = files.filter(f => f.startsWith('Amana_Logo') && (f.endsWith('.png') || f.endsWith('.PNG')));
+        
+        if (logoFiles.length > 0) {
+          // Sort by timestamp in filename and get the most recent
+          logoFiles.sort().reverse();
+          const latestLogoFile = logoFiles[0];
+          const logoPath = path.join(assetsDir, latestLogoFile);
+          const logoBuffer = fs.readFileSync(logoPath);
+          logoBase64 = logoBuffer.toString('base64');
+        }
       } catch (e) {
         console.log('Logo file not found, using placeholder');
       }
