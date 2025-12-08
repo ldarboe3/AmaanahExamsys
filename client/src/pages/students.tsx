@@ -1675,29 +1675,29 @@ export default function Students() {
                     { stage: 'awaiting_payment', label: { en: 'Submit Payment', ar: 'تقديم الدفع' }, icon: CreditCard },
                     { stage: 'payment_review', label: { en: 'Under Review', ar: 'قيد المراجعة' }, icon: Clock },
                     { stage: 'completed', label: { en: 'Completed', ar: 'مكتمل' }, icon: CheckCircle },
-                  ].map((step, index) => {
+                  ]
+                  .filter((step) => {
+                    // Only show the current step and future steps; hide completed steps
+                    const allStages = ['pending_upload', 'awaiting_payment', 'payment_review', 'completed'];
+                    const currentIndex = allStages.indexOf(registrationStage || 'pending_upload');
+                    const stepIndex = allStages.indexOf(step.stage);
+                    return stepIndex >= currentIndex;
+                  })
+                  .map((step, index) => {
                     const isActive = registrationStage === step.stage;
-                    const isCompleted = ['pending_upload', 'awaiting_payment', 'payment_review', 'completed']
-                      .indexOf(registrationStage || 'pending_upload') > ['pending_upload', 'awaiting_payment', 'payment_review', 'completed'].indexOf(step.stage);
                     const StepIcon = step.icon;
                     
                     return (
                       <div key={step.stage} className="flex flex-col items-center flex-1">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all ${
-                          isCompleted 
-                            ? 'bg-chart-3 text-white' 
-                            : isActive 
-                              ? 'bg-primary text-white ring-4 ring-primary/30' 
-                              : 'bg-muted text-muted-foreground'
+                          isActive 
+                            ? 'bg-primary text-white ring-4 ring-primary/30' 
+                            : 'bg-muted text-muted-foreground'
                         }`}>
-                          {isCompleted ? (
-                            <CheckCircle className="w-5 h-5" />
-                          ) : (
-                            <StepIcon className="w-5 h-5" />
-                          )}
+                          <StepIcon className="w-5 h-5" />
                         </div>
                         <span className={`text-xs text-center font-medium ${
-                          isActive ? 'text-primary' : isCompleted ? 'text-chart-3' : 'text-muted-foreground'
+                          isActive ? 'text-primary' : 'text-muted-foreground'
                         }`}>
                           {isRTL ? step.label.ar : step.label.en}
                         </span>
@@ -1705,18 +1705,19 @@ export default function Students() {
                     );
                   })}
                 </div>
-                {/* Progress Line */}
-                <div className="relative h-1 bg-muted rounded-full mx-8 mt-[-40px] mb-8">
-                  <div 
-                    className="absolute h-1 bg-chart-3 rounded-full transition-all"
-                    style={{
-                      width: registrationStage === 'pending_upload' ? '0%' 
-                        : registrationStage === 'awaiting_payment' ? '33%' 
-                        : registrationStage === 'payment_review' ? '66%' 
-                        : '100%'
-                    }}
-                  />
-                </div>
+                {/* Progress Line - hidden when registration is complete */}
+                {registrationStage !== 'completed' && (
+                  <div className="relative h-1 bg-muted rounded-full mx-8 mt-[-40px] mb-8">
+                    <div 
+                      className="absolute h-1 bg-chart-3 rounded-full transition-all"
+                      style={{
+                        width: registrationStage === 'pending_upload' ? '0%' 
+                          : registrationStage === 'awaiting_payment' ? '50%' 
+                          : '100%'
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Stage-specific Content */}
