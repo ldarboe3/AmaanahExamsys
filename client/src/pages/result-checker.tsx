@@ -218,10 +218,10 @@ export default function ResultChecker() {
       // Build result rows HTML
       const resultRowsHtml = resultData.results.map(result => `
         <tr>
-          <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${getSubjectName(result)}</td>
-          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 500;">${result.score}/${result.maxScore}</td>
-          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #059669;">${result.grade}</td>
-          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">${language === 'ar' ? getGradeStatus(result.grade).ar : getGradeStatus(result.grade).en}</td>
+          <td style="padding: 4px 5px; border-bottom: 1px solid #e5e7eb; font-size: 11px;">${getSubjectName(result)}</td>
+          <td style="padding: 4px 5px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 500; font-size: 11px;">${result.score}/${result.maxScore}</td>
+          <td style="padding: 4px 5px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #059669; font-size: 11px;">${result.grade}</td>
+          <td style="padding: 4px 5px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 10px;">${language === 'ar' ? getGradeStatus(result.grade).ar : getGradeStatus(result.grade).en}</td>
         </tr>
       `).join('');
       
@@ -233,40 +233,41 @@ export default function ResultChecker() {
           <meta charset="UTF-8">
           <title>Verified Result - ${resultData.student.indexNumber}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f9fafb; }
-            .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
-            .org-header { padding: 30px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #059669; }
+            body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f9fafb; }
+            .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+            .org-header { padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #059669; }
             .header-text-en { flex: 1; text-align: left; }
-            .header-logo { flex: 0; text-align: center; margin: 0 20px; }
-            .header-logo img { height: 100px; width: auto; }
+            .header-logo { flex: 0; text-align: center; margin: 0 10px; }
+            .header-logo img { height: 70px; width: auto; }
             .header-text-ar { flex: 1; text-align: right; direction: rtl; }
-            .header-text-en p, .header-text-ar p { margin: 4px 0; line-height: 1.4; }
-            .header-text-en .title { font-weight: bold; font-size: 13px; }
-            .header-text-ar .title { font-weight: bold; font-size: 13px; }
-            .header-text-en .subtitle { font-size: 12px; color: #6b7280; }
-            .header-text-ar .subtitle { font-size: 12px; color: #6b7280; }
-            .main-content { padding: 40px; }
-            .header { text-align: center; border-bottom: 3px solid #059669; padding-bottom: 20px; margin-bottom: 30px; }
-            .header-title { font-size: 24px; font-weight: bold; color: #059669; margin: 0; }
-            .header-subtitle { font-size: 14px; color: #6b7280; margin: 5px 0 0 0; }
-            .verification-badge { display: inline-block; background: #ecfdf5; border: 1px solid #059669; color: #047857; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; margin-bottom: 20px; }
-            .student-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+            .header-text-en p, .header-text-ar p { margin: 2px 0; line-height: 1.2; }
+            .header-text-en .title { font-weight: bold; font-size: 11px; }
+            .header-text-ar .title { font-weight: bold; font-size: 11px; }
+            .header-text-en .subtitle { font-size: 10px; color: #6b7280; }
+            .header-text-ar .subtitle { font-size: 10px; color: #6b7280; }
+            .main-content { padding: 15px 20px; }
+            .header { text-align: center; border-bottom: 2px solid #059669; padding-bottom: 8px; margin-bottom: 10px; }
+            .header-title { font-size: 18px; font-weight: bold; color: #059669; margin: 0; }
+            .header-subtitle { font-size: 12px; color: #6b7280; margin: 3px 0 0 0; }
+            .verification-badge { display: inline-block; background: #ecfdf5; border: 1px solid #059669; color: #047857; padding: 4px 10px; border-radius: 3px; font-size: 11px; font-weight: 600; margin-bottom: 8px; }
+            .student-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
             .info-item { }
-            .info-label { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
-            .info-value { font-size: 15px; color: #111827; font-weight: 500; }
-            .results-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-            .results-table th { background: #f3f4f6; padding: 12px; text-align: left; font-weight: 600; color: #374151; font-size: 13px; }
-            .results-table td { padding: 12px; }
-            .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 30px; padding: 20px; background: #f0fdf4; border-radius: 6px; }
+            .info-label { font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase; margin-bottom: 2px; }
+            .info-value { font-size: 12px; color: #111827; font-weight: 500; }
+            .results-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+            .results-table th { background: #f3f4f6; padding: 6px; text-align: left; font-weight: 600; color: #374151; font-size: 11px; }
+            .results-table td { padding: 5px 6px; font-size: 11px; }
+            h3 { margin: 8px 0 5px 0; color: #111827; font-size: 12px; }
+            .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; padding: 10px; background: #f0fdf4; border-radius: 4px; }
             .summary-item { text-align: center; }
-            .summary-label { font-size: 12px; color: #6b7280; font-weight: 600; }
-            .summary-value { font-size: 20px; font-weight: bold; color: #059669; margin-top: 5px; }
-            .barcode-section { text-align: center; border-top: 1px solid #e5e7eb; padding-top: 20px; }
-            .barcode-section p { font-size: 12px; color: #6b7280; margin: 0 0 10px 0; }
-            .barcode-image { max-width: 200px; height: auto; }
-            .footer { text-align: center; font-size: 11px; color: #9ca3af; margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 15px; }
-            .timestamp { font-size: 11px; color: #9ca3af; text-align: center; margin-top: 10px; }
-            @media print { body { background: white; } .container { box-shadow: none; border-radius: 0; } .org-header { padding: 25px 40px; } .main-content { padding: 35px 40px; } }
+            .summary-label { font-size: 10px; color: #6b7280; font-weight: 600; }
+            .summary-value { font-size: 14px; font-weight: bold; color: #059669; margin-top: 2px; }
+            .barcode-section { text-align: center; border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 8px; }
+            .barcode-section p { font-size: 10px; color: #6b7280; margin: 0 0 5px 0; }
+            .barcode-image { max-width: 150px; height: auto; }
+            .footer { text-align: center; font-size: 9px; color: #9ca3af; margin-top: 8px; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+            .timestamp { font-size: 9px; color: #9ca3af; text-align: center; margin-top: 5px; }
+            @media print { body { background: white; margin: 0; padding: 0; } .container { box-shadow: none; border-radius: 0; margin: 0; } }
           </style>
         </head>
         <body>
