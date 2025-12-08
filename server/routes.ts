@@ -4552,7 +4552,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const browser = await puppeteer.launch({
         headless: true,
-        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
@@ -5021,7 +5020,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const browser = await puppeteer.launch({
         headless: true,
-        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
@@ -12809,7 +12807,6 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
 
       // Generate PDF using Puppeteer
       const browser = await puppeteer.launch({ 
-        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
         headless: 'new',
         args: ['--no-sandbox', '--disable-setuid-sandbox']
       });
