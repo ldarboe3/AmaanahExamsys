@@ -17,6 +17,7 @@ import {
   Shield,
   Award,
 } from "lucide-react";
+import amaanahLogo from "@assets/Amana_Logo_1765234375172.png";
 
 interface TranscriptVerification {
   valid: boolean;
@@ -78,12 +79,15 @@ export default function VerifyTranscript() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
           <Link href="/">
-            <div className="flex items-center gap-3 cursor-pointer">
-              <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-primary-foreground" />
-              </div>
+            <div className="flex items-center gap-4 cursor-pointer">
+              <img 
+                src={amaanahLogo} 
+                alt="Amaanah Logo" 
+                className="h-16 w-auto" 
+                data-testid="img-amaanah-logo"
+              />
               <div>
                 <h1 className="text-xl font-semibold text-foreground">Amaanah</h1>
                 <p className="text-xs text-muted-foreground">Transcript Verification</p>
