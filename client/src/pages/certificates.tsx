@@ -187,6 +187,7 @@ export default function Certificates() {
     return true;
   });
 
+  // Paginated query for display
   const { data: eligibleStudentsData, isLoading: eligibleLoading } = useQuery<{
     students: EligibleStudent[];
     total: number;
@@ -214,6 +215,25 @@ export default function Certificates() {
       const response = await fetch(`/api/certificates/eligible-students?${params}`);
       if (!response.ok) throw new Error("Failed to fetch eligible students");
       return response.json();
+    },
+    enabled: !!selectedExamYear,
+  });
+
+  // Unpaginated query for print all and generate all
+  const { data: allEligibleStudents } = useQuery<EligibleStudent[]>({
+    queryKey: ["/api/certificates/eligible-students/all", selectedExamYear, selectedRegion, selectedCluster, selectedSchool, selectedGrade],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedExamYear) params.append("examYearId", selectedExamYear);
+      if (selectedRegion && selectedRegion !== "all") params.append("regionId", selectedRegion);
+      if (selectedCluster && selectedCluster !== "all") params.append("clusterId", selectedCluster);
+      if (selectedSchool && selectedSchool !== "all") params.append("schoolId", selectedSchool);
+      if (selectedGrade && selectedGrade !== "all") params.append("grade", selectedGrade);
+      params.append("limit", "999999");
+      const response = await fetch(`/api/certificates/eligible-students?${params}`);
+      if (!response.ok) throw new Error("Failed to fetch all eligible students");
+      const data = await response.json();
+      return data.students || [];
     },
     enabled: !!selectedExamYear,
   });
@@ -371,7 +391,7 @@ export default function Certificates() {
   };
 
   const handlePrintAll = () => {
-    const studentsWithCerts = eligibleStudentsData?.students?.filter(s => s.hasCertificate) || [];
+    const studentsWithCerts = allEligibleStudents?.filter(s => s.hasCertificate) || [];
     if (studentsWithCerts.length === 0) {
       toast({
         title: isRTL ? "لا توجد شهادات للطباعة" : "No Certificates to Print",
@@ -430,10 +450,11 @@ export default function Certificates() {
           </Button>
           <Button
             onClick={() => {
-              const eligibleIds = eligibleStudentsData?.students
+              const eligibleIds = allEligibleStudents
                 ?.filter(s => s.isEligible && !s.hasCertificate)
                 .map(s => s.id) || [];
               if (eligibleIds.length > 0) {
+                setGeneratingCount(eligibleIds.length);
                 generatePrimaryMutation.mutate(eligibleIds);
               } else {
                 toast({
@@ -445,7 +466,7 @@ export default function Certificates() {
                 });
               }
             }}
-            disabled={generatePrimaryMutation.isPending || !eligibleStudentsData?.summary?.eligible}
+            disabled={generatePrimaryMutation.isPending || !allEligibleStudents?.some(s => s.isEligible && !s.hasCertificate)}
             data-testid="button-generate-all"
           >
             {generatePrimaryMutation.isPending ? (
@@ -454,8 +475,8 @@ export default function Certificates() {
               <Award className="w-4 h-4 me-2" />
             )}
             {isRTL 
-              ? `إنشاء الشهادات (${eligibleStudentsData?.students?.filter(s => s.isEligible && !s.hasCertificate).length || 0})` 
-              : `Generate All (${eligibleStudentsData?.students?.filter(s => s.isEligible && !s.hasCertificate).length || 0})`}
+              ? `إنشاء الشهادات (${allEligibleStudents?.filter(s => s.isEligible && !s.hasCertificate).length || 0})` 
+              : `Generate All (${allEligibleStudents?.filter(s => s.isEligible && !s.hasCertificate).length || 0})`}
           </Button>
         </div>
       </div>

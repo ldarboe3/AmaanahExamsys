@@ -170,7 +170,7 @@ export default function Transcripts() {
     return true;
   });
 
-  // Fetch eligible Grade 6 students with published results
+  // Fetch eligible Grade 6 students with published results (unpaginated for print/generate all)
   const { data: eligibleStudents, isLoading: studentsLoading } = useQuery<EligibleStudent[]>({
     queryKey: ["/api/transcripts/eligible-g6-students", selectedExamYear],
     queryFn: async () => {
@@ -183,6 +183,9 @@ export default function Transcripts() {
     },
     enabled: !!selectedExamYear,
   });
+
+  // Get all students for print/generate all (ensures we get all, not just current page)
+  const allStudentsForBulkOps = eligibleStudents || [];
 
   // Check if student has a transcript
   const getStudentTranscript = (studentId: number): Transcript | undefined => {
@@ -268,7 +271,7 @@ export default function Transcripts() {
   };
 
   const handleGenerateAll = () => {
-    const eligibleIds = filteredStudents
+    const eligibleIds = allStudentsForBulkOps
       .filter(s => !s.hasTranscript)
       .map(s => s.id);
     if (eligibleIds.length > 0) {
@@ -311,7 +314,7 @@ export default function Transcripts() {
   };
 
   const handlePrintAll = () => {
-    const transcriptsWithPdf = filteredStudents
+    const transcriptsWithPdf = allStudentsForBulkOps
       .filter(s => s.hasTranscript)
       .map(s => getStudentTranscript(s.id))
       .filter(t => t !== undefined);
