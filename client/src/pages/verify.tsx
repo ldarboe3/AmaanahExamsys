@@ -282,20 +282,27 @@ export default function Verify() {
           ) : (
             <>
               {/* Verification Result */}
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 rounded-full bg-chart-3/10 flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="w-8 h-8 text-chart-3" />
+              <div className="text-center mb-3">
+                <div className="w-12 h-12 rounded-full bg-chart-3/10 flex items-center justify-center mx-auto mb-2">
+                  <CheckCircle className="w-6 h-6 text-chart-3" />
                 </div>
-                <h2 className="text-xl font-semibold text-chart-3 mb-1">Result Verified</h2>
-                <p className="text-sm text-muted-foreground">
+                <h2 className="text-lg font-semibold text-chart-3 mb-1">Result Verified</h2>
+                <p className="text-xs text-muted-foreground">
                   This is an authentic Amaanah examination result
                 </p>
               </div>
 
+              {/* Warning: Not a Transcript */}
+              <div className="mb-3 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-md">
+                <p className="text-sm font-bold text-red-600 dark:text-red-400">
+                  This is not a transcript
+                </p>
+              </div>
+
               <Card className="border-chart-3/20 bg-chart-3/5">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <Badge className="bg-chart-3 text-chart-3-foreground">Verified</Badge>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <Badge className="bg-chart-3 text-chart-3-foreground text-xs">Verified</Badge>
                     {result.certificateNumber && (
                       <span className="text-xs font-mono text-muted-foreground">
                         Cert: {result.certificateNumber}
@@ -303,56 +310,56 @@ export default function Verify() {
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3">
                   {/* Student Info */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-full bg-background flex items-center justify-center">
-                      <User className="w-7 h-7 text-muted-foreground" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-background flex items-center justify-center flex-shrink-0">
+                      <User className="w-6 h-6 text-muted-foreground" />
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">
+                    <div className="min-w-0">
+                      <h3 className="text-base font-semibold truncate">
                         {result.student.firstName} {result.student.lastName}
                       </h3>
-                      <p className="text-sm text-muted-foreground capitalize">
+                      <p className="text-xs text-muted-foreground capitalize">
                         {result.student.gender} - Grade {result.student.grade}
                       </p>
                     </div>
                   </div>
 
                   {/* Details Grid */}
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">Index Number:</span>
-                      <code className="font-mono font-medium">{result.student.indexNumber}</code>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="flex items-center gap-1">
+                      <span className="text-muted-foreground">Index:</span>
+                      <code className="font-mono font-medium truncate">{result.student.indexNumber}</code>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">Exam Year:</span>
-                      <span className="font-medium">{result.examYear.name}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-muted-foreground">Year:</span>
+                      <span className="font-medium truncate">{result.examYear.name}</span>
                     </div>
-                    <div className="col-span-2 flex items-center gap-2">
-                      <School className="w-4 h-4 text-muted-foreground" />
-                      <span>{result.student.school.name}</span>
+                    <div className="col-span-2 flex items-center gap-1">
+                      <School className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                      <span className="truncate">{result.student.school.name}</span>
                     </div>
                   </div>
 
                   {/* Results Table */}
                   <div>
-                    <h4 className="text-sm font-medium mb-3">Subject Results</h4>
-                    <div className="border rounded-md overflow-hidden bg-background">
-                      <table className="w-full text-sm">
+                    <h4 className="text-xs font-medium mb-2">Subject Results</h4>
+                    <div className="border rounded-sm overflow-hidden bg-background">
+                      <table className="w-full text-xs">
                         <thead className="bg-muted/50">
                           <tr>
-                            <th className="text-left p-2 font-medium">Subject</th>
-                            <th className="text-center p-2 font-medium">Score</th>
-                            <th className="text-center p-2 font-medium">Grade</th>
+                            <th className="text-left p-1 font-medium">Subject</th>
+                            <th className="text-center p-1 font-medium">Score</th>
+                            <th className="text-center p-1 font-medium">Grade</th>
                           </tr>
                         </thead>
                         <tbody>
                           {result.results.map((subj, i) => (
                             <tr key={i} className="border-t">
-                              <td className="p-2">{subj.subject}</td>
-                              <td className="text-center p-2">{subj.score}</td>
-                              <td className="text-center p-2">
+                              <td className="p-1 truncate">{subj.subject}</td>
+                              <td className="text-center p-1">{subj.score}</td>
+                              <td className="text-center p-1">
                                 <Badge variant="secondary" className="text-xs">
                                   {subj.grade}
                                 </Badge>
@@ -365,20 +372,20 @@ export default function Verify() {
                   </div>
 
                   {/* Final Result */}
-                  <div className="p-4 bg-background rounded-md border">
-                    <div className="flex items-center justify-between">
+                  <div className="p-2 bg-background rounded-sm border">
+                    <div className="flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-sm text-muted-foreground">Final Result</p>
-                        <p className="text-xl font-semibold text-chart-3">{result.finalResult}</p>
+                        <p className="text-xs text-muted-foreground">Final Result</p>
+                        <p className="text-base font-semibold text-chart-3">{result.finalResult}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Total Score</p>
-                        <p className="text-xl font-semibold">{result.totalScore}</p>
+                        <p className="text-xs text-muted-foreground">Total Score</p>
+                        <p className="text-base font-semibold">{result.totalScore}</p>
                       </div>
                       {result.rank && (
                         <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Rank</p>
-                          <p className="text-xl font-semibold">#{result.rank}</p>
+                          <p className="text-xs text-muted-foreground">Rank</p>
+                          <p className="text-base font-semibold">#{result.rank}</p>
                         </div>
                       )}
                     </div>
@@ -386,14 +393,14 @@ export default function Verify() {
                 </CardContent>
               </Card>
 
-              <div className="flex gap-4 mt-6">
-                <Button variant="outline" className="flex-1" onClick={handleReset}>
+              <div className="flex gap-3 mt-4">
+                <Button variant="outline" className="flex-1 text-xs" onClick={handleReset}>
                   <Search className="w-4 h-4 mr-2" />
                   Verify Another
                 </Button>
-                <Button className="flex-1">
+                <Button className="flex-1 text-xs">
                   <Award className="w-4 h-4 mr-2" />
-                  Print Certificate
+                  Print
                 </Button>
               </div>
             </>
