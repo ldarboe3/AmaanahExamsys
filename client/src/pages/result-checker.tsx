@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import QRCode from "qrcode";
 import { PublicLayout } from "@/components/public-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -193,30 +194,162 @@ export default function ResultChecker() {
 
   const handlePrintTranscript = async () => {
     try {
-      if (!resultData?.student?.indexNumber) return;
+      if (!resultData) return;
       
-      const response = await fetch(`/api/public/transcripts/${resultData.student.indexNumber}/download`);
-      if (!response.ok) throw new Error('Failed to fetch transcript');
+      // Generate verification token (timestamp + index number)
+      const verificationToken = `${new Date().getTime()}-${resultData.student.indexNumber}`;
       
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      // Generate QR code
+      const qrDataUrl = await QRCode.toDataURL(verificationToken, {
+        errorCorrectionLevel: 'H',
+        type: 'image/png',
+        width: 200,
+        margin: 2,
+      });
       
-      // Create iframe for printing
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.onload = () => {
+      // Format date
+      const currentDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      
+      // Build result rows HTML
+      const resultRowsHtml = resultData.results.map(result => `
+        <tr>
+          <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${getSubjectName(result)}</td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 500;">${result.score}/${result.maxScore}</td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #059669;">${result.grade}</td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">${language === 'ar' ? getGradeStatus(result.grade).ar : getGradeStatus(result.grade).en}</td>
+        </tr>
+      `).join('');
+      
+      // Create HTML content
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Verified Result - ${resultData.student.indexNumber}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f9fafb; }
+            .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+            .header { text-align: center; border-bottom: 3px solid #059669; padding-bottom: 20px; margin-bottom: 30px; }
+            .header-title { font-size: 24px; font-weight: bold; color: #059669; margin: 0; }
+            .header-subtitle { font-size: 14px; color: #6b7280; margin: 5px 0 0 0; }
+            .verification-badge { display: inline-block; background: #ecfdf5; border: 1px solid #059669; color: #047857; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; margin-bottom: 20px; }
+            .student-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+            .info-item { }
+            .info-label { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+            .info-value { font-size: 15px; color: #111827; font-weight: 500; }
+            .results-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+            .results-table th { background: #f3f4f6; padding: 12px; text-align: left; font-weight: 600; color: #374151; font-size: 13px; }
+            .results-table td { padding: 12px; }
+            .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 30px; padding: 20px; background: #f0fdf4; border-radius: 6px; }
+            .summary-item { text-align: center; }
+            .summary-label { font-size: 12px; color: #6b7280; font-weight: 600; }
+            .summary-value { font-size: 20px; font-weight: bold; color: #059669; margin-top: 5px; }
+            .barcode-section { text-align: center; border-top: 1px solid #e5e7eb; padding-top: 20px; }
+            .barcode-section p { font-size: 12px; color: #6b7280; margin: 0 0 10px 0; }
+            .barcode-image { max-width: 200px; height: auto; }
+            .footer { text-align: center; font-size: 11px; color: #9ca3af; margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 15px; }
+            .timestamp { font-size: 11px; color: #9ca3af; text-align: center; margin-top: 10px; }
+            @media print { body { background: white; } .container { box-shadow: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="verification-badge">✓ VERIFIED RESULT</div>
+              <h1 class="header-title">Examination Result</h1>
+              <p class="header-subtitle">Amaanah Verified Online Result</p>
+            </div>
+            
+            <div class="student-info">
+              <div class="info-item">
+                <div class="info-label">Student Name</div>
+                <div class="info-value">${resultData.student.fullName}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Index Number</div>
+                <div class="info-value" style="font-family: monospace;">${resultData.student.indexNumber}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">School</div>
+                <div class="info-value">${language === 'ar' ? resultData.student.schoolAr : resultData.student.schoolEn}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Grade / Level</div>
+                <div class="info-value">Grade ${resultData.student.grade}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Examination Year</div>
+                <div class="info-value">${resultData.student.examYear}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Print Date</div>
+                <div class="info-value">${currentDate}</div>
+              </div>
+            </div>
+            
+            <h3 style="margin: 20px 0 15px 0; color: #111827;">Subject Results</h3>
+            <table class="results-table">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Score</th>
+                  <th>Grade</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${resultRowsHtml}
+              </tbody>
+            </table>
+            
+            <div class="summary">
+              <div class="summary-item">
+                <div class="summary-label">Total Score</div>
+                <div class="summary-value">${resultData.summary.totalScore}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Average Score</div>
+                <div class="summary-value">${resultData.summary.averageScore.toFixed(1)}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Passed Subjects</div>
+                <div class="summary-value">${resultData.summary.passedCount}/${resultData.summary.subjectCount}</div>
+              </div>
+            </div>
+            
+            <div class="barcode-section">
+              <p>VERIFICATION CODE</p>
+              <img src="${qrDataUrl}" alt="Verification QR Code" class="barcode-image">
+              <p style="font-size: 10px; color: #9ca3af; word-break: break-all; margin-top: 10px;">${verificationToken}</p>
+            </div>
+            
+            <div class="footer">
+              <p>This is a verified online result document. For official transcripts, please use the official Amaanah transcript service.</p>
+              <p>© 2024 AMAANAH - General Secretariat for Islamic & Arabic Education</p>
+            </div>
+            
+            <div class="timestamp">Generated on: ${new Date().toLocaleString()}</div>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      // Create and print
+      const printWindow = window.open('', '', 'height=800,width=900');
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        
         setTimeout(() => {
-          iframe.contentWindow?.print();
-        }, 250);
-      };
-      iframe.src = blobUrl;
-      document.body.appendChild(iframe);
-      
-      // Cleanup after print
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-        URL.revokeObjectURL(blobUrl);
-      }, 1000);
+          printWindow.print();
+          printWindow.close();
+        }, 500);
+      }
     } catch (error: any) {
       toast({
         title: language === 'ar' ? 'خطأ' : 'Error',
