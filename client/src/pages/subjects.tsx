@@ -280,6 +280,40 @@ export default function Subjects() {
         </Button>
       </div>
 
+      {/* Statistics Board */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="bg-muted/30">
+          <CardContent className="p-6 text-center">
+            <div className="text-3xl font-bold text-foreground" data-testid="text-total-subjects">
+              {filteredSubjects?.length ?? 0}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {gradeFilter === "all" ? t.subjects.totalSubjects || "Total Subjects" : `${gradeLabels[parseInt(gradeFilter)] || `Grade ${gradeFilter}`}`}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-muted/30">
+          <CardContent className="p-6 text-center">
+            <div className="text-3xl font-bold text-chart-3" data-testid="text-active-subjects">
+              {filteredSubjects?.filter(s => s.isActive)?.length ?? 0}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {t.common.active || "Active"}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-muted/30">
+          <CardContent className="p-6 text-center">
+            <div className="text-3xl font-bold text-muted-foreground" data-testid="text-inactive-subjects">
+              {filteredSubjects?.filter(s => !s.isActive)?.length ?? 0}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {t.common.inactive || "Inactive"}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader className="pb-4">
           <div className="flex flex-col sm:flex-row gap-4">
