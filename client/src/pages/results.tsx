@@ -177,7 +177,7 @@ export default function Results() {
       (subjects || []).forEach((subject: Subject) => {
         const result = resultsList.find(r => r.studentId === student.id && r.subjectId === subject.id);
         const mark = editedMarks[studentKey]?.[subject.id] ?? 
-                     (result ? parseFloat(result.totalScore?.toString() || "0") : null);
+                     (result && result.totalScore ? parseFloat(result.totalScore.toString()) : null);
         marks[subject.id] = mark;
       });
 
