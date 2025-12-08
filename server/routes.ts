@@ -9000,15 +9000,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const student = await storage.getStudent(certificate.studentId);
       const examYear = await storage.getExamYear(certificate.examYearId);
+      const school = student?.schoolId ? await storage.getSchool(student.schoolId) : null;
       
       res.json({
         valid: true,
         certificate: {
           certificateNumber: certificate.certificateNumber,
           studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown',
+          schoolName: school?.name || 'Unknown School',
           grade: certificate.grade,
           examYear: examYear?.year,
-          finalResult: certificate.finalResult,
+          totalScore: certificate.totalScore,
+          rank: certificate.rank,
+          finalResult: certificate.finalGradeWord || certificate.finalResult || '',
+          finalGradeWord: certificate.finalGradeWord || '',
           issuedDate: certificate.issuedDate,
           status: certificate.status,
         }

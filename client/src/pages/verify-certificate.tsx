@@ -65,10 +65,12 @@ export default function VerifyCertificate() {
   };
 
   const getResultColor = (result: string) => {
-    const lowerResult = result.toLowerCase();
-    if (lowerResult.includes('pass') || lowerResult.includes('ناجح')) return 'bg-emerald-500';
-    if (lowerResult.includes('fail') || lowerResult.includes('راسب')) return 'bg-red-500';
-    return 'bg-blue-500';
+    const normalizedResult = result.replace(/[ًٌٍَُِّْ]/g, '').trim().toLowerCase();
+    
+    if (normalizedResult.includes('fail') || normalizedResult.includes('راسب') || 
+        normalizedResult.includes('failed')) return 'bg-red-500';
+    
+    return 'bg-emerald-500';
   };
 
   return (
