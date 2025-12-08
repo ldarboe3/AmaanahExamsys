@@ -65,10 +65,14 @@ export default function VerifyTranscript() {
   };
 
   const getGradeColor = (grade: string) => {
-    if (grade === 'ممتاز' || grade === 'جيد جدًا') return 'bg-emerald-500';
-    if (grade === 'جيد') return 'bg-blue-500';
-    if (grade === 'مقبول') return 'bg-amber-500';
-    return 'bg-red-500';
+    const normalizedGrade = grade.replace(/[ًٌٍَُِّْ]/g, '').trim().toLowerCase();
+    
+    if (normalizedGrade === 'راسب' || normalizedGrade.includes('راسب') || 
+        normalizedGrade.includes('fail') || normalizedGrade.includes('failed')) {
+      return 'bg-red-500';
+    }
+    
+    return 'bg-emerald-500';
   };
 
   return (
