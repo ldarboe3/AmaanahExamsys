@@ -302,7 +302,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold">System Settings</h1>
         <p className="text-muted-foreground">
@@ -351,7 +351,7 @@ export default function Settings() {
                 <Form {...organizationForm}>
                   <form
                     onSubmit={organizationForm.handleSubmit(onSaveOrganization)}
-                    className="space-y-6"
+                    className="space-y-4"
                   >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
@@ -497,7 +497,7 @@ export default function Settings() {
                 <Form {...examSettingsForm}>
                   <form
                     onSubmit={examSettingsForm.handleSubmit(onSaveExamSettings)}
-                    className="space-y-6"
+                    className="space-y-4"
                   >
                     {/* Check if there's an active exam year and if it's past the end date */}
                     {activeExamYear && new Date(activeExamYear.examEndDate || '') < new Date() ? (
@@ -611,7 +611,7 @@ export default function Settings() {
                 <Form {...examSettingsForm}>
                   <form
                     onSubmit={examSettingsForm.handleSubmit(onSaveExamSettings)}
-                    className="space-y-6"
+                    className="space-y-4"
                   >
                     <FormField
                       control={examSettingsForm.control}
@@ -761,7 +761,7 @@ export default function Settings() {
                   <Form {...paymentInstructionsForm}>
                     <form
                       onSubmit={paymentInstructionsForm.handleSubmit(onSavePaymentInstructions)}
-                      className="space-y-6"
+                      className="space-y-4"
                     >
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
@@ -917,7 +917,7 @@ export default function Settings() {
                 <Form {...notificationForm}>
                   <form
                     onSubmit={notificationForm.handleSubmit(onSaveNotifications)}
-                    className="space-y-6"
+                    className="space-y-4"
                   >
                     <FormField
                       control={notificationForm.control}

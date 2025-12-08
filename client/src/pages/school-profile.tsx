@@ -516,7 +516,7 @@ export default function SchoolProfile() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{isRTL ? "ملف المدرسة" : "School Profile"}</h1>
@@ -616,7 +616,7 @@ export default function SchoolProfile() {
         </Card>
 
         {/* Edit Form & Documents */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4">
           {/* Profile Form */}
           <Card>
             <CardHeader>

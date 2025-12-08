@@ -59,7 +59,7 @@ export default function News() {
 
   return (
     <PublicLayout>
-      <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-16 md:py-24">
+      <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-12 md:py-12">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <Badge className="mb-4">
@@ -77,7 +77,7 @@ export default function News() {
       </section>
 
       {featuredArticles.length > 0 && (
-        <section className="py-12 md:py-16 bg-muted/50">
+        <section className="py-12 md:py-12 bg-muted/50">
           <div className="container mx-auto px-4">
             <h2 className="text-2xl font-bold text-foreground mb-8">Featured Stories</h2>
             <div className="grid md:grid-cols-2 gap-6">
@@ -118,7 +118,7 @@ export default function News() {
         </section>
       )}
 
-      <section className="py-16 md:py-24">
+      <section className="py-12 md:py-12">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row gap-4 mb-8">
             <div className="relative flex-1 max-w-md">
@@ -147,7 +147,7 @@ export default function News() {
           </div>
 
           {articlesLoading ? (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {[1, 2, 3].map((i) => (
                 <Card key={i}>
                   <CardContent className="flex gap-6 p-6">
@@ -162,7 +162,7 @@ export default function News() {
               ))}
             </div>
           ) : filteredNews.length > 0 ? (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {filteredNews.map((article) => (
                 <Card key={article.id} className="hover-elevate" data-testid={`card-news-${article.id}`}>
                   <CardContent className="flex gap-6 p-6">

@@ -272,7 +272,7 @@ export default function ResultChecker() {
   return (
     <PublicLayout>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-16 md:py-24">
+      <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-12 md:py-12">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <div className="mb-8">
@@ -300,7 +300,7 @@ export default function ResultChecker() {
       </section>
 
       {/* Search Section */}
-      <section className="py-12 md:py-16">
+      <section className="py-12 md:py-12">
         <div className="container mx-auto px-4">
           <Card className="max-w-2xl mx-auto">
             <CardHeader className="text-center">
@@ -315,7 +315,7 @@ export default function ResultChecker() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSearch} className="space-y-6">
+              <form onSubmit={handleSearch} className="space-y-4">
                 {/* Exam Year and Grade Selection Row */}
                 <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${isRTL ? 'text-right' : ''}`}>
                   <div className="space-y-2">
@@ -426,7 +426,7 @@ export default function ResultChecker() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="max-w-4xl mx-auto space-y-6">
+              <div className="max-w-4xl mx-auto space-y-4">
                 {/* Student Info Card */}
                 <Card>
                   <CardHeader>

@@ -312,7 +312,7 @@ export default function Transcripts() {
   };
 
   return (
-    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold text-foreground flex items-center gap-2">

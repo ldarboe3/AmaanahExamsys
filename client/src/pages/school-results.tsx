@@ -153,7 +153,7 @@ export default function SchoolResults() {
 
   if (error) {
     return (
-      <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+      <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
             {isRTL ? "النتائج" : "Results"}
@@ -177,7 +177,7 @@ export default function SchoolResults() {
   }
 
   return (
-    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       <div>
         <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
           {isRTL ? "النتائج" : "Published Results"}

@@ -445,7 +445,7 @@ export default function Results() {
   // LEVEL 1: Exam Years View
   const renderExamYears = () => {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{isRTL ? "النتائج" : "Results"}</h1>
           <p className="text-muted-foreground mt-1">
@@ -499,7 +499,7 @@ export default function Results() {
     const currentYear = examYears?.find(y => y.id === selectedExamYear);
     
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex items-center gap-4">
           <Button 
             variant="ghost" 
@@ -557,7 +557,7 @@ export default function Results() {
     const currentYear = examYears?.find(y => y.id === selectedExamYear);
     
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Button 
@@ -826,7 +826,7 @@ export default function Results() {
   };
 
   return (
-    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       {!selectedExamYear ? (
         renderExamYears()
       ) : !selectedGrade ? (

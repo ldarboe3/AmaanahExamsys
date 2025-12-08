@@ -84,7 +84,7 @@ export default function Membership() {
     <PublicLayout>
       {/* Hero Section */}
       <section 
-        className="relative py-16 md:py-24"
+        className="relative py-12 md:py-12"
         style={{ backgroundImage: `url(${graduationImage})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/70 to-black/50" />
@@ -116,9 +116,9 @@ export default function Membership() {
       </section>
 
       {/* Membership Categories */}
-      <section className="py-16 md:py-24">
+      <section className="py-12 md:py-12">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <Badge variant="outline" className="mb-4">Categories</Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
               Membership Levels
@@ -156,9 +156,9 @@ export default function Membership() {
       </section>
 
       {/* Benefits */}
-      <section className="py-16 md:py-24 bg-muted/50">
+      <section className="py-12 md:py-12 bg-muted/50">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <Badge variant="outline" className="mb-4">Value</Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
               Membership Benefits
@@ -185,9 +185,9 @@ export default function Membership() {
       </section>
 
       {/* How to Join */}
-      <section className="py-16 md:py-24">
+      <section className="py-12 md:py-12">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <Badge variant="outline" className="mb-4">Process</Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
               How to Join
@@ -198,7 +198,7 @@ export default function Membership() {
           </div>
 
           <div className="max-w-3xl mx-auto">
-            <div className="space-y-6">
+            <div className="space-y-4">
               {howToJoin.map((item, i) => (
                 <div key={i} className="flex gap-6 items-start">
                   <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold flex-shrink-0">
@@ -233,7 +233,7 @@ export default function Membership() {
       </section>
 
       {/* Recognition */}
-      <section className="py-16 md:py-24 bg-primary text-primary-foreground">
+      <section className="py-12 md:py-12 bg-primary text-primary-foreground">
         <div className="container mx-auto px-4 text-center">
           <Award className="w-16 h-16 mx-auto mb-6" />
           <h2 className="text-3xl md:text-4xl font-bold mb-4">

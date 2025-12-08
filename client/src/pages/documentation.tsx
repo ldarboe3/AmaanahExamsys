@@ -554,7 +554,7 @@ export default function Documentation() {
         </p>
       </div>
 
-      <Tabs defaultValue="school-admin" className="space-y-6">
+      <Tabs defaultValue="school-admin" className="space-y-4">
         <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 h-auto gap-2 bg-transparent p-0">
           <TabsTrigger 
             value="school-admin" 

@@ -365,7 +365,7 @@ export default function Regions() {
   };
 
   return (
-    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

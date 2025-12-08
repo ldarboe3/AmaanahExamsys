@@ -422,7 +422,7 @@ export default function Payments() {
     const isRegistrationFee = (schoolInvoiceData as any)?.isRegistrationFee === true;
 
     return (
-      <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+      <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{t.payments.title}</h1>
           <p className="text-muted-foreground mt-1">
@@ -472,7 +472,7 @@ export default function Payments() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Invoice Status Card */}
             <Card className={invoice.status === 'paid' ? 'border-chart-3' : invoice.status === 'pending' ? 'border-chart-5' : ''}>
               <CardHeader className="pb-3">
@@ -507,7 +507,7 @@ export default function Payments() {
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4">
                 {/* Invoice Summary - Different layout for registration fee */}
                 {isRegistrationFee ? (
                   <div className="bg-primary/10 rounded-lg p-6 text-center">
@@ -872,7 +872,7 @@ export default function Payments() {
 
   // Admin view - show all invoices
   return (
-    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1126,7 +1126,7 @@ export default function Payments() {
             </DialogDescription>
           </DialogHeader>
           {selectedInvoice && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-muted/50 rounded-md">
                 <div>
                   <p className="text-xs text-muted-foreground">{isRTL ? "رقم الفاتورة" : "Invoice Number"}</p>

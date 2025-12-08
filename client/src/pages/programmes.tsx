@@ -108,7 +108,7 @@ export default function Programmes() {
   return (
     <PublicLayout>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-16 md:py-24">
+      <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-12 md:py-12">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <Badge className="mb-4">Our Work</Badge>
@@ -124,14 +124,14 @@ export default function Programmes() {
       </section>
 
       {/* Main Programmes */}
-      <section className="py-16 md:py-24">
+      <section className="py-12 md:py-12">
         <div className="container mx-auto px-4">
-          <div className="space-y-16">
+          <div className="space-y-12">
             {programmes.map((programme, i) => (
               <div 
                 key={programme.id} 
                 id={programme.id}
-                className={`grid md:grid-cols-2 gap-12 items-center ${i % 2 === 1 ? 'md:flex-row-reverse' : ''}`}
+                className={`grid md:grid-cols-2 gap-8 items-center ${i % 2 === 1 ? 'md:flex-row-reverse' : ''}`}
               >
                 <div className={i % 2 === 1 ? 'md:order-2' : ''}>
                   <div className={`w-14 h-14 rounded-md bg-${programme.color}/10 flex items-center justify-center mb-4`}>
@@ -170,9 +170,9 @@ export default function Programmes() {
       </section>
 
       {/* Social Welfare */}
-      <section className="py-16 md:py-24 bg-muted/50">
+      <section className="py-12 md:py-12 bg-muted/50">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
+          <div className="grid md:grid-cols-2 gap-8 items-center">
             <div>
               <img 
                 src={teacherImage} 
@@ -204,9 +204,9 @@ export default function Programmes() {
       </section>
 
       {/* Executive Bureau */}
-      <section className="py-16 md:py-24">
+      <section className="py-12 md:py-12">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <Badge variant="outline" className="mb-4">Administration</Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
               Executive Bureau
@@ -218,7 +218,7 @@ export default function Programmes() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
             {bureauUnits.map((unit, i) => (
               <Card key={i} className="hover-elevate">
                 <CardHeader>

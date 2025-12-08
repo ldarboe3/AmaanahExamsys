@@ -276,7 +276,7 @@ export default function Timetable() {
   }, {} as Record<string, TimetableWithRelations[]>);
 
   return (
-    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{t.timetable.title}</h1>
@@ -325,7 +325,7 @@ export default function Timetable() {
               </Button>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {Object.entries(timetableByDate || {}).map(([dateKey, entries]) => (
                 <div key={dateKey}>
                   <div className="flex items-center gap-2 mb-3">

@@ -341,7 +341,7 @@ function AttendanceTab({ centerId, examYearId }: { centerId: number; examYearId?
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -511,7 +511,7 @@ function MalpracticeTab({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Malpractice Reports</h3>
@@ -675,7 +675,7 @@ function LogisticsTab({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -889,7 +889,7 @@ export default function CenterDashboard() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-4 gap-4">
           <Skeleton className="h-24" />
@@ -926,7 +926,7 @@ export default function CenterDashboard() {
   const { center, examYear, statistics, schools, timetable, paperMovements, scriptMovements, malpracticeReports, recentActivity, invigilators } = data;
 
   return (
-    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link href="/centers">
