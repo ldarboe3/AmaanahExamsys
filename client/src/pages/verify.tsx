@@ -36,6 +36,7 @@ import {
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import amaanahLogo from "@assets/Amana_Logo_1765237832354.png";
 
 const verifySchema = z.object({
   indexNumber: z.string().min(6, "Index number must be at least 6 characters"),
@@ -116,11 +117,19 @@ export default function Verify() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/">
-            <div className="cursor-pointer">
-              <h1 className="text-xl font-semibold text-foreground">Amaanah</h1>
-              <p className="text-xs text-muted-foreground">Result Verification</p>
+            <div className="flex items-center gap-3 cursor-pointer">
+              <img 
+                src={amaanahLogo} 
+                alt="Amaanah Logo" 
+                className="h-14 w-auto" 
+                data-testid="img-amaanah-logo"
+              />
+              <div>
+                <h1 className="text-lg font-semibold text-foreground">Amaanah</h1>
+                <p className="text-xs text-muted-foreground">Result Verification</p>
+              </div>
             </div>
           </Link>
           <Link href="/">
