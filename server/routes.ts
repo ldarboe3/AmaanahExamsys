@@ -44,35 +44,7 @@ import bcrypt from "bcrypt";
 import multer from "multer";
 import { randomBytes } from "crypto";
 import * as XLSX from "xlsx";
-import { execSync } from "child_process";
-
-// Helper to find Chromium executable for Puppeteer
-let cachedChromiumPath: string | null = null;
-function getChromiumExecutable(): string {
-  if (cachedChromiumPath) return cachedChromiumPath;
-  
-  // Check environment variable first
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-    cachedChromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    return cachedChromiumPath;
-  }
-  
-  // Try to find chromium in PATH
-  const candidates = ['chromium', 'chromium-browser', 'google-chrome', 'chrome'];
-  for (const cmd of candidates) {
-    try {
-      const path = execSync(`which ${cmd}`, { encoding: 'utf8' }).trim();
-      if (path) {
-        cachedChromiumPath = path;
-        return cachedChromiumPath;
-      }
-    } catch {
-      // Command not found, try next
-    }
-  }
-  
-  throw new Error('Could not find Chromium executable. Set PUPPETEER_EXECUTABLE_PATH environment variable.');
-}
+import { getChromiumExecutable } from "./chromiumHelper";
 
 const schoolDocUploadConfig = multer({
   storage: multer.memoryStorage(),
@@ -4037,8 +4009,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const allStudents = await storage.getStudentsBySchool(schoolId);
       const examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
       
+      // Allow invoice generation even with no students - just return 0 amount
       if (examYearStudents.length === 0) {
-        return res.status(400).json({ message: "No students registered for this exam year" });
+        return res.json({
+          invoiceNumber: generateInvoiceNumber(schoolId, examYearId),
+          schoolId,
+          examYearId,
+          totalStudents: 0,
+          feePerStudent: feePerStudent.toString(),
+          totalAmount: '0.00',
+          message: 'No students registered - invoice shows 0 amount'
+        });
       }
       
       // Group students by grade and count
@@ -4126,8 +4107,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const allStudents = await storage.getStudentsBySchool(schoolId);
         const examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
         
+        // Allow update even with no students
         if (examYearStudents.length === 0) {
-          return res.status(400).json({ message: "No students registered for this exam year" });
+          return res.json({
+            invoice: existingInvoice,
+            items: [],
+            updated: true,
+            message: 'No students registered - invoice shows 0 amount'
+          });
         }
         
         // Group students by grade
@@ -4173,8 +4160,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const allStudents = await storage.getStudentsBySchool(schoolId);
       const examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
       
+      // Allow creation even with no students
       if (examYearStudents.length === 0) {
-        return res.status(400).json({ message: "No students registered for this exam year" });
+        const invoiceNumber = generateInvoiceNumber(schoolId, examYearId);
+        const invoice = await storage.createInvoice({
+          invoiceNumber,
+          schoolId,
+          examYearId,
+          totalStudents: 0,
+          feePerStudent: registrationFee.toString(),
+          certificateFee: certificateFee.toString(),
+          transcriptFee: transcriptFee.toString(),
+          totalAmount: '0.00',
+        });
+        
+        return res.json({
+          invoice,
+          items: [],
+          message: 'No students registered - invoice shows 0 amount'
+        });
       }
       
       // Group students by grade
