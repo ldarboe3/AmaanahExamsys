@@ -554,30 +554,20 @@ export default function ResultChecker() {
                     </CardTitle>
                     <CardDescription>
                       {language === 'ar' 
-                        ? 'قم بإنشاء وتنزيل الشهادة الأكاديمية الرسمية الخاصة بك'
-                        : 'Generate and download your official academic transcript'}
+                        ? 'قم بإنشاء وطباعة الشهادة الأكاديمية الرسمية الخاصة بك'
+                        : 'Generate and print your official academic transcript'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className={`flex flex-wrap gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
                       {resultData.hasTranscript ? (
-                        <>
-                          <Button 
-                            onClick={handleDownloadTranscript}
-                            data-testid="button-download-transcript"
-                          >
-                            <Download className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
-                            {language === 'ar' ? 'تنزيل الشهادة' : 'Download Transcript'}
-                          </Button>
-                          <Button 
-                            variant="outline"
-                            onClick={handlePrintTranscript}
-                            data-testid="button-print-transcript"
-                          >
-                            <Printer className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
-                            {language === 'ar' ? 'طباعة الشهادة' : 'Print Transcript'}
-                          </Button>
-                        </>
+                        <Button 
+                          onClick={handlePrintTranscript}
+                          data-testid="button-print-transcript"
+                        >
+                          <Printer className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                          {language === 'ar' ? 'طباعة الشهادة' : 'Print Transcript'}
+                        </Button>
                       ) : (
                         <Button 
                           onClick={handleGenerateTranscript}
@@ -598,18 +588,6 @@ export default function ResultChecker() {
 
                 {/* General Actions */}
                 <div className={`flex justify-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                  <Button 
-                    variant="outline" 
-                    data-testid="button-download-result"
-                    onClick={() => {
-                      if (resultData?.student?.indexNumber) {
-                        window.open(`/api/public/results/${resultData.student.indexNumber}/pdf`, '_blank');
-                      }
-                    }}
-                  >
-                    <Download className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
-                    {t.resultChecker.downloadResultSlip}
-                  </Button>
                   <Button 
                     onClick={handleReset}
                     data-testid="button-search-another"
