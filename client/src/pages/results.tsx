@@ -174,15 +174,17 @@ export default function Results() {
     return studentList.map(student => {
       const studentKey = `${student.id}`;
       const marks: Record<number, number | null> = {};
+      const grades: Record<number, string | null> = {};
       
       (subjects || []).forEach((subject: Subject) => {
         const result = resultsList.find(r => r.studentId === student.id && r.subjectId === subject.id);
-        const mark = editedMarks[studentKey]?.[subject.id] ?? 
-                     (result && result.totalScore ? parseFloat(result.totalScore.toString()) : null);
-        marks[subject.id] = mark;
+        const editedMark = editedMarks[studentKey]?.[subject.id];
+        const dbMark = result && result.totalScore ? parseFloat(result.totalScore.toString()) : null;
+        marks[subject.id] = editedMark ?? dbMark;
+        grades[subject.id] = result?.grade || null;
       });
 
-      return { student, marks };
+      return { student, marks, grades };
     });
   }, [studentList, resultsList, subjects, editedMarks]);
 
@@ -729,21 +731,45 @@ export default function Results() {
                           <td className="px-3 py-2">{row.student.school?.name}</td>
                           <td className="px-3 py-2 font-medium">{row.student.firstName} {row.student.lastName}</td>
                           
-                          {(subjects || []).map((subj: Subject) => (
-                            <td key={subj.id} className="px-2 py-2 text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={editedMarks[studentKey]?.[subj.id] ?? row.marks[subj.id] ?? ''}
-                                onChange={(e) => handleMarkChange(row.student.id, subj.id, e.target.value)}
-                                onBlur={() => handleSaveMark(row.student.id, subj.id)}
-                                className="w-14 h-8 text-center text-xs"
-                                placeholder="-"
-                                data-testid={`input-mark-${row.student.id}-${subj.id}`}
-                              />
-                            </td>
-                          ))}
+                          {(subjects || []).map((subj: Subject) => {
+                            const numericMark = editedMarks[studentKey]?.[subj.id] ?? row.marks[subj.id];
+                            const letterGrade = row.grades?.[subj.id];
+                            const hasNumericMark = numericMark !== null && numericMark !== undefined;
+                            
+                            return (
+                              <td key={subj.id} className="px-2 py-2 text-center">
+                                {hasNumericMark ? (
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={numericMark}
+                                    onChange={(e) => handleMarkChange(row.student.id, subj.id, e.target.value)}
+                                    onBlur={() => handleSaveMark(row.student.id, subj.id)}
+                                    className="w-14 h-8 text-center text-xs"
+                                    placeholder="-"
+                                    data-testid={`input-mark-${row.student.id}-${subj.id}`}
+                                  />
+                                ) : letterGrade ? (
+                                  <Badge variant="outline" className="font-semibold text-xs">
+                                    {letterGrade}
+                                  </Badge>
+                                ) : (
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value=""
+                                    onChange={(e) => handleMarkChange(row.student.id, subj.id, e.target.value)}
+                                    onBlur={() => handleSaveMark(row.student.id, subj.id)}
+                                    className="w-14 h-8 text-center text-xs"
+                                    placeholder="-"
+                                    data-testid={`input-mark-${row.student.id}-${subj.id}`}
+                                  />
+                                )}
+                              </td>
+                            );
+                          })}
                           
                           <td className="px-3 py-2 text-center font-semibold">{total !== null ? total : '-'}</td>
                           <td className="px-3 py-2 text-center font-semibold">{percentage !== null ? `${percentage}%` : '-'}</td>
