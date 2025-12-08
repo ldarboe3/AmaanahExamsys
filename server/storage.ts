@@ -8,6 +8,7 @@ import {
   newsCategories, newsArticles, resourceCategories, resources, announcements,
   newsletterSubscribers, impactStats,
   paperMovements, scriptMovements, centerAssignments, centerActivityLogs,
+  schoolExamRegistrations,
   type User, type UpsertUser, type Region, type InsertRegion,
   type Cluster, type InsertCluster, type ExamYear, type InsertExamYear,
   type ExamCenter, type InsertExamCenter, type School, type InsertSchool,
@@ -29,6 +30,7 @@ import {
   type ScriptMovement, type InsertScriptMovement,
   type CenterAssignment, type InsertCenterAssignment,
   type CenterActivityLog, type InsertCenterActivityLog,
+  type SchoolExamRegistration, type InsertSchoolExamRegistration,
 } from "@shared/schema";
 import { randomBytes } from "crypto";
 import bcrypt from "bcrypt";
@@ -268,6 +270,12 @@ export interface IStorage {
   markNotificationRead(id: number): Promise<Notification | undefined>;
   markAllNotificationsRead(userId: string): Promise<void>;
   deleteNotification(id: number): Promise<boolean>;
+
+  // School Exam Registrations (Workflow Tracking)
+  getSchoolExamRegistration(schoolId: number, examYearId: number): Promise<SchoolExamRegistration | undefined>;
+  createOrUpdateSchoolExamRegistration(registration: InsertSchoolExamRegistration): Promise<SchoolExamRegistration>;
+  updateSchoolExamRegistrationStage(schoolId: number, examYearId: number, stage: string, additionalData?: Partial<InsertSchoolExamRegistration>): Promise<SchoolExamRegistration | undefined>;
+  getSchoolExamRegistrationsByExamYear(examYearId: number): Promise<SchoolExamRegistration[]>;
 
   // Authentication
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -1699,6 +1707,50 @@ export class DatabaseStorage implements IStorage {
   async deleteNotification(id: number): Promise<boolean> {
     await db.delete(notifications).where(eq(notifications.id, id));
     return true;
+  }
+
+  // School Exam Registrations (Workflow Tracking)
+  async getSchoolExamRegistration(schoolId: number, examYearId: number): Promise<SchoolExamRegistration | undefined> {
+    const [registration] = await db.select().from(schoolExamRegistrations)
+      .where(and(
+        eq(schoolExamRegistrations.schoolId, schoolId),
+        eq(schoolExamRegistrations.examYearId, examYearId)
+      ));
+    return registration;
+  }
+
+  async createOrUpdateSchoolExamRegistration(registration: InsertSchoolExamRegistration): Promise<SchoolExamRegistration> {
+    const existing = await this.getSchoolExamRegistration(registration.schoolId!, registration.examYearId!);
+    if (existing) {
+      const [updated] = await db.update(schoolExamRegistrations)
+        .set({ ...registration, updatedAt: new Date() })
+        .where(eq(schoolExamRegistrations.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(schoolExamRegistrations).values(registration).returning();
+    return created;
+  }
+
+  async updateSchoolExamRegistrationStage(schoolId: number, examYearId: number, stage: string, additionalData?: Partial<InsertSchoolExamRegistration>): Promise<SchoolExamRegistration | undefined> {
+    const existing = await this.getSchoolExamRegistration(schoolId, examYearId);
+    if (existing) {
+      const [updated] = await db.update(schoolExamRegistrations)
+        .set({ stage: stage as any, ...additionalData, updatedAt: new Date() })
+        .where(eq(schoolExamRegistrations.id, existing.id))
+        .returning();
+      return updated;
+    }
+    // Create if doesn't exist
+    const [created] = await db.insert(schoolExamRegistrations)
+      .values({ schoolId, examYearId, stage: stage as any, ...additionalData })
+      .returning();
+    return created;
+  }
+
+  async getSchoolExamRegistrationsByExamYear(examYearId: number): Promise<SchoolExamRegistration[]> {
+    return db.select().from(schoolExamRegistrations)
+      .where(eq(schoolExamRegistrations.examYearId, examYearId));
   }
 
   // Authentication

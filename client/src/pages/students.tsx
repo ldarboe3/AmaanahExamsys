@@ -697,6 +697,30 @@ export default function Students() {
   
   const schoolInvoices = Array.isArray(invoicesResponse) ? invoicesResponse : (invoicesResponse?.data || []);
 
+  // Fetch registration workflow progress for the current school/exam year
+  const registrationProgressQueryUrl = useMemo(() => {
+    if (!currentExamYearId) return null;
+    return `/api/registration-progress/${currentExamYearId}`;
+  }, [currentExamYearId]);
+
+  const { data: registrationProgress } = useQuery<{
+    stage: 'pending_upload' | 'awaiting_payment' | 'payment_review' | 'completed';
+    schoolId: number;
+    examYearId: number;
+    studentUploadedAt: string | null;
+    paymentReceiptUploadedAt: string | null;
+    paymentApprovedAt: string | null;
+  }>({
+    queryKey: [registrationProgressQueryUrl],
+    enabled: isSchoolAdmin && !!registrationProgressQueryUrl,
+  });
+
+  // Get the current registration stage
+  const registrationStage = useMemo(() => {
+    if (!isSchoolAdmin) return null;
+    return registrationProgress?.stage || 'pending_upload';
+  }, [isSchoolAdmin, registrationProgress]);
+
   // Check if the school has a paid invoice for the current exam year
   const schoolPaymentApproved = useMemo(() => {
     if (!schoolInvoices || !selectedSchoolId || !currentExamYearId) return false;
@@ -735,25 +759,25 @@ export default function Students() {
   // Can only approve students if payment is approved
   const canApproveWithPayment = canApproveStudents && schoolPaymentApproved;
 
-  // Determine if countdown should be shown based on role and payment status
+  // Determine if countdown should be shown based on role and registration stage
+  // NEW: Countdown only shown in Stage 1 (pending_upload)
   const shouldShowCountdown = useMemo(() => {
     // Never show countdown for super_admin or examination_admin
     if (canApproveStudents) return false;
     
-    // For school admins, hide countdown if payment is approved
-    if (isSchoolAdmin && schoolPaymentApproved) return false;
+    // For school admins, only show countdown in Stage 1 (pending_upload)
+    if (isSchoolAdmin) {
+      // If stage is pending_upload AND payment was rejected, show countdown (need to re-upload)
+      if (registrationStage === 'pending_upload' || schoolPaymentRejected) {
+        return true;
+      }
+      // For all other stages (awaiting_payment, payment_review, completed), hide countdown
+      return false;
+    }
     
-    // For school admins, SHOW countdown if payment was rejected/failed (need to resubmit)
-    // This takes priority over pending/processing check to handle stale data scenarios
-    if (isSchoolAdmin && schoolPaymentRejected) return true;
-    
-    // For school admins, hide countdown if payment is submitted and pending processing
-    // This check comes after rejected check to ensure rejected takes priority
-    if (isSchoolAdmin && schoolPaymentPendingProcessing) return false;
-    
-    // For school admins with no invoice or other cases, show countdown
+    // Default behavior for other roles
     return true;
-  }, [canApproveStudents, isSchoolAdmin, schoolPaymentApproved, schoolPaymentRejected, schoolPaymentPendingProcessing]);
+  }, [canApproveStudents, isSchoolAdmin, registrationStage, schoolPaymentRejected]);
 
   // Filter clusters based on selected region
   const clustersForFilter = clusters?.filter(
@@ -1635,6 +1659,162 @@ export default function Students() {
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Registration Workflow Progress Banner - 4 Stage System for School Admins */}
+        {isSchoolAdmin && currentExamYearId && !isPastExamYear && (
+          <Card className="border-2 border-primary/30" data-testid="registration-workflow-card">
+            <CardContent className="p-6">
+              {/* Progress Steps Indicator */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  {[
+                    { stage: 'pending_upload', label: { en: 'Upload Students', ar: 'رفع الطلاب' }, icon: Upload },
+                    { stage: 'awaiting_payment', label: { en: 'Submit Payment', ar: 'تقديم الدفع' }, icon: CreditCard },
+                    { stage: 'payment_review', label: { en: 'Under Review', ar: 'قيد المراجعة' }, icon: Clock },
+                    { stage: 'completed', label: { en: 'Completed', ar: 'مكتمل' }, icon: CheckCircle },
+                  ].map((step, index) => {
+                    const isActive = registrationStage === step.stage;
+                    const isCompleted = ['pending_upload', 'awaiting_payment', 'payment_review', 'completed']
+                      .indexOf(registrationStage || 'pending_upload') > ['pending_upload', 'awaiting_payment', 'payment_review', 'completed'].indexOf(step.stage);
+                    const StepIcon = step.icon;
+                    
+                    return (
+                      <div key={step.stage} className="flex flex-col items-center flex-1">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all ${
+                          isCompleted 
+                            ? 'bg-chart-3 text-white' 
+                            : isActive 
+                              ? 'bg-primary text-white ring-4 ring-primary/30' 
+                              : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {isCompleted ? (
+                            <CheckCircle className="w-5 h-5" />
+                          ) : (
+                            <StepIcon className="w-5 h-5" />
+                          )}
+                        </div>
+                        <span className={`text-xs text-center font-medium ${
+                          isActive ? 'text-primary' : isCompleted ? 'text-chart-3' : 'text-muted-foreground'
+                        }`}>
+                          {isRTL ? step.label.ar : step.label.en}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Progress Line */}
+                <div className="relative h-1 bg-muted rounded-full mx-8 mt-[-40px] mb-8">
+                  <div 
+                    className="absolute h-1 bg-chart-3 rounded-full transition-all"
+                    style={{
+                      width: registrationStage === 'pending_upload' ? '0%' 
+                        : registrationStage === 'awaiting_payment' ? '33%' 
+                        : registrationStage === 'payment_review' ? '66%' 
+                        : '100%'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Stage-specific Content */}
+              {registrationStage === 'pending_upload' && (
+                <div className="text-center" data-testid="stage-pending-upload">
+                  <h3 className="font-semibold text-lg mb-2">
+                    {isRTL ? "خطوة 1: رفع قائمة الطلاب" : "Step 1: Upload Student List"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {isRTL 
+                      ? "يرجى تحميل قائمة الطلاب باستخدام نموذج CSV قبل انتهاء فترة التسجيل. بعد الرفع، ستتلقى تعليمات الدفع عبر البريد الإلكتروني."
+                      : "Please upload your student list using the CSV template before the registration deadline. After uploading, you will receive payment instructions via email."}
+                  </p>
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>{isRTL ? "استخدم زر 'رفع الطلاب' أدناه" : "Use the 'Upload Students' button below"}</span>
+                  </div>
+                </div>
+              )}
+
+              {registrationStage === 'awaiting_payment' && (
+                <div className="text-center" data-testid="stage-awaiting-payment">
+                  <div className="inline-flex items-center gap-2 bg-chart-3/10 text-chart-3 px-4 py-2 rounded-full mb-4">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      {isRTL ? "تم رفع الطلاب بنجاح!" : "Students uploaded successfully!"}
+                    </span>
+                  </div>
+                  <h3 className="font-semibold text-lg mb-2">
+                    {isRTL ? "خطوة 2: تقديم الدفع" : "Step 2: Submit Payment"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {isRTL 
+                      ? "تم استلام قائمة طلابكم. يرجى الانتقال إلى صفحة المدفوعات لإتمام عملية الدفع ورفع إيصال البنك."
+                      : "Your student list has been received. Please proceed to the Payments page to complete your payment and upload your bank slip."}
+                  </p>
+                  <Button 
+                    onClick={() => window.location.href = '/dashboard/payments'}
+                    className="bg-primary"
+                    data-testid="button-go-to-payments-stage2"
+                  >
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    {isRTL ? "انتقل إلى المدفوعات" : "Go to Payments"}
+                  </Button>
+                </div>
+              )}
+
+              {registrationStage === 'payment_review' && (
+                <div className="text-center" data-testid="stage-payment-review">
+                  <div className="inline-flex items-center gap-2 bg-chart-2/10 text-chart-2 px-4 py-2 rounded-full mb-4">
+                    <Clock className="w-4 h-4 animate-pulse" />
+                    <span className="text-sm font-medium">
+                      {isRTL ? "قيد المراجعة" : "Under Review"}
+                    </span>
+                  </div>
+                  <h3 className="font-semibold text-lg mb-2">
+                    {isRTL ? "خطوة 3: مراجعة الدفع" : "Step 3: Payment Review"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {isRTL 
+                      ? "تم استلام إيصال الدفع وهو قيد المراجعة من قبل فريق الامتحانات. ستتلقى إشعاراً فور الموافقة على الدفع."
+                      : "Your payment receipt has been received and is under review by the examination team. You will be notified once your payment is approved."}
+                  </p>
+                  <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>{isRTL ? "يرجى الانتظار..." : "Please wait..."}</span>
+                  </div>
+                </div>
+              )}
+
+              {registrationStage === 'completed' && (
+                <div className="text-center" data-testid="stage-completed">
+                  <div className="inline-flex items-center gap-2 bg-chart-3/10 text-chart-3 px-4 py-2 rounded-full mb-4">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      {isRTL ? "اكتمل التسجيل!" : "Registration Complete!"}
+                    </span>
+                  </div>
+                  <h3 className="font-semibold text-lg text-chart-3 mb-2">
+                    {isRTL ? "تهانينا! اكتمل تسجيلكم بنجاح" : "Congratulations! Your registration is complete"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {isRTL 
+                      ? "تمت الموافقة على الدفع وتم تخصيص أرقام الفهرس لجميع طلابكم. تم إرسال تفاصيل أرقام الفهرس إلى بريدكم الإلكتروني."
+                      : "Your payment has been approved and index numbers have been allocated to all your students. Index number details have been sent to your email."}
+                  </p>
+                  <div className="flex items-center justify-center gap-4">
+                    <Badge variant="outline" className="bg-chart-3/10 text-chart-3 border-chart-3/30">
+                      <Hash className="w-3 h-3 mr-1" />
+                      {isRTL ? "تم تخصيص أرقام الفهرس" : "Index Numbers Allocated"}
+                    </Badge>
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                      <Users className="w-3 h-3 mr-1" />
+                      {students?.filter(s => s.status === 'approved').length || 0} {isRTL ? "طالب معتمد" : "Students Approved"}
+                    </Badge>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

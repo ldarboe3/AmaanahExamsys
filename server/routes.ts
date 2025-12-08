@@ -28,6 +28,8 @@ import {
   sendExamYearCreatedNotification,
   sendWeeklyRegistrationReminder,
   sendUrgentRegistrationReminder,
+  sendStudentUploadConfirmationEmail,
+  sendIndexAllocationEmail,
   generateVerificationToken,
   getVerificationExpiry,
   generateIndexNumber,
@@ -3134,6 +3136,88 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Registration Workflow Progress API
+  // For school admins: Returns single object with their school's progress
+  // For other admins: Returns single object with null values (they should use /school/:schoolId/:examYearId endpoint for specific schools)
+  app.get("/api/registration-progress/:examYearId", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const examYearId = parseInt(req.params.examYearId);
+      
+      // For school admins, get their school's registration progress
+      if (user.role === 'school_admin' && user.schoolId) {
+        const progress = await storage.getSchoolExamRegistration(user.schoolId, examYearId);
+        if (!progress) {
+          // Return default pending_upload stage if no progress record exists
+          return res.json({ 
+            stage: 'pending_upload',
+            schoolId: user.schoolId,
+            examYearId,
+            studentUploadedAt: null,
+            paymentReceiptUploadedAt: null,
+            paymentApprovedAt: null
+          });
+        }
+        return res.json(progress);
+      }
+      
+      // For admins (super_admin, examination_admin), return a default response
+      // They should use the specific endpoint /api/registration-progress/school/:schoolId/:examYearId
+      // for individual school progress queries
+      return res.json({ 
+        stage: null,
+        schoolId: null,
+        examYearId,
+        studentUploadedAt: null,
+        paymentReceiptUploadedAt: null,
+        paymentApprovedAt: null,
+        message: 'Use /api/registration-progress/school/:schoolId/:examYearId for specific school progress'
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Endpoint for admins to get all registration progress for an exam year
+  app.get("/api/registration-progress/:examYearId/all", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const examYearId = parseInt(req.params.examYearId);
+      
+      // Only admins can access all registrations
+      if (!['super_admin', 'examination_admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only admins can view all registration progress" });
+      }
+      
+      const allProgress = await storage.getSchoolExamRegistrationsByExamYear(examYearId);
+      res.json(allProgress);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/registration-progress/school/:schoolId/:examYearId", isAuthenticated, async (req, res) => {
+    try {
+      const schoolId = parseInt(req.params.schoolId);
+      const examYearId = parseInt(req.params.examYearId);
+      const progress = await storage.getSchoolExamRegistration(schoolId, examYearId);
+      
+      if (!progress) {
+        return res.json({ 
+          stage: 'pending_upload',
+          schoolId,
+          examYearId,
+          studentUploadedAt: null,
+          paymentReceiptUploadedAt: null,
+          paymentApprovedAt: null
+        });
+      }
+      res.json(progress);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/students/bulk", isAuthenticated, async (req, res) => {
     try {
       const { students: studentList } = req.body;
@@ -3153,8 +3237,54 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (errors.length > 0) {
         return res.status(400).json({ message: "Validation errors", errors, validCount: validStudents.length });
       }
-      const students = await storage.createStudentsBulk(validStudents);
-      res.status(201).json({ created: students.length, students });
+      const createdStudents = await storage.createStudentsBulk(validStudents);
+      
+      // Update registration workflow to Stage 2 (awaiting_payment) and send confirmation email
+      if (createdStudents.length > 0) {
+        const user = req.user as any;
+        const schoolId = validStudents[0]?.schoolId;
+        const examYearId = validStudents[0]?.examYearId;
+        
+        if (schoolId && examYearId) {
+          try {
+            // Update workflow stage to awaiting_payment
+            await storage.updateSchoolExamRegistrationStage(schoolId, examYearId, 'awaiting_payment', {
+              studentUploadedAt: new Date(),
+            });
+            
+            // Send confirmation email to school admin using centralized email service
+            const school = await storage.getSchool(schoolId);
+            const examYear = await storage.getExamYear(examYearId);
+            if (school?.adminUserId && examYear) {
+              const adminUser = await storage.getUser(school.adminUserId);
+              if (adminUser?.email) {
+                try {
+                  const baseUrl = process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co';
+                  await sendStudentUploadConfirmationEmail(
+                    adminUser.email,
+                    school.name,
+                    adminUser.firstName || 'School Administrator',
+                    examYear.name,
+                    createdStudents.length,
+                    baseUrl
+                  );
+                  
+                  // Mark email as sent
+                  await storage.updateSchoolExamRegistrationStage(schoolId, examYearId, 'awaiting_payment', {
+                    uploadConfirmationEmailSent: true
+                  });
+                } catch (emailError: any) {
+                  console.error('Failed to send student upload confirmation email:', emailError.message);
+                }
+              }
+            }
+          } catch (workflowError: any) {
+            console.error('Failed to update registration workflow:', workflowError.message);
+          }
+        }
+      }
+      
+      res.status(201).json({ created: createdStudents.length, students: createdStudents });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -5091,6 +5221,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           invoice.invoiceNumber,
           parseFloat(invoice.totalAmount || '0')
         );
+        
+        // Update registration workflow to Stage 3 (payment_review) - NO email notification
+        if (invoice.examYearId) {
+          try {
+            await storage.updateSchoolExamRegistrationStage(
+              invoice.schoolId, 
+              invoice.examYearId, 
+              'payment_review',
+              {
+                paymentReceiptUploadedAt: new Date(),
+                invoiceId: invoice.id
+              }
+            );
+          } catch (workflowError: any) {
+            console.error('Failed to update registration workflow to payment_review:', workflowError.message);
+          }
+        }
       }
       
       res.json({ 
@@ -5316,6 +5463,67 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           parseFloat(invoice.totalAmount || '0'),
           approvedCount
         );
+      }
+      
+      // Update registration workflow to Stage 4 (completed) and send completion notifications
+      if (invoice.examYearId) {
+        try {
+          const examYear = await storage.getExamYear(invoice.examYearId);
+          
+          // Update stage to completed
+          await storage.updateSchoolExamRegistrationStage(
+            invoice.schoolId, 
+            invoice.examYearId, 
+            'completed',
+            {
+              paymentApprovedAt: new Date(),
+              completionNotificationSent: true
+            }
+          );
+          
+          // Send index allocation email with student index numbers using centralized email service
+          if (school?.adminUserId && indexNumbersGenerated > 0) {
+            const adminUser = await storage.getUser(school.adminUserId);
+            if (adminUser?.email) {
+              try {
+                // Get approved students with index numbers
+                const approvedStudents = allStudents.filter(s => 
+                  s.examYearId === invoice.examYearId && 
+                  s.status === 'approved' && 
+                  s.indexNumber
+                );
+                
+                const baseUrl = `${req.protocol}://${req.get('host')}`;
+                await sendIndexAllocationEmail(
+                  adminUser.email,
+                  school.name,
+                  adminUser.firstName || 'School Administrator',
+                  examYear?.name || 'Amaanah Examination',
+                  approvedStudents.map(s => ({
+                    firstName: s.firstName,
+                    middleName: s.middleName || undefined,
+                    lastName: s.lastName,
+                    indexNumber: s.indexNumber!,
+                    grade: s.grade
+                  })),
+                  baseUrl
+                );
+                
+                // Mark index allocation email as sent
+                await storage.updateSchoolExamRegistrationStage(
+                  invoice.schoolId, 
+                  invoice.examYearId, 
+                  'completed',
+                  { indexAllocationEmailSent: true, paymentApprovalEmailSent: true }
+                );
+              } catch (emailError: any) {
+                console.error('Failed to send index allocation email:', emailError.message);
+              }
+            }
+          }
+        } catch (workflowError: any) {
+          console.error('Failed to update registration workflow to completed:', workflowError.message);
+        }
       }
       
       res.json({

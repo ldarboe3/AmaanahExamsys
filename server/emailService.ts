@@ -1012,3 +1012,212 @@ export async function sendUrgentRegistrationReminder(
     htmlBody: htmlBody
   });
 }
+
+// Send student upload confirmation email (Stage 2)
+export async function sendStudentUploadConfirmationEmail(
+  schoolEmail: string,
+  schoolName: string,
+  adminName: string,
+  examYearName: string,
+  studentCount: number,
+  baseUrl: string
+): Promise<boolean> {
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #0d9488, #047857); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .success { background: #E7F9EE; border-left: 4px solid #10B981; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .summary { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e5e7eb; }
+        .btn { display: inline-block; background: #0d9488; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+        .next-steps { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+        .arabic { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Student Registration Submitted</h1>
+          <p class="arabic">تم تقديم تسجيل الطلاب</p>
+        </div>
+        <div class="content">
+          <div class="success">
+            <strong>✓ Submission Successful!</strong> Your student list has been received.
+          </div>
+          
+          <p>Dear ${adminName},</p>
+          <p>Your student list for <strong>${examYearName}</strong> has been successfully submitted.</p>
+          
+          <div class="summary">
+            <h3 style="margin-top: 0;">Submission Summary</h3>
+            <table style="width: 100%;">
+              <tr><td><strong>School:</strong></td><td>${schoolName}</td></tr>
+              <tr><td><strong>Exam Year:</strong></td><td>${examYearName}</td></tr>
+              <tr><td><strong>Students Registered:</strong></td><td>${studentCount}</td></tr>
+              <tr><td><strong>Submission Date:</strong></td><td>${new Date().toLocaleDateString()}</td></tr>
+            </table>
+          </div>
+          
+          <div class="next-steps">
+            <h3 style="margin-top: 0;">⚡ Next Step: Submit Payment</h3>
+            <p style="margin: 0;">Please proceed to the Payments section to complete your registration payment. Your registration will be reviewed and approved once payment is confirmed.</p>
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${baseUrl}/dashboard/payments" class="btn">Go to Payments</a>
+          </div>
+          
+          <p>If you have any questions, please contact the examination office.</p>
+          
+          <p>Best regards,<br>Amaanah Examination Board</p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <div class="arabic" style="margin-top: 20px;">
+            <h3>تم تقديم تسجيل الطلاب بنجاح!</h3>
+            <p>عدد الطلاب المسجلين: <strong>${studentCount}</strong></p>
+            <p>الخطوة التالية: يرجى الانتقال إلى صفحة المدفوعات لإتمام عملية الدفع.</p>
+          </div>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} Amaanah Islamic Education - The Gambia</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: schoolEmail,
+    subject: `Student Registration Submitted: ${examYearName}`,
+    htmlBody: htmlBody
+  });
+}
+
+// Send index number allocation email (Stage 4)
+export async function sendIndexAllocationEmail(
+  schoolEmail: string,
+  schoolName: string,
+  adminName: string,
+  examYearName: string,
+  students: Array<{ firstName: string; middleName?: string; lastName: string; indexNumber: string; grade: number }>,
+  baseUrl: string
+): Promise<boolean> {
+  // Create student list HTML
+  const studentListHtml = students.map((s, idx) => 
+    `<tr>
+      <td style="padding: 8px; border: 1px solid #e5e7eb;">${idx + 1}</td>
+      <td style="padding: 8px; border: 1px solid #e5e7eb;">${s.firstName} ${s.middleName || ''} ${s.lastName}</td>
+      <td style="padding: 8px; border: 1px solid #e5e7eb; font-weight: bold; color: #0d9488;">${s.indexNumber}</td>
+      <td style="padding: 8px; border: 1px solid #e5e7eb;">Grade ${s.grade}</td>
+    </tr>`
+  ).join('');
+
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 700px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #0d9488, #047857); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .success { background: #E7F9EE; border-left: 4px solid #10B981; padding: 15px; margin: 20px 0; border-radius: 4px; text-align: center; }
+        .info-box { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e5e7eb; }
+        .btn { display: inline-block; background: #0d9488; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+        .important { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+        .arabic { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th { background-color: #0d9488; color: white; padding: 12px 8px; border: 1px solid #e5e7eb; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🎉 Registration Complete - Index Numbers Allocated</h1>
+          <p class="arabic">تهانينا! تم تخصيص أرقام الفهرس</p>
+        </div>
+        <div class="content">
+          <div class="success">
+            <strong style="font-size: 18px;">✓ Registration Complete!</strong>
+            <p style="margin: 5px 0 0 0;">Your payment has been approved and index numbers have been allocated.</p>
+          </div>
+          
+          <p>Dear ${adminName},</p>
+          <p>Congratulations! Your registration for <strong>${examYearName}</strong> has been completed successfully.</p>
+          
+          <div class="info-box">
+            <h3 style="margin-top: 0; color: #0d9488;">What are Index Numbers?</h3>
+            <p>Each student has been assigned a unique <strong>6-digit Index Number</strong>. These index numbers are essential for:</p>
+            <ul>
+              <li>Identifying students during the examination</li>
+              <li>Submitting and retrieving examination results</li>
+              <li>Generating official transcripts and certificates</li>
+              <li>Verifying student records with Amaanah</li>
+            </ul>
+          </div>
+          
+          <div class="important">
+            <h3 style="margin-top: 0;">📋 Important Instructions</h3>
+            <ul style="margin: 10px 0 0 0;">
+              <li>Please share each student's index number with them</li>
+              <li>Students must memorize their index numbers for the exam</li>
+              <li>Index numbers will be printed on exam cards</li>
+              <li>Keep a copy of this email for your records</li>
+            </ul>
+          </div>
+          
+          <h3>Student Index Number Allocation</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Student Name</th>
+                <th>Index Number</th>
+                <th>Grade</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${studentListHtml}
+            </tbody>
+          </table>
+          
+          <p><strong>Total Students Registered:</strong> ${students.length}</p>
+          
+          <div style="text-align: center;">
+            <a href="${baseUrl}/dashboard/students" class="btn">View Students Dashboard</a>
+          </div>
+          
+          <p>Best regards,<br>Amaanah Examination Board</p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <div class="arabic" style="margin-top: 20px;">
+            <h3 style="color: #0d9488;">🎉 تهانينا! اكتمل التسجيل</h3>
+            <p>تمت الموافقة على الدفع وتم تخصيص أرقام الفهرس لجميع طلابكم.</p>
+            <p>عدد الطلاب المسجلين: <strong>${students.length}</strong></p>
+            <p>يرجى مشاركة أرقام الفهرس مع الطلاب والاحتفاظ بهذا البريد الإلكتروني للرجوع إليه.</p>
+          </div>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} Amaanah Islamic Education - The Gambia</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: schoolEmail,
+    subject: `🎉 Index Numbers Allocated: ${examYearName}`,
+    htmlBody: htmlBody
+  });
+}
