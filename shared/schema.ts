@@ -64,6 +64,7 @@ export const users = pgTable("users", {
   studentId: integer("student_id"),
   examinerId: integer("examiner_id"),
   mustChangePassword: boolean("must_change_password").default(false),
+  preferredLanguage: varchar("preferred_language", { length: 10 }).default('english'),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -154,6 +155,7 @@ export const schools = pgTable("schools", {
   hasPenalty: boolean("has_penalty").default(false),
   registrationFeePaid: boolean("registration_fee_paid").default(false),
   registrationInvoiceId: integer("registration_invoice_id"),
+  preferredLanguage: varchar("preferred_language", { length: 10 }).default('english'),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

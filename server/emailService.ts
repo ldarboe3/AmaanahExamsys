@@ -105,80 +105,147 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   }
 }
 
-// Send school verification email with 2-hour expiry link
+// Send school verification email with 2-hour expiry link - supports both English and Arabic
 export async function sendSchoolVerificationEmail(
   schoolEmail: string,
   schoolName: string,
   registrarName: string,
   verificationToken: string,
-  baseUrl: string
+  baseUrl: string,
+  preferredLanguage: string = 'english'
 ): Promise<boolean> {
   const verificationLink = `${baseUrl}/school-verify/${verificationToken}`;
+  const isArabic = preferredLanguage.toLowerCase() === 'arabic';
   
-  const htmlBody = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #1E8F4D, #166534); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .header h1 { margin: 0; font-size: 24px; }
-        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-        .btn { display: inline-block; background: #1E8F4D; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
-        .btn:hover { background: #166534; }
-        .btn a { color: white !important; text-decoration: none; }
-        .warning { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-        .arabic { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>Amaanah Islamic Education</h1>
-          <p class="arabic">الأمانة للتعليم الإسلامي</p>
-        </div>
-        <div class="content">
-          <h2>Welcome to Amaanah Exam System</h2>
-          <p>Dear ${registrarName},</p>
-          <p>Your school <strong>${schoolName}</strong> has been registered in the Amaanah Examination System. Please click the button below to verify your email address and complete your school profile setup.</p>
-          
-          <div style="text-align: center;">
-            <a href="${verificationLink}" class="btn">Verify Email & Complete Registration</a>
+  let htmlBody = '';
+  let subject = '';
+
+  if (isArabic) {
+    htmlBody = `
+      <!DOCTYPE html>
+      <html dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #1E8F4D, #166534); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .header h1 { margin: 0; font-size: 24px; }
+          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+          .btn { display: inline-block; background: #1E8F4D; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+          .warning { background: #FEF3C7; border-right: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px; }
+          .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>الأمانة للتعليم الإسلامي</h1>
+            <p>Amaanah Islamic Education</p>
           </div>
-          
-          <div class="warning">
-            <strong>Important:</strong> This verification link will expire in <strong>2 hours</strong>. If you do not verify within this time, you will need to request a new verification link.
+          <div class="content">
+            <h2>أهلا بك في نظام امتحانات الأمانة</h2>
+            <p>السيد/السيدة ${registrarName}،</p>
+            <p>تم تسجيل مدرستك <strong>${schoolName}</strong> في نظام الامتحانات الإسلامية للأمانة. يرجى النقر على الزر أدناه للتحقق من عنوان بريدك الإلكتروني واستكمال إعداد ملف المدرسة.</p>
+            
+            <div style="text-align: center;">
+              <a href="${verificationLink}" class="btn">التحقق من البريد الإلكتروني واستكمال التسجيل</a>
+            </div>
+            
+            <div class="warning">
+              <strong>مهم:</strong> سينتهي صلاحية رابط التحقق في <strong>ساعتين</strong>. إذا لم تتحقق خلال هذا الوقت، ستحتاج إلى طلب رابط تحقق جديد.
+            </div>
+            
+            <p>إذا لم يعمل الزر، انسخ والصق هذا الرابط في متصفحك:</p>
+            <p style="word-break: break-all; color: #1E8F4D;">${verificationLink}</p>
+            
+            <p>أثناء التحقق، ستتمكن من:</p>
+            <ul>
+              <li>إنشاء اسم المستخدم وكلمة المرور الخاصة بك</li>
+              <li>الوصول الفوري إلى لوحة التحكم الخاصة بمدرستك</li>
+              <li>تسجيل الطلاب للامتحانات</li>
+              <li>عرض وطباعة أرقام الفهرس للطلاب بعد السداد</li>
+            </ul>
+            
+            <p>إذا لم تقم بالتسجيل في هذا الحساب، يرجى تجاهل هذا البريد الإلكتروني.</p>
+            
+            <p>مع أطيب التحيات،<br>فريق امتحانات الأمانة</p>
           </div>
-          
-          <p>If the button doesn't work, copy and paste this link into your browser:</p>
-          <p style="word-break: break-all; color: #1E8F4D;">${verificationLink}</p>
-          
-          <p>During verification, you will:</p>
-          <ul>
-            <li>Create your login username and password</li>
-            <li>Get immediate access to your school dashboard</li>
-            <li>Be able to register students for examinations</li>
-            <li>View and print student index numbers after payment</li>
-          </ul>
-          
-          <p>If you did not register for this account, please ignore this email.</p>
-          
-          <p>Best regards,<br>Amaanah Examination Team</p>
+          <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} الأمانة للتعليم الإسلامي - جمهورية غامبيا</p>
+            <p>هذه رسالة تلقائية. يرجى عدم الرد على هذا البريد الإلكتروني.</p>
+          </div>
         </div>
-        <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} Amaanah Islamic Education - The Gambia</p>
-          <p>This is an automated message. Please do not reply to this email.</p>
+      </body>
+      </html>
+    `;
+    subject = 'تحقق من تسجيل مدرستك - نظام امتحانات الأمانة';
+  } else {
+    htmlBody = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #1E8F4D, #166534); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .header h1 { margin: 0; font-size: 24px; }
+          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+          .btn { display: inline-block; background: #1E8F4D; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+          .btn:hover { background: #166534; }
+          .warning { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px; }
+          .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+          .arabic { font-family: 'Noto Naskh Arabic', 'Traditional Arabic', serif; direction: rtl; text-align: right; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Amaanah Islamic Education</h1>
+            <p class="arabic">الأمانة للتعليم الإسلامي</p>
+          </div>
+          <div class="content">
+            <h2>Welcome to Amaanah Exam System</h2>
+            <p>Dear ${registrarName},</p>
+            <p>Your school <strong>${schoolName}</strong> has been registered in the Amaanah Examination System. Please click the button below to verify your email address and complete your school profile setup.</p>
+            
+            <div style="text-align: center;">
+              <a href="${verificationLink}" class="btn">Verify Email & Complete Registration</a>
+            </div>
+            
+            <div class="warning">
+              <strong>Important:</strong> This verification link will expire in <strong>2 hours</strong>. If you do not verify within this time, you will need to request a new verification link.
+            </div>
+            
+            <p>If the button doesn't work, copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #1E8F4D;">${verificationLink}</p>
+            
+            <p>During verification, you will:</p>
+            <ul>
+              <li>Create your login username and password</li>
+              <li>Get immediate access to your school dashboard</li>
+              <li>Be able to register students for examinations</li>
+              <li>View and print student index numbers after payment</li>
+            </ul>
+            
+            <p>If you did not register for this account, please ignore this email.</p>
+            
+            <p>Best regards,<br>Amaanah Examination Team</p>
+          </div>
+          <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} Amaanah Islamic Education - The Gambia</p>
+            <p>This is an automated message. Please do not reply to this email.</p>
+          </div>
         </div>
-      </div>
-    </body>
-    </html>
-  `;
+      </body>
+      </html>
+    `;
+    subject = 'Verify Your School Registration - Amaanah Exam System';
+  }
 
   return sendEmail({
     to: schoolEmail,
-    subject: 'Verify Your School Registration - Amaanah Exam System',
+    subject: subject,
     htmlBody: htmlBody
   });
 }
