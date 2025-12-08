@@ -35,6 +35,7 @@ The system is built on a robust architecture featuring a React-based frontend, a
 ### Feature Specifications
 - **School Management**: Profile management, school badge upload, invitation system for school administrators. Features authoritative Regions & Clusters validation during upload and a specific school admin credential generation process.
 - **Student Management**: CSV import, index number generation, and a 3-tier registration navigation workflow. Includes a multi-stage student submission workflow with payment confirmation.
+  - **Surname Normalization**: Automatic validation and normalization of surnames against an approved Gambian surname list (80+ surnames with alternate spellings). Matching uses: exact lookup → diacritic normalization → fuzzy matching (Levenshtein ≤1) → transliteration for common variants (Diallo→Jallow, Cissé→Ceesay, etc.). Normalized surnames are stored at data entry and used on all official PDFs.
 - **Financial Management**: Three-tier fee structure, auto-invoice generation (including a mandatory registration fee for new schools), bank slip upload, payment confirmation, and professional PDF invoice downloads.
 - **Results & Certificates**:
   - **Three-Tier Results Navigation**: Interactive boards for examination years and grades, leading to editable marks tables with filtering.
