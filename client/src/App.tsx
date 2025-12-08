@@ -13,6 +13,7 @@ import { NotificationsDropdown } from "@/components/notifications-dropdown";
 import { DocumentationButton } from "@/components/documentation-button";
 import { UserProfileDropdown } from "@/components/user-profile-dropdown";
 import { ScrollToTop } from "@/components/scroll-to-top";
+import { ProtectedRoute } from "@/components/protected-route";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
@@ -88,7 +89,9 @@ function AuthenticatedRoutes() {
       <Route path="/centers" component={Centers} />
       <Route path="/centers/:id" component={CenterDashboard} />
       <Route path="/center-info" component={Centers} />
-      <Route path="/admin-results" component={Results} />
+      <Route path="/admin-results">
+        {() => <ProtectedRoute component={Results} allowedRoles={["super_admin", "examination_admin"]} />}
+      </Route>
       <Route path="/certificates" component={Certificates} />
       <Route path="/transcripts" component={Transcripts} />
       <Route path="/examiners" component={Examiners} />

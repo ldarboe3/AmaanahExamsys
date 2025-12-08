@@ -7103,6 +7103,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.post("/api/results", isAuthenticated, async (req, res) => {
     try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Only admins can create results" });
+      }
+
       const parsed = insertStudentResultSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: fromZodError(parsed.error).message });
@@ -7116,6 +7126,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.post("/api/results/bulk", isAuthenticated, async (req, res) => {
     try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Only admins can create bulk results" });
+      }
+
       const { results: resultList } = req.body;
       if (!Array.isArray(resultList)) {
         return res.status(400).json({ message: "results must be an array" });
@@ -7710,6 +7730,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/results/:id", isAuthenticated, async (req, res) => {
     try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Only admins can edit results" });
+      }
+
       const result = await storage.updateStudentResult(parseInt(req.params.id), req.body);
       if (!result) {
         return res.status(404).json({ message: "Result not found" });
@@ -7722,7 +7752,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.post("/api/results/:id/validate", isAuthenticated, async (req, res) => {
     try {
-      const result = await storage.validateResult(parseInt(req.params.id), req.session.userId!);
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Only admins can validate results" });
+      }
+
+      const result = await storage.validateResult(parseInt(req.params.id), userId);
       if (!result) {
         return res.status(404).json({ message: "Result not found" });
       }
@@ -7734,6 +7774,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.post("/api/results/publish", isAuthenticated, async (req, res) => {
     try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Only admins can publish results" });
+      }
+
       const { examYearId, grade } = req.body;
       if (!examYearId) {
         return res.status(400).json({ message: "examYearId is required" });
@@ -7856,6 +7906,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.delete("/api/results/:id", isAuthenticated, async (req, res) => {
+    const userId = req.session.userId;
+    if (!userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(userId);
+    if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+      return res.status(403).json({ message: "Only admins can delete results" });
+    }
     try {
       await storage.deleteStudentResult(parseInt(req.params.id));
       res.json({ message: "Deleted" });
