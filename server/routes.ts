@@ -3852,7 +3852,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/students/:id", isAuthenticated, async (req, res) => {
     try {
-      const student = await storage.updateStudent(parseInt(req.params.id), req.body);
+      let updateData = req.body;
+      
+      // Normalize surname if lastName is being updated
+      if (updateData.lastName) {
+        const { normalizeSurname } = await import('./surnameService');
+        const surnameResult = await normalizeSurname(updateData.lastName);
+        updateData = {
+          ...updateData,
+          lastName: surnameResult.normalizedSurname
+        };
+      }
+      
+      const student = await storage.updateStudent(parseInt(req.params.id), updateData);
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
       }
