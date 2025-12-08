@@ -113,6 +113,10 @@ export default function Verify() {
     form.reset();
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -407,7 +411,7 @@ export default function Verify() {
                   <Search className="w-4 h-4 mr-2" />
                   Verify Another
                 </Button>
-                <Button className="flex-1 text-xs">
+                <Button className="flex-1 text-xs" onClick={handlePrint}>
                   <Award className="w-4 h-4 mr-2" />
                   Print
                 </Button>
