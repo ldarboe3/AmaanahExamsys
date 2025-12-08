@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import QRCode from 'qrcode';
+import { getChromiumExecutable } from './chromiumHelper';
 import {
   formatArabicDate,
   formatHijriDate,
@@ -506,6 +507,7 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
   
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath: getChromiumExecutable(),
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',

@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import QRCode from 'qrcode';
 import crypto from 'crypto';
+import { getChromiumExecutable } from './chromiumHelper';
 
 // Arabic to English Transliteration Map
 const ARABIC_TO_ENGLISH_MAP: Record<string, string> = {
@@ -716,7 +717,8 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
   const htmlContent = generateTranscriptHTML(data);
 
   const browser = await puppeteer.launch({
-    headless: 'new' as any,
+    headless: true,
+    executablePath: getChromiumExecutable(),
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
   });
 

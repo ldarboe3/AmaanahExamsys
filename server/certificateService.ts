@@ -2,6 +2,7 @@ import puppeteer from 'puppeteer';
 import QRCode from 'qrcode';
 import path from 'path';
 import fs from 'fs';
+import { getChromiumExecutable } from './chromiumHelper';
 import {
   certificateTemplates,
   getCertificateTemplate,
@@ -369,6 +370,7 @@ export async function generateCertificatePDF(data: CertificateData): Promise<str
 
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath: getChromiumExecutable(),
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
   });
 
@@ -764,6 +766,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
 
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath: getChromiumExecutable(),
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
   });
 
@@ -1201,6 +1204,7 @@ export async function generateResultSlipPDF(data: ResultSlipData): Promise<strin
 
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath: getChromiumExecutable(),
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
   });
 

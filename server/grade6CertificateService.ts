@@ -2,6 +2,7 @@ import puppeteer from 'puppeteer';
 import QRCode from 'qrcode';
 import path from 'path';
 import fs from 'fs';
+import { getChromiumExecutable } from './chromiumHelper';
 import {
   formatArabicDate,
   formatHijriDate,
@@ -402,6 +403,7 @@ export async function generateGrade6CertificatePDF(data: Grade6CertificateData):
 
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath: getChromiumExecutable(),
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
   });
 
