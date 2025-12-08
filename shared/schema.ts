@@ -30,6 +30,7 @@ export const userStatusEnum = pgEnum('user_status', ['pending', 'active', 'suspe
 export const schoolTypeEnum = pgEnum('school_type', ['LBS', 'UBS', 'BCS', 'SSS']);
 export const schoolStatusEnum = pgEnum('school_status', ['pending', 'verified', 'approved', 'rejected']);
 export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'processing', 'paid', 'failed', 'rejected']);
+export const invoiceTypeEnum = pgEnum('invoice_type', ['registration', 'examination']);
 export const studentStatusEnum = pgEnum('student_status', ['pending', 'approved', 'rejected']);
 export const resultStatusEnum = pgEnum('result_status', ['pending', 'validated', 'published']);
 export const examinerStatusEnum = pgEnum('examiner_status', ['pending', 'verified', 'active', 'inactive']);
@@ -151,6 +152,8 @@ export const schools = pgTable("schools", {
   schoolBadge: varchar("school_badge", { length: 500 }),
   registrationDeadline: timestamp("registration_deadline"),
   hasPenalty: boolean("has_penalty").default(false),
+  registrationFeePaid: boolean("registration_fee_paid").default(false),
+  registrationInvoiceId: integer("registration_invoice_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -225,10 +228,11 @@ export const systemSettings = pgTable("system_settings", {
 export const invoices = pgTable("invoices", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
+  invoiceType: invoiceTypeEnum("invoice_type").default('examination'),
   schoolId: integer("school_id").notNull().references(() => schools.id),
-  examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
-  totalStudents: integer("total_students").notNull(),
-  feePerStudent: decimal("fee_per_student", { precision: 10, scale: 2 }).notNull(),
+  examYearId: integer("exam_year_id").references(() => examYears.id),
+  totalStudents: integer("total_students").default(0),
+  feePerStudent: decimal("fee_per_student", { precision: 10, scale: 2 }).default('0'),
   certificateFee: decimal("certificate_fee", { precision: 10, scale: 2 }).default('0'),
   transcriptFee: decimal("transcript_fee", { precision: 10, scale: 2 }).default('0'),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
@@ -917,6 +921,7 @@ export const insertSystemSettingSchema = createInsertSchema(systemSettings).pick
 
 export const insertInvoiceSchema = createInsertSchema(invoices).pick({
   invoiceNumber: true,
+  invoiceType: true,
   schoolId: true,
   examYearId: true,
   totalStudents: true,

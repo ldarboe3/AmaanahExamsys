@@ -90,6 +90,19 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Security**: Token-based workflows for invitations and password resets, bcrypt for password hashing, and role-based access control.
 
 ## Recent Changes (December 8, 2025)
+- **School Registration Fee Paywall**: New schools must pay mandatory registration fee before accessing system:
+  - **Invoice Types**: Two types - `registration` (one-time school fee) and `examination` (per-student exam fees)
+  - **Menu Restriction**: School admins see only Payments menu until registration fee is confirmed paid
+  - **Registration Invoice Creation**: Auto-generated when school completes email verification and account setup
+  - **Payment Confirmation**: Sets `school.registrationFeePaid = true` when registration invoice is paid
+  - **API Changes**:
+    - `/api/auth/user` includes computed `registrationFeePaid` flag for school admins
+    - `/api/school/invoice` prioritizes unpaid registration invoices, returns `isRegistrationFee` flag
+  - **Frontend Changes**:
+    - Sidebar restricts to Payments-only for unpaid schools
+    - Payments page shows prominent banner for registration fee invoices
+    - Simplified invoice layout for registration fees (no student breakdown)
+  - **Super Admin Settings**: Configure school registration fee amount in Settings > Fees tab
 - **Payment Instructions Management**: Super Admin can configure bank details for school payments:
   - New "Bank" tab in Settings page for super_admin users only
   - Configurable fields: Bank Name, Branch Name, Account Name, Account Number, SWIFT/BIC Code, Additional Instructions

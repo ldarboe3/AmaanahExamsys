@@ -63,6 +63,11 @@ const schoolAdminMenuDefs: MenuItemDef[] = [
   { key: "schoolProfile", url: "/school-profile", icon: School },
 ];
 
+// Restricted menu for schools that haven't paid their registration fee
+const schoolPendingPaymentMenuDefs: MenuItemDef[] = [
+  { key: "payments", url: "/payments", icon: CreditCard },
+];
+
 const managementDefs: MenuItemDef[] = [
   { key: "regionsAndClusters", url: "/regions", icon: Building2 },
   { key: "subjects", url: "/subjects", icon: BookOpen },
@@ -83,7 +88,20 @@ export function AppSidebar({ side = "left" }: AppSidebarProps) {
   const { t } = useLanguage();
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'examination_admin' || user?.role === 'logistics_admin';
-  const menuDefs = isAdmin ? adminMenuDefs : schoolAdminMenuDefs;
+  const isSchoolAdmin = user?.role === 'school_admin';
+  // Default to false for school admins unless explicitly true - ensures unpaid schools are restricted
+  const registrationFeePaid = (user as any)?.registrationFeePaid === true;
+  
+  // Determine which menu to show
+  let menuDefs: MenuItemDef[];
+  if (isAdmin) {
+    menuDefs = adminMenuDefs;
+  } else if (isSchoolAdmin && !registrationFeePaid) {
+    // School hasn't paid registration fee - only show Payments
+    menuDefs = schoolPendingPaymentMenuDefs;
+  } else {
+    menuDefs = schoolAdminMenuDefs;
+  }
 
   const getNavLabel = (key: string): string => {
     return (t.nav as Record<string, string>)[key] || key;

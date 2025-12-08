@@ -53,6 +53,7 @@ const organizationSchema = z.object({
 });
 
 const examSettingsSchema = z.object({
+  schoolRegistrationFee: z.coerce.number().min(0),
   registrationFee: z.coerce.number().min(0),
   lateFee: z.coerce.number().min(0),
   certificateFee: z.coerce.number().min(0),
@@ -93,6 +94,7 @@ interface SystemSettings {
   address?: string;
   website?: string;
   logoUrl?: string;
+  schoolRegistrationFee?: number;
   registrationFee?: number;
   lateFee?: number;
   certificateFee?: number;
@@ -167,6 +169,7 @@ export default function Settings() {
   const examSettingsForm = useForm<ExamSettingsFormData>({
     resolver: zodResolver(examSettingsSchema),
     defaultValues: {
+      schoolRegistrationFee: settings?.schoolRegistrationFee || 500,
       registrationFee: settings?.registrationFee || 150,
       lateFee: settings?.lateFee || 50,
       certificateFee: settings?.certificateFee || 100,
@@ -633,13 +636,33 @@ export default function Settings() {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={examSettingsForm.control}
+                      name="schoolRegistrationFee"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>School Registration Fee (One-time)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              data-testid="input-school-registration-fee"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Mandatory one-time fee for new schools to join the Amaanah system. Schools must pay this fee before accessing the full system.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
                         control={examSettingsForm.control}
                         name="registrationFee"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Registration Fee (per student)</FormLabel>
+                            <FormLabel>Student Exam Fee (per student)</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
