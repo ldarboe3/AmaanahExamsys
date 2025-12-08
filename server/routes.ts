@@ -1946,20 +1946,43 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "Username already taken. Please choose another." });
       }
       
+      // Check if a user already exists with this school's email (from previous setup attempt)
+      const existingUserByEmail = await db.select().from(users)
+        .where(eq(users.email, school.email));
+      
       // Hash the password
       const passwordHash = await bcrypt.hash(password, 10);
       
-      // Create the school admin user account
-      const [newUser] = await db.insert(users).values({
-        username,
-        passwordHash,
-        email: school.email,
-        firstName: school.registrarName.split(' ')[0] || school.registrarName,
-        lastName: school.registrarName.split(' ').slice(1).join(' ') || '',
-        role: 'school_admin',
-        status: 'active',
-        schoolId: school.id,
-      }).returning();
+      let newUser;
+      if (existingUserByEmail.length > 0 && existingUserByEmail[0].schoolId === school.id) {
+        // User already exists for this school, update the username and password
+        const [updatedUser] = await db.update(users)
+          .set({
+            username,
+            passwordHash,
+            status: 'active',
+            updatedAt: new Date()
+          })
+          .where(eq(users.id, existingUserByEmail[0].id))
+          .returning();
+        newUser = updatedUser;
+      } else if (existingUserByEmail.length > 0) {
+        // Email belongs to a different school/user
+        return res.status(400).json({ message: "This email is already registered with another account." });
+      } else {
+        // Create new user account
+        const [createdUser] = await db.insert(users).values({
+          username,
+          passwordHash,
+          email: school.email,
+          firstName: school.registrarName.split(' ')[0] || school.registrarName,
+          lastName: school.registrarName.split(' ').slice(1).join(' ') || '',
+          role: 'school_admin',
+          status: 'active',
+          schoolId: school.id,
+        }).returning();
+        newUser = createdUser;
+      }
       
       // Get school registration fee from settings
       const allSettings = await storage.getAllSettings();
