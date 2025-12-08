@@ -8753,17 +8753,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         
         // Build marks map from results
         const marksMap = new Map<string, number | null>();
+        
+        // Helper to normalize text for matching (removes punctuation, parentheses, extra spaces)
+        const normalizeForMatch = (text: string): string => {
+          return cleanArabicTextTranscript(text)
+            .replace(/[()[\]{}.,;:!?'"]/g, '') // Remove punctuation
+            .replace(/\s+/g, ' ')              // Normalize whitespace
+            .trim();
+        };
+        
+        // Helper to normalize English abbreviations (S.E.S → SES)
+        const normalizeEnglish = (text: string): string => {
+          return text.toLowerCase().replace(/[.\s]/g, '').trim();
+        };
+        
         for (const result of publishedResults) {
           const subject = allSubjects.find(s => s.id === result.subjectId);
           if (subject) {
             // Clean the subject names for robust matching
-            const cleanedDbName = cleanArabicTextTranscript(subject.name || '');
-            const cleanedDbArabicName = cleanArabicTextTranscript(subject.arabicName || '');
+            const cleanedDbName = normalizeForMatch(subject.name || '');
+            const cleanedDbArabicName = normalizeForMatch(subject.arabicName || '');
+            const dbEnglishNorm = normalizeEnglish(subject.name || '');
             
             // Try to match by multiple methods for robustness
             const g6Subject = GRADE_6_SUBJECTS.find(g6s => {
-              const cleanedG6Name = cleanArabicTextTranscript(g6s.arabicName);
-              const cleanedG6English = g6s.englishName.toLowerCase().trim();
+              const cleanedG6Name = normalizeForMatch(g6s.arabicName);
+              const g6EnglishNorm = normalizeEnglish(g6s.englishName);
+              const g6ArabicNorm = normalizeEnglish(g6s.arabicName); // For English subjects stored in arabicName
               
               // Match by code
               if (g6s.code.toLowerCase() === subject.code?.toLowerCase()) return true;
@@ -8771,8 +8787,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               // Match by cleaned Arabic name (exact)
               if (cleanedG6Name === cleanedDbName || cleanedG6Name === cleanedDbArabicName) return true;
               
-              // Match by English name
-              if (cleanedG6English === subject.name?.toLowerCase().trim()) return true;
+              // Match by normalized English (handles S.E.S vs S E S)
+              if (g6EnglishNorm === dbEnglishNorm) return true;
+              if (g6ArabicNorm === dbEnglishNorm) return true;
               
               // Match by partial Arabic name (core word matching)
               // Extract core Arabic word (remove prefixes like ال)
@@ -8782,6 +8799,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               
               // Check if core words match (at least 3 chars to avoid false positives)
               if (g6Core.length >= 3 && (dbCore.includes(g6Core) || dbArabicCore.includes(g6Core) || g6Core.includes(dbCore))) {
+                return true;
+              }
+              
+              // Match by extracting key Arabic words (for complex subjects like القراءة والمحفوظات)
+              const g6Words = cleanedG6Name.split(' ').filter(w => w.length >= 3);
+              const dbWords = cleanedDbName.split(' ').filter(w => w.length >= 3);
+              const dbArabicWords = cleanedDbArabicName.split(' ').filter(w => w.length >= 3);
+              
+              // Check if major keywords overlap
+              const g6KeyWords = g6Words.map(w => w.replace(/^ال/, ''));
+              const dbKeyWords = [...dbWords, ...dbArabicWords].map(w => w.replace(/^ال/, ''));
+              const matchingWords = g6KeyWords.filter(w => dbKeyWords.some(dw => dw.includes(w) || w.includes(dw)));
+              
+              if (matchingWords.length >= 1 && g6KeyWords.length > 0) {
                 return true;
               }
               
