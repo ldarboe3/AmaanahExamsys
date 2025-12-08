@@ -110,6 +110,17 @@ interface SchoolInvoiceWithExamYear extends Invoice {
   isCurrentYear: boolean;
 }
 
+interface PaymentInstructions {
+  configured: boolean;
+  bankName?: string;
+  accountName?: string;
+  accountNumber?: string;
+  swiftCode?: string;
+  branchName?: string;
+  additionalInstructions?: string;
+  message?: string;
+}
+
 const getGradeLabel = (grade: number, isRTL: boolean) => {
   const gradeLabels: Record<number, { en: string; ar: string }> = {
     3: { en: "Grade 3", ar: "الصف 3" },
@@ -184,6 +195,12 @@ export default function Payments() {
   // For school admins: fetch all invoices including past ones
   const { data: allSchoolInvoices, isLoading: isAllInvoicesLoading } = useQuery<SchoolInvoiceWithExamYear[]>({
     queryKey: ["/api/school/invoices/all"],
+    enabled: isSchoolAdmin,
+  });
+
+  // Fetch payment instructions (for schools to know where to pay)
+  const { data: paymentInstructions } = useQuery<PaymentInstructions>({
+    queryKey: ["/api/public/payment-instructions"],
     enabled: isSchoolAdmin,
   });
 
@@ -532,7 +549,7 @@ export default function Payments() {
                 )}
 
                 {/* Payment Instructions */}
-                {invoice.status === 'pending' && (
+                {invoice.status === 'pending' && paymentInstructions?.configured && (
                   <div className="bg-chart-5/10 border border-chart-5/30 rounded-lg p-4">
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="w-5 h-5 text-chart-5 mt-0.5" />
@@ -544,11 +561,39 @@ export default function Payments() {
                             : "Please pay the amount to the bank account below and upload your bank slip"}
                         </p>
                         <div className="mt-3 space-y-1 text-sm">
-                          <p><span className="text-muted-foreground">{isRTL ? "البنك:" : "Bank:"}</span> Guaranty Trust Bank (Gambia) Ltd</p>
-                          <p><span className="text-muted-foreground">{isRTL ? "اسم الحساب:" : "Account Name:"}</span> Amaanah Islamic Education Trust</p>
-                          <p><span className="text-muted-foreground">{isRTL ? "رقم الحساب:" : "Account Number:"}</span> 211-123456789-01</p>
+                          <p><span className="text-muted-foreground">{isRTL ? "البنك:" : "Bank:"}</span> {paymentInstructions.bankName}</p>
+                          {paymentInstructions.branchName && (
+                            <p><span className="text-muted-foreground">{isRTL ? "الفرع:" : "Branch:"}</span> {paymentInstructions.branchName}</p>
+                          )}
+                          <p><span className="text-muted-foreground">{isRTL ? "اسم الحساب:" : "Account Name:"}</span> {paymentInstructions.accountName}</p>
+                          <p><span className="text-muted-foreground">{isRTL ? "رقم الحساب:" : "Account Number:"}</span> {paymentInstructions.accountNumber}</p>
+                          {paymentInstructions.swiftCode && (
+                            <p><span className="text-muted-foreground">{isRTL ? "رمز سويفت:" : "SWIFT/BIC:"}</span> {paymentInstructions.swiftCode}</p>
+                          )}
                           <p><span className="text-muted-foreground">{isRTL ? "المبلغ:" : "Amount:"}</span> <span className="font-semibold">{formatCurrency(invoice.totalAmount)}</span></p>
+                          {paymentInstructions.additionalInstructions && (
+                            <p className="mt-2 p-2 bg-background rounded border text-muted-foreground italic">
+                              {paymentInstructions.additionalInstructions}
+                            </p>
+                          )}
                         </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Fallback if payment instructions not configured */}
+                {invoice.status === 'pending' && !paymentInstructions?.configured && (
+                  <div className="bg-chart-5/10 border border-chart-5/30 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-chart-5 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-chart-5">{isRTL ? "في انتظار الدفع" : "Payment Required"}</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {isRTL 
+                            ? "يرجى التواصل مع الإدارة للحصول على تفاصيل الدفع"
+                            : "Please contact the administration for payment details"}
+                        </p>
                       </div>
                     </div>
                   </div>
