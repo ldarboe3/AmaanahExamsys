@@ -35,6 +35,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { apiRequest } from "@/lib/queryClient";
+import amaanahLogo from "@assets/amaanah-logo-BXDbf4ee_1764613882774.png";
 import {
   Table,
   TableBody,
@@ -233,7 +234,18 @@ export default function ResultChecker() {
           <title>Verified Result - ${resultData.student.indexNumber}</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f9fafb; }
-            .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+            .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+            .org-header { padding: 30px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #059669; }
+            .header-text-en { flex: 1; text-align: left; }
+            .header-logo { flex: 0; text-align: center; margin: 0 20px; }
+            .header-logo img { height: 100px; width: auto; }
+            .header-text-ar { flex: 1; text-align: right; direction: rtl; }
+            .header-text-en p, .header-text-ar p { margin: 4px 0; line-height: 1.4; }
+            .header-text-en .title { font-weight: bold; font-size: 13px; }
+            .header-text-ar .title { font-weight: bold; font-size: 13px; }
+            .header-text-en .subtitle { font-size: 12px; color: #6b7280; }
+            .header-text-ar .subtitle { font-size: 12px; color: #6b7280; }
+            .main-content { padding: 40px; }
             .header { text-align: center; border-bottom: 3px solid #059669; padding-bottom: 20px; margin-bottom: 30px; }
             .header-title { font-size: 24px; font-weight: bold; color: #059669; margin: 0; }
             .header-subtitle { font-size: 14px; color: #6b7280; margin: 5px 0 0 0; }
@@ -254,11 +266,29 @@ export default function ResultChecker() {
             .barcode-image { max-width: 200px; height: auto; }
             .footer { text-align: center; font-size: 11px; color: #9ca3af; margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 15px; }
             .timestamp { font-size: 11px; color: #9ca3af; text-align: center; margin-top: 10px; }
-            @media print { body { background: white; } .container { box-shadow: none; } }
+            @media print { body { background: white; } .container { box-shadow: none; border-radius: 0; } .org-header { padding: 25px 40px; } .main-content { padding: 35px 40px; } }
           </style>
         </head>
         <body>
           <div class="container">
+            <div class="org-header">
+              <div class="header-text-en">
+                <p class="title">The General Secretariat for</p>
+                <p class="title">Islamic/Arabic Education in</p>
+                <p class="title">The Gambia</p>
+                <p class="subtitle">Examination affairs unit</p>
+              </div>
+              <div class="header-logo">
+                <img src="${amaanahLogo}" alt="Amaanah Logo">
+              </div>
+              <div class="header-text-ar">
+                <p class="title">الأمانة العامة للتعليم الإسلامي</p>
+                <p class="title">والعربي</p>
+                <p class="title">في غامبيا</p>
+                <p class="subtitle">قسم الامتحانات</p>
+              </div>
+            </div>
+            <div class="main-content">
             <div class="header">
               <div class="verification-badge">✓ VERIFIED RESULT</div>
               <h1 class="header-title">Examination Result</h1>
@@ -334,6 +364,7 @@ export default function ResultChecker() {
             </div>
             
             <div class="timestamp">Generated on: ${new Date().toLocaleString()}</div>
+            </div>
           </div>
         </body>
         </html>
