@@ -203,14 +203,13 @@ export default function SchoolResults() {
                 {isRTL ? "السنة الامتحانية" : "Examination Year"}
               </label>
               <Select
-                value={selectedExamYearId ? String(selectedExamYearId) : ""}
-                onValueChange={(value) => setSelectedExamYearId(value ? parseInt(value) : null)}
+                value={selectedExamYearId ? String(selectedExamYearId) : "placeholder"}
+                onValueChange={(value) => setSelectedExamYearId(value === "placeholder" ? null : parseInt(value))}
               >
                 <SelectTrigger data-testid="select-exam-year-filter">
                   <SelectValue placeholder={isRTL ? "اختر السنة" : "Select Year"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{isRTL ? "جميع السنوات" : "All Years"}</SelectItem>
                   {examYears.map((year) => (
                     <SelectItem key={year.id} value={String(year.id)}>
                       {year.name}
