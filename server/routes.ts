@@ -35,6 +35,7 @@ import {
   generateIndexNumber,
   generateInvoiceNumber,
 } from "./emailService";
+import { normalizeSurname } from "./surnameService";
 import {
   notifyExamYearCreated,
   notifyRegistrationDeadlineApproaching,
@@ -8992,11 +8993,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/transcript/${qrToken}`;
         
         try {
+          const normalizedSurnameResult = await normalizeSurname(student.lastName);
+          const normalizedLastName = normalizedSurnameResult.normalizedSurname;
+          
           const pdfPath = await generateTranscriptPDF({
             student: {
               id: student.id,
               firstName: student.firstName,
-              lastName: student.lastName,
+              lastName: normalizedLastName,
               middleName: student.middleName,
               gender: student.gender as 'male' | 'female',
               dateOfBirth: student.dateOfBirth,
@@ -9101,11 +9105,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/transcript/${qrToken}`;
         
         try {
+          const normalizedSurnameResult = await normalizeSurname(student.lastName);
+          const normalizedLastName = normalizedSurnameResult.normalizedSurname;
+          
           const pdfPath = await generateTranscriptPDF({
             student: {
               id: student.id,
               firstName: student.firstName,
-              lastName: student.lastName,
+              lastName: normalizedLastName,
               middleName: student.middleName,
               gender: student.gender as 'male' | 'female',
               dateOfBirth: student.dateOfBirth,
@@ -9370,8 +9377,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           
           const pdfPath = await generateTranscriptPDF(transcriptData);
           
-          // Get transliterated names for storage
-          const studentNameAr = `${student.firstName} ${student.middleName || ''} ${student.lastName}`.trim();
+          // Get transliterated names for storage with normalized surname
+          const normalizedSurnameForG6 = await normalizeSurname(student.lastName);
+          const studentNameAr = `${student.firstName} ${student.middleName || ''} ${normalizedSurnameForG6.normalizedSurname}`.trim();
           const studentNameEn = transliterateArabicToEnglish(studentNameAr);
           const schoolNameAr = school.name;
           const schoolNameEn = transliterateArabicToEnglish(school.name);
@@ -11020,16 +11028,18 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
 
       // Prepare transcript data for PDF generation
       const { generateTranscriptPDF } = await import('./certificateService');
+      const normalizedPublicSurname = await normalizeSurname(student.lastName);
+      const normalizedLastNamePublic = normalizedPublicSurname.normalizedSurname;
       
       const pdfPath = await generateTranscriptPDF({
         student: {
           id: student.id,
           firstName: student.firstName || '',
           middleName: student.middleName || '',
-          lastName: student.lastName || '',
+          lastName: normalizedLastNamePublic,
           arabicName: student.arabicName || '',
           fullNameAr: student.arabicName || '',
-          fullNameEn: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+          fullNameEn: [student.firstName, student.middleName, normalizedLastNamePublic].filter(Boolean).join(' '),
           indexNumber: student.indexNumber || '',
           grade: student.grade,
           gender: student.gender || 'male',
@@ -11062,7 +11072,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         grade: student.grade,
         transcriptNumber,
         studentNameAr: student.arabicName || '',
-        studentNameEn: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+        studentNameEn: [student.firstName, student.middleName, normalizedLastNamePublic].filter(Boolean).join(' '),
         schoolNameAr: school.arabicName || school.name,
         schoolNameEn: school.name,
         subjects: JSON.stringify(subjects),
