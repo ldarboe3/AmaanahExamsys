@@ -10049,6 +10049,38 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Public payment instructions - returns bank account details for schools
+  app.get("/api/public/payment-instructions", async (req, res) => {
+    try {
+      const allSettings = await storage.getAllSettings();
+      const paymentKeys = ['bankName', 'accountName', 'accountNumber', 'swiftCode', 'branchName', 'additionalInstructions'];
+      
+      const paymentInstructions: Record<string, string> = {};
+      for (const setting of allSettings) {
+        if (paymentKeys.includes(setting.key)) {
+          paymentInstructions[setting.key] = setting.value || '';
+        }
+      }
+      
+      // Only return if at least bank name and account number are set
+      if (!paymentInstructions.bankName || !paymentInstructions.accountNumber) {
+        return res.json({ configured: false, message: "Payment instructions not yet configured" });
+      }
+      
+      res.json({
+        configured: true,
+        bankName: paymentInstructions.bankName,
+        accountName: paymentInstructions.accountName,
+        accountNumber: paymentInstructions.accountNumber,
+        swiftCode: paymentInstructions.swiftCode,
+        branchName: paymentInstructions.branchName,
+        additionalInstructions: paymentInstructions.additionalInstructions,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Public results search with exam year and grade filters
   app.get("/api/public/results/search", async (req, res) => {
     try {

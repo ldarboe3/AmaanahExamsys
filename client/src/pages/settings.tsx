@@ -1,5 +1,5 @@
 import { useLanguage } from "@/lib/i18n/LanguageContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,6 +36,7 @@ import {
   Save,
   Globe,
   AlertTriangle,
+  Landmark,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -70,9 +71,19 @@ const notificationSchema = z.object({
   systemAnnouncements: z.boolean().default(true),
 });
 
+const paymentInstructionsSchema = z.object({
+  bankName: z.string().min(2, "Bank name is required"),
+  accountName: z.string().min(2, "Account name is required"),
+  accountNumber: z.string().min(5, "Account number is required"),
+  swiftCode: z.string().optional(),
+  branchName: z.string().optional(),
+  additionalInstructions: z.string().optional(),
+});
+
 type OrganizationFormData = z.infer<typeof organizationSchema>;
 type ExamSettingsFormData = z.infer<typeof examSettingsSchema>;
 type NotificationFormData = z.infer<typeof notificationSchema>;
+type PaymentInstructionsFormData = z.infer<typeof paymentInstructionsSchema>;
 
 interface SystemSettings {
   organizationName?: string;
@@ -95,6 +106,12 @@ interface SystemSettings {
   paymentReminders?: boolean;
   resultNotifications?: boolean;
   systemAnnouncements?: boolean;
+  bankName?: string;
+  accountName?: string;
+  accountNumber?: string;
+  swiftCode?: string;
+  branchName?: string;
+  additionalInstructions?: string;
 }
 
 function SettingsSkeleton() {
@@ -172,6 +189,32 @@ export default function Settings() {
     },
   });
 
+  const paymentInstructionsForm = useForm<PaymentInstructionsFormData>({
+    resolver: zodResolver(paymentInstructionsSchema),
+    defaultValues: {
+      bankName: "",
+      accountName: "",
+      accountNumber: "",
+      swiftCode: "",
+      branchName: "",
+      additionalInstructions: "",
+    },
+  });
+
+  // Reset payment instructions form when settings data loads
+  useEffect(() => {
+    if (settings) {
+      paymentInstructionsForm.reset({
+        bankName: settings.bankName || "",
+        accountName: settings.accountName || "",
+        accountNumber: settings.accountNumber || "",
+        swiftCode: settings.swiftCode || "",
+        branchName: settings.branchName || "",
+        additionalInstructions: settings.additionalInstructions || "",
+      });
+    }
+  }, [settings, paymentInstructionsForm]);
+
   const updateSettingsMutation = useMutation({
     mutationFn: async (data: Partial<SystemSettings>) => {
       return apiRequest("POST", "/api/settings", data);
@@ -204,7 +247,38 @@ export default function Settings() {
     updateSettingsMutation.mutate(data);
   };
 
+  const savePaymentInstructionsMutation = useMutation({
+    mutationFn: async (data: PaymentInstructionsFormData) => {
+      const promises = Object.entries(data).map(([key, value]) => {
+        return apiRequest("POST", "/api/settings", { key, value: value || "", category: "payment" });
+      });
+      await Promise.all(promises);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/public/payment-instructions"] });
+      paymentInstructionsForm.reset(data);
+      toast({
+        title: "Payment Instructions Saved",
+        description: "Bank account details have been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save payment instructions",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSavePaymentInstructions = (data: PaymentInstructionsFormData) => {
+    savePaymentInstructionsMutation.mutate(data);
+  };
+
   const isAdmin = user?.role === "super_admin" || user?.role === "examination_admin";
+  const isSuperAdmin = user?.role === "super_admin";
 
   if (!isAdmin) {
     return (
@@ -234,7 +308,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-5 max-w-3xl">
           <TabsTrigger value="organization" className="flex items-center gap-2">
             <Building2 className="w-4 h-4" />
             <span className="hidden sm:inline">Organization</span>
@@ -247,6 +321,12 @@ export default function Settings() {
             <CreditCard className="w-4 h-4" />
             <span className="hidden sm:inline">Fees</span>
           </TabsTrigger>
+          {isSuperAdmin && (
+            <TabsTrigger value="payment-instructions" className="flex items-center gap-2">
+              <Landmark className="w-4 h-4" />
+              <span className="hidden sm:inline">Bank</span>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="w-4 h-4" />
             <span className="hidden sm:inline">Notifications</span>
@@ -641,6 +721,163 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isSuperAdmin && (
+          <TabsContent value="payment-instructions" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Instructions</CardTitle>
+                <CardDescription>
+                  Configure official bank account details for schools to make payments. These details will be displayed to all schools.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <SettingsSkeleton />
+                ) : (
+                  <Form {...paymentInstructionsForm}>
+                    <form
+                      onSubmit={paymentInstructionsForm.handleSubmit(onSavePaymentInstructions)}
+                      className="space-y-6"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={paymentInstructionsForm.control}
+                          name="bankName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Bank Name</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="e.g., Trust Bank Gambia"
+                                  {...field}
+                                  data-testid="input-bank-name"
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                The name of the bank where the Amaanah account is held
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={paymentInstructionsForm.control}
+                          name="branchName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Branch Name (Optional)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="e.g., Banjul Main Branch"
+                                  {...field}
+                                  data-testid="input-branch-name"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={paymentInstructionsForm.control}
+                          name="accountName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Name</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="e.g., Amaanah Examination Board"
+                                  {...field}
+                                  data-testid="input-account-name"
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                The name registered on the bank account
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={paymentInstructionsForm.control}
+                          name="accountNumber"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Number</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="e.g., 1234567890"
+                                  {...field}
+                                  data-testid="input-account-number"
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                The bank account number for payments
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <FormField
+                        control={paymentInstructionsForm.control}
+                        name="swiftCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>SWIFT/BIC Code (Optional)</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., TBGLGMGM"
+                                {...field}
+                                data-testid="input-swift-code"
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              For international transfers
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={paymentInstructionsForm.control}
+                        name="additionalInstructions"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Additional Instructions (Optional)</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="e.g., Please include school name and invoice number as payment reference."
+                                {...field}
+                                data-testid="input-additional-instructions"
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Any additional payment instructions for schools
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="flex justify-end">
+                        <Button
+                          type="submit"
+                          disabled={savePaymentInstructionsMutation.isPending}
+                          data-testid="button-save-payment-instructions"
+                        >
+                          <Save className="w-4 h-4 mr-2" />
+                          {savePaymentInstructionsMutation.isPending ? "Saving..." : "Save Payment Instructions"}
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="notifications" className="mt-6">
           <Card>
