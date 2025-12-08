@@ -8317,6 +8317,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         if (!student.gender) missingFields.push('gender');
         if (!student.dateOfBirth) missingFields.push('dateOfBirth');
         if (!student.placeOfBirth) missingFields.push('placeOfBirth');
+        if (!student.indexNumber) missingFields.push('indexNumber');
         
         // Calculate grade - return Arabic descriptive result
         let finalGrade = null;
