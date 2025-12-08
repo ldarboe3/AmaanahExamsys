@@ -440,12 +440,12 @@ export default function Subjects() {
                                     {subject.isActive ? (
                                       <>
                                         <XCircle className="w-4 h-4 me-2" />
-                                        {t.common.deactivate}
+                                        {"Deactivate"}
                                       </>
                                     ) : (
                                       <>
                                         <CheckCircle className="w-4 h-4 me-2" />
-                                        {t.common.activate}
+                                        {"Activate"}
                                       </>
                                     )}
                                   </DropdownMenuItem>

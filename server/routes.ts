@@ -6714,16 +6714,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         gradeLevel = 3; // Default to grade 3
       }
       
-      // Get subjects for the grade level
-      const subjects = await storage.getSubjectsByGrade(gradeLevel);
+      // Get ALL subjects for the grade level (active and inactive)
+      const allSubjects = await storage.getAllSubjects();
+      const subjects = allSubjects.filter(s => s.grade === gradeLevel);
       
-      // Build template headers
-      const headers = ['School name', 'address', 'Student name'];
-      subjects.forEach(s => headers.push(s.name));
+      // Sort subjects by code for consistent ordering
+      subjects.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+      
+      // Build template headers - include index number for better student matching
+      const headers = ['School name', 'Index Number', 'Student name'];
+      
+      // Add all subject columns (using name which may be Arabic or English)
+      subjects.forEach(s => {
+        // Use the primary name of the subject
+        headers.push(s.name);
+      });
       
       // Create CSV with BOM for UTF-8
       const BOM = '\uFEFF';
       const csvContent = BOM + headers.join(',') + '\n';
+      
+      console.log(`[Template] Generated Grade ${gradeLevel} template with ${subjects.length} subjects: ${subjects.map(s => s.name).join(', ')}`);
       
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="results_template_grade_${gradeLevel}.csv"`);
