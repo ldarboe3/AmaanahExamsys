@@ -7458,8 +7458,118 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!examYearId) {
         return res.status(400).json({ message: "examYearId is required" });
       }
+
+      // Get exam year details
+      const examYear = await storage.getExamYear(examYearId);
+      if (!examYear) {
+        return res.status(404).json({ message: "Exam year not found" });
+      }
+
+      // Publish results
       const count = await storage.publishResults(examYearId, grade);
-      res.json({ message: "Results published", published: count });
+
+      // Send notifications to schools with registered students
+      if (count > 0) {
+        try {
+          // Get all students with published results for this exam year/grade
+          const allStudents = await storage.getStudentsByExamYear(examYearId);
+          const filteredStudents = grade 
+            ? allStudents.filter(s => s.grade === grade)
+            : allStudents;
+
+          // Get unique school IDs
+          const schoolIds = [...new Set(filteredStudents.map(s => s.schoolId).filter(Boolean))];
+
+          if (schoolIds.length > 0) {
+            // Get schools and their admin users
+            const notificationsToCreate: any[] = [];
+            const emailsToSend: any[] = [];
+
+            for (const schoolId of schoolIds) {
+              const school = await storage.getSchool(schoolId);
+              if (!school || !school.adminUserId) continue;
+
+              const adminUser = await storage.getUser(school.adminUserId);
+              if (!adminUser) continue;
+
+              // Create in-dashboard notification
+              const notificationData = {
+                type: 'results_published',
+                title: 'Examination Results Published',
+                message: `Results for ${examYear.name} (Grade ${grade || 'all'}) have been published. You can now view and download student transcripts.`,
+                data: {
+                  examYearId,
+                  grade: grade || null,
+                  schoolId,
+                  actionUrl: '/school/results'
+                },
+                userId: school.adminUserId,
+                isRead: false
+              };
+
+              notificationsToCreate.push(notificationData);
+
+              // Prepare email
+              emailsToSend.push({
+                to: adminUser.email,
+                schoolName: school.name,
+                examYearName: examYear.name,
+                grade: grade || 'All Grades',
+                adminName: adminUser.firstName || 'School Administrator'
+              });
+            }
+
+            // Bulk create notifications
+            if (notificationsToCreate.length > 0) {
+              await storage.createNotificationsBulk(notificationsToCreate);
+            }
+
+            // Send emails
+            if (emailsToSend.length > 0) {
+              for (const emailData of emailsToSend) {
+                try {
+                  const sgMail = require('@sendgrid/mail');
+                  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+                  const emailContent = `
+                    <h2>Examination Results Published</h2>
+                    <p>Dear ${emailData.adminName},</p>
+                    <p>The examination results for <strong>${emailData.examYearName}</strong> (Grade ${emailData.grade}) have been published.</p>
+                    <p>You can now:</p>
+                    <ul>
+                      <li>View all student results on your school dashboard</li>
+                      <li>Download student transcripts</li>
+                      <li>Generate and print official PDF reports with Amaanah branding</li>
+                    </ul>
+                    <p>Please log in to your school administrator account to access these results.</p>
+                    <p><a href="${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/school/results" style="background-color: #0d9488; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">View Results</a></p>
+                    <p>Best regards,<br>Amaanah Examination Board</p>
+                  `;
+
+                  await sgMail.send({
+                    to: emailData.to,
+                    from: 'noreply@amaanah.examination.org',
+                    subject: `Results Published: ${emailData.examYearName}`,
+                    html: emailContent
+                  });
+                } catch (emailError: any) {
+                  console.error(`Failed to send email to ${emailData.to}:`, emailError.message);
+                  // Continue with other emails even if one fails
+                }
+              }
+            }
+          }
+        } catch (notificationError: any) {
+          console.error("Error sending result publication notifications:", notificationError.message);
+          // Don't fail the entire publish if notifications fail
+        }
+      }
+
+      res.json({ 
+        message: "Results published", 
+        published: count,
+        notificationsCount: Math.min(count, schoolIds?.length || 0) 
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
