@@ -38,10 +38,11 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Financial Management**: Three-tier fee structure, auto-invoice generation (including a mandatory registration fee for new schools), bank slip upload, payment confirmation, and professional PDF invoice downloads.
 - **Results & Certificates**:
   - **Three-Tier Results Navigation**: Interactive boards for examination years and grades, leading to editable marks tables with filtering.
-  - **Editable Marks Entry**: Interactive tables with real-time auto-calculation of total marks and percentages.
+  - **Editable Marks Entry**: Interactive tables with real-time auto-calculation of total marks and percentages (Admin only).
   - **Comprehensive Results CSV Upload**: Template download, Arabic text cleaning, authoritative school/student matching, and mark validation with detailed error reporting.
   - **Unified Certificate/Transcript Workflow**: Eligibility-based student selection, filtering, bulk generation, preview, and print functionalities. Includes gender-specific templates and QR verification.
   - **Online Result Checker**: Public checker for candidates to search results and generate/download transcripts.
+  - **School Results Dashboard**: Read-only results view with no edit/upload capabilities. Shows student results in table format with examination ranking. Schools can download PDF reports with official Amaanah logo and address.
 - **Administrative Tools**: Comprehensive audit logging, advanced CSV export functionalities, and role-based access control.
 - **Exam Management**: Examiner, subject, timetable, and exam center management.
 - **Website Management**: Public-facing website content management system.

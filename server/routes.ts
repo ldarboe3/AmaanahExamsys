@@ -12073,6 +12073,312 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Generate PDF for school results with logo and address
+  app.get("/api/school/results/pdf", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'school_admin') {
+        return res.status(403).json({ message: "Only school admins can access this" });
+      }
+
+      const schoolId = await getSchoolIdForUser(user);
+      if (!schoolId) {
+        return res.status(404).json({ message: "No school associated with this account" });
+      }
+
+      // Get school info
+      const school = await storage.getSchool(schoolId);
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      
+      // Get school's students
+      const students = await storage.getStudentsBySchool(schoolId);
+      if (!students || students.length === 0) {
+        return res.status(400).json({ message: "No students found" });
+      }
+
+      // Get published results for this school's students
+      let publishedResults: any[] = [];
+      for (const student of students) {
+        const studentResults = await storage.getResultsByStudent(student.id);
+        const published = studentResults.filter(r => r.status === 'published');
+        if (published.length > 0) {
+          publishedResults = publishedResults.concat(published);
+        }
+      }
+
+      // If examYearId specified, filter to that year
+      if (examYearId) {
+        publishedResults = publishedResults.filter(r => r.examYearId === examYearId);
+      }
+
+      if (publishedResults.length === 0) {
+        return res.status(400).json({ message: "No published results available" });
+      }
+
+      // Get subjects and exam year info
+      const subjects = await storage.getAllSubjects();
+      const activeExamYear = examYearId 
+        ? await storage.getExamYear(examYearId) 
+        : await storage.getActiveExamYear();
+
+      // Calculate rankings per exam year and grade
+      const resultsByGradeAndYear = new Map<string, any[]>();
+      for (const result of publishedResults) {
+        const student = students.find(s => s.id === result.studentId);
+        const key = `${result.examYearId}-${student?.grade || ''}`;
+        if (!resultsByGradeAndYear.has(key)) {
+          resultsByGradeAndYear.set(key, []);
+        }
+        resultsByGradeAndYear.get(key)!.push(result);
+      }
+
+      // Sort by totalScore descending for each group to get rankings
+      const rankedResults = new Map<number, number>();
+      for (const [_, groupResults] of resultsByGradeAndYear) {
+        const sorted = [...groupResults].sort((a, b) => {
+          const scoreA = parseFloat(a.totalScore || '0');
+          const scoreB = parseFloat(b.totalScore || '0');
+          return scoreB - scoreA;
+        });
+        sorted.forEach((result, index) => {
+          rankedResults.set(result.id, index + 1);
+        });
+      }
+
+      // Prepare data for PDF
+      const resultsWithRanking = publishedResults.map(r => ({
+        ...r,
+        ranking: rankedResults.get(r.id) || null,
+        subject: subjects.find(s => s.id === r.subjectId),
+        student: students.find(s => s.id === r.studentId)
+      })).sort((a, b) => {
+        const scoreA = parseFloat(a.totalScore || '0');
+        const scoreB = parseFloat(b.totalScore || '0');
+        return scoreB - scoreA;
+      });
+
+      // Generate HTML content with logo and address header
+      const currentDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html dir="rtl" lang="ar">
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body {
+              font-family: 'Amiri', 'Arial', sans-serif;
+              margin: 0;
+              padding: 20px;
+              background: white;
+              color: #333;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #0d9488;
+              padding-bottom: 20px;
+              margin-bottom: 20px;
+            }
+            .logo-section {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              gap: 20px;
+              margin-bottom: 15px;
+            }
+            .logo {
+              width: 80px;
+              height: 80px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 48px;
+              font-weight: bold;
+              color: #0d9488;
+              border: 2px solid #0d9488;
+              border-radius: 8px;
+            }
+            .org-info {
+              text-align: center;
+            }
+            .org-name {
+              font-size: 24px;
+              font-weight: bold;
+              color: #0d9488;
+              margin: 0;
+            }
+            .org-address {
+              font-size: 12px;
+              color: #666;
+              margin: 5px 0 0 0;
+              line-height: 1.6;
+            }
+            .doc-title {
+              font-size: 20px;
+              font-weight: bold;
+              text-align: center;
+              margin: 20px 0;
+              color: #0d9488;
+            }
+            .school-info {
+              background: #f0f9f7;
+              padding: 12px;
+              border-radius: 6px;
+              margin-bottom: 20px;
+              font-size: 13px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+              font-size: 12px;
+            }
+            th {
+              background: #0d9488;
+              color: white;
+              padding: 10px;
+              text-align: center;
+              border: 1px solid #0d9488;
+              font-weight: bold;
+            }
+            td {
+              padding: 8px;
+              border: 1px solid #ddd;
+              text-align: center;
+            }
+            tr:nth-child(odd) {
+              background: #f9fafb;
+            }
+            tr:nth-child(even) {
+              background: white;
+            }
+            .student-name {
+              text-align: right;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #ddd;
+              font-size: 11px;
+              color: #666;
+            }
+            .print-date {
+              text-align: center;
+              font-size: 11px;
+              color: #666;
+              margin-top: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo-section">
+              <div class="logo">أ</div>
+              <div class="org-info">
+                <p class="org-name">أمانة الامتحانات</p>
+                <p class="org-name">AMAANAH</p>
+                <p class="org-address">
+                  جمهورية مولدوفا<br>
+                  Republic of Moldova<br>
+                  ✉️ info@amaanah.education<br>
+                  📱 +1-800-AMAANAH
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="doc-title">
+            تقرير النتائج - Results Report
+          </div>
+
+          <div class="school-info">
+            <strong>${school.name}</strong><br>
+            منطقة: ${school.regionId ? `Region ${school.regionId}` : 'N/A'}<br>
+            السنة الدراسية: ${activeExamYear?.name || 'N/A'}<br>
+            تم الطباعة: ${currentDate}
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>اسم الطالب<br>Student Name</th>
+                <th>رقم الفهرس<br>Index</th>
+                <th>الصف<br>Grade</th>
+                <th>المادة<br>Subject</th>
+                <th>المجموع<br>Total</th>
+                <th>النسبة %<br>%</th>
+                <th>الترتيب<br>Rank</th>
+                <th>الحالة<br>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${resultsWithRanking.map((result, idx) => {
+                const totalScore = parseFloat(result.totalScore || '0');
+                const percentage = (totalScore / 100) * 100;
+                return `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td class="student-name">${result.student?.firstName} ${result.student?.lastName}</td>
+                    <td>${result.student?.indexNumber || '-'}</td>
+                    <td>${result.student?.grade || '-'}</td>
+                    <td>${result.subject?.name || 'N/A'}</td>
+                    <td>${totalScore.toFixed(1)}</td>
+                    <td>${percentage.toFixed(1)}</td>
+                    <td>${result.ranking || '-'}</td>
+                    <td>Published</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <p>هذا المستند الرسمي يحتوي على سجل الامتحانات الرسمي</p>
+            <p>This is an official document containing the official examination record</p>
+            <div class="print-date">
+              <small>تم الإنشاء: ${new Date().toISOString()}</small>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Generate PDF using Puppeteer
+      const browser = await puppeteer.launch({ 
+        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+        headless: 'new',
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+      const page = await browser.newPage();
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        margin: { top: 10, right: 10, bottom: 10, left: 10 }
+      });
+      
+      await browser.close();
+
+      // Send PDF to client
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="school-results-${school.name.replace(/\\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("School results PDF error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get school's assigned center info (for school admin/student view)
   app.get("/api/schools/:id/center-info", async (req, res) => {
     try {
