@@ -62,6 +62,7 @@ interface EligibleStudent {
   resultsCount: number;
   totalScore: number;
   percentage: string;
+  finalGrade: string;
   hasTranscript?: boolean;
 }
 
@@ -565,7 +566,7 @@ export default function Transcripts() {
                       <TableHead>{isRTL ? "الطالب" : "Student"}</TableHead>
                       <TableHead>{isRTL ? "رقم الفهرس" : "Index"}</TableHead>
                       <TableHead>{isRTL ? "المدرسة" : "School"}</TableHead>
-                      <TableHead>{isRTL ? "النسبة" : "Percentage"}</TableHead>
+                      <TableHead>{isRTL ? "النتيجة النهائية" : "Final Result"}</TableHead>
                       <TableHead>{isRTL ? "الحالة" : "Status"}</TableHead>
                       <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
                     </TableRow>
@@ -606,8 +607,8 @@ export default function Transcripts() {
                             <span className="text-sm">{student.schoolName}</span>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">
-                              {parseFloat(student.percentage).toFixed(1)}%
+                            <Badge variant={student.finalGrade === 'راسب' ? 'destructive' : 'default'}>
+                              {student.finalGrade}
                             </Badge>
                           </TableCell>
                           <TableCell>
