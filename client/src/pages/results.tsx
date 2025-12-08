@@ -733,40 +733,20 @@ export default function Results() {
                           
                           {(subjects || []).map((subj: Subject) => {
                             const numericMark = editedMarks[studentKey]?.[subj.id] ?? row.marks[subj.id];
-                            const letterGrade = row.grades?.[subj.id];
-                            const hasNumericMark = numericMark !== null && numericMark !== undefined;
                             
                             return (
                               <td key={subj.id} className="px-2 py-2 text-center">
-                                {hasNumericMark ? (
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={numericMark}
-                                    onChange={(e) => handleMarkChange(row.student.id, subj.id, e.target.value)}
-                                    onBlur={() => handleSaveMark(row.student.id, subj.id)}
-                                    className="w-14 h-8 text-center text-xs"
-                                    placeholder="-"
-                                    data-testid={`input-mark-${row.student.id}-${subj.id}`}
-                                  />
-                                ) : letterGrade ? (
-                                  <Badge variant="outline" className="font-semibold text-xs">
-                                    {letterGrade}
-                                  </Badge>
-                                ) : (
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value=""
-                                    onChange={(e) => handleMarkChange(row.student.id, subj.id, e.target.value)}
-                                    onBlur={() => handleSaveMark(row.student.id, subj.id)}
-                                    className="w-14 h-8 text-center text-xs"
-                                    placeholder="-"
-                                    data-testid={`input-mark-${row.student.id}-${subj.id}`}
-                                  />
-                                )}
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={numericMark ?? ''}
+                                  onChange={(e) => handleMarkChange(row.student.id, subj.id, e.target.value)}
+                                  onBlur={() => handleSaveMark(row.student.id, subj.id)}
+                                  className="w-14 h-8 text-center text-xs"
+                                  placeholder="-"
+                                  data-testid={`input-mark-${row.student.id}-${subj.id}`}
+                                />
                               </td>
                             );
                           })}

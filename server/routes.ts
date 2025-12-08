@@ -6557,7 +6557,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const existing = await storage.getResultByStudentAndSubject(row.studentId!, mark.subjectId, previewData.examYearId);
           
           await storage.upsertStudentResult(row.studentId!, mark.subjectId, previewData.examYearId, {
-            score: mark.score.toFixed(2),
+            totalScore: mark.score.toFixed(2),
             grade: calculateGrade(mark.score),
             status: 'pending',
             remarks: null,
