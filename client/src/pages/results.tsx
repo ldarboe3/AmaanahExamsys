@@ -113,11 +113,12 @@ export default function Results() {
   const { data: regions } = useQuery<Region[]>({ queryKey: ["/api/regions"] });
   const { data: clusters } = useQuery<Cluster[]>({ queryKey: ["/api/clusters"] });
   const { data: schoolsResponse } = useQuery<{ data: School[], total: number }>({ queryKey: ["/api/schools"] });
-  const { data: subjects, isLoading: subjectsLoading } = useQuery<Subject[]>({
-    queryKey: selectedGrade ? ["/api/subjects", selectedGrade] : null,
+  const { data: subjectsData = [], isLoading: subjectsLoading } = useQuery<Subject[]>({
+    queryKey: ["/api/subjects", selectedGrade ?? 0],
     queryFn: () => fetch(`/api/subjects?grade=${selectedGrade}`).then(r => r.json()),
     enabled: !!selectedGrade,
   });
+  const subjects: Subject[] = subjectsData || [];
 
   const schools = schoolsResponse?.data || [];
 
