@@ -36,6 +36,7 @@ import {
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import amaanahLogo from "@assets/Amana_Logo_1765235154789.png";
 
 const verifySchema = z.object({
   indexNumber: z.string().min(6, "Index number must be at least 6 characters"),
@@ -75,6 +76,8 @@ interface VerificationResult {
 export default function Verify() {
   const { toast } = useToast();
   const [result, setResult] = useState<VerificationResult | null>(null);
+  const [selectedExamYear, setSelectedExamYear] = useState<string>("");
+  const [selectedGrade, setSelectedGrade] = useState<string>("");
 
   const form = useForm<VerifyFormData>({
     resolver: zodResolver(verifySchema),
@@ -114,12 +117,15 @@ export default function Verify() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
           <Link href="/">
-            <div className="flex items-center gap-3 cursor-pointer">
-              <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-primary-foreground" />
-              </div>
+            <div className="flex items-center gap-4 cursor-pointer">
+              <img 
+                src={amaanahLogo} 
+                alt="Amaanah Logo" 
+                className="h-16 w-auto" 
+                data-testid="img-amaanah-logo"
+              />
               <div>
                 <h1 className="text-xl font-semibold text-foreground">Amaanah</h1>
                 <p className="text-xs text-muted-foreground">Result Verification</p>
@@ -136,116 +142,151 @@ export default function Verify() {
       </header>
 
       <main className="container mx-auto px-4 py-12">
-        <div className="max-w-xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           {!result ? (
             <>
-              {/* Verification Form */}
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <Shield className="w-8 h-8 text-primary" />
-                </div>
-                <h2 className="text-2xl font-semibold mb-2">Verify Examination Result</h2>
-                <p className="text-muted-foreground">
-                  Enter the student's index number and exam details to verify their results
-                </p>
-              </div>
+              {/* Interactive Board Section */}
+              {!selectedExamYear || !selectedGrade ? (
+                <>
+                  <div className="text-center mb-12">
+                    <h2 className="text-3xl font-bold mb-2">Verify Your Results</h2>
+                    <p className="text-muted-foreground">
+                      Select your exam year and grade to get started
+                    </p>
+                  </div>
 
-              <Card>
-                <CardContent className="p-6">
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="indexNumber"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Index Number</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Enter 6-digit index number"
-                                {...field}
-                                data-testid="input-index-number"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                  {/* Exam Year Board */}
+                  <div className="mb-12">
+                    <h3 className="text-lg font-semibold mb-4">Select Exam Year</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {["2024", "2023", "2022", "2021"].map((year) => (
+                        <Button
+                          key={year}
+                          variant={selectedExamYear === year ? "default" : "outline"}
+                          className="h-24 flex flex-col items-center justify-center rounded-lg"
+                          onClick={() => setSelectedExamYear(year)}
+                          data-testid={`button-year-${year}`}
+                        >
+                          <Calendar className="w-6 h-6 mb-2" />
+                          <span className="text-lg font-semibold">{year}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="examYear"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Exam Year</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-exam-year">
-                                    <SelectValue placeholder="Select year" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="2024">2024</SelectItem>
-                                  <SelectItem value="2023">2023</SelectItem>
-                                  <SelectItem value="2022">2022</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="grade"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Grade</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-grade">
-                                    <SelectValue placeholder="Select grade" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="3">Grade 3</SelectItem>
-                                  <SelectItem value="6">Grade 6</SelectItem>
-                                  <SelectItem value="9">Grade 9</SelectItem>
-                                  <SelectItem value="12">Grade 12</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                  {/* Grade Board */}
+                  {selectedExamYear && (
+                    <div className="mb-12">
+                      <h3 className="text-lg font-semibold mb-4">Select Grade</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {["3", "6", "9", "12"].map((grade) => (
+                          <Button
+                            key={grade}
+                            variant={selectedGrade === grade ? "default" : "outline"}
+                            className="h-24 flex flex-col items-center justify-center rounded-lg"
+                            onClick={() => setSelectedGrade(grade)}
+                            data-testid={`button-grade-${grade}`}
+                          >
+                            <GraduationCap className="w-6 h-6 mb-2" />
+                            <span className="text-lg font-semibold">Grade {grade}</span>
+                          </Button>
+                        ))}
                       </div>
+                    </div>
+                  )}
 
+                  {selectedExamYear && selectedGrade && (
+                    <div className="text-center">
                       <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={verifyMutation.isPending}
-                        data-testid="button-verify"
+                        size="lg"
+                        onClick={() => {
+                          form.setValue("examYear", selectedExamYear);
+                          form.setValue("grade", selectedGrade);
+                        }}
+                        data-testid="button-continue"
                       >
-                        {verifyMutation.isPending ? (
-                          "Verifying..."
-                        ) : (
-                          <>
-                            <Search className="w-4 h-4 mr-2" />
-                            Verify Result
-                          </>
-                        )}
+                        Continue
+                        <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
                       </Button>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Verification Form */}
+                  <div className="text-center mb-8">
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                      <Shield className="w-8 h-8 text-primary" />
+                    </div>
+                    <h2 className="text-2xl font-semibold mb-2">Enter Your Details</h2>
+                    <p className="text-muted-foreground">
+                      Enter your index number to retrieve your results
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedExamYear("");
+                        setSelectedGrade("");
+                        form.reset();
+                      }}
+                      className="mt-2"
+                      data-testid="button-back-board"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Back to Selection
+                    </Button>
+                  </div>
 
-              <p className="text-center text-sm text-muted-foreground mt-6">
-                This service is for verifying authentic Amaanah examination results.
-                <br />
-                For any issues, please contact the Amaanah office.
-              </p>
+                  <Card>
+                    <CardContent className="p-6">
+                      <Form {...form}>
+                        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="indexNumber"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Index Number</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="Enter 6-digit index number"
+                                    {...field}
+                                    data-testid="input-index-number"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={verifyMutation.isPending}
+                            data-testid="button-verify"
+                          >
+                            {verifyMutation.isPending ? (
+                              "Verifying..."
+                            ) : (
+                              <>
+                                <Search className="w-4 h-4 mr-2" />
+                                Verify Result
+                              </>
+                            )}
+                          </Button>
+                        </form>
+                      </Form>
+                    </CardContent>
+                  </Card>
+
+                  <p className="text-center text-sm text-muted-foreground mt-6">
+                    This service is for verifying authentic Amaanah examination results.
+                    <br />
+                    For any issues, please contact the Amaanah office.
+                  </p>
+                </>
+              )}
             </>
           ) : (
             <>
