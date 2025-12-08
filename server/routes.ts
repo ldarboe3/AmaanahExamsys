@@ -1017,8 +1017,31 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Schools API
-  app.get("/api/schools", async (req, res) => {
+  app.get("/api/schools", isAuthenticated, async (req, res) => {
     try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // School admins can only see their own school
+      if (user.role === 'school_admin') {
+        const schoolId = await getSchoolIdForUser(user);
+        if (!schoolId) {
+          return res.status(404).json({ message: "No school associated with this account" });
+        }
+        const school = await storage.getSchool(schoolId);
+        if (!school) {
+          return res.status(404).json({ message: "School not found" });
+        }
+        return res.json({ data: [school], total: 1, limit: 1, offset: 0 });
+      }
+
+      // Only admins (super_admin, examination_admin) can see all schools
+      if (!['super_admin', 'examination_admin', 'logistics_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
       let schools = await storage.getAllSchools();
       
       // Apply filters
@@ -1053,9 +1076,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.get("/api/schools/:id", async (req, res) => {
+  app.get("/api/schools/:id", isAuthenticated, async (req, res) => {
     try {
-      const school = await storage.getSchool(parseInt(req.params.id));
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const schoolId = parseInt(req.params.id);
+      
+      // School admins can only access their own school
+      if (user.role === 'school_admin') {
+        const userSchoolId = await getSchoolIdForUser(user);
+        if (userSchoolId !== schoolId) {
+          return res.status(403).json({ message: "Access denied. You can only access your own school." });
+        }
+      } else if (!['super_admin', 'examination_admin', 'logistics_admin'].includes(user.role || '')) {
+        // Other roles cannot access this endpoint
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const school = await storage.getSchool(schoolId);
       if (!school) {
         return res.status(404).json({ message: "School not found" });
       }
