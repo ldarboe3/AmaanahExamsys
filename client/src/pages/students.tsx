@@ -323,10 +323,10 @@ export default function Students() {
     },
     onSuccess: async (data: any) => {
       toast({
-        title: isRTL ? "تم الرفع بنجاح" : "Upload Successful",
+        title: isRTL ? "تم تسجيل الطلاب بنجاح" : "Students Registered Successfully",
         description: isRTL 
-          ? `تم إضافة ${data.created} طالب`
-          : `Added ${data.created} students`,
+          ? `تم استقبال طلبك! تم إضافة ${data.created} طالب. يرجى الانتقال إلى صفحة المدفوعات لإتمام عملية الدفع حتى يتمكن أماناه من مراجعة وإقرار التسجيل.`
+          : `Your submission has been received! Added ${data.created} students. Please proceed to Payments to complete payment so Amaanah can review and approve the registration.`,
       });
       setShowUploadDialog(false);
       setUploadFile(null);
@@ -2716,62 +2716,118 @@ export default function Students() {
         <DialogContent dir={isRTL ? "rtl" : "ltr"} className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary" />
-              {isRTL ? "ملخص الفاتورة" : "Invoice Summary"}
+              <CheckCircle className="w-5 h-5 text-chart-3" />
+              {isRTL ? "تم استقبال طلبك" : "Submission Received"}
             </DialogTitle>
             <DialogDescription>
               {isRTL 
-                ? "تم حساب الفاتورة تلقائياً بناءً على عدد الطلاب المسجلين"
-                : "Invoice has been automatically calculated based on registered students"}
+                ? "تم تسجيل الطلاب بنجاح. الرجاء إكمال المدفوعات للمتابعة"
+                : "Students have been registered successfully. Please complete payment to proceed"}
             </DialogDescription>
           </DialogHeader>
           
           {generatedInvoice?.invoice && (
             <div className="space-y-4">
-              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{isRTL ? "رقم الفاتورة" : "Invoice Number"}</span>
-                  <span className="font-mono">{generatedInvoice.invoice.invoiceNumber}</span>
+              {/* Workflow Steps */}
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <div className="w-6 h-6 rounded-full bg-chart-3/20 text-chart-3 flex items-center justify-center font-semibold text-sm flex-shrink-0">✓</div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{isRTL ? "الخطوة 1: تحميل الطلاب ✓" : "Step 1: Student Upload ✓"}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isRTL ? "تم قبول طلبك وتم تسجيل جميع الطلاب" : "Your submission has been received and all students have been registered"}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{isRTL ? "إجمالي الطلاب" : "Total Students"}</span>
-                  <span className="font-semibold">{generatedInvoice.invoice.totalStudents}</span>
+                
+                <div className="flex gap-3">
+                  <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold text-sm flex-shrink-0">2</div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{isRTL ? "الخطوة 2: دفع الفاتورة" : "Step 2: Payment Submission"}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isRTL ? "يرجى دفع الفاتورة أدناه والتوجه إلى صفحة المدفوعات لتحميل إيصال الدفع" : "Please pay the invoice below and upload the payment receipt on the Payments page"}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{isRTL ? "الرسوم لكل طالب" : "Fee per Student"}</span>
-                  <span>GMD {parseFloat(generatedInvoice.invoice.feePerStudent || 0).toFixed(2)}</span>
+                
+                <div className="flex gap-3">
+                  <div className="w-6 h-6 rounded-full bg-chart-2/20 text-chart-2 flex items-center justify-center font-semibold text-sm flex-shrink-0">3</div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{isRTL ? "الخطوة 3: قيد المراجعة" : "Step 3: Under Review"}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isRTL ? "ستقوم أماناه بمراجعة الدفع. ستتلقى إشعارات عبر البريد الإلكتروني والنظام عند اتخاذ أي إجراء" : "Amaanah will review your payment. You'll receive email and in-system notifications when action is taken"}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex gap-3">
+                  <div className="w-6 h-6 rounded-full bg-chart-3/20 text-chart-3 flex items-center justify-center font-semibold text-sm flex-shrink-0">4</div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{isRTL ? "الخطوة 4: الموافقة النهائية" : "Step 4: Final Approval"}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isRTL ? "عند الموافقة، سيتم قبول تسجيل الطلاب رسمياً للامتحان. لاحظ أن جميع الطلاب يجب أن يتم تقديمهم في دفعة واحدة فقط" : "Upon approval, your student registration will be officially accepted. Note: All candidates must be submitted in a single batch only"}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {generatedInvoice.items?.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm">{isRTL ? "تفاصيل حسب الصف" : "Breakdown by Grade"}</h4>
-                  <div className="bg-muted/30 rounded-lg divide-y">
-                    {generatedInvoice.items.map((item: any) => (
-                      <div key={item.grade} className="flex items-center justify-between p-3 text-sm">
-                        <span>{getGradeLabel(item.grade, isRTL)}</span>
-                        <span className="text-muted-foreground">
-                          {item.studentCount} × GMD {parseFloat(item.feePerStudent).toFixed(2)} = 
-                          <span className="font-medium text-foreground ms-1">GMD {parseFloat(item.subtotal).toFixed(2)}</span>
-                        </span>
-                      </div>
-                    ))}
+              {/* Invoice Details */}
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-sm mb-3">{isRTL ? "تفاصيل الفاتورة" : "Invoice Details"}</h4>
+                <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{isRTL ? "رقم الفاتورة" : "Invoice Number"}</span>
+                    <span className="font-mono">{generatedInvoice.invoice.invoiceNumber}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{isRTL ? "إجمالي الطلاب" : "Total Students"}</span>
+                    <span className="font-semibold">{generatedInvoice.invoice.totalStudents}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{isRTL ? "الرسوم لكل طالب" : "Fee per Student"}</span>
+                    <span>GMD {parseFloat(generatedInvoice.invoice.feePerStudent || 0).toFixed(2)}</span>
                   </div>
                 </div>
-              )}
 
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-lg">{isRTL ? "المبلغ الإجمالي" : "Total Amount"}</span>
-                  <span className="font-bold text-2xl text-primary">
-                    GMD {parseFloat(generatedInvoice.invoice.totalAmount || 0).toFixed(2)}
-                  </span>
+                {generatedInvoice.items?.length > 0 && (
+                  <div className="space-y-2 mt-3">
+                    <h5 className="font-medium text-sm">{isRTL ? "تفاصيل حسب الصف" : "Breakdown by Grade"}</h5>
+                    <div className="bg-muted/30 rounded-lg divide-y">
+                      {generatedInvoice.items.map((item: any) => (
+                        <div key={item.grade} className="flex items-center justify-between p-3 text-sm">
+                          <span>{getGradeLabel(item.grade, isRTL)}</span>
+                          <span className="text-muted-foreground">
+                            {item.studentCount} × GMD {parseFloat(item.feePerStudent).toFixed(2)} = 
+                            <span className="font-medium text-foreground ms-1">GMD {parseFloat(item.subtotal).toFixed(2)}</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mt-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-lg">{isRTL ? "المبلغ الإجمالي" : "Total Amount"}</span>
+                    <span className="font-bold text-xl text-primary">
+                      GMD {parseFloat(generatedInvoice.invoice.totalAmount || 0).toFixed(2)}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {isRTL 
-                    ? "يرجى الانتقال إلى صفحة المدفوعات لإتمام عملية الدفع"
-                    : "Please proceed to the Payments page to complete your payment"}
-                </p>
+              </div>
+
+              {/* Important Notice */}
+              <div className="border-t pt-4">
+                <div className="bg-chart-2/10 border border-chart-2/30 rounded-lg p-3">
+                  <p className="text-xs font-medium text-chart-2 mb-1">
+                    {isRTL ? "⚠️ ملاحظة مهمة" : "⚠️ Important Notice"}
+                  </p>
+                  <p className="text-xs text-foreground">
+                    {isRTL 
+                      ? "جميع الطلاب المسجلين يجب أن يتم تقديمهم في دفعة واحدة فقط. لن يتم قبول أي طلاب إضافيين بعد هذا التسجيل الأولي."
+                      : "All registered students must be submitted in a single batch only. No additional students will be accepted after this initial submission."}
+                  </p>
+                </div>
               </div>
             </div>
           )}
