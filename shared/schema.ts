@@ -625,6 +625,32 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Registration Workflow Stages
+export const registrationWorkflowStageEnum = pgEnum('registration_workflow_stage', [
+  'pending_upload',     // Stage 1: Before uploading students (show deadline + instructions)
+  'awaiting_payment',   // Stage 2: After upload, waiting for payment submission
+  'payment_review',     // Stage 3: Payment receipt uploaded, under review
+  'completed'           // Stage 4: Payment confirmed, registration complete
+]);
+
+// School Exam Registrations - Track workflow progress per school per exam year
+export const schoolExamRegistrations = pgTable("school_exam_registrations", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  schoolId: integer("school_id").notNull().references(() => schools.id),
+  examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
+  stage: registrationWorkflowStageEnum("stage").default('pending_upload'),
+  studentUploadedAt: timestamp("student_uploaded_at"),
+  paymentReceiptUploadedAt: timestamp("payment_receipt_uploaded_at"),
+  paymentApprovedAt: timestamp("payment_approved_at"),
+  invoiceId: integer("invoice_id").references(() => invoices.id),
+  uploadConfirmationEmailSent: boolean("upload_confirmation_email_sent").default(false),
+  paymentApprovalEmailSent: boolean("payment_approval_email_sent").default(false),
+  indexAllocationEmailSent: boolean("index_allocation_email_sent").default(false),
+  completionNotificationSent: boolean("completion_notification_sent").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one }) => ({
   school: one(schools, {
@@ -1064,6 +1090,20 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).pick({
   ipAddress: true,
 });
 
+export const insertSchoolExamRegistrationSchema = createInsertSchema(schoolExamRegistrations).pick({
+  schoolId: true,
+  examYearId: true,
+  stage: true,
+  studentUploadedAt: true,
+  paymentReceiptUploadedAt: true,
+  paymentApprovedAt: true,
+  invoiceId: true,
+  uploadConfirmationEmailSent: true,
+  paymentApprovalEmailSent: true,
+  indexAllocationEmailSent: true,
+  completionNotificationSent: true,
+});
+
 export const insertNotificationSchema = createInsertSchema(notifications).pick({
   userId: true,
   title: true,
@@ -1368,6 +1408,8 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+export type InsertSchoolExamRegistration = z.infer<typeof insertSchoolExamRegistrationSchema>;
+export type SchoolExamRegistration = typeof schoolExamRegistrations.$inferSelect;
 export type InsertInvigilatorAssignment = z.infer<typeof insertInvigilatorAssignmentSchema>;
 export type InvigilatorAssignment = typeof invigilatorAssignments.$inferSelect;
 export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
