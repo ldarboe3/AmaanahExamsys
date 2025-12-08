@@ -7870,18 +7870,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         if (!student.dateOfBirth) missingFields.push('dateOfBirth');
         if (!student.placeOfBirth) missingFields.push('placeOfBirth');
         
-        // Calculate grade
+        // Calculate grade - return Arabic descriptive result
         let finalGrade = null;
         let passed = false;
         if (publishedResults.length > 0) {
           const totalScore = publishedResults.reduce((sum, r) => sum + parseFloat(r.totalScore || '0'), 0);
           const average = totalScore / publishedResults.length;
-          if (average >= 80) finalGrade = 'A';
-          else if (average >= 70) finalGrade = 'B';
-          else if (average >= 60) finalGrade = 'C';
-          else if (average >= 50) finalGrade = 'D';
-          else finalGrade = 'FAIL';
-          passed = finalGrade !== 'FAIL';
+          if (average >= 80) finalGrade = 'ممتاز';
+          else if (average >= 70) finalGrade = 'جيد جدا';
+          else if (average >= 60) finalGrade = 'جيد';
+          else if (average >= 50) finalGrade = 'مقبول';
+          else finalGrade = 'راسب';
+          passed = finalGrade !== 'راسب';
         }
         
         // Check if already has certificate (using pre-fetched data)
