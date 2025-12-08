@@ -191,9 +191,38 @@ export default function ResultChecker() {
     }
   };
 
-  const handlePrintTranscript = () => {
-    if (resultData?.student?.indexNumber) {
-      window.open(`/api/public/transcripts/${resultData.student.indexNumber}/download?print=true`, '_blank');
+  const handlePrintTranscript = async () => {
+    try {
+      if (!resultData?.student?.indexNumber) return;
+      
+      const response = await fetch(`/api/public/transcripts/${resultData.student.indexNumber}/download`);
+      if (!response.ok) throw new Error('Failed to fetch transcript');
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Create iframe for printing
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.onload = () => {
+        setTimeout(() => {
+          iframe.contentWindow?.print();
+        }, 250);
+      };
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+      
+      // Cleanup after print
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        URL.revokeObjectURL(blobUrl);
+      }, 1000);
+    } catch (error: any) {
+      toast({
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   };
 
