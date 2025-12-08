@@ -85,6 +85,37 @@ function TranscriptsTableSkeleton() {
   );
 }
 
+function GeneratingOverlay({ isRTL, count }: { isRTL: boolean; count: number }) {
+  return (
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-card p-8 rounded-lg shadow-lg border max-w-md w-full mx-4 text-center">
+        <div className="mb-6">
+          <div className="relative w-20 h-20 mx-auto">
+            <Loader2 className="w-20 h-20 text-primary animate-spin" />
+            <FileText className="w-8 h-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+          </div>
+        </div>
+        <h3 className="text-xl font-semibold mb-2">
+          {isRTL ? "جاري إنشاء كشوف الدرجات..." : "Generating Transcripts..."}
+        </h3>
+        <p className="text-muted-foreground mb-4">
+          {isRTL 
+            ? `يرجى الانتظار، جاري إنشاء ${count} كشف درجات`
+            : `Please wait, generating ${count} transcript(s)`}
+        </p>
+        <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+          <div className="bg-primary h-full animate-pulse" style={{ width: '60%' }} />
+        </div>
+        <p className="text-xs text-muted-foreground mt-4">
+          {isRTL 
+            ? "قد يستغرق هذا بضع ثوانٍ لكل كشف درجات"
+            : "This may take a few seconds per transcript"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function Transcripts() {
   const { toast } = useToast();
   const { t, isRTL } = useLanguage();
@@ -313,6 +344,9 @@ export default function Transcripts() {
 
   return (
     <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
+      {generateTranscriptMutation.isPending && (
+        <GeneratingOverlay isRTL={isRTL} count={selectedStudents.length} />
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold text-foreground flex items-center gap-2">
