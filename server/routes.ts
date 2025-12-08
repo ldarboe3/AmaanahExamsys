@@ -1175,15 +1175,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const verificationToken = generateVerificationToken();
       const verificationExpiry = getVerificationExpiry();
       
+      // Extract language from request, default to 'english'
+      const preferredLanguage = req.body.preferredLanguage || 'english';
+      
       const school = await storage.createSchool({
         ...parsed.data,
         verificationToken,
         verificationExpiry,
         status: 'pending',
         isEmailVerified: false,
+        preferredLanguage,
       });
       
-      // Send verification email
+      // Send verification email in the school's preferred language
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       try {
         await sendSchoolVerificationEmail(
@@ -1191,7 +1195,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           school.name,
           school.registrarName,
           verificationToken,
-          baseUrl
+          baseUrl,
+          preferredLanguage
         );
       } catch (emailError) {
         console.error('Failed to send verification email:', emailError);
