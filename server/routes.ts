@@ -9483,22 +9483,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const student = await storage.getStudent(transcript.studentId);
       const examYear = await storage.getExamYear(transcript.examYearId);
+      const school = student?.schoolId ? await storage.getSchool(student.schoolId) : null;
+      
+      // Provide sensible defaults for missing transcript fields
+      const studentFullName = student ? `${student.firstName} ${student.middleName || ''} ${student.lastName}`.trim() : 'Unknown';
+      const schoolName = school?.name || 'Unknown School';
       
       res.json({
         valid: true,
         transcript: {
-          transcriptNumber: transcript.transcriptNumber,
-          studentNameAr: transcript.studentNameAr || (student ? `${student.firstName} ${student.lastName}` : 'Unknown'),
-          studentNameEn: transcript.studentNameEn,
-          schoolNameAr: transcript.schoolNameAr,
-          schoolNameEn: transcript.schoolNameEn,
-          grade: transcript.grade,
-          examYear: examYear?.year,
-          totalScore: transcript.totalScore,
-          percentage: transcript.percentage,
-          finalGrade: transcript.finalGrade,
-          issuedDate: transcript.issuedDate,
-          status: transcript.status,
+          transcriptNumber: transcript.transcriptNumber || '',
+          studentNameAr: transcript.studentNameAr || studentFullName,
+          studentNameEn: transcript.studentNameEn || studentFullName,
+          schoolNameAr: transcript.schoolNameAr || schoolName,
+          schoolNameEn: transcript.schoolNameEn || schoolName,
+          grade: transcript.grade || 0,
+          examYear: examYear?.year || new Date().getFullYear(),
+          totalScore: transcript.totalScore?.toString() || '0',
+          percentage: transcript.percentage?.toString() || '0',
+          finalGrade: transcript.finalGrade || 'Unknown',
+          issuedDate: transcript.issuedDate?.toISOString() || new Date().toISOString(),
+          status: transcript.status || 'issued',
         }
       });
     } catch (error: any) {
