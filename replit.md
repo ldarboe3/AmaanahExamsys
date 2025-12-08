@@ -89,7 +89,16 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Scalability**: Designed to manage countrywide examinations with a multi-tenant architecture for schools.
 - **Security**: Token-based workflows for invitations and password resets, bcrypt for password hashing, and role-based access control.
 
-## Recent Changes (December 6, 2025 - Final)
+## Recent Changes (December 8, 2025)
+- **Payment Instructions Management**: Super Admin can configure bank details for school payments:
+  - New "Bank" tab in Settings page for super_admin users only
+  - Configurable fields: Bank Name, Branch Name, Account Name, Account Number, SWIFT/BIC Code, Additional Instructions
+  - Settings stored in systemSettings table with "payment" category
+  - Public API endpoint `/api/public/payment-instructions` returns configured bank details
+  - School payments page dynamically displays payment instructions from settings
+  - Shows fallback message if payment instructions not configured
+
+## Previous Changes (December 6, 2025)
 - **Online Result Checker Enhancement**: Comprehensive public result checker for candidates:
   - Three-field search form: Examination Year dropdown, Grade/Level dropdown, Index Number
   - Displays student information, subject-by-subject results with grades and pass/fail status
