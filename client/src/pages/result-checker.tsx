@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import amaanahLogo from "@assets/amaanah-logo-BXDbf4ee_1764990120736.png";
 import {
   Select,
   SelectContent,
@@ -274,6 +275,14 @@ export default function ResultChecker() {
       <section className="bg-gradient-to-br from-primary/10 via-background to-primary/5 py-16 md:py-24">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
+            <div className="mb-8">
+              <img 
+                src={amaanahLogo} 
+                alt="Amaanah Logo" 
+                className="h-24 mx-auto"
+                data-testid="img-amaanah-logo"
+              />
+            </div>
             <Badge className="mb-4">
               <FileCheck className="w-3 h-3 mr-1" />
               {t.resultChecker.examinationResults}
