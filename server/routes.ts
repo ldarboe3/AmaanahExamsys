@@ -12627,8 +12627,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       // Calculate rankings per exam year and grade
       const resultsByGradeAndYear = new Map<string, any[]>();
       for (const result of publishedResults) {
-        const key = `${result.examYearId}-${students.find(s => 
-          (storage.getResultsByStudent(s.id) as any).some((r: any) => r.id === result.id))?.grade || ''}`;
+        const student = students.find(s => s.id === result.studentId);
+        const key = `${result.examYearId}-${student?.grade || ''}`;
         if (!resultsByGradeAndYear.has(key)) {
           resultsByGradeAndYear.set(key, []);
         }
