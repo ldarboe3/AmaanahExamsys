@@ -158,7 +158,60 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!user) {
       return res.status(401).json({ message: "User not found" });
     }
-    res.json(user);
+    
+    // If user is a school_admin, include the school's registration fee payment status
+    // Initialize to false for school admins - only flip to true if explicitly paid
+    let registrationFeePaid = user.role !== 'school_admin'; // false for school_admin, true for others
+    
+    if (user.role === 'school_admin') {
+      let school = null;
+      
+      // First try direct lookup if user has schoolId
+      if (user.schoolId) {
+        school = await storage.getSchool(user.schoolId);
+      }
+      
+      // If not found, try reverse lookup by admin user ID
+      if (!school) {
+        const schoolByAdmin = await storage.getSchoolByAdminUserId(user.id);
+        if (schoolByAdmin) {
+          school = schoolByAdmin;
+          // Update user's schoolId for future lookups - await to ensure consistency
+          await db.update(users)
+            .set({ schoolId: schoolByAdmin.id, updatedAt: new Date() })
+            .where(eq(users.id, user.id));
+        }
+      }
+      
+      // Only set to true if school exists AND registrationFeePaid is explicitly true
+      if (school && school.registrationFeePaid === true) {
+        registrationFeePaid = true;
+      }
+      // Otherwise registrationFeePaid stays false (initialized above)
+    }
+    
+    // Build response manually to prevent stored registrationFeePaid from overriding computed value
+    const userResponse = {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      profileImageUrl: user.profileImageUrl,
+      role: user.role,
+      status: user.status,
+      schoolId: user.schoolId,
+      centerId: user.centerId,
+      studentId: user.studentId,
+      examinerId: user.examinerId,
+      mustChangePassword: user.mustChangePassword,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      registrationFeePaid, // Use computed value, not stored
+    };
+    res.json(userResponse);
   });
 
   app.get("/api/auth/login", async (req, res) => {
@@ -1860,7 +1913,30 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         schoolId: school.id,
       }).returning();
       
-      // Mark school as verified, approved, and link to admin user
+      // Get school registration fee from settings
+      const allSettings = await storage.getAllSettings();
+      const schoolRegistrationFee = parseFloat(
+        allSettings.find(s => s.key === 'schoolRegistrationFee')?.value || '500'
+      );
+      
+      // Generate invoice number for registration fee
+      const invoiceCount = await db.select({ count: sql<number>`count(*)` }).from(invoices);
+      const invoiceNumber = `REG-${new Date().getFullYear()}-${String((invoiceCount[0]?.count || 0) + 1).padStart(6, '0')}`;
+      
+      // Create registration fee invoice
+      const [registrationInvoice] = await db.insert(invoices).values({
+        invoiceNumber,
+        invoiceType: 'registration',
+        schoolId: school.id,
+        examYearId: null,
+        totalStudents: 0,
+        feePerStudent: '0',
+        totalAmount: schoolRegistrationFee.toString(),
+        status: 'pending',
+        notes: 'School Registration Fee - One-time mandatory fee for joining the Amaanah Examination System',
+      }).returning();
+      
+      // Mark school as verified, approved, and link to admin user with registration invoice
       const [updatedSchool] = await db.update(schools)
         .set({ 
           isEmailVerified: true, 
@@ -1868,6 +1944,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           verificationExpiry: null,
           status: 'approved',
           adminUserId: newUser.id,
+          registrationFeePaid: false,
+          registrationInvoiceId: registrationInvoice.id,
           updatedAt: new Date()
         })
         .where(eq(schools.id, school.id))
@@ -1883,7 +1961,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           details: { 
             schoolName: school.name,
             username,
-            status: 'approved'
+            status: 'approved',
+            registrationInvoiceId: registrationInvoice.id,
+            registrationFee: schoolRegistrationFee
           },
         });
       } catch (auditError) {
@@ -1891,9 +1971,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       res.json({ 
-        message: "School verification and account setup complete", 
+        message: "School verification and account setup complete. Please pay the registration fee to access all features.", 
         school: updatedSchool,
-        username 
+        username,
+        registrationInvoice
       });
     } catch (error: any) {
       console.error('Verification error:', error);
@@ -4729,20 +4810,45 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(403).json({ message: "No school associated with this account" });
       }
       
+      // Get the school to check registration fee status
+      const school = await storage.getSchool(schoolId);
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      
+      const invoices = await storage.getInvoicesBySchool(schoolId);
+      
+      // Priority 1: If registration fee is not paid, show the registration invoice first
+      // Use strict equality to prevent truthy values from bypassing the check
+      if (school.registrationFeePaid !== true) {
+        const registrationInvoice = invoices.find(inv => inv.invoiceType === 'registration' && inv.status !== 'paid');
+        if (registrationInvoice) {
+          return res.json({ 
+            invoice: registrationInvoice, 
+            items: [], 
+            examYear: null,
+            isRegistrationFee: true,
+            message: "Please pay the registration fee to unlock all features"
+          });
+        }
+        // If no registration invoice exists but fee isn't paid, still indicate this is a registration requirement
+        // This handles legacy schools that might not have a registration invoice yet
+      }
+      
+      // Priority 2: Show examination invoice for active exam year
       const activeExamYear = await storage.getActiveExamYear();
       if (!activeExamYear) {
         return res.json({ invoice: null, message: "No active exam year" });
       }
       
-      const invoices = await storage.getInvoicesBySchool(schoolId);
-      const invoice = invoices.find(inv => inv.examYearId === activeExamYear.id);
+      const invoice = invoices.find(inv => inv.examYearId === activeExamYear.id && (inv as any).invoiceType !== 'registration');
       
       if (!invoice) {
         return res.json({ invoice: null, message: "No invoice found for current exam year" });
       }
       
       const items = await storage.getInvoiceItems(invoice.id);
-      res.json({ invoice, items, examYear: activeExamYear });
+      res.json({ invoice, items, examYear: activeExamYear, isRegistrationFee: false });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -5075,6 +5181,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         })
         .where(eq(invoices.id, invoiceId))
         .returning();
+      
+      // If this is a registration invoice, mark the school's registration fee as paid
+      if ((invoice as any).invoiceType === 'registration') {
+        await db.update(schools)
+          .set({ 
+            registrationFeePaid: true,
+            updatedAt: new Date()
+          })
+          .where(eq(schools.id, invoice.schoolId));
+      }
       
       // Send payment confirmation email to school
       const school = await storage.getSchool(invoice.schoolId);
