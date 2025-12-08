@@ -1215,15 +1215,23 @@ export class DatabaseStorage implements IStorage {
       conditions.push(inArray(studentResults.studentId, studentIdsInGrade.map(s => s.id)));
     }
     
-    const resultsBefore = await db.select({ id: studentResults.id })
-      .from(studentResults)
-      .where(and(...conditions));
-    
-    await db.update(studentResults)
-      .set({ status: 'published' as any, updatedAt: new Date() })
-      .where(and(...conditions));
-    
-    return resultsBefore.length;
+    try {
+      // Update all matching results to 'published' status
+      const updateResult = await db.update(studentResults)
+        .set({ status: 'published' as any, updatedAt: new Date() })
+        .where(and(...conditions));
+      
+      // Count how many were actually published by checking the results now
+      const publishedResults = await db.select({ id: studentResults.id })
+        .from(studentResults)
+        .where(and(eq(studentResults.examYearId, examYearId), eq(studentResults.status, 'published' as any)))
+        .limit(grade ? 10000 : 100000);
+      
+      return publishedResults.length;
+    } catch (error: any) {
+      console.error('Error publishing results:', error);
+      throw error;
+    }
   }
 
   async deleteStudentResult(id: number): Promise<boolean> {
