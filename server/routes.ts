@@ -6853,7 +6853,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const { firstName, lastName } = parseStudentName(row.rawStudentName);
           
           // Create student with minimal required data
-          const newStudent = await storage.createStudent({
+          let newStudent = await storage.createStudent({
             firstName,
             lastName,
             schoolId: row.schoolId!,
@@ -6863,12 +6863,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             gender: 'male', // Default, will be updated if needed
           });
           
+          // Auto-generate index number for approved students
+          if (newStudent.status === 'approved' && !newStudent.indexNumber) {
+            const indexNum = generateIndexNumber();
+            await storage.updateStudent(newStudent.id, { indexNumber: indexNum });
+            newStudent.indexNumber = indexNum;
+          }
+          
           // Update row with new student ID for result processing
           row.studentId = newStudent.id;
           row.isMatched = true; // Ensure row is processed for results
           studentsCreated++;
           
-          console.log(`[Confirm] Created student: ${firstName} ${lastName} (ID: ${newStudent.id}) for school ${row.schoolId}`);
+          console.log(`[Confirm] Created student: ${firstName} ${lastName} (ID: ${newStudent.id}, Index: ${newStudent.indexNumber}) for school ${row.schoolId}`);
         } catch (error: any) {
           console.error(`[Confirm] Failed to create student for row ${row.rowNumber}:`, error.message);
         }
