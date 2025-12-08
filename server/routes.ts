@@ -3129,8 +3129,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!parsed.success) {
         return res.status(400).json({ message: fromZodError(parsed.error).message });
       }
-      const student = await storage.createStudent(parsed.data);
-      res.status(201).json(student);
+      
+      // Normalize surname using the approved Gambian surnames list
+      const { normalizeSurname } = await import('./surnameService');
+      const surnameResult = await normalizeSurname(parsed.data.lastName);
+      
+      const normalizedStudentData = {
+        ...parsed.data,
+        lastName: surnameResult.normalizedSurname
+      };
+      
+      const student = await storage.createStudent(normalizedStudentData);
+      res.status(201).json({
+        ...student,
+        surnameNormalization: surnameResult.origin !== 'approved_list' || surnameResult.matchedFrom ? {
+          original: surnameResult.originalSurname,
+          normalized: surnameResult.normalizedSurname,
+          origin: surnameResult.origin,
+          confidence: surnameResult.confidence
+        } : undefined
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -3226,14 +3244,41 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       const validStudents: any[] = [];
       const errors: any[] = [];
-      studentList.forEach((s, index) => {
+      const surnameNormalizations: any[] = [];
+      
+      // Import surname normalization service
+      const { normalizeSurname } = await import('./surnameService');
+      
+      for (let index = 0; index < studentList.length; index++) {
+        const s = studentList[index];
         const parsed = insertStudentSchema.safeParse(s);
         if (parsed.success) {
-          validStudents.push(parsed.data);
+          // Normalize the surname using the approved Gambian surnames list
+          const surnameResult = await normalizeSurname(parsed.data.lastName);
+          
+          // Update the lastName with the normalized surname
+          const normalizedStudent = {
+            ...parsed.data,
+            lastName: surnameResult.normalizedSurname
+          };
+          
+          validStudents.push(normalizedStudent);
+          
+          // Track surname normalizations for reporting
+          if (surnameResult.origin !== 'approved_list' || surnameResult.matchedFrom) {
+            surnameNormalizations.push({
+              row: index + 1,
+              original: surnameResult.originalSurname,
+              normalized: surnameResult.normalizedSurname,
+              origin: surnameResult.origin,
+              confidence: surnameResult.confidence
+            });
+          }
         } else {
           errors.push({ row: index + 1, error: fromZodError(parsed.error).message });
         }
-      });
+      }
+      
       if (errors.length > 0) {
         return res.status(400).json({ message: "Validation errors", errors, validCount: validStudents.length });
       }
@@ -3284,7 +3329,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
       
-      res.status(201).json({ created: createdStudents.length, students: createdStudents });
+      res.status(201).json({ 
+        created: createdStudents.length, 
+        students: createdStudents,
+        surnameNormalizations: surnameNormalizations.length > 0 ? surnameNormalizations : undefined
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -1363,6 +1363,28 @@ export const insertImpactStatSchema = createInsertSchema(impactStats).pick({
   isActive: true,
 });
 
+// Approved Gambian Surnames table for name validation and normalization
+export const approvedSurnameOriginEnum = pgEnum('surname_origin', ['approved_list', 'transliterated', 'fuzzy_match', 'manual']);
+
+export const approvedSurnames = pgTable("approved_surnames", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  surname: varchar("surname", { length: 100 }).notNull().unique(),
+  surnameLower: varchar("surname_lower", { length: 100 }).notNull().unique(),
+  alternateSpellings: text("alternate_spellings").array().default([]),
+  linguisticOrigin: varchar("linguistic_origin", { length: 50 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertApprovedSurnameSchema = createInsertSchema(approvedSurnames).pick({
+  surname: true,
+  surnameLower: true,
+  alternateSpellings: true,
+  linguisticOrigin: true,
+  isActive: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1440,3 +1462,5 @@ export type InsertNewsletterSubscriber = z.infer<typeof insertNewsletterSubscrib
 export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect;
 export type InsertImpactStat = z.infer<typeof insertImpactStatSchema>;
 export type ImpactStat = typeof impactStats.$inferSelect;
+export type InsertApprovedSurname = z.infer<typeof insertApprovedSurnameSchema>;
+export type ApprovedSurname = typeof approvedSurnames.$inferSelect;
