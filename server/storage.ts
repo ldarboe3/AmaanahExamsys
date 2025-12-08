@@ -131,6 +131,7 @@ export interface IStorage {
     resultsCount: number;
     totalScore: number;
     percentage: string;
+    finalGrade: string;
   }[]>;
 
   // Invoices
@@ -846,6 +847,7 @@ export class DatabaseStorage implements IStorage {
     resultsCount: number;
     totalScore: number;
     percentage: string;
+    finalGrade: string;
   }[]> {
     const result = await db.execute(sql`
       SELECT 
@@ -859,7 +861,14 @@ export class DatabaseStorage implements IStorage {
         sch.name as "schoolName",
         COUNT(sr.id)::int as "resultsCount",
         COALESCE(SUM(sr.total_score), 0)::float as "totalScore",
-        ROUND(COALESCE(SUM(sr.total_score) / NULLIF(COUNT(sr.id) * 100, 0) * 100, 0)::numeric, 1)::text as "percentage"
+        ROUND(COALESCE(SUM(sr.total_score) / NULLIF(COUNT(sr.id) * 100, 0) * 100, 0)::numeric, 1)::text as "percentage",
+        CASE 
+          WHEN COALESCE(SUM(sr.total_score) / NULLIF(COUNT(sr.id) * 100, 0) * 100, 0) >= 80 THEN 'ممتاز'
+          WHEN COALESCE(SUM(sr.total_score) / NULLIF(COUNT(sr.id) * 100, 0) * 100, 0) >= 70 THEN 'جيد جدا'
+          WHEN COALESCE(SUM(sr.total_score) / NULLIF(COUNT(sr.id) * 100, 0) * 100, 0) >= 60 THEN 'جيد'
+          WHEN COALESCE(SUM(sr.total_score) / NULLIF(COUNT(sr.id) * 100, 0) * 100, 0) >= 50 THEN 'مقبول'
+          ELSE 'راسب'
+        END as "finalGrade"
       FROM students s
       JOIN schools sch ON sch.id = s.school_id
       JOIN student_results sr ON sr.student_id = s.id
