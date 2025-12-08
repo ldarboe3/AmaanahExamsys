@@ -90,6 +90,17 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Security**: Token-based workflows for invitations and password resets, bcrypt for password hashing, and role-based access control.
 
 ## Recent Changes (December 8, 2025)
+- **School Student Submission Workflow**: Comprehensive multi-stage messaging for student registration:
+  - **Template Download**: Schools download official CSV template (UTF-8) from grade cards
+  - **Upload & Initial Confirmation**: Enhanced success message confirming receipt and instructing payment
+  - **Payment Submission & Under-Review State**: 
+    - New invoice summary dialog with 4-step workflow visualization
+    - Step 1: Student Upload (marked as completed with checkmark)
+    - Step 2: Payment Submission (pay invoice and upload receipt on Payments page)
+    - Step 3: Under Review (Amaanah reviews payment; notifications sent via email and in-system)
+    - Step 4: Final Approval (official acceptance for examination; students submitted in single batch only)
+  - **Important Notice**: Emphasizes that all students must be submitted in one batch; no additional students accepted afterward
+  - **Bilingual Support**: All workflow messaging in English and Arabic with proper RTL formatting
 - **School Registration Fee Paywall**: New schools must pay mandatory registration fee before accessing system:
   - **Invoice Types**: Two types - `registration` (one-time school fee) and `examination` (per-student exam fees)
   - **Menu Restriction**: School admins see only Payments menu until registration fee is confirmed paid
