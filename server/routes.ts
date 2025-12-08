@@ -132,6 +132,42 @@ async function getSchoolIdForUser(user: any): Promise<number | null> {
   return null;
 }
 
+// Ensure all approved students have index numbers
+async function ensureApprovedStudentsHaveIndexNumbers(examYearId?: number): Promise<void> {
+  try {
+    let approvedStudents: any[];
+    
+    if (examYearId) {
+      approvedStudents = await db.select()
+        .from(students)
+        .where(and(
+          eq(students.status, 'approved'),
+          sql`${students.indexNumber} IS NULL OR ${students.indexNumber} = ''`,
+          eq(students.examYearId, examYearId)
+        ));
+    } else {
+      approvedStudents = await db.select()
+        .from(students)
+        .where(and(
+          eq(students.status, 'approved'),
+          sql`${students.indexNumber} IS NULL OR ${students.indexNumber} = ''`
+        ));
+    }
+    
+    // Generate index numbers for students without them
+    for (const student of approvedStudents) {
+      const indexNum = generateIndexNumber();
+      await storage.updateStudent(student.id, { indexNumber: indexNum });
+    }
+    
+    if (approvedStudents.length > 0) {
+      console.log(`[Index Generation] Generated index numbers for ${approvedStudents.length} approved students${examYearId ? ` in exam year ${examYearId}` : ''}`);
+    }
+  } catch (error: any) {
+    console.error('[Index Generation] Error ensuring approved students have index numbers:', error.message);
+  }
+}
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   // Session setup
   app.use(
@@ -3308,6 +3344,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "Validation errors", errors, validCount: validStudents.length });
       }
       const createdStudents = await storage.createStudentsBulk(validStudents);
+      
+      // Ensure all created students have index numbers if they're approved
+      if (createdStudents.length > 0) {
+        for (const student of createdStudents) {
+          if (student.status === 'approved' && !student.indexNumber) {
+            const indexNum = generateIndexNumber();
+            await storage.updateStudent(student.id, { indexNumber: indexNum });
+          }
+        }
+      }
       
       // Update registration workflow to Stage 2 (awaiting_payment) and send confirmation email
       if (createdStudents.length > 0) {
@@ -8306,6 +8352,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!targetExamYear) {
         return res.status(400).json({ message: "No exam year found" });
       }
+      
+      // Ensure all approved students have index numbers before retrieving eligible students
+      await ensureApprovedStudentsHaveIndexNumbers(targetExamYear.id);
 
       // Get all schools for filtering by region/cluster
       const allSchools = await storage.getAllSchools();
@@ -9490,6 +9539,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!targetExamYear) {
         return res.status(400).json({ message: "No exam year found" });
       }
+      
+      // Ensure all approved students have index numbers before retrieving eligible students
+      await ensureApprovedStudentsHaveIndexNumbers(targetExamYear.id);
       
       // Use optimized batch query to get all eligible Grade 6 students with published results
       const eligibleStudents = await storage.getEligibleG6Students(targetExamYear.id);
