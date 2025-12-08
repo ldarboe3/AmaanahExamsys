@@ -261,6 +261,25 @@ export default function ResultChecker() {
     return language === 'ar' ? result.statusAr : result.status;
   };
 
+  const getGradeStatus = (grade: string) => {
+    const normalizedGrade = grade.toUpperCase();
+    
+    const statusMap: Record<string, { en: string; ar: string }> = {
+      'A+': { en: 'Excellent', ar: 'ممتاز' },
+      'A': { en: 'Very Good', ar: 'جداً جيد' },
+      'B+': { en: 'Good', ar: 'جيد' },
+      'B': { en: 'Good', ar: 'جيد' },
+      'C+': { en: 'Satisfactory', ar: 'مرضي' },
+      'C': { en: 'Satisfactory', ar: 'مرضي' },
+      'D+': { en: 'Fair', ar: 'مقبول' },
+      'D': { en: 'Fair', ar: 'مقبول' },
+      'E': { en: 'Failed', ar: 'راسب' },
+      'F': { en: 'Failed', ar: 'راسب' },
+    };
+    
+    return statusMap[normalizedGrade] || { en: 'N/A', ar: 'غ.م' };
+  };
+
   const gradeOptions = [
     { value: "3", labelEn: "Grade 3 - Lower Basic", labelAr: "الصف الثالث - المرحلة الابتدائية الدنيا" },
     { value: "6", labelEn: "Grade 6 - Upper Basic", labelAr: "الصف السادس - المرحلة الابتدائية" },
@@ -426,13 +445,17 @@ export default function ResultChecker() {
                         <GraduationCap className="w-5 h-5 text-primary" />
                         {t.resultChecker.studentInformation}
                       </CardTitle>
-                      <Badge variant={resultData.overallStatus === 'PASSED' ? 'default' : 'destructive'}>
-                        {resultData.overallStatus === 'PASSED' ? (
+                      <Badge variant={resultData.summary.failedCount === 0 ? 'default' : 'destructive'}>
+                        {resultData.summary.failedCount === 0 ? (
                           <CheckCircle className="w-3 h-3 mr-1" />
                         ) : (
                           <AlertCircle className="w-3 h-3 mr-1" />
                         )}
-                        {language === 'ar' ? resultData.overallStatusAr : resultData.overallStatus}
+                        {resultData.summary.failedCount === 0 ? (
+                          language === 'ar' ? 'ناجح' : 'Passed'
+                        ) : (
+                          language === 'ar' ? 'راسب' : 'Failed'
+                        )}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -561,10 +584,10 @@ export default function ResultChecker() {
                             </TableCell>
                             <TableCell className="text-center">
                               <Badge 
-                                variant={result.status === 'PASSED' ? 'outline' : 'destructive'} 
+                                variant={['A+', 'A', 'B+', 'B', 'C+', 'C', 'D+', 'D'].includes(result.grade.toUpperCase()) ? 'outline' : 'destructive'} 
                                 className="text-xs"
                               >
-                                {getStatusText(result)}
+                                {language === 'ar' ? getGradeStatus(result.grade).ar : getGradeStatus(result.grade).en}
                               </Badge>
                             </TableCell>
                           </TableRow>
