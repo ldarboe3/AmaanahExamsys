@@ -11912,6 +11912,91 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Get published results for a school (school results visibility)
+  app.get("/api/school/results", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'school_admin') {
+        return res.status(403).json({ message: "Only school admins can access this" });
+      }
+
+      const schoolId = await getSchoolIdForUser(user);
+      if (!schoolId) {
+        return res.status(404).json({ message: "No school associated with this account" });
+      }
+
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      
+      // Get school's students
+      const students = await storage.getStudentsBySchool(schoolId);
+      if (!students || students.length === 0) {
+        return res.json({ students: [], results: [], examYears: [] });
+      }
+
+      // Get all exam years for dropdown
+      const allExamYears = await storage.getAllExamYears();
+      
+      // Get published results for this school's students
+      let publishedResults: any[] = [];
+      for (const student of students) {
+        const studentResults = await storage.getResultsByStudent(student.id);
+        const published = studentResults.filter(r => r.status === 'published');
+        if (published.length > 0) {
+          publishedResults = publishedResults.concat(published);
+        }
+      }
+
+      // If examYearId specified, filter to that year
+      if (examYearId) {
+        publishedResults = publishedResults.filter(r => r.examYearId === examYearId);
+      }
+
+      // Get subjects for reference
+      const subjects = await storage.getAllSubjects();
+
+      // Calculate rankings per exam year and grade
+      const resultsByGradeAndYear = new Map<string, any[]>();
+      for (const result of publishedResults) {
+        const key = `${result.examYearId}-${students.find(s => 
+          (storage.getResultsByStudent(s.id) as any).some((r: any) => r.id === result.id))?.grade || ''}`;
+        if (!resultsByGradeAndYear.has(key)) {
+          resultsByGradeAndYear.set(key, []);
+        }
+        resultsByGradeAndYear.get(key)!.push(result);
+      }
+
+      // Sort by totalScore descending for each group to get rankings
+      const rankedResults = new Map<number, number>(); // resultId -> ranking
+      for (const [_, groupResults] of resultsByGradeAndYear) {
+        const sorted = [...groupResults].sort((a, b) => {
+          const scoreA = parseFloat(a.totalScore || '0');
+          const scoreB = parseFloat(b.totalScore || '0');
+          return scoreB - scoreA;
+        });
+        sorted.forEach((result, index) => {
+          rankedResults.set(result.id, index + 1);
+        });
+      }
+
+      res.json({
+        school: { id: schoolId },
+        students: students.map(s => ({
+          ...s,
+          results: publishedResults.filter(r => r.studentId === s.id)
+        })),
+        results: publishedResults.map(r => ({
+          ...r,
+          ranking: rankedResults.get(r.id) || null,
+          subject: subjects.find(s => s.id === r.subjectId)
+        })),
+        examYears: allExamYears,
+      });
+    } catch (error: any) {
+      console.error("School results error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get school's assigned center info (for school admin/student view)
   app.get("/api/schools/:id/center-info", async (req, res) => {
     try {
