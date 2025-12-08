@@ -8762,7 +8762,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               g6s.englishName.toLowerCase() === subject.name?.toLowerCase()
             );
             if (g6Subject) {
-              marksMap.set(g6Subject.code, parseFloat(result.totalScore || '0'));
+              // Calculate total mark: use totalScore if available, otherwise sum firstTermScore + examScore
+              let totalMark = 0;
+              if (result.totalScore && parseFloat(result.totalScore) > 0) {
+                totalMark = parseFloat(result.totalScore);
+              } else if (result.firstTermScore || result.examScore) {
+                const firstTerm = result.firstTermScore ? parseFloat(result.firstTermScore) : 0;
+                const exam = result.examScore ? parseFloat(result.examScore) : 0;
+                totalMark = firstTerm + exam;
+              }
+              marksMap.set(g6Subject.code, totalMark > 0 ? totalMark : null);
             }
           }
         }
