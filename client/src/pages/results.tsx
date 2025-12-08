@@ -195,12 +195,12 @@ export default function Results() {
 
   // Calculate totals and percentage for a row
   const calculateRowTotals = (marks: Record<number, number | null>) => {
-    const validMarks = Object.values(marks).filter(m => m !== null) as number[];
-    if (validMarks.length === 0) return { total: 0, percentage: 0 };
+    const validMarks = Object.values(marks).filter(m => m !== null && m !== undefined) as number[];
+    if (validMarks.length === 0) return { total: null, percentage: null, hasMarks: false };
     const total = validMarks.reduce((a, b) => a + b, 0);
     const maxScore = (subjects?.length || 1) * 100;
     const percentage = (total / maxScore) * 100;
-    return { total: Math.round(total), percentage: Math.round(percentage * 100) / 100 };
+    return { total: Math.round(total), percentage: Math.round(percentage * 100) / 100, hasMarks: true };
   };
 
   // Publish results mutation
@@ -744,8 +744,8 @@ export default function Results() {
                             </td>
                           ))}
                           
-                          <td className="px-3 py-2 text-center font-semibold">{total}</td>
-                          <td className="px-3 py-2 text-center font-semibold">{percentage}%</td>
+                          <td className="px-3 py-2 text-center font-semibold">{total !== null ? total : '-'}</td>
+                          <td className="px-3 py-2 text-center font-semibold">{percentage !== null ? `${percentage}%` : '-'}</td>
                         </tr>
                       );
                     })}
