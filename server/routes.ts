@@ -8714,7 +8714,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         generateTranscriptNumber,
         generateQRToken,
         generateQRCodeDataUrl,
-        transliterateArabicToEnglish
+        transliterateArabicToEnglish,
+        cleanArabicText: cleanArabicTextTranscript
       } = await import('./transcriptService');
 
       const generatedTranscripts = [];
@@ -8755,12 +8756,38 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         for (const result of publishedResults) {
           const subject = allSubjects.find(s => s.id === result.subjectId);
           if (subject) {
-            // Try to match by code or arabicName to GRADE_6_SUBJECTS
-            const g6Subject = GRADE_6_SUBJECTS.find(g6s => 
-              g6s.code.toLowerCase() === subject.code?.toLowerCase() ||
-              g6s.arabicName === subject.arabicName ||
-              g6s.englishName.toLowerCase() === subject.name?.toLowerCase()
-            );
+            // Clean the subject names for robust matching
+            const cleanedDbName = cleanArabicTextTranscript(subject.name || '');
+            const cleanedDbArabicName = cleanArabicTextTranscript(subject.arabicName || '');
+            
+            // Try to match by multiple methods for robustness
+            const g6Subject = GRADE_6_SUBJECTS.find(g6s => {
+              const cleanedG6Name = cleanArabicTextTranscript(g6s.arabicName);
+              const cleanedG6English = g6s.englishName.toLowerCase().trim();
+              
+              // Match by code
+              if (g6s.code.toLowerCase() === subject.code?.toLowerCase()) return true;
+              
+              // Match by cleaned Arabic name (exact)
+              if (cleanedG6Name === cleanedDbName || cleanedG6Name === cleanedDbArabicName) return true;
+              
+              // Match by English name
+              if (cleanedG6English === subject.name?.toLowerCase().trim()) return true;
+              
+              // Match by partial Arabic name (core word matching)
+              // Extract core Arabic word (remove prefixes like ال)
+              const g6Core = cleanedG6Name.replace(/^ال/, '');
+              const dbCore = cleanedDbName.replace(/^ال/, '');
+              const dbArabicCore = cleanedDbArabicName.replace(/^ال/, '');
+              
+              // Check if core words match (at least 3 chars to avoid false positives)
+              if (g6Core.length >= 3 && (dbCore.includes(g6Core) || dbArabicCore.includes(g6Core) || g6Core.includes(dbCore))) {
+                return true;
+              }
+              
+              return false;
+            });
+            
             if (g6Subject) {
               // Calculate total mark: use totalScore if available, otherwise sum firstTermScore + examScore
               let totalMark = 0;
