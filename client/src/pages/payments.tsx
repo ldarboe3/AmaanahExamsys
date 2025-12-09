@@ -287,6 +287,14 @@ export default function Payments() {
           return typeof key === 'string' && key.startsWith('/api/students');
         }
       });
+      // Also invalidate registration progress so the workflow steps update correctly
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/registration-progress');
+        }
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/school/invoice"] });
       const description = data.approvedCount > 0
         ? (isRTL 
             ? `تم تأكيد الدفع. تمت الموافقة على ${data.approvedCount} طالب وتم تعيين أرقام الفهرس.`
