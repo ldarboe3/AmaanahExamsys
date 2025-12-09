@@ -12868,92 +12868,110 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         <head>
           <meta charset="UTF-8">
           <style>
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
             body {
               font-family: 'Amiri', 'Arial', sans-serif;
-              margin: 0;
-              padding: 15px;
               background: white;
               color: #333;
+              line-height: 1.4;
             }
             .header {
               text-align: center;
-              border-bottom: 2px solid #0d9488;
-              padding-bottom: 15px;
-              margin-bottom: 15px;
+              border-bottom: 3px solid #0d9488;
+              padding: 20px 15px 15px 15px;
+              margin-bottom: 12px;
+              background: linear-gradient(to bottom, #f0fdfb 0%, white 100%);
             }
-            .logo-section {
+            .header-content {
               display: flex;
               justify-content: center;
               align-items: center;
-              gap: 15px;
-              margin-bottom: 10px;
+              gap: 20px;
+              margin-bottom: 8px;
             }
             .logo {
-              width: 60px;
-              height: 60px;
+              width: 70px;
+              height: 70px;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 40px;
+              font-size: 48px;
               font-weight: bold;
               color: #0d9488;
-              border: 2px solid #0d9488;
-              border-radius: 6px;
+              border: 3px solid #0d9488;
+              border-radius: 8px;
+              background: white;
             }
             .org-info {
               text-align: center;
             }
             .org-name {
-              font-size: 20px;
+              font-size: 22px;
+              font-weight: bold;
+              color: #0d9488;
+              margin-bottom: 3px;
+              letter-spacing: 0.5px;
+            }
+            .org-address {
+              font-size: 9px;
+              color: #555;
+              line-height: 1.5;
+            }
+            .title-section {
+              text-align: center;
+              margin: 8px 0 10px 0;
+            }
+            .doc-title {
+              font-size: 18px;
               font-weight: bold;
               color: #0d9488;
               margin: 0;
             }
-            .org-address {
-              font-size: 10px;
+            .subtitle {
+              font-size: 12px;
               color: #666;
-              margin: 3px 0 0 0;
-              line-height: 1.4;
-            }
-            .doc-title {
-              font-size: 16px;
-              font-weight: bold;
-              text-align: center;
-              margin: 12px 0;
-              color: #0d9488;
+              margin-top: 4px;
             }
             .school-info {
               background: #f0f9f7;
-              padding: 10px;
+              padding: 8px 12px;
               border-radius: 4px;
-              margin-bottom: 12px;
-              font-size: 11px;
+              margin-bottom: 10px;
+              font-size: 10px;
               line-height: 1.5;
+              border-left: 4px solid #0d9488;
             }
             table {
               width: 100%;
               border-collapse: collapse;
-              margin-top: 10px;
-              font-size: 10px;
+              margin-top: 8px;
+              font-size: 9px;
             }
-            th {
+            thead tr {
               background: #0d9488;
               color: white;
-              padding: 6px 4px;
+            }
+            th {
+              padding: 5px 3px;
               text-align: center;
               border: 1px solid #0d9488;
               font-weight: bold;
               word-wrap: break-word;
+              font-size: 8.5px;
             }
             td {
-              padding: 5px 4px;
+              padding: 4px 3px;
               border: 1px solid #ddd;
               text-align: center;
             }
-            tr:nth-child(odd) {
+            tbody tr:nth-child(odd) {
               background: #f9fafb;
             }
-            tr:nth-child(even) {
+            tbody tr:nth-child(even) {
               background: white;
             }
             .student-name {
@@ -12962,21 +12980,18 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
             }
             .school-name {
               text-align: right;
-              font-size: 9px;
+              font-size: 8px;
             }
             .footer {
               text-align: center;
-              margin-top: 15px;
-              padding-top: 10px;
+              margin-top: 10px;
+              padding-top: 8px;
               border-top: 1px solid #ddd;
-              font-size: 9px;
+              font-size: 8px;
               color: #666;
             }
-            .print-date {
-              text-align: center;
-              font-size: 9px;
-              color: #666;
-              margin-top: 5px;
+            .footer p {
+              margin: 3px 0;
             }
             @page {
               size: A4 landscape;
@@ -12986,37 +13001,33 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         </head>
         <body>
           <div class="header">
-            <div class="logo-section">
+            <div class="header-content">
               <div class="logo">أ</div>
               <div class="org-info">
-                <p class="org-name">أمانة الامتحانات - AMAANAH</p>
-                <p class="org-address">
-                  جمهورية مولدوفا | Republic of Moldova<br>
-                  info@amaanah.education | +1-800-AMAANAH
-                </p>
+                <div class="org-name">أمانة الامتحانات - AMAANAH</div>
+                <div class="org-address">
+                  <div>جمهورية مولدوفا | Republic of Moldova</div>
+                  <div>info@amaanah.education | +1-800-AMAANAH</div>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="doc-title">
-            تقرير النتائج - Results Report
-          </div>
-
-          <div class="school-info">
-            <strong>${school.name}</strong> | منطقة: ${school.regionId ? `Region ${school.regionId}` : 'N/A'} | السنة الدراسية: ${activeExamYear?.name || 'N/A'} | تم الطباعة: ${currentDate}
+          <div class="title-section">
+            <div class="doc-title">تقرير النتائج - Results Report</div>
+            <div class="subtitle">${school.name} - منطقة ${school.regionId || 'N/A'} | ${activeExamYear?.name || ''} | ${currentDate}</div>
           </div>
 
           <table>
             <thead>
               <tr>
                 <th>#</th>
-                <th>اسم الطالب<br>Student Name</th>
-                <th>المدرسة<br>School</th>
+                <th>الطالب<br>Student</th>
                 <th>رقم الفهرس<br>Index</th>
                 <th>الصف<br>Grade</th>
-                ${sortedSubjects.map(s => `<th>${s.name}<br>${s.arabicName}</th>`).join('')}
+                ${sortedSubjects.map(s => `<th>${s.arabicName}<br>${s.name}</th>`).join('')}
                 <th>المجموع<br>Total</th>
-                <th>النسبة %<br>%</th>
+                <th>النسبة<br>%</th>
                 <th>النتيجة<br>Result</th>
                 <th>الترتيب<br>Rank</th>
               </tr>
@@ -13031,13 +13042,12 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
                   <tr>
                     <td>${idx + 1}</td>
                     <td class="student-name">${summary.student?.firstName} ${summary.student?.lastName}</td>
-                    <td class="school-name">${school.name}</td>
                     <td>${summary.student?.indexNumber || '-'}</td>
                     <td>${summary.student?.grade || '-'}</td>
                     ${sortedSubjects.map(s => `<td>${(summary.subjectScores[s.id] || 0).toFixed(1)}</td>`).join('')}
                     <td><strong>${totalScore.toFixed(1)}</strong></td>
                     <td><strong>${summary.percentage}</strong></td>
-                    <td>${finalResultAr} / ${finalResult}</td>
+                    <td>${finalResultAr}/${finalResult}</td>
                     <td><strong>${summary.ranking || '-'}</strong></td>
                   </tr>
                 `;
@@ -13046,10 +13056,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
           </table>
 
           <div class="footer">
-            <p>هذا المستند الرسمي يحتوي على سجل الامتحانات الرسمي / This is an official examination record document</p>
-            <div class="print-date">
-              <small>تم الإنشاء: ${new Date().toISOString()}</small>
-            </div>
+            <p>هذا المستند الرسمي يحتوي على سجل الامتحانات الرسمي / This is an official examination record</p>
+            <p>تم الإنشاء: ${new Date().toLocaleDateString('en-US')} | Created: ${new Date().toLocaleDateString('en-US')}</p>
           </div>
         </body>
         </html>
