@@ -12756,17 +12756,34 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         });
       }
 
-      // Prepare data for PDF - aggregate by student
+      // Prepare data for PDF - include all subject scores for each student
+      const allSubjectsForGrade = new Set<number>();
+      for (const student of students) {
+        const studentResults = publishedResults.filter(r => r.studentId === student.id);
+        studentResults.forEach(r => {
+          if (r.subjectId) allSubjectsForGrade.add(r.subjectId);
+        });
+      }
+      const sortedSubjects = subjects.filter(s => allSubjectsForGrade.has(s.id))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
       const studentSummaries = students
         .filter(s => studentRankings.has(s.id))
         .map(student => {
           const totals = studentTotals.get(student.id)!;
+          const studentResults = publishedResults.filter(r => r.studentId === student.id);
+          const subjectScores: Record<number, number> = {};
+          sortedSubjects.forEach(subj => {
+            const result = studentResults.find(r => r.subjectId === subj.id);
+            subjectScores[subj.id] = result ? parseFloat(result.totalScore || '0') : 0;
+          });
           return {
             student,
             totalScore: totals.total,
             subjectCount: totals.subjectCount,
             percentage: ((totals.total / (totals.subjectCount * 100)) * 100).toFixed(1),
-            ranking: studentRankings.get(student.id)
+            ranking: studentRankings.get(student.id),
+            subjectScores
           };
         })
         .sort((a, b) => b.totalScore - a.totalScore);
@@ -12787,80 +12804,82 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
             body {
               font-family: 'Amiri', 'Arial', sans-serif;
               margin: 0;
-              padding: 20px;
+              padding: 15px;
               background: white;
               color: #333;
             }
             .header {
               text-align: center;
               border-bottom: 2px solid #0d9488;
-              padding-bottom: 20px;
-              margin-bottom: 20px;
+              padding-bottom: 15px;
+              margin-bottom: 15px;
             }
             .logo-section {
               display: flex;
               justify-content: center;
               align-items: center;
-              gap: 20px;
-              margin-bottom: 15px;
+              gap: 15px;
+              margin-bottom: 10px;
             }
             .logo {
-              width: 80px;
-              height: 80px;
+              width: 60px;
+              height: 60px;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 48px;
+              font-size: 40px;
               font-weight: bold;
               color: #0d9488;
               border: 2px solid #0d9488;
-              border-radius: 8px;
+              border-radius: 6px;
             }
             .org-info {
               text-align: center;
             }
             .org-name {
-              font-size: 24px;
+              font-size: 20px;
               font-weight: bold;
               color: #0d9488;
               margin: 0;
             }
             .org-address {
-              font-size: 12px;
+              font-size: 10px;
               color: #666;
-              margin: 5px 0 0 0;
-              line-height: 1.6;
+              margin: 3px 0 0 0;
+              line-height: 1.4;
             }
             .doc-title {
-              font-size: 20px;
+              font-size: 16px;
               font-weight: bold;
               text-align: center;
-              margin: 20px 0;
+              margin: 12px 0;
               color: #0d9488;
             }
             .school-info {
               background: #f0f9f7;
-              padding: 12px;
-              border-radius: 6px;
-              margin-bottom: 20px;
-              font-size: 13px;
+              padding: 10px;
+              border-radius: 4px;
+              margin-bottom: 12px;
+              font-size: 11px;
+              line-height: 1.5;
             }
             table {
               width: 100%;
               border-collapse: collapse;
-              margin-top: 20px;
-              font-size: 12px;
+              margin-top: 10px;
+              font-size: 10px;
             }
             th {
               background: #0d9488;
               color: white;
-              padding: 10px;
+              padding: 6px 4px;
               text-align: center;
               border: 1px solid #0d9488;
               font-weight: bold;
+              word-wrap: break-word;
             }
             td {
-              padding: 8px;
+              padding: 5px 4px;
               border: 1px solid #ddd;
               text-align: center;
             }
@@ -12872,20 +12891,29 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
             }
             .student-name {
               text-align: right;
+              font-weight: 500;
+            }
+            .school-name {
+              text-align: right;
+              font-size: 9px;
             }
             .footer {
               text-align: center;
-              margin-top: 30px;
-              padding-top: 20px;
+              margin-top: 15px;
+              padding-top: 10px;
               border-top: 1px solid #ddd;
-              font-size: 11px;
+              font-size: 9px;
               color: #666;
             }
             .print-date {
               text-align: center;
-              font-size: 11px;
+              font-size: 9px;
               color: #666;
-              margin-top: 10px;
+              margin-top: 5px;
+            }
+            @page {
+              size: A4 landscape;
+              margin: 10mm;
             }
           </style>
         </head>
@@ -12894,13 +12922,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
             <div class="logo-section">
               <div class="logo">أ</div>
               <div class="org-info">
-                <p class="org-name">أمانة الامتحانات</p>
-                <p class="org-name">AMAANAH</p>
+                <p class="org-name">أمانة الامتحانات - AMAANAH</p>
                 <p class="org-address">
-                  جمهورية مولدوفا<br>
-                  Republic of Moldova<br>
-                  ✉️ info@amaanah.education<br>
-                  📱 +1-800-AMAANAH
+                  جمهورية مولدوفا | Republic of Moldova<br>
+                  info@amaanah.education | +1-800-AMAANAH
                 </p>
               </div>
             </div>
@@ -12911,10 +12936,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
           </div>
 
           <div class="school-info">
-            <strong>${school.name}</strong><br>
-            منطقة: ${school.regionId ? `Region ${school.regionId}` : 'N/A'}<br>
-            السنة الدراسية: ${activeExamYear?.name || 'N/A'}<br>
-            تم الطباعة: ${currentDate}
+            <strong>${school.name}</strong> | منطقة: ${school.regionId ? `Region ${school.regionId}` : 'N/A'} | السنة الدراسية: ${activeExamYear?.name || 'N/A'} | تم الطباعة: ${currentDate}
           </div>
 
           <table>
@@ -12922,28 +12944,34 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               <tr>
                 <th>#</th>
                 <th>اسم الطالب<br>Student Name</th>
+                <th>المدرسة<br>School</th>
                 <th>رقم الفهرس<br>Index</th>
                 <th>الصف<br>Grade</th>
-                <th>عدد المواد<br>Subjects</th>
+                ${sortedSubjects.map(s => `<th>${s.name}<br>${s.arabicName}</th>`).join('')}
                 <th>المجموع<br>Total</th>
                 <th>النسبة %<br>%</th>
+                <th>النتيجة<br>Result</th>
                 <th>الترتيب<br>Rank</th>
-                <th>الحالة<br>Status</th>
               </tr>
             </thead>
             <tbody>
               ${studentSummaries.map((summary, idx) => {
+                const totalScore = parseFloat(summary.totalScore.toString());
+                const percentage = parseFloat(summary.percentage);
+                const finalResult = percentage >= 50 ? 'Pass' : 'Fail';
+                const finalResultAr = percentage >= 50 ? 'نجح' : 'رسب';
                 return `
                   <tr>
                     <td>${idx + 1}</td>
                     <td class="student-name">${summary.student?.firstName} ${summary.student?.lastName}</td>
+                    <td class="school-name">${school.name}</td>
                     <td>${summary.student?.indexNumber || '-'}</td>
                     <td>${summary.student?.grade || '-'}</td>
-                    <td>${summary.subjectCount}</td>
-                    <td>${summary.totalScore.toFixed(1)}</td>
-                    <td>${summary.percentage}</td>
-                    <td>${summary.ranking || '-'}</td>
-                    <td>Published</td>
+                    ${sortedSubjects.map(s => `<td>${(summary.subjectScores[s.id] || 0).toFixed(1)}</td>`).join('')}
+                    <td><strong>${totalScore.toFixed(1)}</strong></td>
+                    <td><strong>${summary.percentage}</strong></td>
+                    <td>${finalResultAr} / ${finalResult}</td>
+                    <td><strong>${summary.ranking || '-'}</strong></td>
                   </tr>
                 `;
               }).join('')}
@@ -12951,8 +12979,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
           </table>
 
           <div class="footer">
-            <p>هذا المستند الرسمي يحتوي على سجل الامتحانات الرسمي</p>
-            <p>This is an official document containing the official examination record</p>
+            <p>هذا المستند الرسمي يحتوي على سجل الامتحانات الرسمي / This is an official examination record document</p>
             <div class="print-date">
               <small>تم الإنشاء: ${new Date().toISOString()}</small>
             </div>
@@ -12961,7 +12988,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         </html>
       `;
 
-      // Generate PDF using Puppeteer
+      // Generate PDF using Puppeteer in landscape orientation
       const puppeteer = (await import('puppeteer')).default;
       const browser = await puppeteer.launch({ 
         headless: true,
@@ -12973,6 +13000,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       
       const pdfBuffer = await page.pdf({
         format: 'A4',
+        landscape: true,
         margin: { top: 10, right: 10, bottom: 10, left: 10 }
       });
       
