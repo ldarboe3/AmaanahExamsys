@@ -13057,26 +13057,49 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
 
       // Generate PDF using Puppeteer in landscape orientation
       const puppeteer = (await import('puppeteer')).default;
-      const browser = await puppeteer.launch({ 
-        headless: true,
-        executablePath: getChromiumExecutable(),
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-      });
-      const page = await browser.newPage();
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-      
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        landscape: true,
-        margin: { top: 10, right: 10, bottom: 10, left: 10 }
-      });
-      
-      await browser.close();
+      let browser;
+      try {
+        browser = await puppeteer.launch({ 
+          headless: true,
+          executablePath: getChromiumExecutable(),
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        });
+        const page = await browser.newPage();
+        
+        // Set page size and margins
+        await page.setViewport({ width: 1200, height: 1600 });
+        
+        // Set content with proper wait
+        await page.setContent(htmlContent, { waitUntil: 'load' });
+        
+        // Generate PDF with proper formatting
+        const pdfBuffer = await page.pdf({
+          format: 'A4',
+          landscape: true,
+          margin: { top: 10, right: 10, bottom: 10, left: 10 },
+          printBackground: true,
+          displayHeaderFooter: false
+        });
+        
+        await page.close();
+        await browser.close();
 
-      // Send PDF to client
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="school-results-${school.name.replace(/\\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf"`);
-      res.send(pdfBuffer);
+        // Verify PDF size
+        if (!pdfBuffer || pdfBuffer.length === 0) {
+          throw new Error('PDF generation resulted in empty buffer');
+        }
+
+        // Send PDF to client
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="school-results-${school.name.replace(/[\\s/\\\\]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.send(pdfBuffer);
+      } catch (pdfError: any) {
+        if (browser) {
+          await browser.close();
+        }
+        throw pdfError;
+      }
     } catch (error: any) {
       console.error("School results PDF error:", error);
       res.status(500).json({ message: error.message });
