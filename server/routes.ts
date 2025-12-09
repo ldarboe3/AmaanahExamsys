@@ -544,10 +544,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
         // Get invoices for this school
         const schoolInvoices = await storage.getInvoicesBySchool(schoolId);
-        const paidInvoices = schoolInvoices.filter(inv => inv.status === 'paid');
-        totalRevenue = paidInvoices.reduce((sum, inv) => sum + parseFloat(inv.totalAmount || '0'), 0);
+        // Total revenue: sum of all invoice amounts (whether paid or pending)
+        totalRevenue = schoolInvoices.reduce((sum, inv) => sum + parseFloat(inv.totalAmount || '0'), 0);
         
-        const pendingInvoices = schoolInvoices.filter(inv => inv.status === 'pending');
+        // Pending payments: count invoices that are not paid
+        const pendingInvoices = schoolInvoices.filter(inv => inv.status !== 'paid');
         pendingPayments = pendingInvoices.length;
 
         // School only has 1 school (itself)
