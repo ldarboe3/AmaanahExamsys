@@ -519,22 +519,72 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Dashboard stats
   app.get("/api/dashboard/stats", isAuthenticated, async (req, res) => {
     try {
-      const baseStats = await storage.getDashboardStats();
-      const pendingSchools = await storage.getSchoolsByStatus('pending');
-      const pendingStudents = await storage.getPendingStudents();
-      const pendingInvoices = await storage.getInvoicesByStatus('pending');
-      const pendingResults = await storage.getPendingResults();
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const isSchoolAdmin = user.role === 'school_admin';
+      let totalSchools, pendingSchools, totalStudents, pendingStudents, totalRevenue, pendingPayments, pendingResults;
+
+      if (isSchoolAdmin) {
+        // School admins only see their own school's stats
+        const schoolId = await getSchoolIdForUser(user);
+        if (!schoolId) {
+          return res.status(403).json({ message: "No school associated with this account" });
+        }
+
+        // Get students for this school
+        const schoolStudents = await storage.getStudentsBySchool(schoolId);
+        totalStudents = schoolStudents.length;
+        
+        // Count pending students for this school
+        const pendingSchoolStudents = schoolStudents.filter(s => s.registrationStatus === 'pending');
+        pendingStudents = pendingSchoolStudents.length;
+
+        // Get invoices for this school
+        const schoolInvoices = await storage.getInvoicesBySchool(schoolId);
+        const paidInvoices = schoolInvoices.filter(inv => inv.status === 'paid');
+        totalRevenue = paidInvoices.reduce((sum, inv) => sum + parseFloat(inv.totalAmount || '0'), 0);
+        
+        const pendingInvoices = schoolInvoices.filter(inv => inv.status === 'pending');
+        pendingPayments = pendingInvoices.length;
+
+        // School only has 1 school (itself)
+        totalSchools = 1;
+        pendingSchools = 0;
+
+        // Results for this school only
+        const schoolResults = await storage.getResultsBySchool(schoolId);
+        pendingResults = schoolResults.filter(r => r.status !== 'published').length;
+      } else {
+        // Admin users see all schools' stats
+        const baseStats = await storage.getDashboardStats();
+        const allPendingSchools = await storage.getSchoolsByStatus('pending');
+        const allPendingStudents = await storage.getPendingStudents();
+        const allPendingInvoices = await storage.getInvoicesByStatus('pending');
+        const allPendingResults = await storage.getPendingResults();
+
+        totalSchools = baseStats.totalSchools;
+        pendingSchools = allPendingSchools.length;
+        totalStudents = baseStats.totalStudents;
+        pendingStudents = allPendingStudents.length;
+        totalRevenue = parseFloat(baseStats.totalRevenue);
+        pendingPayments = allPendingInvoices.length;
+        pendingResults = allPendingResults.length;
+      }
+
       const activeExamYear = await storage.getActiveExamYear();
       
       res.json({
-        totalSchools: baseStats.totalSchools,
-        pendingSchools: pendingSchools.length,
-        totalStudents: baseStats.totalStudents,
-        pendingStudents: pendingStudents.length,
-        totalRevenue: parseFloat(baseStats.totalRevenue),
-        pendingPayments: pendingInvoices.length,
+        totalSchools,
+        pendingSchools,
+        totalStudents,
+        pendingStudents,
+        totalRevenue,
+        pendingPayments,
         resultsPublished: 0,
-        pendingResults: pendingResults.length,
+        pendingResults,
         activeExamYear: activeExamYear ? {
           id: activeExamYear.id,
           name: activeExamYear.name,
