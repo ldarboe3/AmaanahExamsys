@@ -36,6 +36,7 @@ import {
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import amaanahLogo from "@assets/Amana_Logo_1765237832354.png";
 
 const verifySchema = z.object({
@@ -75,6 +76,7 @@ interface VerificationResult {
 
 export default function Verify() {
   const { toast } = useToast();
+  const { language, isRTL } = useLanguage();
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [selectedExamYear, setSelectedExamYear] = useState<string>("");
   const [selectedGrade, setSelectedGrade] = useState<string>("");
@@ -93,7 +95,7 @@ export default function Verify() {
       return apiRequest("POST", "/api/verify-result", data);
     },
     onSuccess: (data) => {
-      setResult(data as VerificationResult);
+      setResult(data as unknown as VerificationResult);
     },
     onError: () => {
       toast({
@@ -118,7 +120,7 @@ export default function Verify() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -132,14 +134,14 @@ export default function Verify() {
               />
               <div>
                 <h1 className="text-lg font-semibold text-foreground">Amaanah</h1>
-                <p className="text-xs text-muted-foreground">Result Verification</p>
+                <p className="text-xs text-muted-foreground">{language === 'ar' ? 'التحقق من النتائج' : 'Result Verification'}</p>
               </div>
             </div>
           </Link>
           <Link href="/">
             <Button variant="ghost" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Home
+              <ArrowLeft className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+              {language === 'ar' ? 'العودة للرئيسية' : 'Back to Home'}
             </Button>
           </Link>
         </div>
@@ -153,15 +155,15 @@ export default function Verify() {
               {!selectedExamYear || !selectedGrade ? (
                 <>
                   <div className="text-center mb-12">
-                    <h2 className="text-3xl font-bold mb-2">Verify Your Results</h2>
+                    <h2 className="text-3xl font-bold mb-2">{language === 'ar' ? 'تحقق من نتائجك' : 'Verify Your Results'}</h2>
                     <p className="text-muted-foreground">
-                      Select your exam year and grade to get started
+                      {language === 'ar' ? 'اختر سنة الامتحان والصف لتبدأ' : 'Select your exam year and grade to get started'}
                     </p>
                   </div>
 
                   {/* Exam Year Board */}
                   <div className="mb-12">
-                    <h3 className="text-lg font-semibold mb-4">Select Exam Year</h3>
+                    <h3 className="text-lg font-semibold mb-4">{language === 'ar' ? 'اختر سنة الامتحان' : 'Select Exam Year'}</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {["2024", "2023", "2022", "2021"].map((year) => (
                         <Button
@@ -181,7 +183,7 @@ export default function Verify() {
                   {/* Grade Board */}
                   {selectedExamYear && (
                     <div className="mb-12">
-                      <h3 className="text-lg font-semibold mb-4">Select Grade</h3>
+                      <h3 className="text-lg font-semibold mb-4">{language === 'ar' ? 'اختر الصف' : 'Select Grade'}</h3>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {["3", "6", "9", "12"].map((grade) => (
                           <Button
@@ -192,7 +194,7 @@ export default function Verify() {
                             data-testid={`button-grade-${grade}`}
                           >
                             <GraduationCap className="w-6 h-6 mb-2" />
-                            <span className="text-lg font-semibold">Grade {grade}</span>
+                            <span className="text-lg font-semibold">{language === 'ar' ? 'الصف ' + grade : 'Grade ' + grade}</span>
                           </Button>
                         ))}
                       </div>
@@ -209,8 +211,8 @@ export default function Verify() {
                         }}
                         data-testid="button-continue"
                       >
-                        Continue
-                        <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
+                        {language === 'ar' ? 'متابعة' : 'Continue'}
+                        <ArrowLeft className={`w-4 h-4 ${isRTL ? 'mr-2' : 'ml-2'} rotate-180`} />
                       </Button>
                     </div>
                   )}
@@ -222,9 +224,9 @@ export default function Verify() {
                     <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                       <Shield className="w-8 h-8 text-primary" />
                     </div>
-                    <h2 className="text-2xl font-semibold mb-2">Enter Your Details</h2>
+                    <h2 className="text-2xl font-semibold mb-2">{language === 'ar' ? 'أدخل تفاصيلك' : 'Enter Your Details'}</h2>
                     <p className="text-muted-foreground">
-                      Enter your index number to retrieve your results
+                      {language === 'ar' ? 'أدخل رقم الجلوس الخاص بك لاسترجاع النتائج' : 'Enter your index number to retrieve your results'}
                     </p>
                     <Button
                       variant="ghost"
@@ -237,8 +239,8 @@ export default function Verify() {
                       className="mt-2"
                       data-testid="button-back-board"
                     >
-                      <ArrowLeft className="w-4 h-4 mr-2" />
-                      Back to Selection
+                      <ArrowLeft className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                      {language === 'ar' ? 'العودة للاختيار' : 'Back to Selection'}
                     </Button>
                   </div>
 
@@ -251,10 +253,10 @@ export default function Verify() {
                             name="indexNumber"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Index Number</FormLabel>
+                                <FormLabel>{language === 'ar' ? 'رقم الجلوس' : 'Index Number'}</FormLabel>
                                 <FormControl>
                                   <Input
-                                    placeholder="Enter 6-digit index number"
+                                    placeholder={language === 'ar' ? 'أدخل رقم الجلوس المكون من 6 أرقام' : 'Enter 6-digit index number'}
                                     {...field}
                                     data-testid="input-index-number"
                                   />
@@ -271,11 +273,11 @@ export default function Verify() {
                             data-testid="button-verify"
                           >
                             {verifyMutation.isPending ? (
-                              "Verifying..."
+                              language === 'ar' ? "جاري التحقق..." : "Verifying..."
                             ) : (
                               <>
-                                <Search className="w-4 h-4 mr-2" />
-                                Verify Result
+                                <Search className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                                {language === 'ar' ? 'تحقق من النتيجة' : 'Verify Result'}
                               </>
                             )}
                           </Button>
@@ -285,9 +287,7 @@ export default function Verify() {
                   </Card>
 
                   <p className="text-center text-sm text-muted-foreground mt-6">
-                    This service is for verifying authentic Amaanah examination results.
-                    <br />
-                    For any issues, please contact the Amaanah office.
+                    {language === 'ar' ? 'هذه الخدمة للتحقق من نتائج امتحانات أمانة الحقيقية.\nللمزيد من المساعدة، يرجى التواصل مع مكتب أمانة.' : 'This service is for verifying authentic Amaanah examination results.\nFor any issues, please contact the Amaanah office.'}
                   </p>
                 </>
               )}
@@ -299,26 +299,26 @@ export default function Verify() {
                 <div className="w-12 h-12 rounded-full bg-chart-3/10 flex items-center justify-center mx-auto mb-2">
                   <CheckCircle className="w-6 h-6 text-chart-3" />
                 </div>
-                <h2 className="text-lg font-semibold text-chart-3 mb-1">Result Verified</h2>
+                <h2 className="text-lg font-semibold text-chart-3 mb-1">{language === 'ar' ? 'تم التحقق من النتيجة' : 'Result Verified'}</h2>
                 <p className="text-xs text-muted-foreground">
-                  This is an authentic Amaanah examination result
+                  {language === 'ar' ? 'هذه نتيجة امتحان أمانة حقيقية' : 'This is an authentic Amaanah examination result'}
                 </p>
               </div>
 
               {/* Warning: Not a Transcript */}
               <div className="mb-3 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-md">
                 <p className="text-sm font-bold text-red-600 dark:text-red-400">
-                  This is not a transcript
+                  {language === 'ar' ? 'هذا ليس نسخة رسمية' : 'This is not a transcript'}
                 </p>
               </div>
 
               <Card className="border-chart-3/20 bg-chart-3/5">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between flex-wrap gap-1">
-                    <Badge className="bg-chart-3 text-chart-3-foreground text-xs">Verified</Badge>
+                    <Badge className="bg-chart-3 text-chart-3-foreground text-xs">{language === 'ar' ? 'تم التحقق' : 'Verified'}</Badge>
                     {result.certificateNumber && (
                       <span className="text-xs font-mono text-muted-foreground">
-                        Cert: {result.certificateNumber}
+                        {language === 'ar' ? 'الشهادة:' : 'Cert:'} {result.certificateNumber}
                       </span>
                     )}
                   </div>
@@ -334,7 +334,7 @@ export default function Verify() {
                         {result.student.firstName} {result.student.lastName}
                       </h3>
                       <p className="text-xs text-muted-foreground capitalize">
-                        {result.student.gender} - Grade {result.student.grade}
+                        {language === 'ar' ? 'الصف ' + result.student.grade : 'Grade ' + result.student.grade} {language === 'ar' ? '- ' + (result.student.gender === 'male' ? 'ذكر' : 'أنثى') : ' - ' + result.student.gender}
                       </p>
                     </div>
                   </div>
@@ -342,11 +342,11 @@ export default function Verify() {
                   {/* Details Grid */}
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="flex items-center gap-1">
-                      <span className="text-muted-foreground">Index:</span>
+                      <span className="text-muted-foreground">{language === 'ar' ? 'الجلوس:' : 'Index:'}</span>
                       <code className="font-mono font-medium truncate">{result.student.indexNumber}</code>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-muted-foreground">Year:</span>
+                      <span className="text-muted-foreground">{language === 'ar' ? 'السنة:' : 'Year:'}</span>
                       <span className="font-medium truncate">{result.examYear.name}</span>
                     </div>
                     <div className="col-span-2 flex items-center gap-1">
@@ -357,14 +357,14 @@ export default function Verify() {
 
                   {/* Results Table */}
                   <div>
-                    <h4 className="text-xs font-medium mb-2">Subject Results</h4>
+                    <h4 className="text-xs font-medium mb-2">{language === 'ar' ? 'نتائج المواد' : 'Subject Results'}</h4>
                     <div className="border rounded-sm overflow-hidden bg-background">
                       <table className="w-full text-xs">
                         <thead className="bg-muted/50">
                           <tr>
-                            <th className="text-left p-1 font-medium">Subject</th>
-                            <th className="text-center p-1 font-medium">Score</th>
-                            <th className="text-center p-1 font-medium">Grade</th>
+                            <th className={`${isRTL ? 'text-right' : 'text-left'} p-1 font-medium`}>{language === 'ar' ? 'المادة' : 'Subject'}</th>
+                            <th className="text-center p-1 font-medium">{language === 'ar' ? 'الدرجة' : 'Score'}</th>
+                            <th className="text-center p-1 font-medium">{language === 'ar' ? 'التقدير' : 'Grade'}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -388,16 +388,16 @@ export default function Verify() {
                   <div className="p-2 bg-background rounded-sm border">
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-xs text-muted-foreground">Final Result</p>
+                        <p className="text-xs text-muted-foreground">{language === 'ar' ? 'النتيجة النهائية' : 'Final Result'}</p>
                         <p className="text-base font-semibold text-chart-3">{result.finalResult}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Total Score</p>
+                      <div className={isRTL ? "text-left" : "text-right"}>
+                        <p className="text-xs text-muted-foreground">{language === 'ar' ? 'إجمالي الدرجات' : 'Total Score'}</p>
                         <p className="text-base font-semibold">{result.totalScore}</p>
                       </div>
                       {result.rank && (
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Rank</p>
+                        <div className={isRTL ? "text-left" : "text-right"}>
+                          <p className="text-xs text-muted-foreground">{language === 'ar' ? 'الترتيب' : 'Rank'}</p>
                           <p className="text-base font-semibold">#{result.rank}</p>
                         </div>
                       )}
@@ -408,12 +408,12 @@ export default function Verify() {
 
               <div className="flex gap-3 mt-4">
                 <Button variant="outline" className="flex-1 text-xs" onClick={handleReset}>
-                  <Search className="w-4 h-4 mr-2" />
-                  Verify Another
+                  <Search className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                  {language === 'ar' ? 'تحقق من آخر' : 'Verify Another'}
                 </Button>
                 <Button className="flex-1 text-xs" onClick={handlePrint}>
-                  <Award className="w-4 h-4 mr-2" />
-                  Print
+                  <Award className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                  {language === 'ar' ? 'طباعة' : 'Print'}
                 </Button>
               </div>
             </>
