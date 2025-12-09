@@ -6652,16 +6652,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             const existingStudent = existingStudents.find(s => {
               if (s.grade !== gradeLevel) return false;
               
+              // Full name matching (with middle name)
               const storedFullName = `${s.firstName || ''} ${s.middleName || ''} ${s.lastName || ''}`.replace(/\s+/g, ' ').trim();
               const normalizedStoredName = cleanArabicText(storedFullName, 'student');
               
               if (normalizedStoredName === normalizedStudentName) return true;
               
-              // Fuzzy matching for name variations
+              // Try matching without middle name (firstName + lastName only)
+              // This handles cases where CSV has "John Doe" but student is "John Michael Doe"
+              const storedFirstLastName = `${s.firstName || ''} ${s.lastName || ''}`.replace(/\s+/g, ' ').trim();
+              const normalizedStoredFirstLast = cleanArabicText(storedFirstLastName, 'student');
+              
+              if (normalizedStoredFirstLast === normalizedStudentName) return true;
+              
+              // Also try matching the input name against just firstName + lastName of stored student
+              // This handles both directions
+              const inputParts = normalizedStudentName.split(/\s+/);
+              if (inputParts.length >= 2) {
+                const inputFirstLast = `${inputParts[0]} ${inputParts[inputParts.length - 1]}`;
+                if (inputFirstLast === normalizedStoredFirstLast) return true;
+              }
+              
+              // Fuzzy matching for name variations - with more lenient threshold
               if (normalizedStoredName.includes(normalizedStudentName) || normalizedStudentName.includes(normalizedStoredName)) {
                 const shorterLen = Math.min(normalizedStoredName.length, normalizedStudentName.length);
                 const longerLen = Math.max(normalizedStoredName.length, normalizedStudentName.length);
-                if (shorterLen / longerLen >= 0.6) return true;
+                if (shorterLen / longerLen >= 0.5) return true; // Lowered from 0.6 to 0.5 to handle middle name differences
               }
               
               return false;
