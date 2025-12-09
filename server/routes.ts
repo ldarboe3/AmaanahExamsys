@@ -12919,16 +12919,18 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               flex-shrink: 0;
             }
             .seal {
-              width: 65px;
-              height: 65px;
-              border: 2px solid #228B22;
-              border-radius: 50%;
+              width: 80px;
+              height: 80px;
               display: flex;
               align-items: center;
               justify-content: center;
-              background: #f5f5f5;
-              font-size: 32px;
-              color: #228B22;
+              background: white;
+              border-radius: 0;
+            }
+            .seal img {
+              max-width: 100%;
+              max-height: 100%;
+              object-fit: contain;
             }
             .seal-banner {
               font-size: 9px;
@@ -12937,6 +12939,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               width: 70px;
               text-align: center;
               line-height: 1.2;
+              display: none;
             }
             .header-right {
               text-align: right;
@@ -13080,8 +13083,9 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               </div>
               
               <div class="header-center">
-                <div class="seal">🏛</div>
-                <div class="seal-banner">EDUCATION FOR DEVELOPMENT</div>
+                <div class="seal">
+                  <img src="/amaanah-logo.png" alt="GSIAE/AMAANAH Logo" />
+                </div>
               </div>
               
               <div class="header-right">
