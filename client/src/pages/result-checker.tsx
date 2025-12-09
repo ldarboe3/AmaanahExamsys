@@ -502,7 +502,6 @@ export default function ResultChecker() {
                         <SelectValue placeholder={language === 'ar' ? 'اختر السنة' : 'Select Year'} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">{language === 'ar' ? 'جميع السنوات' : 'All Years'}</SelectItem>
                         {examYears.map((year) => (
                           <SelectItem key={year.id} value={year.id.toString()}>
                             {year.name} {year.isActive && `(${language === 'ar' ? 'نشط' : 'Active'})`}
@@ -521,7 +520,6 @@ export default function ResultChecker() {
                         <SelectValue placeholder={language === 'ar' ? 'اختر الصف' : 'Select Grade'} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">{language === 'ar' ? 'جميع الصفوف' : 'All Grades'}</SelectItem>
                         {gradeOptions.map((grade) => (
                           <SelectItem key={grade.value} value={grade.value}>
                             {language === 'ar' ? grade.labelAr : grade.labelEn}
