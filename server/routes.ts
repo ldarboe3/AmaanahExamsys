@@ -11233,43 +11233,40 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       // Get the host URL for verification
       const verifyUrl = `${req.protocol}://${req.get('host')}/verify/transcript/${qrToken}`;
 
-      // Prepare transcript data for PDF generation
-      const { generateTranscriptPDF } = await import('./certificateService');
+      // Prepare transcript data for PDF generation using transcriptService
+      const { generateTranscriptPDF } = await import('./transcriptService');
       const normalizedPublicSurname = await normalizeSurname(student.lastName);
       const normalizedLastNamePublic = normalizedPublicSurname.normalizedSurname;
       
       const pdfPath = await generateTranscriptPDF({
         student: {
-          id: student.id,
           firstName: student.firstName || '',
           middleName: student.middleName || '',
           lastName: normalizedLastNamePublic,
-          arabicName: student.arabicName || '',
-          fullNameAr: student.arabicName || '',
-          fullNameEn: [student.firstName, student.middleName, normalizedLastNamePublic].filter(Boolean).join(' '),
-          indexNumber: student.indexNumber || '',
-          grade: student.grade,
-          gender: student.gender || 'male',
-          dateOfBirth: student.dateOfBirth || new Date().toISOString().split('T')[0],
-          placeOfBirth: student.placeOfBirth || 'The Gambia',
+          nationality: student.nationality || 'Gambian',
         },
         school: {
-          nameEn: school.name,
-          nameAr: school.arabicName || school.name,
-          addressEn: school.address || '',
-          addressAr: school.arabicAddress || school.address || '',
+          name: school.arabicName || school.name,
+          nameEn: school.name || '',
         },
         examYear: {
-          name: examYear.name,
-          year: examYear.year,
+          hijriYear: examYear.hijriYear || '1446',
         },
-        subjects,
-        totalScore,
-        maxScore,
+        subjectMarks: subjects.map(s => ({
+          arabicName: s.nameAr,
+          englishName: s.name,
+          mark: s.score,
+          maxScore: s.maxScore,
+          minScore: s.passingScore,
+        })),
+        totalMarks: totalScore,
+        totalMaxMarks: maxScore,
         percentage: Math.round(percentage * 100) / 100,
-        finalGrade,
+        finalGrade: {
+          arabic: finalGrade,
+          english: finalGrade,
+        },
         transcriptNumber,
-        verifyUrl,
       });
 
       // Create transcript record
