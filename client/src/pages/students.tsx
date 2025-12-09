@@ -1664,7 +1664,7 @@ export default function Students() {
         )}
 
         {/* Registration Workflow Progress Banner - 4 Stage System for School Admins */}
-        {isSchoolAdmin && currentExamYearId && !isPastExamYear && (
+        {isSchoolAdmin && currentExamYearId && !isPastExamYear && registrationStage !== 'completed' && (
           <Card className="border-2 border-primary/30" data-testid="registration-workflow-card">
             <CardContent className="p-6">
               {/* Progress Steps Indicator */}
