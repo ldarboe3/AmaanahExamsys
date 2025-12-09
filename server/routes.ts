@@ -13057,46 +13057,51 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
 
       // Generate PDF using Puppeteer in landscape orientation
       const puppeteer = (await import('puppeteer')).default;
+      const fs = (await import('fs')).promises;
+      const path = (await import('path')).default;
       let browser;
       try {
-        browser = await puppeteer.launch({ 
-          headless: 'new',
+        browser = await puppeteer.launch({
+          headless: true,
           executablePath: getChromiumExecutable(),
-          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
+          timeout: 30000
         });
+
         const page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: 'domcontentloaded', timeout: 30000 });
         
-        // Encode HTML as data URL
-        const dataUrl = `data:text/html;charset=UTF-8,${encodeURIComponent(htmlContent)}`;
+        const fileName = `school-results-${school.name.replace(/[\\s/\\\\]/g, '-')}-${Date.now()}.pdf`;
+        const filePath = path.join(process.cwd(), 'tmp', fileName);
         
-        // Navigate using data URL
-        await page.goto(dataUrl, { waitUntil: 'networkidle0', timeout: 30000 });
-        
-        // Generate PDF with proper formatting
-        const pdfBuffer = await page.pdf({
+        // Ensure tmp directory exists
+        try {
+          await fs.mkdir(path.dirname(filePath), { recursive: true });
+        } catch (e) {}
+
+        await page.pdf({
+          path: filePath,
           format: 'A4',
           landscape: true,
-          margin: { top: 10, right: 10, bottom: 10, left: 10 },
           printBackground: true,
-          displayHeaderFooter: false
+          margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
         });
-        
+
         await page.close();
-
-        // Verify PDF size
-        if (!pdfBuffer || pdfBuffer.length === 0) {
-          throw new Error('PDF generation resulted in empty buffer');
-        }
-
         await browser.close();
 
-        // Send PDF to client
+        // Read and send the PDF file
+        const pdfBuffer = await fs.readFile(filePath);
+        
+        // Clean up the temp file
+        await fs.unlink(filePath).catch(() => {});
+
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="school-results-${school.name.replace(/[\\s/\\\\]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf"`);
         res.setHeader('Content-Length', pdfBuffer.length);
         res.send(pdfBuffer);
       } catch (pdfError: any) {
-        console.error('PDF generation error:', pdfError);
+        console.error("School results PDF generation error:", pdfError);
         if (browser) {
           try {
             await browser.close();
