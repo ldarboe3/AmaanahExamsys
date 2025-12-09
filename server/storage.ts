@@ -195,6 +195,7 @@ export interface IStorage {
   createStudentResultsBulk(results: InsertStudentResult[]): Promise<StudentResult[]>;
   getStudentResult(id: number): Promise<StudentResult | undefined>;
   getResultsByStudent(studentId: number): Promise<StudentResult[]>;
+  getResultsBySchool(schoolId: number): Promise<StudentResult[]>;
   getResultsByExamYear(examYearId: number): Promise<StudentResult[]>;
   getResultsBySubject(subjectId: number): Promise<StudentResult[]>;
   getResultByStudentAndSubject(studentId: number, subjectId: number, examYearId: number): Promise<StudentResult | undefined>;
@@ -1147,6 +1148,17 @@ export class DatabaseStorage implements IStorage {
 
   async getResultsByStudent(studentId: number): Promise<StudentResult[]> {
     return db.select().from(studentResults).where(eq(studentResults.studentId, studentId));
+  }
+
+  async getResultsBySchool(schoolId: number): Promise<StudentResult[]> {
+    const studentIds = await db.select({ id: students.id })
+      .from(students)
+      .where(eq(students.schoolId, schoolId));
+    
+    if (studentIds.length === 0) return [];
+    
+    return db.select().from(studentResults)
+      .where(inArray(studentResults.studentId, studentIds.map(s => s.id)));
   }
 
   async getResultsByExamYear(examYearId: number): Promise<StudentResult[]> {
