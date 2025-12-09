@@ -73,6 +73,7 @@ export default function SchoolResults() {
   const { t, isRTL } = useLanguage();
   const { toast } = useToast();
   const [selectedExamYearId, setSelectedExamYearId] = useState<number | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const { data, isLoading, error } = useQuery<SchoolResultsData>({
     queryKey: ["/api/school/results"],
@@ -144,7 +145,13 @@ export default function SchoolResults() {
 
   const handleDownloadPDF = async () => {
     try {
-      const response = await fetch('/api/school/results/pdf', {
+      setIsDownloading(true);
+      
+      const url = selectedExamYearId 
+        ? `/api/school/results/pdf?examYearId=${selectedExamYearId}`
+        : '/api/school/results/pdf';
+      
+      const response = await fetch(url, {
         credentials: 'include',
       });
       
@@ -171,25 +178,38 @@ export default function SchoolResults() {
       }
 
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      
+      // Verify blob size
+      if (blob.size === 0) {
+        throw new Error('PDF file is empty. Please try again.');
+      }
+
+      const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
+      link.href = blobUrl;
       link.download = `school-results-${new Date().toISOString().split('T')[0]}.pdf`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      }, 100);
 
       toast({
         title: isRTL ? "تم التنزيل" : "Downloaded",
         description: isRTL ? "تم تنزيل ملف PDF بنجاح" : "PDF file downloaded successfully",
       });
     } catch (error: any) {
+      console.error('Download error:', error);
       toast({
         title: t.common.error,
         description: error.message || (isRTL ? "فشل تنزيل PDF" : "Failed to download PDF"),
         variant: "destructive",
       });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -263,11 +283,13 @@ export default function SchoolResults() {
 
             <Button
               onClick={handleDownloadPDF}
-              disabled={filteredResults.length === 0}
+              disabled={filteredResults.length === 0 || isDownloading}
               data-testid="button-download-results-pdf"
             >
               <Download className="w-4 h-4 me-2" />
-              {isRTL ? "تنزيل PDF" : "Download PDF"}
+              {isDownloading 
+                ? (isRTL ? "جاري التنزيل..." : "Downloading...") 
+                : (isRTL ? "تنزيل PDF" : "Download PDF")}
             </Button>
           </div>
 
