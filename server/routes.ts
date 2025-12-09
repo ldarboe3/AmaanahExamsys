@@ -4218,24 +4218,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const allStudents = await storage.getStudentsBySchool(schoolId);
       const examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
       
-      // Allow creation even with no students
+      // Do NOT create invoice if there are no students - examination invoice should only exist when students are uploaded
       if (examYearStudents.length === 0) {
-        const invoiceNumber = generateInvoiceNumber(schoolId, examYearId);
-        const invoice = await storage.createInvoice({
-          invoiceNumber,
-          schoolId,
-          examYearId,
-          totalStudents: 0,
-          feePerStudent: registrationFee.toString(),
-          certificateFee: certificateFee.toString(),
-          transcriptFee: transcriptFee.toString(),
-          totalAmount: '0.00',
-        });
-        
         return res.json({
-          invoice,
+          invoice: null,
           items: [],
-          message: 'No students registered - invoice shows 0 amount'
+          message: 'No students registered yet - upload students first before generating an invoice'
         });
       }
       
