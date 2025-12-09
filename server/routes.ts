@@ -13050,7 +13050,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               
               <div class="header-center">
                 <div class="seal">
-                  <img src="/amaanah-logo.png" alt="GSIAE/AMAANAH Logo" />
+                  <img src="file://${process.cwd()}/public/amaanah-logo.png" alt="GSIAE/AMAANAH Logo" />
                 </div>
               </div>
               
