@@ -561,7 +561,9 @@ export function validateCertificateRequirements(student: StudentData): {
   const errors: string[] = [];
   const errorsAr: string[] = [];
 
-  if (!student.firstName || !student.lastName) {
+  // Accept names where: both firstName and lastName exist, OR just firstName exists (for Arabic names)
+  const hasName = student.firstName && (student.lastName || student.firstName.includes(' '));
+  if (!hasName) {
     errors.push('Student name is required');
     errorsAr.push('اسم الطالب مطلوب');
   }
