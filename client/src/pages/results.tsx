@@ -248,13 +248,6 @@ export default function Results() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/results"] });
     },
-    onError: (error: any) => {
-      toast({
-        title: t.common.error,
-        description: isRTL ? "فشل حفظ الدرجة" : "Failed to save mark",
-        variant: "destructive",
-      });
-    },
   });
 
   const handleMarkChange = (studentId: number, subjectId: number, value: string) => {
