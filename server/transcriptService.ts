@@ -285,9 +285,8 @@ export function validateTranscriptRequirements(data: Partial<TranscriptData>): T
     errors.push('Student data is required');
     errorsAr.push('بيانات الطالب مطلوبة');
   } else {
-    // Accept names where: both firstName and lastName exist, OR just firstName exists (for Arabic names)
-    const hasName = data.student.firstName && (data.student.lastName || data.student.firstName.includes(' '));
-    if (!hasName) {
+    // Accept names where firstName exists (works for both English and Arabic names)
+    if (!data.student.firstName || data.student.firstName.trim().length === 0) {
       errors.push('Student Arabic name is required');
       errorsAr.push('اسم الطالب بالعربية مطلوب');
     }
