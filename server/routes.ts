@@ -12960,41 +12960,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               line-height: 1.3;
             }
             .amaanah-branding {
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              gap: 15px;
-              margin-top: 12px;
-              padding-top: 12px;
-              border-top: 1px solid #ddd;
-            }
-            .amaanah-logo {
-              width: 50px;
-              height: 50px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 36px;
-              font-weight: bold;
-              color: #0d9488;
-              border: 2px solid #0d9488;
-              border-radius: 6px;
-              background: white;
-            }
-            .amaanah-info {
-              text-align: center;
-            }
-            .amaanah-name {
-              font-size: 16px;
-              font-weight: bold;
-              color: #0d9488;
-              margin: 0;
-            }
-            .amaanah-address {
-              font-size: 8px;
-              color: #666;
-              margin: 2px 0 0 0;
-              line-height: 1.4;
+              display: none;
             }
             .title-section {
               text-align: center;
