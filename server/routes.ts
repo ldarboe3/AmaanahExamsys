@@ -13081,14 +13081,14 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
             <thead>
               <tr>
                 <th>#</th>
-                <th>الطالب<br>Student</th>
-                <th>رقم الفهرس<br>Index</th>
-                <th>الصف<br>Grade</th>
-                ${sortedSubjects.map(s => `<th>${s.arabicName}<br>${s.name}</th>`).join('')}
-                <th>المجموع<br>Total</th>
-                <th>النسبة<br>%</th>
-                <th>النتيجة<br>Result</th>
-                <th>الترتيب<br>Rank</th>
+                <th>Student</th>
+                <th>Index</th>
+                <th>Grade</th>
+                ${sortedSubjects.map(s => `<th>${s.name}</th>`).join('')}
+                <th>Total</th>
+                <th>%</th>
+                <th>Result</th>
+                <th>Rank</th>
               </tr>
             </thead>
             <tbody>
