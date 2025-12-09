@@ -3990,17 +3990,35 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Invoices API
-  app.get("/api/invoices", async (req, res) => {
+  app.get("/api/invoices", isAuthenticated, async (req, res) => {
     try {
-      const schoolId = req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined;
-      const status = req.query.status as string | undefined;
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const isSchoolAdmin = user.role === 'school_admin';
       let invoices;
-      if (status) {
-        invoices = await storage.getInvoicesByStatus(status);
-      } else if (schoolId) {
+
+      if (isSchoolAdmin) {
+        // School admins can only view their own school's invoices
+        const schoolId = await getSchoolIdForUser(user);
+        if (!schoolId) {
+          return res.status(403).json({ message: "No school associated with this account" });
+        }
         invoices = await storage.getInvoicesBySchool(schoolId);
       } else {
-        invoices = await storage.getAllInvoices();
+        // Admin users can view filtered invoices
+        const status = req.query.status as string | undefined;
+        const schoolIdParam = req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined;
+        
+        if (status) {
+          invoices = await storage.getInvoicesByStatus(status);
+        } else if (schoolIdParam) {
+          invoices = await storage.getInvoicesBySchool(schoolIdParam);
+        } else {
+          invoices = await storage.getAllInvoices();
+        }
       }
       
       // Enrich invoices with school and exam year information
