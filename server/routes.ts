@@ -12862,6 +12862,13 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         day: 'numeric' 
       });
 
+      // Load logo as base64
+      const fsModule = (await import('fs')).promises;
+      const pathModule = (await import('path')).default;
+      const logoBuffer = await fsModule.readFile(pathModule.join(process.cwd(), 'public/amaanah-logo.png'));
+      const logoBase64 = logoBuffer.toString('base64');
+      const logoDataUrl = `data:image/png;base64,${logoBase64}`;
+
       const htmlContent = `
         <!DOCTYPE html>
         <html dir="rtl" lang="ar">
@@ -13050,7 +13057,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               
               <div class="header-center">
                 <div class="seal">
-                  <img src="file://${process.cwd()}/public/amaanah-logo.png" alt="GSIAE/AMAANAH Logo" />
+                  <img src="${logoDataUrl}" alt="GSIAE/AMAANAH Logo" style="max-width: 100%; height: auto;" />
                 </div>
               </div>
               
