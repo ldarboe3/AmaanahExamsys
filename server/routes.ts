@@ -2097,6 +2097,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         feePerStudent: '0',
         totalAmount: schoolRegistrationFee.toString(),
         status: 'pending',
+        description: `School registration - GMD ${schoolRegistrationFee.toFixed(2)}`,
         notes: 'School Registration Fee - One-time mandatory fee for joining the Amaanah Examination System',
       }).returning();
       

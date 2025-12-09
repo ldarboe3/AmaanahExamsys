@@ -1006,6 +1006,7 @@ export default function Payments() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>{isRTL ? "الفاتورة" : "Invoice"}</TableHead>
+                    <TableHead>{isRTL ? "الوصف" : "Description"}</TableHead>
                     <TableHead>{isRTL ? "المدرسة" : "School"}</TableHead>
                     <TableHead>{t.common.students}</TableHead>
                     <TableHead>{isRTL ? "المبلغ" : "Amount"}</TableHead>
@@ -1030,6 +1031,9 @@ export default function Payments() {
                               </p>
                             </div>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{(invoice as any).description || (isRTL ? "—" : "—")}</span>
                         </TableCell>
                         <TableCell>
                           <span className="text-sm">{invoice.school?.name || (isRTL ? "غير معروف" : "Unknown")}</span>
