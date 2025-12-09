@@ -243,6 +243,7 @@ export const invoices = pgTable("invoices", {
   bankSlipUrl: varchar("bank_slip_url", { length: 500 }),
   paymentDate: timestamp("payment_date"),
   paymentMethod: varchar("payment_method", { length: 50 }),
+  description: varchar("description", { length: 500 }),
   notes: text("notes"),
   rejectionReason: text("rejection_reason"),
   rejectedAt: timestamp("rejected_at"),
