@@ -5537,8 +5537,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "Invoice already paid" });
       }
       
-      if (invoice.status !== 'processing') {
-        return res.status(400).json({ message: "Invoice must have a bank slip uploaded before payment can be confirmed" });
+      // Allow admins to confirm payment for both 'pending' (no bank slip) and 'processing' (with bank slip) invoices
+      if (invoice.status !== 'processing' && invoice.status !== 'pending') {
+        return res.status(400).json({ message: "Invoice cannot be confirmed in its current state" });
       }
       
       // Update invoice status to paid

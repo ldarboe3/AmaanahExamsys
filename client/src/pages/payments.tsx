@@ -1077,6 +1077,22 @@ export default function Payments() {
                                   {isRTL ? "عرض إيصال البنك" : "View Bank Slip"}
                                 </DropdownMenuItem>
                               )}
+                              {/* Show Confirm Payment for pending/processing invoices (admin can confirm directly) */}
+                              {canConfirmPayments && (invoice.status === 'pending' || invoice.status === 'processing') && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => confirmPaymentMutation.mutate(invoice.id)}
+                                    className="text-chart-3"
+                                    disabled={confirmPaymentMutation.isPending}
+                                  >
+                                    <CheckCircle className="w-4 h-4 me-2" />
+                                    {confirmPaymentMutation.isPending 
+                                      ? (isRTL ? "جاري التأكيد..." : "Confirming...") 
+                                      : (isRTL ? "تأكيد الدفع" : "Confirm Payment")}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                               {/* Show Approve All Students only for paid invoices */}
                               {canConfirmPayments && invoice.status === 'paid' && (
                                 <>
