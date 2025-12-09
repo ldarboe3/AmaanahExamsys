@@ -11197,7 +11197,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return {
           name: subject?.name || 'Unknown Subject',
           nameAr: subject?.arabicName || subject?.name || 'مادة غير معروفة',
-          score: r.rawScore || 0,
+          score: parseFloat(r.totalScore || '0'),
           maxScore: 100,
           passingScore: subject?.passingScore || 50,
         };
