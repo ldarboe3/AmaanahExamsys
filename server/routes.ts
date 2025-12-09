@@ -530,14 +530,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (isSchoolAdmin) {
         // School admins only see their own school's stats
         const schoolId = await getSchoolIdForUser(user);
-        console.log('[Dashboard Stats] School admin user:', user.id, 'username:', user.username, 'schoolId:', user.schoolId, 'resolved schoolId:', schoolId);
         if (!schoolId) {
           return res.status(403).json({ message: "No school associated with this account" });
         }
 
         // Get students for this school
         const schoolStudents = await storage.getStudentsBySchool(schoolId);
-        console.log('[Dashboard Stats] School', schoolId, 'has', schoolStudents.length, 'students');
         totalStudents = schoolStudents.length;
         
         // Count pending students for this school
@@ -546,10 +544,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
         // Get invoices for this school
         const schoolInvoices = await storage.getInvoicesBySchool(schoolId);
-        console.log('[Dashboard Stats] School', schoolId, 'has', schoolInvoices.length, 'invoices:', schoolInvoices.map(i => ({ id: i.id, amount: i.totalAmount })));
         // Total revenue: sum of all invoice amounts (whether paid or pending)
         totalRevenue = schoolInvoices.reduce((sum, inv) => sum + parseFloat(inv.totalAmount || '0'), 0);
-        console.log('[Dashboard Stats] Total revenue:', totalRevenue);
         
         // Pending payments: count invoices that are not paid
         const pendingInvoices = schoolInvoices.filter(inv => inv.status !== 'paid');
