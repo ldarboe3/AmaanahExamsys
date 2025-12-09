@@ -59,6 +59,7 @@ interface Student {
   indexNumber?: string;
   grade: number;
   results?: StudentResult[];
+  ranking?: number;
 }
 
 interface SchoolResultsData {
@@ -301,10 +302,8 @@ export default function SchoolResults() {
                     </thead>
                     <tbody>
                       {studentsWithResults.map((student, idx) => {
-                        const studentResults = filteredResults.filter(
-                          (r) => r.studentId === student.id
-                        );
-                        const ranking = studentResults[0]?.ranking;
+                        // Use student-level ranking directly from backend
+                        const ranking = student.ranking;
                         const total = getStudentTotal(student.id, selectedExamYearId || undefined);
                         const percentage = getStudentPercentage(
                           student.id,

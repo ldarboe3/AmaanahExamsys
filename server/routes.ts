@@ -12629,27 +12629,30 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       // Get subjects for reference
       const subjects = await storage.getAllSubjects();
 
-      // Calculate rankings per exam year and grade
-      const resultsByGradeAndYear = new Map<string, any[]>();
-      for (const result of publishedResults) {
-        const student = students.find(s => s.id === result.studentId);
-        const key = `${result.examYearId}-${student?.grade || ''}`;
-        if (!resultsByGradeAndYear.has(key)) {
-          resultsByGradeAndYear.set(key, []);
+      // Calculate STUDENT rankings based on total scores (not per-subject)
+      // Group students by exam year and grade
+      const studentsByGradeAndYear = new Map<string, { studentId: number; total: number }[]>();
+      for (const student of students) {
+        const studentResults = publishedResults.filter(r => r.studentId === student.id);
+        if (studentResults.length === 0) continue;
+        
+        const examYearId = studentResults[0]?.examYearId;
+        const key = `${examYearId}-${student.grade || ''}`;
+        
+        const total = studentResults.reduce((sum, r) => sum + parseFloat(r.totalScore || '0'), 0);
+        
+        if (!studentsByGradeAndYear.has(key)) {
+          studentsByGradeAndYear.set(key, []);
         }
-        resultsByGradeAndYear.get(key)!.push(result);
+        studentsByGradeAndYear.get(key)!.push({ studentId: student.id, total });
       }
 
-      // Sort by totalScore descending for each group to get rankings
-      const rankedResults = new Map<number, number>(); // resultId -> ranking
-      for (const [_, groupResults] of resultsByGradeAndYear) {
-        const sorted = [...groupResults].sort((a, b) => {
-          const scoreA = parseFloat(a.totalScore || '0');
-          const scoreB = parseFloat(b.totalScore || '0');
-          return scoreB - scoreA;
-        });
-        sorted.forEach((result, index) => {
-          rankedResults.set(result.id, index + 1);
+      // Sort by total score descending and assign rankings per student
+      const studentRankings = new Map<number, number>(); // studentId -> ranking
+      for (const [_, studentTotals] of studentsByGradeAndYear) {
+        const sorted = [...studentTotals].sort((a, b) => b.total - a.total);
+        sorted.forEach((item, index) => {
+          studentRankings.set(item.studentId, index + 1);
         });
       }
 
@@ -12657,11 +12660,12 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         school: { id: schoolId },
         students: students.map(s => ({
           ...s,
-          results: publishedResults.filter(r => r.studentId === s.id)
+          results: publishedResults.filter(r => r.studentId === s.id),
+          ranking: studentRankings.get(s.id) || null
         })),
         results: publishedResults.map(r => ({
           ...r,
-          ranking: rankedResults.get(r.id) || null,
+          ranking: studentRankings.get(r.studentId) || null,
           subject: subjects.find(s => s.id === r.subjectId)
         })),
         examYears: allExamYears,
@@ -12724,41 +12728,48 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         ? await storage.getExamYear(examYearId) 
         : await storage.getActiveExamYear();
 
-      // Calculate rankings per exam year and grade
-      const resultsByGradeAndYear = new Map<string, any[]>();
-      for (const result of publishedResults) {
-        const student = students.find(s => s.id === result.studentId);
-        const key = `${result.examYearId}-${student?.grade || ''}`;
-        if (!resultsByGradeAndYear.has(key)) {
-          resultsByGradeAndYear.set(key, []);
+      // Calculate STUDENT rankings based on total scores (not per-subject)
+      const studentsByGradeAndYear = new Map<string, { studentId: number; total: number; subjectCount: number }[]>();
+      for (const student of students) {
+        const studentResults = publishedResults.filter(r => r.studentId === student.id);
+        if (studentResults.length === 0) continue;
+        
+        const examYearIdForStudent = studentResults[0]?.examYearId;
+        const key = `${examYearIdForStudent}-${student.grade || ''}`;
+        
+        const total = studentResults.reduce((sum, r) => sum + parseFloat(r.totalScore || '0'), 0);
+        
+        if (!studentsByGradeAndYear.has(key)) {
+          studentsByGradeAndYear.set(key, []);
         }
-        resultsByGradeAndYear.get(key)!.push(result);
+        studentsByGradeAndYear.get(key)!.push({ studentId: student.id, total, subjectCount: studentResults.length });
       }
 
-      // Sort by totalScore descending for each group to get rankings
-      const rankedResults = new Map<number, number>();
-      for (const [_, groupResults] of resultsByGradeAndYear) {
-        const sorted = [...groupResults].sort((a, b) => {
-          const scoreA = parseFloat(a.totalScore || '0');
-          const scoreB = parseFloat(b.totalScore || '0');
-          return scoreB - scoreA;
-        });
-        sorted.forEach((result, index) => {
-          rankedResults.set(result.id, index + 1);
+      // Sort by total score descending and assign rankings per student
+      const studentRankings = new Map<number, number>();
+      const studentTotals = new Map<number, { total: number; subjectCount: number }>();
+      for (const [_, studentsList] of studentsByGradeAndYear) {
+        const sorted = [...studentsList].sort((a, b) => b.total - a.total);
+        sorted.forEach((item, index) => {
+          studentRankings.set(item.studentId, index + 1);
+          studentTotals.set(item.studentId, { total: item.total, subjectCount: item.subjectCount });
         });
       }
 
-      // Prepare data for PDF
-      const resultsWithRanking = publishedResults.map(r => ({
-        ...r,
-        ranking: rankedResults.get(r.id) || null,
-        subject: subjects.find(s => s.id === r.subjectId),
-        student: students.find(s => s.id === r.studentId)
-      })).sort((a, b) => {
-        const scoreA = parseFloat(a.totalScore || '0');
-        const scoreB = parseFloat(b.totalScore || '0');
-        return scoreB - scoreA;
-      });
+      // Prepare data for PDF - aggregate by student
+      const studentSummaries = students
+        .filter(s => studentRankings.has(s.id))
+        .map(student => {
+          const totals = studentTotals.get(student.id)!;
+          return {
+            student,
+            totalScore: totals.total,
+            subjectCount: totals.subjectCount,
+            percentage: ((totals.total / (totals.subjectCount * 100)) * 100).toFixed(1),
+            ranking: studentRankings.get(student.id)
+          };
+        })
+        .sort((a, b) => b.totalScore - a.totalScore);
 
       // Generate HTML content with logo and address header
       const currentDate = new Date().toLocaleDateString('en-US', { 
@@ -12913,7 +12924,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
                 <th>اسم الطالب<br>Student Name</th>
                 <th>رقم الفهرس<br>Index</th>
                 <th>الصف<br>Grade</th>
-                <th>المادة<br>Subject</th>
+                <th>عدد المواد<br>Subjects</th>
                 <th>المجموع<br>Total</th>
                 <th>النسبة %<br>%</th>
                 <th>الترتيب<br>Rank</th>
@@ -12921,19 +12932,17 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               </tr>
             </thead>
             <tbody>
-              ${resultsWithRanking.map((result, idx) => {
-                const totalScore = parseFloat(result.totalScore || '0');
-                const percentage = (totalScore / 100) * 100;
+              ${studentSummaries.map((summary, idx) => {
                 return `
                   <tr>
                     <td>${idx + 1}</td>
-                    <td class="student-name">${result.student?.firstName} ${result.student?.lastName}</td>
-                    <td>${result.student?.indexNumber || '-'}</td>
-                    <td>${result.student?.grade || '-'}</td>
-                    <td>${result.subject?.name || 'N/A'}</td>
-                    <td>${totalScore.toFixed(1)}</td>
-                    <td>${percentage.toFixed(1)}</td>
-                    <td>${result.ranking || '-'}</td>
+                    <td class="student-name">${summary.student?.firstName} ${summary.student?.lastName}</td>
+                    <td>${summary.student?.indexNumber || '-'}</td>
+                    <td>${summary.student?.grade || '-'}</td>
+                    <td>${summary.subjectCount}</td>
+                    <td>${summary.totalScore.toFixed(1)}</td>
+                    <td>${summary.percentage}</td>
+                    <td>${summary.ranking || '-'}</td>
                     <td>Published</td>
                   </tr>
                 `;
@@ -12953,6 +12962,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       `;
 
       // Generate PDF using Puppeteer
+      const puppeteer = (await import('puppeteer')).default;
       const browser = await puppeteer.launch({ 
         headless: true,
         executablePath: getChromiumExecutable(),
