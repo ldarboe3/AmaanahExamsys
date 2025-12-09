@@ -13060,17 +13060,17 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       let browser;
       try {
         browser = await puppeteer.launch({ 
-          headless: true,
+          headless: 'new',
           executablePath: getChromiumExecutable(),
-          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
         });
         const page = await browser.newPage();
         
-        // Set page size and margins
-        await page.setViewport({ width: 1200, height: 1600 });
+        // Encode HTML as data URL
+        const dataUrl = `data:text/html;charset=UTF-8,${encodeURIComponent(htmlContent)}`;
         
-        // Set content with proper wait
-        await page.setContent(htmlContent, { waitUntil: 'load' });
+        // Navigate using data URL
+        await page.goto(dataUrl, { waitUntil: 'networkidle0', timeout: 30000 });
         
         // Generate PDF with proper formatting
         const pdfBuffer = await page.pdf({
@@ -13082,12 +13082,13 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         });
         
         await page.close();
-        await browser.close();
 
         // Verify PDF size
         if (!pdfBuffer || pdfBuffer.length === 0) {
           throw new Error('PDF generation resulted in empty buffer');
         }
+
+        await browser.close();
 
         // Send PDF to client
         res.setHeader('Content-Type', 'application/pdf');
@@ -13095,8 +13096,11 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         res.setHeader('Content-Length', pdfBuffer.length);
         res.send(pdfBuffer);
       } catch (pdfError: any) {
+        console.error('PDF generation error:', pdfError);
         if (browser) {
-          await browser.close();
+          try {
+            await browser.close();
+          } catch (e) {}
         }
         throw pdfError;
       }
