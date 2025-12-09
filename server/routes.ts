@@ -8023,7 +8023,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
               // Create in-dashboard notification
               const notificationData = {
-                type: 'results_published',
+                type: 'result_published' as const,
                 title: 'Examination Results Published',
                 message: `Results for ${examYear.name} (Grade ${grade || 'all'}) have been published. You can now view and download student transcripts.`,
                 data: {
