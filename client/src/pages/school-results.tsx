@@ -125,7 +125,25 @@ export default function SchoolResults() {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to download PDF');
+        // Try to parse error message from JSON response
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to download PDF');
+        } catch (jsonError) {
+          // If not JSON, throw generic error
+          throw new Error('Failed to download PDF');
+        }
+      }
+
+      // Check if response is actually a PDF
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/pdf')) {
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'No published results available');
+        } catch {
+          throw new Error('No published results available');
+        }
       }
 
       const blob = await response.blob();
