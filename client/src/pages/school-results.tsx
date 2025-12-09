@@ -94,6 +94,29 @@ export default function SchoolResults() {
       )
     : students;
 
+  // Get unique subjects sorted by name
+  const getSubjects = (): Subject[] => {
+    const uniqueSubjects = new Map<number, Subject>();
+    filteredResults.forEach(r => {
+      if (r.subject && r.subjectId) {
+        uniqueSubjects.set(r.subjectId, r.subject);
+      }
+    });
+    return Array.from(uniqueSubjects.values()).sort((a, b) => 
+      (a.name || '').localeCompare(b.name || '')
+    );
+  };
+
+  const subjects = getSubjects();
+
+  // Get subject score for a student
+  const getSubjectScore = (studentId: number, subjectId: number): string => {
+    const result = filteredResults.find(
+      r => r.studentId === studentId && r.subjectId === subjectId
+    );
+    return result ? parseFloat(result.totalScore || '0').toFixed(1) : '0';
+  };
+
   // Group results by student and exam year
   const getStudentTotal = (studentId: number, examYearId?: number) => {
     const results = examYearId
@@ -273,70 +296,112 @@ export default function SchoolResults() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50 border-b">
-                      <tr>
-                        <th className="text-left px-3 py-3 font-semibold">
-                          {isRTL ? "اسم الطالب" : "Student Name"}
-                        </th>
-                        <th className="text-left px-3 py-3 font-semibold">
-                          {isRTL ? "رقم الفهرس" : "Index Number"}
-                        </th>
-                        <th className="text-left px-3 py-3 font-semibold">
-                          {isRTL ? "الصف" : "Grade"}
-                        </th>
-                        <th className="text-center px-3 py-3 font-semibold">
-                          {isRTL ? "المجموع" : "Total"}
-                        </th>
-                        <th className="text-center px-3 py-3 font-semibold">
-                          {isRTL ? "النسبة %" : "Percentage"}
-                        </th>
-                        <th className="text-center px-3 py-3 font-semibold">
-                          {isRTL ? "الترتيب" : "Ranking"}
-                        </th>
-                        <th className="text-center px-3 py-3 font-semibold">
-                          {isRTL ? "النتيجة" : "Status"}
-                        </th>
-                      </tr>
-                    </thead>
+                <div style={{ overflowX: 'auto' }}>
+                    <style>{`
+                      @media print {
+                        @page {
+                          size: A4 landscape;
+                          margin: 10mm;
+                        }
+                        body {
+                          margin: 0;
+                          padding: 0;
+                        }
+                        .results-table {
+                          font-size: 9px;
+                          width: 100%;
+                        }
+                        .results-table thead {
+                          background: #0d9488;
+                          color: white;
+                        }
+                        .results-table th {
+                          padding: 4px 2px;
+                          font-weight: bold;
+                          text-align: center;
+                          border: 1px solid #0d9488;
+                        }
+                        .results-table td {
+                          padding: 3px 2px;
+                          border: 1px solid #ddd;
+                        }
+                        .results-table tr:nth-child(odd) {
+                          background: #f9fafb;
+                        }
+                      }
+                    `}</style>
+                    <table className="w-full text-sm results-table">
+                      <thead className="bg-muted/50 border-b">
+                        <tr>
+                          <th className="text-left px-3 py-3 font-semibold">
+                            {isRTL ? "اسم الطالب" : "Student Name"}
+                          </th>
+                          <th className="text-left px-3 py-3 font-semibold">
+                            {isRTL ? "رقم الفهرس" : "Index Number"}
+                          </th>
+                          <th className="text-left px-3 py-3 font-semibold">
+                            {isRTL ? "الصف" : "Grade"}
+                          </th>
+                          {subjects.map((subject) => (
+                            <th key={subject.id} className="text-center px-2 py-2 font-semibold text-xs whitespace-nowrap">
+                              {isRTL ? subject.arabicName : subject.name}
+                            </th>
+                          ))}
+                          <th className="text-center px-3 py-3 font-semibold">
+                            {isRTL ? "المجموع" : "Total"}
+                          </th>
+                          <th className="text-center px-3 py-3 font-semibold">
+                            {isRTL ? "النسبة %" : "%"}
+                          </th>
+                          <th className="text-center px-3 py-3 font-semibold">
+                            {isRTL ? "الترتيب" : "Rank"}
+                          </th>
+                          <th className="text-center px-3 py-3 font-semibold">
+                            {isRTL ? "النتيجة" : "Status"}
+                          </th>
+                        </tr>
+                      </thead>
                     <tbody>
-                      {studentsWithResults.map((student, idx) => {
-                        // Use student-level ranking directly from backend
-                        const ranking = student.ranking;
-                        const total = getStudentTotal(student.id, selectedExamYearId || undefined);
-                        const percentage = getStudentPercentage(
-                          student.id,
-                          selectedExamYearId || undefined
-                        );
+                        {studentsWithResults.map((student, idx) => {
+                          const ranking = student.ranking;
+                          const total = getStudentTotal(student.id, selectedExamYearId || undefined);
+                          const percentage = getStudentPercentage(
+                            student.id,
+                            selectedExamYearId || undefined
+                          );
 
-                        return (
-                          <tr
-                            key={student.id}
-                            className={idx % 2 === 0 ? "bg-white dark:bg-slate-950" : "bg-muted/30"}
-                            data-testid={`row-student-${student.id}`}
-                          >
-                            <td className="px-3 py-2 font-medium">
-                              {student.firstName} {student.lastName}
-                            </td>
-                            <td className="px-3 py-2">{student.indexNumber || "-"}</td>
-                            <td className="px-3 py-2">{student.grade}</td>
-                            <td className="px-3 py-2 text-center font-semibold">{total}</td>
-                            <td className="px-3 py-2 text-center font-semibold">{percentage}%</td>
-                            <td className="px-3 py-2 text-center">
-                              {ranking ? `${ranking}${rankingSuffix(ranking)}` : "-"}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <Badge variant="outline">
-                                {isRTL ? "منشور" : "Published"}
-                              </Badge>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                          return (
+                            <tr
+                              key={student.id}
+                              className={idx % 2 === 0 ? "bg-white dark:bg-slate-950" : "bg-muted/30"}
+                              data-testid={`row-student-${student.id}`}
+                            >
+                              <td className="px-3 py-2 font-medium">
+                                {student.firstName} {student.lastName}
+                              </td>
+                              <td className="px-3 py-2">{student.indexNumber || "-"}</td>
+                              <td className="px-3 py-2">{student.grade}</td>
+                              {subjects.map((subject) => (
+                                <td key={subject.id} className="px-2 py-2 text-center text-xs">
+                                  {getSubjectScore(student.id, subject.id)}
+                                </td>
+                              ))}
+                              <td className="px-3 py-2 text-center font-semibold">{total}</td>
+                              <td className="px-3 py-2 text-center font-semibold">{percentage}%</td>
+                              <td className="px-3 py-2 text-center">
+                                {ranking ? `${ranking}${rankingSuffix(ranking)}` : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <Badge variant="outline">
+                                  {isRTL ? "منشور" : "Published"}
+                                </Badge>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
               </CardContent>
             </Card>
           )}
