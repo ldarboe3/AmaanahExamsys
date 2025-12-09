@@ -12880,46 +12880,118 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               line-height: 1.4;
             }
             .header {
-              text-align: center;
-              border-bottom: 3px solid #0d9488;
-              padding: 20px 15px 15px 15px;
+              border-bottom: 3px solid #000;
+              padding: 15px 0;
               margin-bottom: 12px;
-              background: linear-gradient(to bottom, #f0fdfb 0%, white 100%);
-            }
-            .header-content {
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              gap: 20px;
-              margin-bottom: 8px;
-            }
-            .logo {
-              width: 70px;
-              height: 70px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 48px;
-              font-weight: bold;
-              color: #0d9488;
-              border: 3px solid #0d9488;
-              border-radius: 8px;
               background: white;
             }
-            .org-info {
-              text-align: center;
+            .government-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 15px;
+              padding: 0 15px;
+              gap: 30px;
             }
-            .org-name {
-              font-size: 22px;
+            .header-left {
+              text-align: left;
+              flex: 1;
+              padding-top: 8px;
+            }
+            .header-left-title {
+              font-size: 13px;
+              font-weight: bold;
+              color: #000;
+              margin: 0;
+              line-height: 1.3;
+            }
+            .header-left-subtitle {
+              font-size: 11px;
+              color: #000;
+              margin: 3px 0 0 0;
+              line-height: 1.3;
+            }
+            .header-center {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 8px;
+              flex-shrink: 0;
+            }
+            .seal {
+              width: 65px;
+              height: 65px;
+              border: 2px solid #228B22;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background: #f5f5f5;
+              font-size: 32px;
+              color: #228B22;
+            }
+            .seal-banner {
+              font-size: 9px;
+              color: #000;
+              font-weight: bold;
+              width: 70px;
+              text-align: center;
+              line-height: 1.2;
+            }
+            .header-right {
+              text-align: right;
+              flex: 1;
+              padding-top: 8px;
+            }
+            .header-right-title {
+              font-size: 13px;
+              font-weight: bold;
+              color: #000;
+              margin: 0;
+              line-height: 1.3;
+            }
+            .header-right-subtitle {
+              font-size: 11px;
+              color: #000;
+              margin: 3px 0 0 0;
+              line-height: 1.3;
+            }
+            .amaanah-branding {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              gap: 15px;
+              margin-top: 12px;
+              padding-top: 12px;
+              border-top: 1px solid #ddd;
+            }
+            .amaanah-logo {
+              width: 50px;
+              height: 50px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 36px;
               font-weight: bold;
               color: #0d9488;
-              margin-bottom: 3px;
-              letter-spacing: 0.5px;
+              border: 2px solid #0d9488;
+              border-radius: 6px;
+              background: white;
             }
-            .org-address {
-              font-size: 9px;
-              color: #555;
-              line-height: 1.5;
+            .amaanah-info {
+              text-align: center;
+            }
+            .amaanah-name {
+              font-size: 16px;
+              font-weight: bold;
+              color: #0d9488;
+              margin: 0;
+            }
+            .amaanah-address {
+              font-size: 8px;
+              color: #666;
+              margin: 2px 0 0 0;
+              line-height: 1.4;
             }
             .title-section {
               text-align: center;
@@ -13001,12 +13073,29 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         </head>
         <body>
           <div class="header">
-            <div class="header-content">
-              <div class="logo">أ</div>
-              <div class="org-info">
-                <div class="org-name">أمانة الامتحانات - AMAANAH</div>
-                <div class="org-address">
-                  <div>جمهورية مولدوفا | Republic of Moldova</div>
+            <div class="government-header">
+              <div class="header-left">
+                <p class="header-left-title">The General Secretariat for<br>Islamic/Arabic Education in<br>The Gambia</p>
+                <p class="header-left-subtitle">Examination affairs unit</p>
+              </div>
+              
+              <div class="header-center">
+                <div class="seal">🏛</div>
+                <div class="seal-banner">EDUCATION FOR DEVELOPMENT</div>
+              </div>
+              
+              <div class="header-right">
+                <p class="header-right-title">الأمانة العامة للتعليم<br>الإسلامي العربي<br>في غامبيا</p>
+                <p class="header-right-subtitle">قسم الامتحانات</p>
+              </div>
+            </div>
+
+            <div class="amaanah-branding">
+              <div class="amaanah-logo">أ</div>
+              <div class="amaanah-info">
+                <div class="amaanah-name">أمانة الامتحانات - AMAANAH</div>
+                <div class="amaanah-address">
+                  <div>Republic of the Gambia | جمهورية غامبيا</div>
                   <div>info@amaanah.education | +1-800-AMAANAH</div>
                 </div>
               </div>
