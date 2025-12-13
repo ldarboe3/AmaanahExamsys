@@ -6542,13 +6542,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Map CSV columns to subject IDs
       const subjectColumnMapping: Map<string, number> = new Map();
+      console.log('[Preview] Subject columns from CSV:', subjectColumns);
+      console.log('[Preview] DB subjects normalized:', Array.from(subjectHeaderMap.keys()));
+      
       for (const col of subjectColumns) {
         const normalizedCol = cleanArabicText(col, 'subject');
         const subjectId = subjectHeaderMap.get(normalizedCol);
+        console.log(`[Preview] Matching col "${col}" -> normalized "${normalizedCol}" -> subjectId=${subjectId}`);
         if (subjectId) {
           subjectColumnMapping.set(col, subjectId);
         }
       }
+      console.log('[Preview] Subject column mapping size:', subjectColumnMapping.size);
 
       // Tracking
       const previewRows: PreviewRow[] = [];
