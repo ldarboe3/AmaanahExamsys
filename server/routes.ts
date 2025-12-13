@@ -6501,11 +6501,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "CSV file is empty" });
       }
 
-      // Metadata columns for identification
+      // Metadata columns for identification (exclude these from subject matching)
       const metadataColumns = [
         'school name', 'schoolname', 'school_name', 'school', 'المدرسة',
         'address', 'العنوان',
-        'student name', 'studentname', 'student_name', 'student', 'اسم الطالب', 'الطالب'
+        'student name', 'studentname', 'student_name', 'student', 'اسم الطالب', 'الطالب',
+        'region', 'cluster', 'المنطقة', 'الكتلة',
+        'المجموع', 'total', 'النسبة%', 'النسبة', 'percentage', '%',
+        'التقدير', 'grade', 'result', 'النتيجة', 'assessment', 'رقم', '#', 'no', 'number'
       ];
       
       const allColumns = Object.keys(rows[0]);
