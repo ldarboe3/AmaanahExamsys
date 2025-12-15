@@ -7,7 +7,6 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LanguageProvider, useLanguage } from "@/lib/i18n/LanguageContext";
 import { AppSidebar } from "@/components/app-sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { NotificationsDropdown } from "@/components/notifications-dropdown";
 import { DocumentationButton } from "@/components/documentation-button";
@@ -163,7 +162,6 @@ function AuthenticatedLayout() {
               <NotificationsDropdown />
               <DocumentationButton />
               <LanguageToggle />
-              <ThemeToggle />
               <UserProfileDropdown />
             </div>
           </header>
