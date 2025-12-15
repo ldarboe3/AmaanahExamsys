@@ -27,9 +27,23 @@ function grade(score: number): string {
   return 'F';
 }
 
+async function getMaxIndexNumber(): Promise<number> {
+  const result = await db.select({
+    maxIndex: sql`MAX(CAST(index_number AS INTEGER))`
+  }).from(students);
+  
+  const maxVal = result[0]?.maxIndex;
+  return (maxVal && !isNaN(maxVal)) ? parseInt(maxVal) : 0;
+}
+
 async function run() {
   const EXAM_YEAR = 10, GRADE = 6;
   console.log('=== FULL IMPORT START ===');
+
+  // Get max index number
+  const maxIndex = await getMaxIndexNumber();
+  let indexCounter = maxIndex + 1;
+  console.log(`Starting from index number: ${indexCounter}`);
 
   const workbook = XLSX.readFile('attached_assets/Amaanah_G6_1765840099034.xls');
   const sheet = workbook.Sheets['total'];
@@ -37,7 +51,7 @@ async function run() {
   
   const headers = data[0];
   const rows = data.slice(1).filter(r => r[0] && r[1]);
-  console.log(`Rows: ${rows.length}`);
+  console.log(`Rows to process: ${rows.length}`);
 
   // Get column indices
   const cols = {
@@ -66,7 +80,7 @@ async function run() {
     const id = subjectMap.get(clean(col.name));
     if (id) subjectCols.push({ idx: col.idx, id });
   }
-  console.log(`Matched ${subjectCols.length} subjects`);
+  console.log(`Matched ${subjectCols.length} subjects\n`);
 
   // Get default region/cluster
   const defaultRegion = dbRegions[0]?.id || 340;
@@ -75,7 +89,6 @@ async function run() {
   // Track created schools
   const newSchools = new Map<string, number>();
   const studentCache = new Map<string, number>();
-  let indexCounter = 1;
 
   let created = 0, matched = 0, results = 0;
 
@@ -128,14 +141,16 @@ async function run() {
         
         // Update to approved with index if missing
         if (!match.indexNumber || match.status !== 'approved') {
+          const newIndex = match.indexNumber || String(indexCounter++).padStart(6, '0');
           await db.update(students).set({
             status: 'approved',
-            indexNumber: match.indexNumber || String(indexCounter++).padStart(6, '0')
+            indexNumber: newIndex
           }).where(eq(students.id, studentId));
         }
       } else {
         // Create student
         const parts = studentName.split(/\s+/);
+        const newIndex = String(indexCounter++).padStart(6, '0');
         const [newStudent] = await db.insert(students).values({
           firstName: parts[0],
           lastName: parts.slice(1).join(' ') || parts[0],
@@ -144,7 +159,7 @@ async function run() {
           examYearId: EXAM_YEAR,
           status: 'approved',
           gender: 'male',
-          indexNumber: String(indexCounter++).padStart(6, '0')
+          indexNumber: newIndex
         }).returning();
         studentId = newStudent.id;
         created++;
@@ -186,11 +201,13 @@ async function run() {
     if ((i + 1) % 50 === 0) console.log(`${i + 1}/${rows.length}...`);
   }
 
-  console.log('\n=== DONE ===');
+  console.log('\n=== IMPORT COMPLETE ===');
+  console.log(`Total rows: ${rows.length}`);
   console.log(`Schools created: ${newSchools.size}`);
   console.log(`Students matched: ${matched}`);
   console.log(`Students created: ${created}`);
-  console.log(`Results: ${results}`);
+  console.log(`Total results: ${results}`);
+  console.log(`Max index number assigned: ${String(indexCounter - 1).padStart(6, '0')}`);
   process.exit(0);
 }
 
