@@ -183,6 +183,7 @@ async function run() {
         await db.update(studentResults).set({
           score: val.toFixed(2),
           grade: grade(val),
+          status: 'published',
           updatedAt: new Date()
         }).where(eq(studentResults.id, existing[0].id));
       } else {
@@ -192,7 +193,7 @@ async function run() {
           examYearId: EXAM_YEAR,
           score: val.toFixed(2),
           grade: grade(val),
-          status: 'pending'
+          status: 'published'
         });
       }
       results++;
