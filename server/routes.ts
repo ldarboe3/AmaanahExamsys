@@ -8063,34 +8063,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               await storage.createNotificationsBulk(notificationsToCreate);
             }
 
-            // Send emails
+            // Send emails using the proper SendGrid connector
             if (emailsToSend.length > 0) {
+              const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+                ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+                : 'https://amaanah.repl.co';
+              
               for (const emailData of emailsToSend) {
                 try {
-                  const sgMail = require('@sendgrid/mail');
-                  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
-                  const emailContent = `
-                    <h2>Examination Results Published</h2>
-                    <p>Dear ${emailData.adminName},</p>
-                    <p>The examination results for <strong>${emailData.examYearName}</strong> (Grade ${emailData.grade}) have been published.</p>
-                    <p>You can now:</p>
-                    <ul>
-                      <li>View all student results on your school dashboard</li>
-                      <li>Download student transcripts</li>
-                      <li>Generate and print official PDF reports with Amaanah branding</li>
-                    </ul>
-                    <p>Please log in to your school administrator account to access these results.</p>
-                    <p><a href="${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/school/results" style="background-color: #0d9488; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">View Results</a></p>
-                    <p>Best regards,<br>Amaanah Examination Board</p>
-                  `;
-
-                  await sgMail.send({
-                    to: emailData.to,
-                    from: 'noreply@amaanah.examination.org',
-                    subject: `Results Published: ${emailData.examYearName}`,
-                    html: emailContent
-                  });
+                  await sendResultsPublishedEmail(
+                    emailData.to,
+                    emailData.schoolName,
+                    emailData.examYearName,
+                    typeof emailData.grade === 'number' ? emailData.grade : 6,
+                    baseUrl
+                  );
+                  console.log(`Results published email sent to ${emailData.to}`);
                 } catch (emailError: any) {
                   console.error(`Failed to send email to ${emailData.to}:`, emailError.message);
                   // Continue with other emails even if one fails
