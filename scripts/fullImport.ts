@@ -1,6 +1,7 @@
 import { db } from '../server/db';
 import { schools, students, subjects, studentResults, regions, clusters } from '../shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
+import { detectGender } from '../server/genderDetection';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const XLSX = require('xlsx');
@@ -139,18 +140,25 @@ async function run() {
         studentId = match.id;
         matched++;
         
-        // Update to approved with index if missing
-        if (!match.indexNumber || match.status !== 'approved') {
+        // Update to approved with index and auto-detect gender if missing
+        const genderResult = detectGender(studentName);
+        const detectedGender = genderResult.gender === 'unknown' ? match.gender : genderResult.gender;
+        
+        if (!match.indexNumber || match.status !== 'approved' || match.gender !== detectedGender) {
           const newIndex = match.indexNumber || String(indexCounter++).padStart(6, '0');
           await db.update(students).set({
             status: 'approved',
-            indexNumber: newIndex
+            indexNumber: newIndex,
+            gender: detectedGender
           }).where(eq(students.id, studentId));
         }
       } else {
-        // Create student
+        // Create student with auto gender detection
         const parts = studentName.split(/\s+/);
         const newIndex = String(indexCounter++).padStart(6, '0');
+        const genderResult = detectGender(studentName);
+        const detectedGender = genderResult.gender === 'unknown' ? 'male' : genderResult.gender;
+        
         const [newStudent] = await db.insert(students).values({
           firstName: parts[0],
           lastName: parts.slice(1).join(' ') || parts[0],
@@ -158,7 +166,7 @@ async function run() {
           grade: GRADE,
           examYearId: EXAM_YEAR,
           status: 'approved',
-          gender: 'male',
+          gender: detectedGender,
           indexNumber: newIndex
         }).returning();
         studentId = newStudent.id;
