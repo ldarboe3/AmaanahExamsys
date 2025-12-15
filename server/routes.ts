@@ -7411,6 +7411,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     s = s.replace(/[\u200B\u200C\u200D\u200E\u200F\uFEFF]/g, '');
     // Remove other invisible formatting characters
     s = s.replace(/[\u2060-\u206F]/g, '');
+    // Remove Arabic tatweel/kashida (ـ U+0640) - used for text stretching in Excel/Arabic text
+    s = s.replace(/\u0640/g, '');
     
     // 7) Convert Arabic-Indic digits to ASCII for Region/Cluster fields
     // ٠١٢٣٤٥٦٧٨٩ → 0123456789
