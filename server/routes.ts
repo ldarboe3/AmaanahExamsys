@@ -4632,6 +4632,40 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Download unmatched records from results upload as CSV
+  app.post("/api/bulk-upload/results/download-unmatched", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only super admin and examination admin can download unmatched records" });
+      }
+
+      const { unmatchedRecords } = req.body;
+      if (!Array.isArray(unmatchedRecords) || unmatchedRecords.length === 0) {
+        return res.status(400).json({ message: "No unmatched records provided" });
+      }
+
+      // Create CSV content with UTF-8 BOM
+      const BOM = '\uFEFF';
+      let csvContent = BOM + '"Row","Student Name","School Name","Status","Reason"\n';
+      
+      unmatchedRecords.forEach((record: any) => {
+        const studentName = `${record.firstName || ''} ${record.middleName || ''} ${record.lastName || ''}`.trim();
+        const escapedStudentName = studentName.replace(/"/g, '""');
+        const escapedSchoolName = (record.schoolName || '').replace(/"/g, '""');
+        const escapedMessage = (record.message || '').replace(/"/g, '""');
+        csvContent += `${record.row},"${escapedStudentName}","${escapedSchoolName}","${record.status}","${escapedMessage}"\n`;
+      });
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="unmatched-results-records.csv"');
+      res.send(csvContent);
+    } catch (error: any) {
+      console.error('Download unmatched results records error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Download unmatched schools as CSV
   app.post("/api/students/download-unmatched-schools", isAuthenticated, async (req, res) => {
     try {

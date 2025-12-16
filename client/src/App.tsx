@@ -38,6 +38,7 @@ import Settings from "@/pages/settings";
 import Profile from "@/pages/profile";
 import SchoolProfile from "@/pages/school-profile";
 import SchoolResults from "@/pages/school-results";
+import ResultsUpload from "@/pages/results-upload";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -91,6 +92,9 @@ function AuthenticatedRoutes() {
       <Route path="/center-info" component={Centers} />
       <Route path="/admin-results">
         {() => <ProtectedRoute component={Results} allowedRoles={["super_admin", "examination_admin"]} />}
+      </Route>
+      <Route path="/results-upload">
+        {() => <ProtectedRoute component={ResultsUpload} allowedRoles={["super_admin", "examination_admin"]} />}
       </Route>
       <Route path="/certificates" component={Certificates} />
       <Route path="/transcripts" component={Transcripts} />
