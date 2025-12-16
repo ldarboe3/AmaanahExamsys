@@ -371,7 +371,17 @@ export default function Students() {
       formData.append('examYearId', adminUploadExamYear.toString());
       formData.append('grade', adminUploadGrade.toString());
 
-      setAdminUploadProgress(20);
+      // Simulate progressive upload based on file size
+      const fileSizeMB = file.size / (1024 * 1024);
+      const estimatedUploadTime = Math.max(2000, fileSizeMB * 500); // At least 2s, or 500ms per MB
+      
+      // Progressive upload indicator
+      let uploadProgress = 5;
+      const uploadInterval = setInterval(() => {
+        uploadProgress = Math.min(uploadProgress + 3, 30);
+        setAdminUploadProgress(uploadProgress);
+      }, estimatedUploadTime / 10);
+
       setAdminUploadPhase('parsing');
 
       const response = await fetch('/api/students/bulk-upload-preview', {
@@ -380,7 +390,8 @@ export default function Students() {
         credentials: 'include',
       });
 
-      setAdminUploadProgress(60);
+      clearInterval(uploadInterval);
+      setAdminUploadProgress(40);
       setAdminUploadPhase('matching');
 
       if (!response.ok) {
@@ -388,8 +399,18 @@ export default function Students() {
         throw new Error(error.message || 'Upload failed');
       }
 
+      // Progressive parsing indicator - server is processing
+      let parseProgress = 40;
+      const parseInterval = setInterval(() => {
+        parseProgress = Math.min(parseProgress + 5, 90);
+        setAdminUploadProgress(parseProgress);
+      }, 500);
+
+      const result = await response.json();
+      
+      clearInterval(parseInterval);
       setAdminUploadProgress(100);
-      return response.json();
+      return result;
     },
     onSuccess: (data) => {
       setAdminUploadPhase('preview');
@@ -424,19 +445,27 @@ export default function Students() {
       }
 
       setAdminUploadPhase('confirming');
-      setAdminUploadProgress(10);
+      setAdminUploadProgress(5);
 
       // Only send students that have a matched school
       const matchedStudents = adminUploadPreview.filter(s => s.matchedSchoolId);
       
+      if (matchedStudents.length === 0) {
+        throw new Error("No matched students to upload");
+      }
+      
       // Process in batches for large uploads to prevent timeout
-      const BATCH_SIZE = 500;
+      const BATCH_SIZE = 200; // Smaller batches for faster progress updates
       let totalCreated = 0;
       let totalFailed = 0;
+      const totalBatches = Math.ceil(matchedStudents.length / BATCH_SIZE);
       
       for (let i = 0; i < matchedStudents.length; i += BATCH_SIZE) {
         const batch = matchedStudents.slice(i, i + BATCH_SIZE);
-        const progress = Math.min(10 + ((i / matchedStudents.length) * 85), 95);
+        const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+        
+        // Calculate progress: reserve 5% at start and 5% at end
+        const progress = Math.round(5 + ((batchNumber / totalBatches) * 90));
         setAdminUploadProgress(progress);
         
         const response = await apiRequest('POST', '/api/students/bulk-upload-confirm', {
