@@ -4010,11 +4010,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
 
         try {
+          // Normalize gender from file - accepts Male/Female, M/F (case-insensitive)
+          let normalizedGender = 'male'; // default
+          const genderValue = String(student.gender || '').trim().toLowerCase();
+          if (genderValue === 'female' || genderValue === 'f') {
+            normalizedGender = 'female';
+          } else if (genderValue === 'male' || genderValue === 'm') {
+            normalizedGender = 'male';
+          }
+          
           const studentData = {
             firstName: student.firstName,
             lastName: student.lastName,
             middleName: student.middleName || '',
-            gender: student.gender || 'male',
+            gender: normalizedGender,
             schoolId: schoolId, // Use resolved schoolId (matched or newly created)
             examYearId: parseInt(examYearId),
             grade: parseInt(grade),
