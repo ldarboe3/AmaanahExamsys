@@ -36,6 +36,13 @@ const administrativeUnits = [
       "Decision Implementation: Execute Executive Committee resolutions promptly",
       "Regional Coordination: Support timely submission of regional reports",
       "Conflict Resolution: Supervise reconciliation processes and address disputes"
+    ],
+    responsibilitiesAr: [
+      "إدارة العمليات: الإشراف على العمليات الداخلية اليومية والتواصل بين الوحدات",
+      "دعم اللجنة التنفيذية: إعداد التقارير وحضور الاجتماعات ومتابعة القرارات",
+      "تنفيذ القرارات: تنفيذ قرارات اللجنة التنفيذية بسرعة",
+      "التنسيق الإقليمي: دعم تقديم التقارير الإقليمية في الوقت المناسب",
+      "حل النزاعات: الإشراف على عمليات المصالحة ومعالجة النزاعات"
     ]
   },
   {
@@ -51,6 +58,13 @@ const administrativeUnits = [
       "Manage institutional partnerships and MOUs",
       "Develop and distribute communication materials",
       "Manage media campaigns (TV, radio, print, online)"
+    ],
+    responsibilitiesAr: [
+      "توحيد المؤسسات التعليمية الإسلامية تحت مظلة الأمانة",
+      "التعاون مع الوزارات والمدارس التقليدية",
+      "إدارة الشراكات المؤسسية ومذكرات التفاهم",
+      "تطوير وتوزيع مواد الاتصال",
+      "إدارة الحملات الإعلامية (التلفزيون، الإذاعة، المطبوعات، الإنترنت)"
     ]
   },
   {
@@ -66,6 +80,13 @@ const administrativeUnits = [
       "Facilitate structured communication within Amaanah",
       "Safeguard critical records and official stamps",
       "Issue attestations and manage Madrasah registrations"
+    ],
+    responsibilitiesAr: [
+      "تسجيل جميع المراسلات الواردة والصادرة",
+      "إدارة أنظمة الملفات المركزية وقواعد بيانات جهات الاتصال",
+      "تسهيل الاتصال المنظم داخل الأمانة",
+      "حماية السجلات الحيوية والأختام الرسمية",
+      "إصدار الشهادات وإدارة تسجيلات المدارس"
     ]
   },
   {
@@ -81,6 +102,13 @@ const administrativeUnits = [
       "Address staff concerns and coordinate welfare activities",
       "Manage performance appraisals and KPI tracking",
       "Identify training needs and organize training programs"
+    ],
+    responsibilitiesAr: [
+      "المساعدة في التوظيف وتوجيه الموظفين الجدد",
+      "الحفاظ على ملفات الموظفين ونظام معلومات الموارد البشرية",
+      "معالجة مخاوف الموظفين وتنسيق أنشطة الرفاهية",
+      "إدارة تقييمات الأداء ومتابعة مؤشرات الأداء",
+      "تحديد احتياجات التدريب وتنظيم برامج التدريب"
     ]
   },
   {
@@ -96,6 +124,13 @@ const administrativeUnits = [
       "Perform monthly reconciliations and resolve discrepancies",
       "Track budgets and prepare reports for stakeholders",
       "Facilitate internal and external audits"
+    ],
+    responsibilitiesAr: [
+      "تسجيل المعاملات والحفاظ على أنظمة المحاسبة",
+      "معالجة جميع المدفوعات وفقاً للسياسة",
+      "إجراء المطابقات الشهرية وحل التناقضات",
+      "تتبع الميزانيات وإعداد التقارير لأصحاب المصلحة",
+      "تسهيل المراجعات الداخلية والخارجية"
     ]
   },
   {
@@ -111,6 +146,13 @@ const administrativeUnits = [
       "Develop procurement plans and implement policy",
       "Maintain supplier database and procurement documentation",
       "Supervise service contracts and monitor utilities"
+    ],
+    responsibilitiesAr: [
+      "الحفاظ على سجل الأصول الثابتة وإجراء التحققات",
+      "إدارة نقل الأصول والتصرف فيها والتأمين عليها",
+      "تطوير خطط الشراء وتنفيذ السياسة",
+      "الحفاظ على قاعدة بيانات الموردين ووثائق الشراء",
+      "الإشراف على عقود الخدمة ومراقبة المرافق"
     ]
   },
   {
@@ -126,6 +168,13 @@ const administrativeUnits = [
       "Participate in school assessments for registration/accreditation",
       "Ensure compliance with minimum standards for education delivery",
       "Recommend corrective actions for low-performing institutions"
+    ],
+    responsibilitiesAr: [
+      "جمع وتحليل تقارير المراقبة من المراقبين الميدانيين",
+      "إجراء زيارات فصلية لتقييم المعايير الأكاديمية والتشغيلية",
+      "المشاركة في تقييمات المدارس للتسجيل والاعتماد",
+      "ضمان الامتثال للحد الأدنى من معايير تقديم التعليم",
+      "التوصية بإجراءات تصحيحية للمؤسسات منخفضة الأداء"
     ]
   },
   {
@@ -141,6 +190,13 @@ const administrativeUnits = [
       "Produce, evaluate, and distribute approved learning materials",
       "Organize validation workshops for stakeholders",
       "Develop teacher guides and training materials"
+    ],
+    responsibilitiesAr: [
+      "مواءمة المناهج مع المعايير الوطنية والقيم الإسلامية",
+      "تطوير إطار المناهج الوطني لمراكز الحفظ",
+      "إنتاج وتقييم وتوزيع المواد التعليمية المعتمدة",
+      "تنظيم ورش عمل التحقق لأصحاب المصلحة",
+      "تطوير أدلة المعلمين ومواد التدريب"
     ]
   },
   {
@@ -156,6 +212,13 @@ const administrativeUnits = [
       "Coordinate secure printing and distribution",
       "Supervise exam centers and ensure rule compliance",
       "Analyze performance data to inform policies"
+    ],
+    responsibilitiesAr: [
+      "تصميم وإدارة الامتحانات الموحدة",
+      "إعداد الجداول واللوجستيات وأوراق الأسئلة",
+      "تنسيق الطباعة والتوزيع الآمن",
+      "الإشراف على مراكز الامتحان وضمان الامتثال للقواعد",
+      "تحليل بيانات الأداء لإثراء السياسات"
     ]
   },
   {
@@ -171,6 +234,13 @@ const administrativeUnits = [
       "Provide tech support and training to staff",
       "Maintain MIS and digital collaboration platforms",
       "Support e-learning and digital exam systems"
+    ],
+    responsibilitiesAr: [
+      "تركيب وصيانة أنظمة الأجهزة والبرمجيات",
+      "ضمان سلامة البيانات والنسخ الاحتياطي وأمن النظام",
+      "توفير الدعم الفني والتدريب للموظفين",
+      "صيانة نظام المعلومات الإدارية ومنصات التعاون الرقمي",
+      "دعم أنظمة التعلم الإلكتروني والامتحانات الرقمية"
     ]
   },
   {
@@ -186,6 +256,13 @@ const administrativeUnits = [
       "Maintain financial records of endowments",
       "Support income-generating initiatives (e.g., Waqf)",
       "Establish partnerships for technical and financial support"
+    ],
+    responsibilitiesAr: [
+      "تحديد فرص التمويل وكتابة المقترحات",
+      "تتبع مخرجات المشروع وإشراك أصحاب المصلحة",
+      "الحفاظ على السجلات المالية للأوقاف",
+      "دعم المبادرات المدرة للدخل (مثل الوقف)",
+      "إقامة شراكات للدعم الفني والمالي"
     ]
   },
   {
@@ -201,6 +278,13 @@ const administrativeUnits = [
       "Conduct training for Qur'anic teachers",
       "Establish QA mechanisms for Tahfeez institutions",
       "Host national Qur'an competitions"
+    ],
+    responsibilitiesAr: [
+      "تسجيل جميع مراكز القرآن والمجالس",
+      "تطوير قاعدة بيانات ودليل وطني",
+      "إجراء تدريب لمعلمي القرآن",
+      "إنشاء آليات ضمان الجودة لمؤسسات التحفيظ",
+      "استضافة مسابقات القرآن الوطنية"
     ]
   }
 ];
@@ -210,24 +294,28 @@ const governanceStructure = [
     title: "General Assembly",
     titleAr: "الجمعية العامة",
     description: "Representative body of member schools and Secretariat officials that meets annually to set strategic direction.",
+    descriptionAr: "الهيئة التمثيلية للمدارس الأعضاء ومسؤولي الأمانة العامة التي تجتمع سنوياً لتحديد التوجه الاستراتيجي.",
     icon: Users,
   },
   {
     title: "Executive Committee",
     titleAr: "اللجنة التنفيذية",
     description: "Elected leadership with two-year terms, including directors of major institutes and advisory members from partner organizations.",
+    descriptionAr: "القيادة المنتخبة بفترات سنتين، تضم مديري المعاهد الرئيسية وأعضاء استشاريين من المنظمات الشريكة.",
     icon: Building2,
   },
   {
     title: "Executive Bureau",
     titleAr: "المكتب التنفيذي",
     description: "Professional Secretariat that manages day-to-day operations, policy execution, and administrative functions.",
+    descriptionAr: "الأمانة المهنية التي تدير العمليات اليومية وتنفيذ السياسات والوظائف الإدارية.",
     icon: Briefcase,
   },
   {
     title: "Sub-Committees",
     titleAr: "اللجان الفرعية",
     description: "Technical groups for curriculum & training, examinations & scholarships, quality assurance, and socio-cultural activities.",
+    descriptionAr: "مجموعات فنية للمناهج والتدريب، والامتحانات والمنح، وضمان الجودة، والأنشطة الاجتماعية والثقافية.",
     icon: Settings,
   },
 ];
@@ -289,7 +377,7 @@ export default function OrganisationStructure() {
                   <CardTitle className="text-lg">{isRTL ? item.titleAr : item.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CardDescription>{item.description}</CardDescription>
+                  <CardDescription>{isRTL ? item.descriptionAr : item.description}</CardDescription>
                 </CardContent>
               </Card>
             ))}
@@ -366,7 +454,7 @@ export default function OrganisationStructure() {
                       {isRTL ? "المسؤوليات الرئيسية:" : "Key Responsibilities:"}
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1">
-                      {unit.responsibilities.slice(0, 3).map((resp, i) => (
+                      {(isRTL ? unit.responsibilitiesAr : unit.responsibilities).slice(0, 3).map((resp, i) => (
                         <li key={i} className="flex items-start gap-2">
                           <span className="text-primary mt-1">•</span>
                           <span>{resp}</span>
