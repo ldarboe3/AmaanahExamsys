@@ -46,6 +46,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Search,
   UserPlus,
   Users,
@@ -54,6 +64,9 @@ import {
   Edit,
   Key,
   Loader2,
+  UserX,
+  UserCheck,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
@@ -120,6 +133,7 @@ export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -175,6 +189,47 @@ export default function UsersPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to update user role",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ userId, status }: { userId: string; status: string }) => {
+      return apiRequest("PATCH", `/api/users/${userId}/status`, { status });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "User status updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user status",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return apiRequest("DELETE", `/api/users/${userId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setUserToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
         variant: "destructive",
       });
     },
@@ -510,6 +565,31 @@ export default function UsersPage() {
                               <Key className="w-4 h-4 mr-2" />
                               {isRTL ? "إعادة تعيين كلمة المرور" : "Reset Password"}
                             </DropdownMenuItem>
+                            {user.status === 'active' ? (
+                              <DropdownMenuItem
+                                onClick={() => updateStatusMutation.mutate({ userId: user.id, status: 'suspended' })}
+                                data-testid={`button-deactivate-${user.id}`}
+                              >
+                                <UserX className="w-4 h-4 mr-2" />
+                                {isRTL ? "تعليق الحساب" : "Deactivate"}
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                onClick={() => updateStatusMutation.mutate({ userId: user.id, status: 'active' })}
+                                data-testid={`button-activate-${user.id}`}
+                              >
+                                <UserCheck className="w-4 h-4 mr-2" />
+                                {isRTL ? "تفعيل الحساب" : "Activate"}
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              onClick={() => setUserToDelete(user)}
+                              className="text-destructive focus:text-destructive"
+                              data-testid={`button-delete-${user.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              {isRTL ? "حذف المستخدم" : "Delete User"}
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -528,6 +608,35 @@ export default function UsersPage() {
           )}
         </CardContent>
       </Card>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isRTL ? "تأكيد حذف المستخدم" : "Confirm User Deletion"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRTL 
+                ? `هل أنت متأكد من حذف المستخدم "${userToDelete?.username}"؟ لا يمكن التراجع عن هذا الإجراء.`
+                : `Are you sure you want to delete user "${userToDelete?.username}"? This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{isRTL ? "إلغاء" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => userToDelete && deleteUserMutation.mutate(userToDelete.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteUserMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              {isRTL ? "حذف" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
