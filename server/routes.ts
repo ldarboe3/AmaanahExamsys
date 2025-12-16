@@ -10010,12 +10010,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Users management API
+  // Helper to check if user can manage other users
+  const canManageUsers = (role: string) => role === 'super_admin' || role === 'examination_admin';
+  
   app.get("/api/users", isAuthenticated, async (req, res) => {
     try {
-      // Only super_admin can view all users
       const currentUser = await storage.getUser(req.session.userId!);
-      if (!currentUser || currentUser.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super_admin can view users" });
+      if (!currentUser || !canManageUsers(currentUser.role)) {
+        return res.status(403).json({ message: "Only super_admin and examination_admin can view users" });
       }
       const users = await storage.getAllUsers();
       res.json(users);
@@ -10026,10 +10028,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/users/:id/role", isAuthenticated, async (req, res) => {
     try {
-      // Only super_admin can update user roles
       const currentUser = await storage.getUser(req.session.userId!);
-      if (!currentUser || currentUser.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super_admin can update user roles" });
+      if (!currentUser || !canManageUsers(currentUser.role)) {
+        return res.status(403).json({ message: "Only super_admin and examination_admin can update user roles" });
       }
       
       const { role, schoolId, centerId } = req.body;
@@ -10055,6 +10056,99 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       res.json(user);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Deactivate/activate user
+  app.patch("/api/users/:id/status", isAuthenticated, async (req, res) => {
+    try {
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser || !canManageUsers(currentUser.role)) {
+        return res.status(403).json({ message: "Only super_admin and examination_admin can update user status" });
+      }
+      
+      const { status } = req.body;
+      if (!status || !['active', 'suspended', 'pending'].includes(status)) {
+        return res.status(400).json({ message: "Valid status (active, suspended, pending) is required" });
+      }
+      
+      const targetUser = await storage.getUser(parseInt(req.params.id));
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Prevent deactivating yourself
+      if (targetUser.id === currentUser.id) {
+        return res.status(400).json({ message: "Cannot change your own status" });
+      }
+      
+      // Only super_admin can deactivate other super_admins
+      if (targetUser.role === 'super_admin' && currentUser.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super_admin can deactivate other super_admins" });
+      }
+      
+      const user = await storage.updateUserStatus(parseInt(req.params.id), status);
+      
+      // Log status change
+      try {
+        await storage.createAuditLog({
+          userId: req.session.userId!,
+          action: 'user_status_changed',
+          entityType: 'user',
+          entityId: req.params.id,
+          details: { newStatus: status, previousStatus: targetUser.status, changedBy: req.session.userId },
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for status change:', auditError);
+      }
+      
+      res.json(user);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Delete user
+  app.delete("/api/users/:id", isAuthenticated, async (req, res) => {
+    try {
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser || !canManageUsers(currentUser.role)) {
+        return res.status(403).json({ message: "Only super_admin and examination_admin can delete users" });
+      }
+      
+      const targetUser = await storage.getUser(parseInt(req.params.id));
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Prevent deleting yourself
+      if (targetUser.id === currentUser.id) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+      
+      // Only super_admin can delete other super_admins
+      if (targetUser.role === 'super_admin' && currentUser.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super_admin can delete other super_admins" });
+      }
+      
+      await storage.deleteUser(parseInt(req.params.id));
+      
+      // Log deletion
+      try {
+        await storage.createAuditLog({
+          userId: req.session.userId!,
+          action: 'user_deleted',
+          entityType: 'user',
+          entityId: req.params.id,
+          details: { deletedUsername: targetUser.username, deletedRole: targetUser.role, deletedBy: req.session.userId },
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for user deletion:', auditError);
+      }
+      
+      res.json({ message: "User deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

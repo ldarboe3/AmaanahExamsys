@@ -153,7 +153,7 @@ export function AppSidebar({ side = "left" }: AppSidebarProps) {
             <SidebarGroupContent>
               <SidebarMenu>
                 {managementDefs
-                  .filter(item => item.key !== 'users' || user?.role === 'super_admin')
+                  .filter(item => item.key !== 'users' || user?.role === 'super_admin' || user?.role === 'examination_admin')
                   .map((item) => (
                   <SidebarMenuItem key={item.key}>
                     <SidebarMenuButton
