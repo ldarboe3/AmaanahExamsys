@@ -3699,11 +3699,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         let candidateSchools = allSchools;
         
         if (regionName) {
-          // Try matching by ID first (for numeric region values like "1", "2")
-          const regionId = parseInt(regionName);
-          let matchedRegion = !isNaN(regionId) ? allRegions.find(r => r.id === regionId) : null;
+          // For numeric values like "1", try to match "Region 1" by name pattern
+          const regionNum = parseInt(regionName);
+          let matchedRegion = null;
           
-          // If not found by ID, try matching by name
+          if (!isNaN(regionNum)) {
+            // Look for regions named like "Region 1", "Region 2", etc.
+            matchedRegion = allRegions.find(r => 
+              r.name.toLowerCase().includes(`region ${regionNum}`) ||
+              r.name.toLowerCase() === `region${regionNum}` ||
+              r.name === regionName
+            );
+          }
+          
+          // If not found by number pattern, try matching by name
           if (!matchedRegion) {
             matchedRegion = allRegions.find(r => 
               normalizeSchoolName(r.name).includes(normalizeSchoolName(regionName)) ||
@@ -3716,11 +3725,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
         
         if (clusterName && candidateSchools.length > 0) {
-          // Try matching by ID first (for numeric cluster values like "1", "2")
-          const clusterId = parseInt(clusterName);
-          let matchedCluster = !isNaN(clusterId) ? allClusters.find(c => c.id === clusterId) : null;
+          // For numeric values like "1", try to match "Cluster 1" by name pattern
+          const clusterNum = parseInt(clusterName);
+          let matchedCluster = null;
           
-          // If not found by ID, try matching by name
+          if (!isNaN(clusterNum)) {
+            // Look for clusters named like "Cluster 1", "Cluster 2", etc.
+            // Filter by the matched region if we have one
+            const regionFilteredClusters = candidateSchools.length > 0 && candidateSchools[0].regionId
+              ? allClusters.filter(c => c.regionId === candidateSchools[0].regionId)
+              : allClusters;
+            
+            matchedCluster = regionFilteredClusters.find(c => 
+              c.name.toLowerCase().includes(`cluster ${clusterNum}`) ||
+              c.name.toLowerCase() === `cluster${clusterNum}` ||
+              c.name === clusterName
+            );
+          }
+          
+          // If not found by number pattern, try matching by name
           if (!matchedCluster) {
             matchedCluster = allClusters.find(c => 
               normalizeSchoolName(c.name).includes(normalizeSchoolName(clusterName)) ||
