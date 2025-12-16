@@ -3940,37 +3940,88 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           if (schoolsCreatedMap.has(schoolKey)) {
             schoolId = schoolsCreatedMap.get(schoolKey)!;
           } else {
-            // Find region and cluster IDs
+            // Find region and cluster IDs from file data
             let regionId: number | null = null;
             let clusterId: number | null = null;
             
-            const regionNum = parseInt(student.regionName);
-            if (!isNaN(regionNum)) {
-              const matchedRegion = allRegions.find(r => 
-                r.name.toLowerCase().includes(`region ${regionNum}`) ||
-                r.name === student.regionName
-              );
-              if (matchedRegion) regionId = matchedRegion.id;
-            }
+            const regionValue = String(student.regionName || '').trim();
+            const clusterValue = String(student.clusterName || '').trim();
             
-            if (regionId) {
-              const clusterNum = parseInt(student.clusterName);
-              const regionClusters = allClusters.filter(c => c.regionId === regionId);
-              
-              if (!isNaN(clusterNum)) {
-                const matchedCluster = regionClusters.find(c => 
-                  c.name.toLowerCase().includes(`cluster ${clusterNum}`) ||
-                  c.name === student.clusterName
-                );
-                if (matchedCluster) clusterId = matchedCluster.id;
+            console.log(`Matching region: "${regionValue}", cluster: "${clusterValue}" for school: ${student.schoolName}`);
+            
+            // Try to match region - support numeric (1, 2, 3) or text (Region 1, R1)
+            const regionNum = parseInt(regionValue);
+            if (!isNaN(regionNum) && regionNum > 0) {
+              // Numeric value like "1", "2", "3"
+              const matchedRegion = allRegions.find(r => 
+                r.name.toLowerCase() === `region ${regionNum}` ||
+                r.name.toLowerCase().includes(`region ${regionNum}`) ||
+                r.code === `R${regionNum}`
+              );
+              if (matchedRegion) {
+                regionId = matchedRegion.id;
+                console.log(`  Matched region ${regionNum} -> ${matchedRegion.name} (ID: ${matchedRegion.id})`);
+              }
+            } else if (regionValue) {
+              // Text value like "Region 1" or "R1"
+              const matchedRegion = allRegions.find(r => 
+                r.name.toLowerCase() === regionValue.toLowerCase() ||
+                r.code?.toLowerCase() === regionValue.toLowerCase()
+              );
+              if (matchedRegion) {
+                regionId = matchedRegion.id;
+                console.log(`  Matched region text "${regionValue}" -> ${matchedRegion.name} (ID: ${matchedRegion.id})`);
               }
             }
             
-            // Default to first region/cluster if not found
-            if (!regionId && allRegions.length > 0) regionId = allRegions[0].id;
-            if (!clusterId) {
-              const fallbackClusters = allClusters.filter(c => c.regionId === regionId);
-              if (fallbackClusters.length > 0) clusterId = fallbackClusters[0].id;
+            // Match cluster within the found region
+            if (regionId) {
+              const regionClusters = allClusters.filter(c => c.regionId === regionId);
+              const clusterNum = parseInt(clusterValue);
+              
+              if (!isNaN(clusterNum) && clusterNum > 0) {
+                // Numeric value like "1", "2", "3"
+                const matchedCluster = regionClusters.find(c => 
+                  c.name.toLowerCase() === `cluster ${clusterNum}` ||
+                  c.name.toLowerCase().includes(`cluster ${clusterNum}`) ||
+                  c.code === `CL${clusterNum}`
+                );
+                if (matchedCluster) {
+                  clusterId = matchedCluster.id;
+                  console.log(`  Matched cluster ${clusterNum} -> ${matchedCluster.name} (ID: ${matchedCluster.id})`);
+                }
+              } else if (clusterValue) {
+                // Text value like "Cluster 1" or "CL1"
+                const matchedCluster = regionClusters.find(c => 
+                  c.name.toLowerCase() === clusterValue.toLowerCase() ||
+                  c.code?.toLowerCase() === clusterValue.toLowerCase()
+                );
+                if (matchedCluster) {
+                  clusterId = matchedCluster.id;
+                  console.log(`  Matched cluster text "${clusterValue}" -> ${matchedCluster.name} (ID: ${matchedCluster.id})`);
+                }
+              }
+              
+              // Default to first cluster in region if not found
+              if (!clusterId && regionClusters.length > 0) {
+                clusterId = regionClusters[0].id;
+                console.log(`  Cluster not matched, defaulting to first: ${regionClusters[0].name}`);
+              }
+            }
+            
+            // Only fallback to Region 1 if no region info provided at all
+            if (!regionId) {
+              if (!regionValue) {
+                console.log(`  No region specified, defaulting to Region 1`);
+                regionId = allRegions[0]?.id || null;
+              } else {
+                console.log(`  WARNING: Could not match region "${regionValue}"`);
+                regionId = allRegions[0]?.id || null;
+              }
+              if (regionId && !clusterId) {
+                const fallbackClusters = allClusters.filter(c => c.regionId === regionId);
+                if (fallbackClusters.length > 0) clusterId = fallbackClusters[0].id;
+              }
             }
             
             if (regionId && clusterId) {
