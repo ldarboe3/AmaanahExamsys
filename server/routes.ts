@@ -3906,9 +3906,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const { students: studentList, examYearId, grade, createMissingSchools } = req.body;
       
+      console.log(`[STUDENT BULK UPLOAD] Starting confirmation with ${studentList?.length || 0} students, examYearId: ${examYearId}, grade: ${grade}`);
+      
       if (!Array.isArray(studentList) || studentList.length === 0) {
         return res.status(400).json({ message: "No students to upload" });
       }
+      
+      console.log(`[STUDENT BULK UPLOAD] First student in list:`, JSON.stringify(studentList[0], null, 2));
 
       if (!examYearId || !grade) {
         return res.status(400).json({ message: "examYearId and grade are required" });
@@ -4088,6 +4092,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           }
 
           const newStudent = await storage.createStudent(parsed.data);
+          console.log(`[STUDENT BULK UPLOAD] Created student: ${student.firstName} ${student.lastName} (ID: ${newStudent.id}) for school ID: ${schoolId}`);
           
           // Auto-generate index number for approved students
           if (newStudent.status === 'approved' && !newStudent.indexNumber) {
