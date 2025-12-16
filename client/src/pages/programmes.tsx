@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useLocation } from "wouter";
 import { PublicLayout } from "@/components/public-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -145,6 +147,21 @@ const keyRoles = [
 
 export default function Programmes() {
   const { isRTL } = useLanguage();
+  const [location] = useLocation();
+  
+  // Scroll to anchor section when page loads with hash
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash) {
+      const id = hash.replace('#', '');
+      const element = document.getElementById(id);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }, [location]);
   
   return (
     <PublicLayout>
@@ -173,7 +190,7 @@ export default function Programmes() {
               <div 
                 key={programme.id} 
                 id={programme.id}
-                className={`grid md:grid-cols-2 gap-8 items-center ${i % 2 === 1 ? 'md:flex-row-reverse' : ''}`}
+                className={`grid md:grid-cols-2 gap-8 items-center scroll-mt-24 ${i % 2 === 1 ? 'md:flex-row-reverse' : ''}`}
               >
                 <div className={i % 2 === 1 ? 'md:order-2' : ''}>
                   <div className={`w-14 h-14 rounded-md bg-${programme.color}/10 flex items-center justify-center mb-4`}>
