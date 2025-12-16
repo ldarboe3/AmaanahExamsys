@@ -75,6 +75,7 @@ const managementDefs: MenuItemDef[] = [
   { key: "websiteManagement", url: "/website-management", icon: Globe },
   { key: "reportsAndExports", url: "/reports", icon: FileDown },
   { key: "auditLogs", url: "/audit-logs", icon: History },
+  { key: "users", url: "/users", icon: UserCheck },
   { key: "settings", url: "/settings", icon: Settings },
 ];
 
@@ -151,7 +152,9 @@ export function AppSidebar({ side = "left" }: AppSidebarProps) {
             <SidebarGroupLabel>{t.nav.management}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {managementDefs.map((item) => (
+                {managementDefs
+                  .filter(item => item.key !== 'users' || user?.role === 'super_admin')
+                  .map((item) => (
                   <SidebarMenuItem key={item.key}>
                     <SidebarMenuButton
                       asChild
