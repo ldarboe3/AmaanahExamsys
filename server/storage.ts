@@ -284,7 +284,7 @@ export interface IStorage {
   verifyPassword(userId: string, password: string): Promise<boolean>;
   updatePassword(userId: string, newPassword: string): Promise<boolean>;
   updateUserStatus(userId: string, status: string): Promise<User | undefined>;
-  deleteUser(userId: number): Promise<boolean>;
+  deleteUser(userId: string): Promise<boolean>;
 
   // Exam Cards
   createExamCard(card: InsertExamCard): Promise<ExamCard>;
@@ -1806,8 +1806,8 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async deleteUser(userId: number): Promise<boolean> {
-    const result = await db.delete(users).where(eq(users.id, String(userId)));
+  async deleteUser(userId: string): Promise<boolean> {
+    await db.delete(users).where(eq(users.id, userId));
     return true;
   }
 

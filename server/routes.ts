@@ -10134,7 +10134,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(403).json({ message: "Only super_admin and examination_admin can delete users" });
       }
       
-      const targetUser = await storage.getUser(parseInt(req.params.id));
+      const targetUser = await storage.getUser(req.params.id);
       if (!targetUser) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -10149,7 +10149,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(403).json({ message: "Only super_admin can delete other super_admins" });
       }
       
-      await storage.deleteUser(parseInt(req.params.id));
+      await storage.deleteUser(req.params.id);
       
       // Log deletion
       try {
