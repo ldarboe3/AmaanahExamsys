@@ -107,34 +107,40 @@ const programmes = [
 const bureauUnits = [
   {
     title: "Administration Unit",
+    titleAr: "وحدة الإدارة",
     roles: ["Records/Secretariat", "HR", "Finance", "Public Relations", "IT"],
+    rolesAr: ["السجلات/الأمانة", "الموارد البشرية", "المالية", "العلاقات العامة", "تقنية المعلومات"],
     icon: Database,
   },
   {
     title: "Programmes & Operations Unit",
+    titleAr: "وحدة البرامج والعمليات",
     roles: ["Curriculum Development & Training", "Assessment/Examinations", "Quality Assurance & Monitoring", "Data and Certification"],
+    rolesAr: ["تطوير المناهج والتدريب", "التقييم/الامتحانات", "ضمان الجودة والمراقبة", "البيانات والشهادات"],
     icon: GraduationCap,
   },
   {
     title: "Endowment & Projects Unit",
+    titleAr: "وحدة الأوقاف والمشاريع",
     roles: ["Endowment Coordination", "Resource Mobilisation", "Project Development", "Project Supervision"],
+    rolesAr: ["تنسيق الأوقاف", "تعبئة الموارد", "تطوير المشاريع", "الإشراف على المشاريع"],
     icon: Building2,
   },
 ];
 
 const keyRoles = [
-  "Administrative Secretary (Executive Secretary)",
-  "Secretary/Records Manager",
-  "Human Resources Officer",
-  "Treasurer/Accounting Officer",
-  "Public Relations Officer",
-  "IT Officer",
-  "Head of Programmes/Operations",
-  "Curriculum Development & Training Officer",
-  "Assessment/Examinations Officer",
-  "Quality Assurance & Monitoring Officer",
-  "Quality Assurance Liaison Officers (regional)",
-  "Head of Endowment & Projects",
+  { en: "Administrative Secretary (Executive Secretary)", ar: "السكرتير الإداري (السكرتير التنفيذي)" },
+  { en: "Secretary/Records Manager", ar: "أمين السجلات/مدير السجلات" },
+  { en: "Human Resources Officer", ar: "مسؤول الموارد البشرية" },
+  { en: "Treasurer/Accounting Officer", ar: "أمين الصندوق/مسؤول المحاسبة" },
+  { en: "Public Relations Officer", ar: "مسؤول العلاقات العامة" },
+  { en: "IT Officer", ar: "مسؤول تقنية المعلومات" },
+  { en: "Head of Programmes/Operations", ar: "رئيس البرامج/العمليات" },
+  { en: "Curriculum Development & Training Officer", ar: "مسؤول تطوير المناهج والتدريب" },
+  { en: "Assessment/Examinations Officer", ar: "مسؤول التقييم/الامتحانات" },
+  { en: "Quality Assurance & Monitoring Officer", ar: "مسؤول ضمان الجودة والمراقبة" },
+  { en: "Quality Assurance Liaison Officers (regional)", ar: "مسؤولو الاتصال لضمان الجودة (إقليمي)" },
+  { en: "Head of Endowment & Projects", ar: "رئيس الأوقاف والمشاريع" },
 ];
 
 export default function Programmes() {
@@ -249,14 +255,14 @@ export default function Programmes() {
       <section className="py-12 md:py-12">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
-            <Badge variant="outline" className="mb-4">Administration</Badge>
+            <Badge variant="outline" className="mb-4">{isRTL ? "الإدارة" : "Administration"}</Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Executive Bureau
+              {isRTL ? "المكتب التنفيذي" : "Executive Bureau"}
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              The Bureau is the management hub of AMAANAH, ensuring policy execution, educational 
-              planning, staff management, budgeting and reporting, data systems, public relations, 
-              regional coordination, and reconciliation.
+              {isRTL 
+                ? "المكتب التنفيذي هو مركز الإدارة في الأمانة، يضمن تنفيذ السياسات والتخطيط التعليمي وإدارة الموظفين وإعداد الميزانيات والتقارير وأنظمة البيانات والعلاقات العامة والتنسيق الإقليمي والمصالحة."
+                : "The Bureau is the management hub of AMAANAH, ensuring policy execution, educational planning, staff management, budgeting and reporting, data systems, public relations, regional coordination, and reconciliation."}
             </p>
           </div>
 
@@ -267,11 +273,11 @@ export default function Programmes() {
                   <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center mb-4">
                     <unit.icon className="w-6 h-6 text-primary" />
                   </div>
-                  <CardTitle className="text-lg">{unit.title}</CardTitle>
+                  <CardTitle className="text-lg">{isRTL ? unit.titleAr : unit.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2">
-                    {unit.roles.map((role, j) => (
+                    {(isRTL ? unit.rolesAr : unit.roles).map((role, j) => (
                       <li key={j} className="text-sm text-muted-foreground flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                         {role}
@@ -284,12 +290,12 @@ export default function Programmes() {
           </div>
 
           <div className="bg-muted/30 rounded-xl p-8">
-            <h3 className="text-xl font-semibold text-foreground mb-6 text-center">Key Roles</h3>
+            <h3 className="text-xl font-semibold text-foreground mb-6 text-center">{isRTL ? "الأدوار الرئيسية" : "Key Roles"}</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {keyRoles.map((role, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm">
                   <Users className="w-4 h-4 text-primary flex-shrink-0" />
-                  <span className="text-muted-foreground">{role}</span>
+                  <span className="text-muted-foreground">{isRTL ? role.ar : role.en}</span>
                 </div>
               ))}
             </div>
