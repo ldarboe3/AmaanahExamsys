@@ -353,56 +353,109 @@ export default function SeniorExecutives() {
 
       <section className="py-12 md:py-12 bg-muted/50">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-8">
+          <div className="text-center mb-12">
             <Badge variant="outline" className="mb-4">
-              {isRTL ? "المكتب التنفيذي" : "Executive Bureau"}
+              {isRTL ? "الإدارة" : "Administration"}
             </Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              {isRTL ? "الأدوار الرئيسية في المكتب التنفيذي" : "Key Roles in the Executive Bureau"}
+              {isRTL ? "المكتب التنفيذي" : "Executive Bureau"}
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-3xl mx-auto">
               {isRTL 
-                ? "المكتب التنفيذي هو مركز الإدارة للأمانة، يضمن تنفيذ السياسات والتخطيط التعليمي وإدارة الموظفين."
-                : "The Executive Bureau is the management hub of AMAANAH, ensuring policy execution, educational planning, and staff management."}
+                ? "المكتب التنفيذي هو مركز الإدارة للأمانة، يضمن تنفيذ السياسات والتخطيط التعليمي وإدارة الموظفين وإعداد الميزانيات والتقارير وأنظمة البيانات والعلاقات العامة والتنسيق الإقليمي والمصالحة."
+                : "The Bureau is the management hub of AMAANAH, ensuring policy execution, educational planning, staff management, budgeting and reporting, data systems, public relations, regional coordination, and reconciliation"}
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Object.values(groupedRoles).flat().map((role, i) => (
-              <Card key={i} className="hover-elevate" data-testid={`card-role-${role.title.toLowerCase().replace(/\s+/g, '-')}`}>
-                <CardHeader>
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <role.icon className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base">{isRTL ? role.titleAr : role.title}</CardTitle>
-                      <Badge variant="secondary" className="mt-1 text-xs">
-                        {isRTL ? role.categoryAr : role.category}
-                      </Badge>
-                    </div>
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <Card className="hover-elevate" data-testid="card-unit-administration">
+              <CardHeader className="text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <FileText className="w-8 h-8 text-primary" />
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    {isRTL ? role.descriptionAr : role.description}
-                  </p>
-                  <div>
-                    <p className="text-xs font-medium text-foreground mb-2">
-                      {isRTL ? "المسؤوليات الرئيسية:" : "Key Responsibilities:"}
-                    </p>
-                    <ul className="text-xs text-muted-foreground space-y-1">
-                      {(isRTL ? role.responsibilitiesAr : role.responsibilities).map((resp, j) => (
-                        <li key={j} className="flex items-start gap-2">
-                          <span className="text-primary mt-0.5">•</span>
-                          <span>{resp}</span>
-                        </li>
-                      ))}
-                    </ul>
+                </div>
+                <CardTitle className="text-lg">{isRTL ? "وحدة الإدارة" : "Administration Unit"}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                    <span className="text-sm text-muted-foreground">{isRTL ? "السكرتير الإداري" : "Administrative Secretary"}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                    <span className="text-sm text-muted-foreground">{isRTL ? "أمين الصندوق/مسؤول المحاسبة" : "Treasurer/Accounting Officer"}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                    <span className="text-sm text-muted-foreground">{isRTL ? "مسؤول العلاقات العامة" : "Public Relations Officer"}</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="hover-elevate" data-testid="card-unit-programmes">
+              <CardHeader className="text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <BookOpen className="w-8 h-8 text-primary" />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+                <CardTitle className="text-lg">{isRTL ? "وحدة البرامج والعمليات" : "Programmes & Operations Unit"}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                    <span className="text-sm text-muted-foreground">{isRTL ? "تطوير المناهج والتدريب" : "Curriculum Development & Training"}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                    <span className="text-sm text-muted-foreground">{isRTL ? "التقييم والامتحانات" : "Assessment/Examinations"}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                    <span className="text-sm text-muted-foreground">{isRTL ? "ضمان الجودة والمراقبة" : "Quality Assurance & Monitoring"}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                    <span className="text-sm text-muted-foreground">{isRTL ? "البيانات والشهادات" : "Data and Certification"}</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="hover-elevate" data-testid="card-unit-endowment">
+              <CardHeader className="text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Briefcase className="w-8 h-8 text-primary" />
+                  </div>
+                </div>
+                <CardTitle className="text-lg">{isRTL ? "وحدة الأوقاف والمشاريع" : "Endowment & Projects Unit"}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                    <span className="text-sm text-muted-foreground">{isRTL ? "تنسيق الأوقاف" : "Endowment Coordination"}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                    <span className="text-sm text-muted-foreground">{isRTL ? "تعبئة الموارد" : "Resource Mobilisation"}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                    <span className="text-sm text-muted-foreground">{isRTL ? "تطوير المشاريع" : "Project Development"}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                    <span className="text-sm text-muted-foreground">{isRTL ? "الإشراف على المشاريع" : "Project Supervision"}</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
