@@ -251,39 +251,6 @@ export default function Login() {
                   </form>
                 </Form>
 
-                <div className="mt-6 pt-6 border-t">
-                  <p className="text-sm text-muted-foreground text-center mb-4">
-                    {t.auth.testCredentials}
-                  </p>
-                  <div className="space-y-2 text-xs text-muted-foreground">
-                    <div className="grid grid-cols-2 gap-2 p-3 bg-muted/50 rounded-md">
-                      <div>
-                        <p className="font-medium text-foreground">{t.auth.superAdmin}</p>
-                        <p>superadmin / Admin@123</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{t.auth.examAdmin}</p>
-                        <p>examinationadmin / Admin@123</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{t.auth.logisticsAdmin}</p>
-                        <p>logisticsadmin / Admin@123</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{t.auth.schoolAdmin}</p>
-                        <p>schooladmin / Admin@123</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{t.auth.examiner}</p>
-                        <p>examiner / Admin@123</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{t.auth.candidate}</p>
-                        <p>candidate / Admin@123</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
