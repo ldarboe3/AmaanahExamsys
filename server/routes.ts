@@ -3520,13 +3520,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   function normalizeSchoolName(name: string): string {
     return name
       .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '') // Remove special chars
+      .replace(/[\u064B-\u0652]/g, '') // Remove Arabic diacritics (tashkeel)
+      .replace(/[^\p{L}\p{N}\s]/gu, '') // Keep letters (including Arabic), numbers, spaces
       .replace(/\s+/g, ' ')        // Normalize spaces
-      .replace(/\b(the|of|and|school|islamic|arabic|madrasa|madrassa|institute|center|centre)\b/g, '')
+      .replace(/\b(the|of|and|school|islamic|arabic|madrasa|madrassa|institute|center|centre)\b/gi, '')
+      .replace(/\b(الإسلامية|المدرسة|معهد|مدرسة)\b/g, '') // Remove common Arabic school words
       .trim();
   }
 
-  // Calculate similarity score between two strings (simple Levenshtein-based)
+  // Calculate similarity score between two strings (supports Arabic)
   function calculateSimilarity(str1: string, str2: string): number {
     const s1 = normalizeSchoolName(str1);
     const s2 = normalizeSchoolName(str2);
@@ -3538,8 +3540,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (s1.includes(s2) || s2.includes(s1)) return 0.9;
     
     // Simple word overlap score
-    const words1 = s1.split(' ').filter(w => w.length > 2);
-    const words2 = s2.split(' ').filter(w => w.length > 2);
+    const words1 = s1.split(' ').filter(w => w.length > 1);
+    const words2 = s2.split(' ').filter(w => w.length > 1);
     
     if (words1.length === 0 || words2.length === 0) return 0;
     
@@ -3697,22 +3699,36 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         let candidateSchools = allSchools;
         
         if (regionName) {
-          const matchedRegion = allRegions.find(r => 
-            normalizeSchoolName(r.name).includes(normalizeSchoolName(regionName)) ||
-            normalizeSchoolName(regionName).includes(normalizeSchoolName(r.name))
-          );
+          // Try matching by ID first (for numeric region values like "1", "2")
+          const regionId = parseInt(regionName);
+          let matchedRegion = !isNaN(regionId) ? allRegions.find(r => r.id === regionId) : null;
+          
+          // If not found by ID, try matching by name
+          if (!matchedRegion) {
+            matchedRegion = allRegions.find(r => 
+              normalizeSchoolName(r.name).includes(normalizeSchoolName(regionName)) ||
+              normalizeSchoolName(regionName).includes(normalizeSchoolName(r.name))
+            );
+          }
           if (matchedRegion) {
-            candidateSchools = candidateSchools.filter(s => s.regionId === matchedRegion.id);
+            candidateSchools = candidateSchools.filter(s => s.regionId === matchedRegion!.id);
           }
         }
         
         if (clusterName && candidateSchools.length > 0) {
-          const matchedCluster = allClusters.find(c => 
-            normalizeSchoolName(c.name).includes(normalizeSchoolName(clusterName)) ||
-            normalizeSchoolName(clusterName).includes(normalizeSchoolName(c.name))
-          );
+          // Try matching by ID first (for numeric cluster values like "1", "2")
+          const clusterId = parseInt(clusterName);
+          let matchedCluster = !isNaN(clusterId) ? allClusters.find(c => c.id === clusterId) : null;
+          
+          // If not found by ID, try matching by name
+          if (!matchedCluster) {
+            matchedCluster = allClusters.find(c => 
+              normalizeSchoolName(c.name).includes(normalizeSchoolName(clusterName)) ||
+              normalizeSchoolName(clusterName).includes(normalizeSchoolName(c.name))
+            );
+          }
           if (matchedCluster) {
-            candidateSchools = candidateSchools.filter(s => s.clusterId === matchedCluster.id);
+            candidateSchools = candidateSchools.filter(s => s.clusterId === matchedCluster!.id);
           }
         }
 
