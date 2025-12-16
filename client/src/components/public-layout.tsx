@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { BackToTop } from "@/components/back-to-top";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
@@ -150,7 +149,6 @@ export function PublicHeader() {
           </Link>
           <div className="hidden sm:flex items-center gap-1 ms-2 ps-2 border-s border-border">
             <LanguageToggle />
-            <ThemeToggle />
           </div>
           
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -187,7 +185,6 @@ export function PublicHeader() {
                 <div className="pt-6 mt-4 border-t space-y-3">
                   <div className="flex items-center gap-2 px-4">
                     <LanguageToggle />
-                    <ThemeToggle />
                   </div>
                   <Link href="/results" onClick={() => setMobileMenuOpen(false)}>
                     <Button variant="outline" className="w-full">{t.website.checkResults}</Button>
