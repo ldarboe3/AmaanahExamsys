@@ -367,50 +367,41 @@ export default function SeniorExecutives() {
             </p>
           </div>
 
-          <div className="space-y-12">
-            {Object.entries(groupedRoles).map(([category, roles]) => (
-              <div key={category}>
-                <h3 className="text-xl font-semibold text-foreground mb-6 text-center md:text-left">
-                  {category}
-                </h3>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {roles.map((role, i) => (
-                    <Card key={i} className="hover-elevate" data-testid={`card-role-${role.title.toLowerCase().replace(/\s+/g, '-')}`}>
-                      <CardHeader>
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <role.icon className="w-6 h-6 text-primary" />
-                          </div>
-                          <div>
-                            <CardTitle className="text-base">{isRTL ? role.titleAr : role.title}</CardTitle>
-                            <Badge variant="secondary" className="mt-1 text-xs">
-                              {isRTL ? role.categoryAr : role.category}
-                            </Badge>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                          {isRTL ? role.descriptionAr : role.description}
-                        </p>
-                        <div>
-                          <p className="text-xs font-medium text-foreground mb-2">
-                            {isRTL ? "المسؤوليات الرئيسية:" : "Key Responsibilities:"}
-                          </p>
-                          <ul className="text-xs text-muted-foreground space-y-1">
-                            {(isRTL ? role.responsibilitiesAr : role.responsibilities).map((resp, j) => (
-                              <li key={j} className="flex items-start gap-2">
-                                <span className="text-primary mt-0.5">•</span>
-                                <span>{resp}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Object.values(groupedRoles).flat().map((role, i) => (
+              <Card key={i} className="hover-elevate" data-testid={`card-role-${role.title.toLowerCase().replace(/\s+/g, '-')}`}>
+                <CardHeader>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <role.icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">{isRTL ? role.titleAr : role.title}</CardTitle>
+                      <Badge variant="secondary" className="mt-1 text-xs">
+                        {isRTL ? role.categoryAr : role.category}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    {isRTL ? role.descriptionAr : role.description}
+                  </p>
+                  <div>
+                    <p className="text-xs font-medium text-foreground mb-2">
+                      {isRTL ? "المسؤوليات الرئيسية:" : "Key Responsibilities:"}
+                    </p>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      {(isRTL ? role.responsibilitiesAr : role.responsibilities).map((resp, j) => (
+                        <li key={j} className="flex items-start gap-2">
+                          <span className="text-primary mt-0.5">•</span>
+                          <span>{resp}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
