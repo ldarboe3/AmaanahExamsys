@@ -114,6 +114,7 @@ export interface IStorage {
   getStudentsByExamYear(examYearId: number): Promise<Student[]>;
   getStudentsByStatus(status: string): Promise<Student[]>;
   getStudentsByCenter(centerId: number): Promise<Student[]>;
+  getStudentsByGrade(grade: number): Promise<Student[]>;
   getPendingStudents(): Promise<Student[]>;
   getAllStudents(): Promise<Student[]>;
   updateStudent(id: number, student: Partial<InsertStudent>): Promise<Student | undefined>;
@@ -785,6 +786,10 @@ export class DatabaseStorage implements IStorage {
     const schoolIds = schoolsInCenter.map(s => s.id);
     if (schoolIds.length === 0) return [];
     return db.select().from(students).where(inArray(students.schoolId, schoolIds)).orderBy(asc(students.lastName));
+  }
+
+  async getStudentsByGrade(grade: number): Promise<Student[]> {
+    return db.select().from(students).where(eq(students.grade, grade)).orderBy(asc(students.lastName), asc(students.firstName));
   }
 
   async getPendingStudents(): Promise<Student[]> {

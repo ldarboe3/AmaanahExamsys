@@ -7365,10 +7365,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Track schools that will be created
       const schoolsToCreateMap = new Map<string, SchoolToCreate>();
 
-      // PERFORMANCE FIX: Pre-load all students for this grade level at once
-      // Instead of fetching per-school during row processing
-      const allStudents = await storage.getAllStudents();
-      const gradeStudents = allStudents.filter(s => s.grade === gradeLevel);
+      // PERFORMANCE FIX: Pre-load students for this grade level only (efficient DB query)
+      // Instead of fetching all students and filtering in JS
+      const gradeStudents = await storage.getStudentsByGrade(gradeLevel);
       
       // Create efficient lookup map: schoolId -> Map<normalizedName, studentId>
       const studentsBySchool = new Map<number, Map<string, number>>();
