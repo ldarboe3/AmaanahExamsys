@@ -3841,6 +3841,61 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Helper function to generate readable school email
+  function generateSchoolEmail(schoolName: string): string {
+    // Remove Arabic diacritics and normalize
+    let emailPrefix = schoolName
+      .replace(/[\u064B-\u0652]/g, '') // Remove Arabic diacritics
+      .replace(/\s+/g, '_') // Replace spaces with underscore
+      .replace(/[^\p{L}\p{N}_]/gu, '') // Keep letters, numbers, underscore
+      .substring(0, 30) // Limit length
+      .toLowerCase();
+    
+    // If mostly Arabic, transliterate or use simplified version
+    if (/[\u0600-\u06FF]/.test(emailPrefix)) {
+      // Use a simple hash-like ID for Arabic names
+      const hash = schoolName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 10000;
+      emailPrefix = `school_${hash}`;
+    }
+    
+    return `${emailPrefix}@amaanah.gm`;
+  }
+
+  // Helper function to create school admin account
+  // Returns only safe metadata (email) - never credentials
+  async function createSchoolAdminAccount(school: any): Promise<{ email: string; created: boolean } | null> {
+    const DEFAULT_PASSWORD = 'Schooladmin0001';
+    
+    try {
+      const email = generateSchoolEmail(school.name);
+      const username = email.split('@')[0];
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return { email, created: false };
+      }
+      
+      // Create school admin user
+      await storage.createUserWithPassword({
+        email,
+        username,
+        role: 'school_admin' as any,
+        schoolId: school.id,
+        firstName: school.name.substring(0, 50),
+        lastName: 'Admin',
+        password: DEFAULT_PASSWORD,
+      });
+      
+      // Log for server-side admin reference only - never expose in response
+      console.log(`Created school admin: ${email} for school: ${school.name} (default password)`);
+      return { email, created: true };
+    } catch (error: any) {
+      console.error(`Failed to create school admin for ${school.name}:`, error.message);
+      return null;
+    }
+  }
+
   // Admin bulk student upload - confirm and create students
   app.post("/api/students/bulk-upload-confirm", isAuthenticated, async (req, res) => {
     try {
@@ -3849,7 +3904,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(403).json({ message: "Only super admin and examination admin can bulk upload students" });
       }
 
-      const { students: studentList, examYearId, grade } = req.body;
+      const { students: studentList, examYearId, grade, createMissingSchools } = req.body;
       
       if (!Array.isArray(studentList) || studentList.length === 0) {
         return res.status(400).json({ message: "No students to upload" });
@@ -3868,10 +3923,89 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const created: any[] = [];
       const failed: any[] = [];
       const schoolStudentMap = new Map<number, number>(); // Track students by school for invoice creation
+      const schoolsCreatedMap = new Map<string, number>(); // Track newly created schools by name
+      const schoolAdminsCreated: string[] = []; // Track created school admin emails
+      
+      // Get regions and clusters for school creation
+      const allRegions = await storage.getAllRegions();
+      const allClusters = await storage.getAllClusters();
 
       for (const student of studentList) {
-        if (!student.matchedSchoolId) {
-          failed.push({ ...student, error: 'No school matched' });
+        let schoolId = student.matchedSchoolId;
+        
+        // If no matched school but we have school info, create the school
+        if (!schoolId && student.schoolName && createMissingSchools !== false) {
+          // Check if we already created this school in this batch
+          const schoolKey = `${student.schoolName}_${student.regionName}_${student.clusterName}`;
+          if (schoolsCreatedMap.has(schoolKey)) {
+            schoolId = schoolsCreatedMap.get(schoolKey)!;
+          } else {
+            // Find region and cluster IDs
+            let regionId: number | null = null;
+            let clusterId: number | null = null;
+            
+            const regionNum = parseInt(student.regionName);
+            if (!isNaN(regionNum)) {
+              const matchedRegion = allRegions.find(r => 
+                r.name.toLowerCase().includes(`region ${regionNum}`) ||
+                r.name === student.regionName
+              );
+              if (matchedRegion) regionId = matchedRegion.id;
+            }
+            
+            if (regionId) {
+              const clusterNum = parseInt(student.clusterName);
+              const regionClusters = allClusters.filter(c => c.regionId === regionId);
+              
+              if (!isNaN(clusterNum)) {
+                const matchedCluster = regionClusters.find(c => 
+                  c.name.toLowerCase().includes(`cluster ${clusterNum}`) ||
+                  c.name === student.clusterName
+                );
+                if (matchedCluster) clusterId = matchedCluster.id;
+              }
+            }
+            
+            // Default to first region/cluster if not found
+            if (!regionId && allRegions.length > 0) regionId = allRegions[0].id;
+            if (!clusterId) {
+              const fallbackClusters = allClusters.filter(c => c.regionId === regionId);
+              if (fallbackClusters.length > 0) clusterId = fallbackClusters[0].id;
+            }
+            
+            if (regionId && clusterId) {
+              try {
+                const email = generateSchoolEmail(student.schoolName);
+                const newSchool = await storage.createSchool({
+                  name: student.schoolName,
+                  registrarName: 'Auto-created from bulk upload',
+                  email,
+                  address: student.address || '',
+                  schoolType: 'LBS',
+                  regionId,
+                  clusterId,
+                  status: 'approved',
+                });
+                
+                schoolId = newSchool.id;
+                schoolsCreatedMap.set(schoolKey, newSchool.id);
+                
+                // Create school admin account
+                const adminResult = await createSchoolAdminAccount(newSchool);
+                if (adminResult && adminResult.created) {
+                  schoolAdminsCreated.push(adminResult.email);
+                }
+                
+                console.log(`Created school: ${student.schoolName} (ID: ${newSchool.id}) in Region ${regionId}, Cluster ${clusterId}`);
+              } catch (error: any) {
+                console.error(`Failed to create school ${student.schoolName}:`, error.message);
+              }
+            }
+          }
+        }
+        
+        if (!schoolId) {
+          failed.push({ ...student, error: 'No school matched and could not create' });
           continue;
         }
 
@@ -3881,7 +4015,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             lastName: student.lastName,
             middleName: student.middleName || '',
             gender: student.gender || 'male',
-            schoolId: student.matchedSchoolId,
+            schoolId: schoolId, // Use resolved schoolId (matched or newly created)
             examYearId: parseInt(examYearId),
             grade: parseInt(grade),
             status: 'approved' as const, // Auto-approve bulk uploaded students
@@ -3905,8 +4039,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           created.push(newStudent);
           
           // Track student count by school
-          const count = schoolStudentMap.get(student.matchedSchoolId) || 0;
-          schoolStudentMap.set(student.matchedSchoolId, count + 1);
+          const count = schoolStudentMap.get(schoolId) || 0;
+          schoolStudentMap.set(schoolId, count + 1);
         } catch (error: any) {
           failed.push({ ...student, error: error.message });
         }
@@ -3954,7 +4088,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         students: created,
         errors: failed,
         invoicesCreated: invoicesCreated.length,
-        message: `${created.length} students auto-approved and ${invoicesCreated.length} financial record(s) created`,
+        schoolsCreated: schoolsCreatedMap.size,
+        schoolAdminsCreated: schoolAdminsCreated,
+        message: `${created.length} students, ${schoolsCreatedMap.size} schools, and ${schoolAdminsCreated.length} school admins created`,
       });
     } catch (error: any) {
       console.error('Bulk upload confirm error:', error);

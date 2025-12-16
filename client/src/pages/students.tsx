@@ -447,21 +447,23 @@ export default function Students() {
       setAdminUploadPhase('confirming');
       setAdminUploadProgress(5);
 
-      // Only send students that have a matched school
-      const matchedStudents = adminUploadPreview.filter(s => s.matchedSchoolId);
+      // Send all students (matched and unmatched) - backend will create missing schools
+      const allStudents = adminUploadPreview.filter(s => s.status !== 'error');
       
-      if (matchedStudents.length === 0) {
-        throw new Error("No matched students to upload");
+      if (allStudents.length === 0) {
+        throw new Error("No students to upload");
       }
       
       // Process in batches for large uploads to prevent timeout
       const BATCH_SIZE = 200; // Smaller batches for faster progress updates
       let totalCreated = 0;
       let totalFailed = 0;
-      const totalBatches = Math.ceil(matchedStudents.length / BATCH_SIZE);
+      let totalSchoolsCreated = 0;
+      let schoolAdminEmails: string[] = [];
+      const totalBatches = Math.ceil(allStudents.length / BATCH_SIZE);
       
-      for (let i = 0; i < matchedStudents.length; i += BATCH_SIZE) {
-        const batch = matchedStudents.slice(i, i + BATCH_SIZE);
+      for (let i = 0; i < allStudents.length; i += BATCH_SIZE) {
+        const batch = allStudents.slice(i, i + BATCH_SIZE);
         const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
         
         // Calculate progress: reserve 5% at start and 5% at end
@@ -472,23 +474,31 @@ export default function Students() {
           students: batch,
           examYearId: adminUploadExamYear,
           grade: adminUploadGrade,
+          createMissingSchools: true, // Auto-create schools with admin accounts
         });
         
         const data = await response.json();
         totalCreated += data.created || 0;
         totalFailed += data.failed || 0;
+        totalSchoolsCreated += data.schoolsCreated || 0;
+        if (data.schoolAdminsCreated) {
+          schoolAdminEmails = [...schoolAdminEmails, ...data.schoolAdminsCreated];
+        }
       }
 
       setAdminUploadProgress(100);
-      return { created: totalCreated, failed: totalFailed };
+      return { created: totalCreated, failed: totalFailed, schoolsCreated: totalSchoolsCreated, schoolAdminEmails };
     },
     onSuccess: (data) => {
       setAdminUploadPhase('complete');
+      const schoolInfo = data.schoolsCreated > 0 
+        ? (isRTL ? ` (${data.schoolsCreated} مدرسة جديدة)` : ` (${data.schoolsCreated} new schools)`)
+        : '';
       toast({
         title: isRTL ? "تم الرفع بنجاح" : "Upload Complete",
         description: isRTL 
-          ? `تم إضافة ${data.created} طالب، فشل ${data.failed} طالب`
-          : `Created ${data.created} students, ${data.failed} failed`,
+          ? `تم إضافة ${data.created} طالب، فشل ${data.failed} طالب${schoolInfo}`
+          : `Created ${data.created} students, ${data.failed} failed${schoolInfo}`,
       });
       
       // Invalidate all student queries and refetch
