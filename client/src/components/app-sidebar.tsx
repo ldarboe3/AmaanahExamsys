@@ -48,7 +48,6 @@ const adminMenuDefs: MenuItemDef[] = [
   { key: "examCenters", url: "/centers", icon: MapPin },
   { key: "payments", url: "/payments", icon: CreditCard },
   { key: "results", url: "/admin-results", icon: FileCheck },
-  { key: "resultsUpload", url: "/results-upload", icon: FileCheck },
   { key: "certificates", url: "/certificates", icon: Award },
   { key: "transcripts", url: "/transcripts", icon: BookOpen },
   { key: "examiners", url: "/examiners", icon: UserCheck },
