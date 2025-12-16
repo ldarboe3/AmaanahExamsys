@@ -26,6 +26,7 @@ import Results from "@/pages/results";
 import Certificates from "@/pages/certificates";
 import Transcripts from "@/pages/transcripts";
 import Examiners from "@/pages/examiners";
+import UsersPage from "@/pages/users";
 import Analytics from "@/pages/analytics";
 import Verify from "@/pages/verify";
 import Regions from "@/pages/regions";
@@ -94,6 +95,9 @@ function AuthenticatedRoutes() {
       <Route path="/certificates" component={Certificates} />
       <Route path="/transcripts" component={Transcripts} />
       <Route path="/examiners" component={Examiners} />
+      <Route path="/users">
+        {() => <ProtectedRoute component={UsersPage} allowedRoles={["super_admin"]} />}
+      </Route>
       <Route path="/analytics" component={Analytics} />
       <Route path="/regions" component={Regions} />
       <Route path="/audit-logs" component={AuditLogs} />

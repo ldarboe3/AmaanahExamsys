@@ -336,6 +336,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Update last login
       await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
 
+      // Log login action
+      try {
+        await storage.createAuditLog({
+          userId: user.id,
+          action: 'user_login',
+          entityType: 'user',
+          entityId: user.id,
+          details: { username: user.username, role: user.role, ip: req.ip },
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for login:', auditError);
+      }
+
       res.json({ 
         ...user, 
         passwordHash: undefined,
@@ -387,6 +400,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         role: role || 'school_admin',
         password,
       });
+
+      // Log user registration
+      try {
+        await storage.createAuditLog({
+          userId: req.session.userId || user.id,
+          action: 'user_created',
+          entityType: 'user',
+          entityId: user.id,
+          details: { username, email, role: role || 'school_admin', createdBy: req.session.userId || 'self' },
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for user creation:', auditError);
+      }
 
       res.status(201).json({ ...user, passwordHash: undefined });
     } catch (error: any) {
@@ -2318,6 +2344,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!school) {
         return res.status(404).json({ message: "School not found" });
       }
+      
+      // Log school approval
+      try {
+        await storage.createAuditLog({
+          userId: req.session.userId!,
+          action: 'school_approved',
+          entityType: 'school',
+          entityId: school.id.toString(),
+          details: { schoolName: school.name, approvedBy: req.session.userId },
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for school approval:', auditError);
+      }
+      
       res.json(school);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2330,6 +2370,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!school) {
         return res.status(404).json({ message: "School not found" });
       }
+      
+      // Log school rejection
+      try {
+        await storage.createAuditLog({
+          userId: req.session.userId!,
+          action: 'school_rejected',
+          entityType: 'school',
+          entityId: school.id.toString(),
+          details: { schoolName: school.name, rejectedBy: req.session.userId },
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for school rejection:', auditError);
+      }
+      
       res.json(school);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -9958,6 +10012,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Users management API
   app.get("/api/users", isAuthenticated, async (req, res) => {
     try {
+      // Only super_admin can view all users
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser || currentUser.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super_admin can view users" });
+      }
       const users = await storage.getAllUsers();
       res.json(users);
     } catch (error: any) {
@@ -9967,6 +10026,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/users/:id/role", isAuthenticated, async (req, res) => {
     try {
+      // Only super_admin can update user roles
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser || currentUser.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super_admin can update user roles" });
+      }
+      
       const { role, schoolId, centerId } = req.body;
       if (!role) {
         return res.status(400).json({ message: "role is required" });
@@ -9975,6 +10040,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
+      
+      // Log role change
+      try {
+        await storage.createAuditLog({
+          userId: req.session.userId!,
+          action: 'user_role_changed',
+          entityType: 'user',
+          entityId: req.params.id,
+          details: { newRole: role, changedBy: req.session.userId },
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for role change:', auditError);
+      }
+      
       res.json(user);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
