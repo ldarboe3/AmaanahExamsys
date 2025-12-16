@@ -4235,6 +4235,403 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ============================================================
+  // RESULTS-ONLY BULK UPLOAD (Match existing schools/students only)
+  // ============================================================
+  
+  // Results-only upload preview - matches existing schools and students only
+  app.post("/api/bulk-upload/results/preview", isAuthenticated, studentBulkUploadConfig.single('file'), async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only super admin and examination admin can upload results" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const { examYearId, grade } = req.body;
+      if (!examYearId || !grade) {
+        return res.status(400).json({ message: "Exam year and grade are required" });
+      }
+
+      // Parse file (CSV or Excel)
+      let data: any[] = [];
+      const fileName = req.file.originalname.toLowerCase();
+      
+      if (fileName.endsWith('.csv')) {
+        const content = req.file.buffer.toString('utf-8');
+        const lines = content.split(/\r?\n/).filter(line => line.trim());
+        if (lines.length < 2) {
+          return res.status(400).json({ message: "File is empty or has no data rows" });
+        }
+        
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].match(/("([^"]*("")*)*"|[^,]*)/g) || [];
+          const row: any = {};
+          headers.forEach((h, idx) => {
+            let val = values[idx] || '';
+            val = val.replace(/^"|"$/g, '').replace(/""/g, '"').trim();
+            row[h] = val;
+          });
+          data.push(row);
+        }
+      } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        const XLSX = await import('xlsx');
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+      } else {
+        return res.status(400).json({ message: "Unsupported file format. Use CSV or Excel." });
+      }
+
+      if (data.length === 0) {
+        return res.status(400).json({ message: "No data rows found in file" });
+      }
+
+      // Get all schools, students, regions, clusters, and subjects
+      const allSchools = await storage.getSchools();
+      const allStudents = await storage.getStudents();
+      const regions = await storage.getRegions();
+      const clusters = await storage.getClusters();
+      const subjects = await storage.getSubjects();
+
+      const regionMap = new Map(regions.map(r => [r.id, r]));
+      const clusterMap = new Map(clusters.map(c => [c.id, c]));
+
+      // Detect column mappings
+      const headers = Object.keys(data[0]);
+      let schoolColIdx = headers.findIndex(h => /school/i.test(h) || /مدرسة/i.test(h));
+      let firstNameColIdx = headers.findIndex(h => /first.*name|الاسم الأول/i.test(h));
+      let lastNameColIdx = headers.findIndex(h => /last.*name|surname|الاسم الأخير|اللقب/i.test(h));
+      let middleNameColIdx = headers.findIndex(h => /middle.*name|الاسم الأوسط/i.test(h));
+      let fullNameColIdx = headers.findIndex(h => /^name$|full.*name|الاسم|اسم الطالب/i.test(h));
+      let regionColIdx = headers.findIndex(h => /region|المنطقة/i.test(h));
+      let clusterColIdx = headers.findIndex(h => /cluster|المجموعة/i.test(h));
+
+      // Detect subject columns
+      const subjectColumns: { colIndex: number; subjectId: number; subjectName: string; header: string }[] = [];
+      const gradeNum = parseInt(grade);
+      const gradeSubjects = subjects.filter(s => s.grade === gradeNum);
+
+      for (let i = 0; i < headers.length; i++) {
+        const header = headers[i];
+        const normalizedHeader = normalizeArabicText(header);
+        
+        for (const subject of gradeSubjects) {
+          const normalizedSubject = normalizeArabicText(subject.name);
+          if (normalizedHeader === normalizedSubject || 
+              header.toLowerCase() === subject.name.toLowerCase() ||
+              normalizedHeader.includes(normalizedSubject) ||
+              normalizedSubject.includes(normalizedHeader)) {
+            subjectColumns.push({
+              colIndex: i,
+              subjectId: subject.id,
+              subjectName: subject.name,
+              header: header
+            });
+            break;
+          }
+        }
+      }
+
+      const hasScores = subjectColumns.length > 0;
+      if (!hasScores) {
+        return res.status(400).json({ 
+          message: "No subject score columns detected in file. Results upload requires subject columns matching Grade " + grade + " subjects.",
+          detectedHeaders: headers,
+          expectedSubjects: gradeSubjects.map(s => s.name)
+        });
+      }
+
+      // Process each row - match existing schools and students only
+      const previewResults: any[] = [];
+      
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        const values = Object.values(row);
+
+        // Extract school name
+        const schoolName = schoolColIdx >= 0 ? String(values[schoolColIdx] || '').trim() : '';
+        
+        // Extract student name
+        let firstName = '', lastName = '', middleName = '';
+        if (firstNameColIdx >= 0 && lastNameColIdx >= 0) {
+          firstName = String(values[firstNameColIdx] || '').trim();
+          lastName = String(values[lastNameColIdx] || '').trim();
+          middleName = middleNameColIdx >= 0 ? String(values[middleNameColIdx] || '').trim() : '';
+        } else if (fullNameColIdx >= 0) {
+          const fullName = String(values[fullNameColIdx] || '').trim();
+          const parts = fullName.split(/\s+/);
+          if (parts.length >= 2) {
+            firstName = parts[0];
+            lastName = parts[parts.length - 1];
+            middleName = parts.slice(1, -1).join(' ');
+          } else {
+            firstName = fullName;
+          }
+        }
+
+        // Extract region/cluster for better matching
+        const regionName = regionColIdx >= 0 ? String(values[regionColIdx] || '').trim() : '';
+        const clusterName = clusterColIdx >= 0 ? String(values[clusterColIdx] || '').trim() : '';
+
+        if (!schoolName || !firstName) {
+          previewResults.push({
+            row: i + 2,
+            firstName,
+            lastName,
+            middleName,
+            schoolName,
+            status: 'error',
+            message: 'Missing required fields (school name or student name)',
+            matchedSchoolId: null,
+            matchedStudentId: null,
+            scores: []
+          });
+          continue;
+        }
+
+        // Find matching school
+        let matchedSchool: any = null;
+        let candidateSchools = [...allSchools];
+        
+        // Filter by region/cluster if provided
+        if (regionName) {
+          const regionNum = parseInt(regionName);
+          const matchedRegion = !isNaN(regionNum) 
+            ? regions.find(r => r.name === `Region ${regionNum}` || r.name === regionName)
+            : regions.find(r => r.name.toLowerCase().includes(regionName.toLowerCase()));
+          if (matchedRegion) {
+            candidateSchools = candidateSchools.filter(s => s.regionId === matchedRegion.id);
+          }
+        }
+        if (clusterName) {
+          const clusterNum = parseInt(clusterName);
+          const matchedCluster = !isNaN(clusterNum)
+            ? clusters.find(c => c.name === `Cluster ${clusterNum}` || c.name === clusterName)
+            : clusters.find(c => c.name.toLowerCase().includes(clusterName.toLowerCase()));
+          if (matchedCluster) {
+            candidateSchools = candidateSchools.filter(s => s.clusterId === matchedCluster.id);
+          }
+        }
+
+        // Match school by name
+        let bestSchoolMatch: { school: any; score: number } | null = null;
+        for (const school of candidateSchools) {
+          const score = calculateSimilarity(schoolName, school.name);
+          if (score >= 0.5 && (!bestSchoolMatch || score > bestSchoolMatch.score)) {
+            bestSchoolMatch = { school, score };
+          }
+        }
+        
+        if (!bestSchoolMatch) {
+          const exactMatch = candidateSchools.find(s => s.name.toLowerCase() === schoolName.toLowerCase());
+          if (exactMatch) {
+            bestSchoolMatch = { school: exactMatch, score: 1.0 };
+          }
+        }
+
+        if (!bestSchoolMatch || bestSchoolMatch.score < 0.8) {
+          previewResults.push({
+            row: i + 2,
+            firstName,
+            lastName,
+            middleName,
+            schoolName,
+            status: 'unmatched_school',
+            message: bestSchoolMatch 
+              ? `Possible school match: ${bestSchoolMatch.school.name} (${Math.round(bestSchoolMatch.score * 100)}%) - too low confidence`
+              : 'No matching school found in database',
+            matchedSchoolId: null,
+            matchedStudentId: null,
+            scores: []
+          });
+          continue;
+        }
+
+        matchedSchool = bestSchoolMatch.school;
+
+        // Find matching student within the matched school
+        const schoolStudents = allStudents.filter(s => 
+          s.schoolId === matchedSchool.id && 
+          s.examYearId === parseInt(examYearId) &&
+          s.grade === parseInt(grade)
+        );
+
+        let matchedStudent: any = null;
+        let bestStudentScore = 0;
+
+        for (const student of schoolStudents) {
+          // Calculate name similarity
+          const firstNameScore = calculateSimilarity(firstName, student.firstName);
+          const lastNameScore = calculateSimilarity(lastName, student.lastName || '');
+          const combinedScore = (firstNameScore + lastNameScore) / 2;
+          
+          if (combinedScore > bestStudentScore && combinedScore >= 0.7) {
+            matchedStudent = student;
+            bestStudentScore = combinedScore;
+          }
+        }
+
+        // Extract scores
+        const scores: { subjectId: number; subjectName: string; score: number | null }[] = [];
+        for (const subjCol of subjectColumns) {
+          const rawScore = row[headers[subjCol.colIndex]];
+          const scoreValue = rawScore !== undefined && rawScore !== '' ? parseFloat(String(rawScore)) : null;
+          scores.push({
+            subjectId: subjCol.subjectId,
+            subjectName: subjCol.subjectName,
+            score: !isNaN(scoreValue as number) ? scoreValue : null
+          });
+        }
+
+        if (!matchedStudent) {
+          previewResults.push({
+            row: i + 2,
+            firstName,
+            lastName,
+            middleName,
+            schoolName,
+            matchedSchoolName: matchedSchool.name,
+            matchedSchoolId: matchedSchool.id,
+            status: 'unmatched_student',
+            message: `Student not found in ${matchedSchool.name} for Grade ${grade}`,
+            matchedStudentId: null,
+            scores
+          });
+          continue;
+        }
+
+        // Successfully matched both school and student
+        previewResults.push({
+          row: i + 2,
+          firstName,
+          lastName,
+          middleName,
+          schoolName,
+          matchedSchoolName: matchedSchool.name,
+          matchedSchoolId: matchedSchool.id,
+          matchedStudentId: matchedStudent.id,
+          matchedStudentName: `${matchedStudent.firstName} ${matchedStudent.lastName || ''}`.trim(),
+          indexNumber: matchedStudent.indexNumber,
+          status: 'matched',
+          message: `Matched: ${matchedStudent.firstName} ${matchedStudent.lastName || ''} (${matchedStudent.indexNumber || 'No index'})`,
+          scores
+        });
+      }
+
+      // Calculate summary
+      const matched = previewResults.filter(r => r.status === 'matched').length;
+      const unmatchedSchools = previewResults.filter(r => r.status === 'unmatched_school').length;
+      const unmatchedStudents = previewResults.filter(r => r.status === 'unmatched_student').length;
+      const errors = previewResults.filter(r => r.status === 'error').length;
+
+      res.json({
+        success: true,
+        preview: previewResults,
+        summary: {
+          total: previewResults.length,
+          matched,
+          unmatchedSchools,
+          unmatchedStudents,
+          errors,
+          canProceed: matched > 0
+        },
+        subjectColumns: subjectColumns.map(s => ({ subjectId: s.subjectId, subjectName: s.subjectName })),
+      });
+    } catch (error: any) {
+      console.error('Results upload preview error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Results-only upload confirm - creates results for matched students only
+  app.post("/api/bulk-upload/results/confirm", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Only super admin and examination admin can upload results" });
+      }
+
+      const { examYearId, grade, results } = req.body;
+      if (!examYearId || !grade || !Array.isArray(results)) {
+        return res.status(400).json({ message: "Exam year, grade, and results array are required" });
+      }
+
+      // Only process matched results
+      const matchedResults = results.filter((r: any) => r.status === 'matched' && r.matchedStudentId);
+      
+      if (matchedResults.length === 0) {
+        return res.status(400).json({ message: "No matched students to upload results for" });
+      }
+
+      let resultsCreated = 0;
+      let resultsFailed = 0;
+      const errors: any[] = [];
+
+      for (const result of matchedResults) {
+        const studentId = result.matchedStudentId;
+        const scores = result.scores || [];
+
+        for (const scoreData of scores) {
+          if (scoreData.score !== null && scoreData.score !== undefined) {
+            try {
+              // Check if result already exists
+              const existingResults = await storage.getStudentResults(studentId);
+              const existingResult = existingResults.find(
+                r => r.subjectId === scoreData.subjectId && r.examYearId === parseInt(examYearId)
+              );
+
+              if (existingResult) {
+                // Update existing result
+                await storage.updateStudentResult(existingResult.id, {
+                  examScore: scoreData.score.toString(),
+                  totalScore: scoreData.score.toString(),
+                  status: 'published',
+                });
+              } else {
+                // Create new result
+                await storage.createStudentResult({
+                  studentId,
+                  subjectId: scoreData.subjectId,
+                  examYearId: parseInt(examYearId),
+                  examScore: scoreData.score.toString(),
+                  totalScore: scoreData.score.toString(),
+                  status: 'published',
+                });
+              }
+              resultsCreated++;
+            } catch (err: any) {
+              resultsFailed++;
+              errors.push({
+                studentId,
+                subjectId: scoreData.subjectId,
+                error: err.message
+              });
+            }
+          }
+        }
+      }
+
+      console.log(`[RESULTS BULK UPLOAD] Created/updated ${resultsCreated} results for ${matchedResults.length} students`);
+
+      res.json({
+        success: true,
+        studentsProcessed: matchedResults.length,
+        resultsCreated,
+        resultsFailed,
+        errors,
+        message: `${resultsCreated} results uploaded and published for ${matchedResults.length} students`,
+      });
+    } catch (error: any) {
+      console.error('Results upload confirm error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Download unmatched schools as CSV
   app.post("/api/students/download-unmatched-schools", isAuthenticated, async (req, res) => {
     try {
