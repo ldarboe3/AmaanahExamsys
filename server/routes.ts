@@ -7387,53 +7387,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             console.log(`[Preview] Row ${i+2}: rawSchool="${schoolName.trim()}" normalized="${normalizedSchoolName}" matched=${!!matchedSchool}`);
           }
 
-          // If school not found, we'll create it - track for creation
+          // If school not found - mark as unmatched (NO creation)
           if (!matchedSchool) {
             if (!processedSchoolNames.has(normalizedSchoolName)) {
-              // Track school for creation (auto-create enabled)
-              schoolsToCreateMap.set(normalizedSchoolName, {
-                normalizedName: normalizedSchoolName,
-                rawName: schoolName.trim(),
-                address: address.trim(),
+              // Track unmatched school for reporting
+              unmatchedSchools.push({
+                rowNumber: i + 2,
+                rawSchoolName: schoolName.trim(),
+                reason: 'School not found in database',
               });
               processedSchoolNames.add(normalizedSchoolName);
             }
             
-            // Still need to validate student name
-            if (!studentName.trim()) {
-              noMarksRows.push({
-                rowNumber: i + 2,
-                rawSchoolName: schoolName.trim(),
-                reason: 'Missing student name',
-              });
-              continue;
-            }
-            
-            // Parse marks for validation
-            let hasValidMarks = false;
-            const validMarks: Array<{ subjectId: number; score: number }> = [];
-            
-            for (const [colName, subjectId] of subjectColumnMapping.entries()) {
-              const rawValue = row[colName];
-              if (rawValue === undefined || rawValue === null || rawValue === '') continue;
-              const score = parseFloat(rawValue);
-              if (!isNaN(score) && score >= 0 && score <= 100) {
-                hasValidMarks = true;
-                validMarks.push({ subjectId, score });
-              }
-            }
-            
-            if (!hasValidMarks) {
-              noMarksRows.push({
-                rowNumber: i + 2,
-                rawSchoolName: schoolName.trim(),
-                rawStudentName: studentName.trim(),
-                reason: 'No valid marks found',
-              });
-              continue;
-            }
-            
-            // Mark as will_create_school (school + student will be created)
+            // Mark row as unmatched school - will be skipped
             previewRows.push({
               rowNumber: i + 2,
               rawSchoolName: schoolName.trim(),
@@ -7443,9 +7409,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               normalizedStudentName: cleanArabicText(studentName, 'student'),
               schoolId: null,
               studentId: null,
-              marks: validMarks,
-              isMatched: true,
-              matchStatus: 'will_create_school',
+              marks: [],
+              isMatched: false,
+              matchStatus: 'unmatched_school',
             });
             continue;
           }
@@ -7563,8 +7529,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           }
 
           if (!studentId) {
-            // Student not found - mark for creation (user approved this behavior)
-            // We'll create the student during confirm phase
+            // Student not found - mark as unmatched (NO creation)
+            unmatchedStudents.push({
+              rowNumber: i + 2,
+              rawSchoolName: schoolName.trim(),
+              rawStudentName: fullStudentName,
+              matchedSchoolName: matchedSchool.name,
+              reason: 'Student not found in database',
+            });
             previewRows.push({
               rowNumber: i + 2,
               rawSchoolName: schoolName.trim(),
@@ -7575,8 +7547,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               schoolId: matchedSchool.id,
               studentId: null,
               marks: validMarks,
-              isMatched: true, // Treat as matched since we'll create the student
-              matchStatus: 'will_create',
+              isMatched: false, // NOT matched - will be skipped
+              matchStatus: 'unmatched_student',
             });
             continue;
           }
@@ -7601,11 +7573,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
 
-      const matchedRows = previewRows.filter(r => r.isMatched).length;
-      const newStudentsCount = previewRows.filter(r => r.matchStatus === 'will_create' || r.matchStatus === 'will_create_school').length;
+      const matchedRows = previewRows.filter(r => r.isMatched && r.matchStatus === 'matched').length;
+      const unmatchedSchoolsCount = previewRows.filter(r => r.matchStatus === 'unmatched_school').length;
+      const unmatchedStudentsCount = previewRows.filter(r => r.matchStatus === 'unmatched_student').length;
       const existingStudentsCount = previewRows.filter(r => r.matchStatus === 'matched').length;
-      const newSchoolsCount = schoolsToCreateMap.size;
-      const schoolsToCreate = Array.from(schoolsToCreateMap.values());
 
       // Store preview data for confirmation
       const sessionKey = `preview_${userId}_${Date.now()}`;
@@ -7622,8 +7593,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           unmatchedStudents: unmatchedStudents.length,
           noMarksRows: noMarksRows.length,
           invalidMarksRows: invalidMarksRows.length,
-          newSchoolsCount,
-          newStudentsCount,
+          unmatchedSchoolsCount,
+          unmatchedStudentsCount,
           existingStudentsCount,
         },
         examYearId,
@@ -7632,7 +7603,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         unmatchedStudents,
         noMarksRows,
         invalidMarksRows,
-        schoolsToCreate,
         timestamp: Date.now(),
       });
 
@@ -7645,7 +7615,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         timestamp: Date.now(),
       });
 
-      console.log(`[Preview] Complete: ${rows.length} rows, ${matchedRows} matched, ${matchedSchoolIds.size} existing schools, ${newSchoolsCount} new schools to create, ${existingStudentsCount} existing students, ${newStudentsCount} new students to create`);
+      console.log(`[Preview] Complete: ${rows.length} rows, ${matchedRows} matched, ${matchedSchoolIds.size} schools matched, ${existingStudentsCount} students matched, ${unmatchedSchoolsCount} schools not found, ${unmatchedStudentsCount} students not found`);
 
       res.json({
         success: true,
@@ -7660,13 +7630,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           unmatchedStudents: unmatchedStudents.length,
           noMarksRows: noMarksRows.length,
           invalidMarksRows: invalidMarksRows.length,
-          newSchoolsCount,
-          newStudentsCount,
+          unmatchedSchoolsCount,
+          unmatchedStudentsCount,
           existingStudentsCount,
         },
         sampleUnmatchedSchools: unmatchedSchools.slice(0, 5),
         sampleUnmatchedStudents: unmatchedStudents.slice(0, 5),
-        sampleNewSchools: schoolsToCreate.slice(0, 5),
       });
 
     } catch (error: any) {
@@ -7728,114 +7697,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       let resultsCreated = 0;
       let resultsUpdated = 0;
-      let studentsCreated = 0;
-      let schoolsCreated = 0;
 
-      // Step 0: Create schools for "will_create_school" rows
-      const willCreateSchoolRows = previewData.rows.filter(r => r.matchStatus === 'will_create_school' && r.marks.length > 0);
-      const schoolsToCreate = previewData.schoolsToCreate || [];
+      // Only process rows where both school AND student were matched (NO creation)
+      const processableRows = previewData.rows.filter(r => r.matchStatus === 'matched' && r.studentId && r.marks.length > 0);
       
-      // Need region/cluster for school creation - use defaults or first available
-      let regionId = defaultRegionId;
-      let clusterId = defaultClusterId;
-      
-      if (!regionId || !clusterId) {
-        // Get first available region and cluster as fallback
-        const regions = await storage.getAllRegions();
-        if (regions.length > 0) {
-          regionId = regionId || regions[0].id;
-          const clusters = await storage.getClustersByRegion(regionId);
-          if (clusters.length > 0) {
-            clusterId = clusterId || clusters[0].id;
-          }
-        }
-      }
-
-      if (willCreateSchoolRows.length > 0 && (!regionId || !clusterId)) {
-        return res.status(400).json({ 
-          message: "Cannot create schools: No region/cluster specified and none available in database. Please add regions and clusters first." 
-        });
-      }
-
-      // Create schools and build mapping of normalized name -> new school ID
-      const newSchoolMap = new Map<string, number>();
-      
-      for (const schoolInfo of schoolsToCreate) {
-        try {
-          // Generate a unique email for the school (required field)
-          const timestamp = Date.now();
-          const randomNum = Math.floor(Math.random() * 10000);
-          const sanitizedName = schoolInfo.rawName.replace(/[^a-zA-Z0-9\u0600-\u06FF]/g, '').substring(0, 20);
-          const uniqueEmail = `school_${sanitizedName}_${timestamp}_${randomNum}@autogenerated.local`;
-          
-          const newSchool = await storage.createSchool({
-            name: schoolInfo.rawName,
-            registrarName: 'Auto-created from results upload',
-            email: uniqueEmail,
-            address: schoolInfo.address || '',
-            schoolType: 'LBS', // Default type
-            regionId: regionId!,
-            clusterId: clusterId!,
-            status: 'approved', // Auto-approve so students get index numbers
-          });
-          
-          newSchoolMap.set(schoolInfo.normalizedName, newSchool.id);
-          schoolsCreated++;
-          
-          console.log(`[Confirm] Created school: ${schoolInfo.rawName} (ID: ${newSchool.id})`);
-        } catch (error: any) {
-          console.error(`[Confirm] Failed to create school ${schoolInfo.rawName}:`, error.message);
-        }
-      }
-
-      // Update rows with new school IDs
-      for (const row of willCreateSchoolRows) {
-        const newSchoolId = newSchoolMap.get(row.normalizedSchoolName);
-        if (newSchoolId) {
-          row.schoolId = newSchoolId;
-        }
-      }
-
-      // Step 1: Create students for "will_create" and "will_create_school" rows
-      const willCreateStudentRows = previewData.rows.filter(
-        r => (r.matchStatus === 'will_create' || r.matchStatus === 'will_create_school') && r.schoolId && r.marks.length > 0
-      );
-      
-      for (const row of willCreateStudentRows) {
-        try {
-          const { firstName, lastName } = parseStudentName(row.rawStudentName);
-          
-          // Create student with minimal required data
-          let newStudent = await storage.createStudent({
-            firstName,
-            lastName,
-            schoolId: row.schoolId!,
-            grade: previewData.gradeLevel,
-            status: 'approved', // Auto-approve to allow index number generation
-            examYearId: previewData.examYearId,
-            gender: 'male', // Default, will be updated if needed
-          });
-          
-          // Auto-generate index number for approved students
-          if (newStudent.status === 'approved' && !newStudent.indexNumber) {
-            const indexNum = generateIndexNumber();
-            await storage.updateStudent(newStudent.id, { indexNumber: indexNum });
-            newStudent.indexNumber = indexNum;
-          }
-          
-          // Update row with new student ID for result processing
-          row.studentId = newStudent.id;
-          row.isMatched = true; // Ensure row is processed for results
-          studentsCreated++;
-          
-          console.log(`[Confirm] Created student: ${firstName} ${lastName} (ID: ${newStudent.id}, Index: ${newStudent.indexNumber}) for school ${row.schoolId}`);
-        } catch (error: any) {
-          console.error(`[Confirm] Failed to create student for row ${row.rowNumber}:`, error.message);
-        }
-      }
-
-      // Step 2: Apply results for all matched rows (existing + newly created students)
-      const processableRows = previewData.rows.filter(r => r.isMatched && r.studentId && r.marks.length > 0);
+      console.log(`[Confirm] Processing ${processableRows.length} matched rows for results upload (no new students/schools created)`);
 
       for (const row of processableRows) {
         for (const mark of row.marks) {
@@ -7856,68 +7722,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
 
-      // Step 3: Clean up - Delete students with no results and schools with no students
-      try {
-        // Get all students and schools to check for cleanup needs
-        const allStudents = await storage.getAllStudents();
-        const allSchools = await storage.getAllSchools();
-        let studentsDeleted = 0;
-        let schoolsDeleted = 0;
-        
-        // First pass: Delete students with no results in this exam year
-        for (const student of allStudents) {
-          if (student.examYearId === previewData.examYearId && student.grade === previewData.gradeLevel) {
-            // Check if this student has any results by trying to get them
-            const studentResults = await storage.getStudentResults(student.id);
-            const hasResultsInExamYear = studentResults?.some(r => r.examYearId === previewData.examYearId);
-            
-            if (!hasResultsInExamYear) {
-              try {
-                await storage.deleteStudent(student.id);
-                studentsDeleted++;
-                console.log(`[Confirm] Deleted student ${student.id} (${student.firstName} ${student.lastName}) - no results`);
-              } catch (error: any) {
-                console.warn(`[Confirm] Failed to delete student ${student.id}:`, error.message);
-              }
-            }
-          }
-        }
-        
-        // Second pass: Delete schools with no students
-        for (const school of allSchools) {
-          // Re-fetch students to account for deletions
-          const remainingStudents = await storage.getAllStudents();
-          const hasStudents = remainingStudents.some(s => s.schoolId === school.id);
-          
-          if (!hasStudents) {
-            try {
-              await storage.deleteSchool(school.id);
-              schoolsDeleted++;
-              console.log(`[Confirm] Deleted school ${school.id} (${school.name}) - no students`);
-            } catch (error: any) {
-              console.warn(`[Confirm] Failed to delete school ${school.id}:`, error.message);
-            }
-          }
-        }
-        
-        if (studentsDeleted > 0 || schoolsDeleted > 0) {
-          console.log(`[Confirm] Cleanup: Deleted ${studentsDeleted} students with no results and ${schoolsDeleted} empty schools`);
-        }
-      } catch (error: any) {
-        console.warn('[Confirm] Cleanup failed (non-fatal):', error.message);
-      }
-
       // Clean up preview data
       uploadPreviewStore.delete(sessionKey);
 
-      console.log(`[Confirm] Applied: ${schoolsCreated} schools created, ${studentsCreated} students created, ${resultsCreated} results created, ${resultsUpdated} results updated`);
+      console.log(`[Confirm] Applied: ${resultsCreated} results created, ${resultsUpdated} results updated for ${processableRows.length} matched students`);
 
       res.json({
         success: true,
         summary: {
           studentsProcessed: processableRows.length,
-          schoolsCreated,
-          studentsCreated,
           resultsCreated,
           resultsUpdated,
         },

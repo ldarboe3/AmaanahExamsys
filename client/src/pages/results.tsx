@@ -948,30 +948,58 @@ export default function Results() {
                       <span className="text-muted-foreground">{isRTL ? "الطلاب الموجودين" : "Existing Students"}</span>
                       <span className="font-medium">{formatNumber(previewData.summary?.existingStudentsCount || 0)}</span>
                     </div>
-                    {(previewData.summary?.newSchoolsCount || 0) > 0 && (
-                      <div className="flex justify-between p-2 bg-emerald-500/10 rounded col-span-2">
-                        <span className="text-emerald-600">{isRTL ? "مدارس جديدة سيتم إنشاؤها" : "New Schools to Create"}</span>
-                        <span className="font-medium text-emerald-600">{formatNumber(previewData.summary?.newSchoolsCount || 0)}</span>
+                    {(previewData.summary?.unmatchedSchoolsCount || 0) > 0 && (
+                      <div className="flex justify-between p-2 bg-red-500/10 rounded col-span-2">
+                        <span className="text-red-600">{isRTL ? "مدارس غير موجودة (سيتم تخطيها)" : "Schools Not Found (will be skipped)"}</span>
+                        <span className="font-medium text-red-600">{formatNumber(previewData.summary?.unmatchedSchoolsCount || 0)}</span>
                       </div>
                     )}
-                    {(previewData.summary?.newStudentsCount || 0) > 0 && (
-                      <div className="flex justify-between p-2 bg-blue-500/10 rounded col-span-2">
-                        <span className="text-blue-600">{isRTL ? "طلاب جدد سيتم إنشاؤهم" : "New Students to Create"}</span>
-                        <span className="font-medium text-blue-600">{formatNumber(previewData.summary?.newStudentsCount || 0)}</span>
+                    {(previewData.summary?.unmatchedStudentsCount || 0) > 0 && (
+                      <div className="flex justify-between p-2 bg-amber-500/10 rounded col-span-2">
+                        <span className="text-amber-600">{isRTL ? "طلاب غير موجودين (سيتم تخطيهم)" : "Students Not Found (will be skipped)"}</span>
+                        <span className="font-medium text-amber-600">{formatNumber(previewData.summary?.unmatchedStudentsCount || 0)}</span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Error Details - Show only for actual issues (noMarks, invalidMarks) */}
-                {(previewData.summary?.noMarksRows > 0 ||
+                {/* Error Details - Show for unmatched records and other issues */}
+                {(previewData.summary?.unmatchedSchoolsCount > 0 ||
+                  previewData.summary?.unmatchedStudentsCount > 0 ||
+                  previewData.summary?.noMarksRows > 0 ||
                   previewData.summary?.invalidMarksRows > 0) && (
                   <div className="border border-amber-500/30 rounded-lg p-4 space-y-3 bg-amber-50/50 dark:bg-amber-500/5">
                     <h4 className="font-semibold flex items-center gap-2 text-amber-600">
                       <AlertCircle className="w-4 h-4" />
-                      {isRTL ? "المشاكل المكتشفة" : "Issues Found"}
+                      {isRTL ? "السجلات التي سيتم تخطيها" : "Records That Will Be Skipped"}
                     </h4>
                     <div className="space-y-2">
+                      {previewData.summary?.unmatchedSchoolsCount > 0 && (
+                        <div className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded border border-red-200">
+                          <div>
+                            <p className="text-sm font-medium text-red-600">{isRTL ? "مدارس غير موجودة" : "Schools Not Found"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {previewData.summary.unmatchedSchoolsCount} {isRTL ? "صفوف لمدارس غير مسجلة" : "rows for unregistered schools"}
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadErrors('unmatched')} data-testid="button-download-unmatched-schools">
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+                      {previewData.summary?.unmatchedStudentsCount > 0 && (
+                        <div className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded border border-amber-200">
+                          <div>
+                            <p className="text-sm font-medium text-amber-600">{isRTL ? "طلاب غير موجودين" : "Students Not Found"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {previewData.summary.unmatchedStudentsCount} {isRTL ? "صفوف لطلاب غير مسجلين" : "rows for unregistered students"}
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadErrors('unmatchedstudents')} data-testid="button-download-unmatched-students">
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
                       {previewData.summary?.noMarksRows > 0 && (
                         <div className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded border">
                           <div>
