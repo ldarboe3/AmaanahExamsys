@@ -7361,10 +7361,40 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const processedSchoolNames = new Set<string>();
       const matchedSchoolIds = new Set<number>();
       const matchedStudentIds = new Set<number>();
-      const studentCache = new Map<string, number | null>();
       
       // Track schools that will be created
       const schoolsToCreateMap = new Map<string, SchoolToCreate>();
+
+      // PERFORMANCE FIX: Pre-load all students for this grade level at once
+      // Instead of fetching per-school during row processing
+      const allStudents = await storage.getAllStudents();
+      const gradeStudents = allStudents.filter(s => s.grade === gradeLevel);
+      
+      // Create efficient lookup map: schoolId -> Map<normalizedName, studentId>
+      const studentsBySchool = new Map<number, Map<string, number>>();
+      for (const student of gradeStudents) {
+        if (!student.schoolId) continue;
+        
+        // Get or create the school's student map
+        if (!studentsBySchool.has(student.schoolId)) {
+          studentsBySchool.set(student.schoolId, new Map());
+        }
+        const schoolStudentMap = studentsBySchool.get(student.schoolId)!;
+        
+        // Add multiple name variations for matching
+        const fullName = `${student.firstName || ''} ${student.middleName || ''} ${student.lastName || ''}`.replace(/\s+/g, ' ').trim();
+        const firstLastName = `${student.firstName || ''} ${student.lastName || ''}`.replace(/\s+/g, ' ').trim();
+        
+        const normalizedFull = cleanArabicText(fullName, 'student');
+        const normalizedFirstLast = cleanArabicText(firstLastName, 'student');
+        
+        schoolStudentMap.set(normalizedFull, student.id);
+        if (normalizedFirstLast !== normalizedFull) {
+          schoolStudentMap.set(normalizedFirstLast, student.id);
+        }
+      }
+      
+      console.log(`[Preview] Pre-loaded ${gradeStudents.length} students for grade ${gradeLevel} across ${studentsBySchool.size} schools`);
 
       // Process each row (matching only, no saving)
       for (let i = 0; i < rows.length; i++) {
@@ -7482,50 +7512,37 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             continue;
           }
 
-          // Try to match student
+          // Try to match student using pre-loaded lookup map (FAST)
           const schoolId = matchedSchool.id;
-          const studentCacheKey = `${schoolId}_${normalizedStudentName}_${gradeLevel}`;
-          let studentId = studentCache.get(studentCacheKey);
-
-          if (studentId === undefined) {
-            const existingStudents = await storage.getStudentsBySchool(schoolId);
+          const schoolStudentMap = studentsBySchool.get(schoolId);
+          let studentId: number | null = null;
+          
+          if (schoolStudentMap) {
+            // Direct lookup first
+            studentId = schoolStudentMap.get(normalizedStudentName) || null;
             
-            const existingStudent = existingStudents.find(s => {
-              if (s.grade !== gradeLevel) return false;
-              
-              // Full name matching (with middle name)
-              const storedFullName = `${s.firstName || ''} ${s.middleName || ''} ${s.lastName || ''}`.replace(/\s+/g, ' ').trim();
-              const normalizedStoredName = cleanArabicText(storedFullName, 'student');
-              
-              if (normalizedStoredName === normalizedStudentName) return true;
-              
-              // Try matching without middle name (firstName + lastName only)
-              // This handles cases where CSV has "John Doe" but student is "John Michael Doe"
-              const storedFirstLastName = `${s.firstName || ''} ${s.lastName || ''}`.replace(/\s+/g, ' ').trim();
-              const normalizedStoredFirstLast = cleanArabicText(storedFirstLastName, 'student');
-              
-              if (normalizedStoredFirstLast === normalizedStudentName) return true;
-              
-              // Also try matching the input name against just firstName + lastName of stored student
-              // This handles both directions
+            // If not found, try first+last name only (skip middle name)
+            if (!studentId) {
               const inputParts = normalizedStudentName.split(/\s+/);
               if (inputParts.length >= 2) {
                 const inputFirstLast = `${inputParts[0]} ${inputParts[inputParts.length - 1]}`;
-                if (inputFirstLast === normalizedStoredFirstLast) return true;
+                studentId = schoolStudentMap.get(inputFirstLast) || null;
               }
-              
-              // Fuzzy matching for name variations - with more lenient threshold
-              if (normalizedStoredName.includes(normalizedStudentName) || normalizedStudentName.includes(normalizedStoredName)) {
-                const shorterLen = Math.min(normalizedStoredName.length, normalizedStudentName.length);
-                const longerLen = Math.max(normalizedStoredName.length, normalizedStudentName.length);
-                if (shorterLen / longerLen >= 0.5) return true; // Lowered from 0.6 to 0.5 to handle middle name differences
+            }
+            
+            // Fuzzy matching as last resort
+            if (!studentId) {
+              for (const [storedName, storedId] of schoolStudentMap.entries()) {
+                if (storedName.includes(normalizedStudentName) || normalizedStudentName.includes(storedName)) {
+                  const shorterLen = Math.min(storedName.length, normalizedStudentName.length);
+                  const longerLen = Math.max(storedName.length, normalizedStudentName.length);
+                  if (shorterLen / longerLen >= 0.5) {
+                    studentId = storedId;
+                    break;
+                  }
+                }
               }
-              
-              return false;
-            });
-
-            studentId = existingStudent?.id || null;
-            studentCache.set(studentCacheKey, studentId);
+            }
           }
 
           if (!studentId) {
