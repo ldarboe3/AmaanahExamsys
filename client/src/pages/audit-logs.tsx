@@ -53,6 +53,38 @@ const actionColors: Record<string, string> = {
   reject: "bg-chart-5/10 text-chart-5",
   login: "bg-chart-4/10 text-chart-4",
   logout: "bg-muted text-muted-foreground",
+  user_login: "bg-chart-4/10 text-chart-4",
+  user_created: "bg-chart-3/10 text-chart-3",
+  user_role_changed: "bg-chart-2/10 text-chart-2",
+  user_status_changed: "bg-chart-2/10 text-chart-2",
+  user_deleted: "bg-destructive/10 text-destructive",
+  school_approved: "bg-chart-3/10 text-chart-3",
+  school_rejected: "bg-chart-5/10 text-chart-5",
+  payment_confirmed: "bg-chart-3/10 text-chart-3",
+  results_published: "bg-chart-4/10 text-chart-4",
+  student_registered: "bg-chart-3/10 text-chart-3",
+  certificate_generated: "bg-chart-4/10 text-chart-4",
+};
+
+const actionLabels: Record<string, { en: string; ar: string }> = {
+  user_login: { en: "User Login", ar: "تسجيل دخول" },
+  user_created: { en: "User Created", ar: "إنشاء مستخدم" },
+  user_role_changed: { en: "Role Changed", ar: "تغيير الدور" },
+  user_status_changed: { en: "Status Changed", ar: "تغيير الحالة" },
+  user_deleted: { en: "User Deleted", ar: "حذف مستخدم" },
+  school_approved: { en: "School Approved", ar: "موافقة على المدرسة" },
+  school_rejected: { en: "School Rejected", ar: "رفض المدرسة" },
+  payment_confirmed: { en: "Payment Confirmed", ar: "تأكيد الدفع" },
+  results_published: { en: "Results Published", ar: "نشر النتائج" },
+  student_registered: { en: "Student Registered", ar: "تسجيل طالب" },
+  certificate_generated: { en: "Certificate Generated", ar: "إصدار شهادة" },
+  create: { en: "Create", ar: "إنشاء" },
+  update: { en: "Update", ar: "تحديث" },
+  delete: { en: "Delete", ar: "حذف" },
+  approve: { en: "Approve", ar: "موافقة" },
+  reject: { en: "Reject", ar: "رفض" },
+  login: { en: "Login", ar: "تسجيل دخول" },
+  logout: { en: "Logout", ar: "تسجيل خروج" },
 };
 
 function AuditLogsSkeleton() {
@@ -103,9 +135,11 @@ export default function AuditLogs() {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Audit Logs</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
+            {isRTL ? "سجلات التدقيق" : "Audit Logs"}
+          </h1>
           <p className="text-muted-foreground mt-1">
-            Track all system activities and administrative actions
+            {isRTL ? "تتبع جميع أنشطة النظام والإجراءات الإدارية" : "Track all system activities and administrative actions"}
           </p>
         </div>
         <Button variant="outline" data-testid="button-export-logs">
@@ -117,12 +151,16 @@ export default function AuditLogs() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Activities</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {isRTL ? "إجمالي الأنشطة" : "Total Activities"}
+            </CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{logs?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">All recorded actions</p>
+            <p className="text-xs text-muted-foreground">
+              {isRTL ? "جميع الإجراءات المسجلة" : "All recorded actions"}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -201,12 +239,12 @@ export default function AuditLogs() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Timestamp</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Entity Type</TableHead>
-                    <TableHead>Entity ID</TableHead>
-                    <TableHead>IP Address</TableHead>
+                    <TableHead>{isRTL ? "الوقت" : "Timestamp"}</TableHead>
+                    <TableHead>{isRTL ? "المستخدم" : "User"}</TableHead>
+                    <TableHead>{isRTL ? "الإجراء" : "Action"}</TableHead>
+                    <TableHead>{isRTL ? "نوع الكيان" : "Entity Type"}</TableHead>
+                    <TableHead>{isRTL ? "التفاصيل" : "Details"}</TableHead>
+                    <TableHead>{isRTL ? "عنوان IP" : "IP Address"}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -214,32 +252,36 @@ export default function AuditLogs() {
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>No audit logs found</p>
+                        <p>{isRTL ? "لا توجد سجلات تدقيق" : "No audit logs found"}</p>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredLogs?.map((log) => (
-                      <TableRow key={log.id} data-testid={`row-audit-log-${log.id}`}>
-                        <TableCell className="font-mono text-sm">
-                          {format(new Date(log.createdAt), "MMM d, yyyy HH:mm:ss")}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {log.userId || "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={actionColors[log.action] || "bg-muted"}>
-                            {log.action}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{log.entityType}</TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {log.entityId || "-"}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm text-muted-foreground">
-                          {log.ipAddress || "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    filteredLogs?.map((log) => {
+                      const actionLabel = actionLabels[log.action];
+                      const details = log.oldData || log.newData;
+                      return (
+                        <TableRow key={log.id} data-testid={`row-audit-log-${log.id}`}>
+                          <TableCell className="font-mono text-sm">
+                            {format(new Date(log.createdAt), "MMM d, yyyy HH:mm:ss")}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {details?.username || log.userId || "-"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={actionColors[log.action] || "bg-muted"}>
+                              {actionLabel ? (isRTL ? actionLabel.ar : actionLabel.en) : log.action}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="capitalize">{log.entityType}</TableCell>
+                          <TableCell className="text-sm max-w-[200px] truncate">
+                            {details?.schoolName || details?.newRole || details?.newStatus || log.entityId || "-"}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm text-muted-foreground">
+                            {details?.ip || log.ipAddress || "-"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
