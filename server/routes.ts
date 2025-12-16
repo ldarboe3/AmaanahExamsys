@@ -4292,11 +4292,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       // Get all schools, students, regions, clusters, and subjects
-      const allSchools = await storage.getSchools();
-      const allStudents = await storage.getStudents();
-      const regions = await storage.getRegions();
-      const clusters = await storage.getClusters();
-      const subjects = await storage.getSubjects();
+      const allSchools = await storage.getAllSchools();
+      const allStudents = await storage.getAllStudents();
+      const regions = await storage.getAllRegions();
+      const clusters = await storage.getAllClusters();
+      const subjects = await storage.getAllSubjects();
 
       const regionMap = new Map(regions.map(r => [r.id, r]));
       const clusterMap = new Map(clusters.map(c => [c.id, c]));
