@@ -428,15 +428,30 @@ export default function Students() {
 
       // Only send students that have a matched school
       const matchedStudents = adminUploadPreview.filter(s => s.matchedSchoolId);
-
-      const response = await apiRequest('POST', '/api/students/bulk-upload-confirm', {
-        students: matchedStudents,
-        examYearId: adminUploadExamYear,
-        grade: adminUploadGrade,
-      });
+      
+      // Process in batches for large uploads to prevent timeout
+      const BATCH_SIZE = 500;
+      let totalCreated = 0;
+      let totalFailed = 0;
+      
+      for (let i = 0; i < matchedStudents.length; i += BATCH_SIZE) {
+        const batch = matchedStudents.slice(i, i + BATCH_SIZE);
+        const progress = Math.min(10 + ((i / matchedStudents.length) * 85), 95);
+        setAdminUploadProgress(progress);
+        
+        const response = await apiRequest('POST', '/api/students/bulk-upload-confirm', {
+          students: batch,
+          examYearId: adminUploadExamYear,
+          grade: adminUploadGrade,
+        });
+        
+        const data = await response.json();
+        totalCreated += data.created || 0;
+        totalFailed += data.failed || 0;
+      }
 
       setAdminUploadProgress(100);
-      return response.json();
+      return { created: totalCreated, failed: totalFailed };
     },
     onSuccess: (data) => {
       setAdminUploadPhase('complete');
@@ -2747,6 +2762,28 @@ export default function Students() {
                   </div>
                   <Progress value={adminUploadProgress} className="w-full h-3" />
                 </div>
+                {adminUploadPhase === 'confirming' && adminUploadProgress >= 100 && (
+                  <div className="flex flex-col items-center gap-2 pt-4">
+                    <p className="text-sm text-chart-3 font-medium">
+                      {isRTL ? "اكتملت المعالجة!" : "Processing complete!"}
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        resetAdminUpload();
+                        setShowAdminUploadDialog(false);
+                        queryClient.invalidateQueries({ queryKey: ['/api/students'] });
+                        toast({
+                          title: isRTL ? "تم الإغلاق" : "Closed",
+                          description: isRTL ? "تم إغلاق نافذة الرفع" : "Upload dialog closed",
+                        });
+                      }}
+                      data-testid="button-force-close-upload"
+                    >
+                      {isRTL ? "إغلاق وتحديث" : "Close & Refresh"}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 
