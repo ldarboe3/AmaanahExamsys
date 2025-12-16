@@ -30,6 +30,12 @@ const executiveRoles = [
       "Executive Committee liaison and reporting",
       "Cross-functional coordination and oversight",
       "Staff performance and development oversight"
+    ],
+    responsibilitiesAr: [
+      "القيادة الاستراتيجية وتنفيذ الرؤية",
+      "التواصل مع اللجنة التنفيذية وإعداد التقارير",
+      "التنسيق والإشراف بين الإدارات",
+      "الإشراف على أداء الموظفين وتطويرهم"
     ]
   },
   {
@@ -45,6 +51,12 @@ const executiveRoles = [
       "Internal communication facilitation",
       "Documentation and records safeguarding",
       "Administrative efficiency oversight"
+    ],
+    responsibilitiesAr: [
+      "إدارة المراسلات والملفات",
+      "تسهيل الاتصال الداخلي",
+      "حفظ الوثائق والسجلات",
+      "الإشراف على الكفاءة الإدارية"
     ]
   },
   {
@@ -60,6 +72,12 @@ const executiveRoles = [
       "Examination and assessment oversight",
       "Quality assurance and monitoring management",
       "Data and certification administration"
+    ],
+    responsibilitiesAr: [
+      "تطوير المناهج وتنسيق التدريب",
+      "الإشراف على الامتحانات والتقييم",
+      "إدارة ضمان الجودة والمراقبة",
+      "إدارة البيانات والشهادات"
     ]
   },
   {
@@ -75,6 +93,12 @@ const executiveRoles = [
       "Media management and public campaigns",
       "Institutional partnership coordination",
       "Communication materials development"
+    ],
+    responsibilitiesAr: [
+      "العلاقات الخارجية وإشراك أصحاب المصلحة",
+      "إدارة الإعلام والحملات العامة",
+      "تنسيق الشراكات المؤسسية",
+      "تطوير مواد الاتصال"
     ]
   },
   {
@@ -90,6 +114,12 @@ const executiveRoles = [
       "Staff welfare and development",
       "Performance management",
       "HR policy implementation"
+    ],
+    responsibilitiesAr: [
+      "التوظيف والتهيئة",
+      "رفاهية الموظفين وتطويرهم",
+      "إدارة الأداء",
+      "تنفيذ سياسات الموارد البشرية"
     ]
   },
   {
@@ -105,6 +135,12 @@ const executiveRoles = [
       "Budget implementation and reporting",
       "Audit coordination",
       "Financial compliance oversight"
+    ],
+    responsibilitiesAr: [
+      "إدارة المعاملات المالية",
+      "تنفيذ الميزانية وإعداد التقارير",
+      "تنسيق المراجعة",
+      "الإشراف على الامتثال المالي"
     ]
   },
   {
@@ -120,6 +156,12 @@ const executiveRoles = [
       "Learning materials development",
       "Teacher training coordination",
       "Curriculum implementation monitoring"
+    ],
+    responsibilitiesAr: [
+      "تصميم المناهج ومواءمتها",
+      "تطوير المواد التعليمية",
+      "تنسيق تدريب المعلمين",
+      "مراقبة تنفيذ المناهج"
     ]
   },
   {
@@ -135,6 +177,12 @@ const executiveRoles = [
       "Marking coordination and quality control",
       "Results analysis and reporting",
       "Examination policy compliance"
+    ],
+    responsibilitiesAr: [
+      "تطوير الامتحانات وإدارتها",
+      "تنسيق التصحيح ومراقبة الجودة",
+      "تحليل النتائج وإعداد التقارير",
+      "الامتثال لسياسة الامتحانات"
     ]
   },
   {
@@ -150,6 +198,12 @@ const executiveRoles = [
       "Quality standards compliance",
       "Institutional data collection",
       "Performance improvement support"
+    ],
+    responsibilitiesAr: [
+      "مراقبة وتقييم المدارس",
+      "الامتثال لمعايير الجودة",
+      "جمع البيانات المؤسسية",
+      "دعم تحسين الأداء"
     ]
   },
   {
@@ -165,6 +219,12 @@ const executiveRoles = [
       "Digital platform management",
       "Technical support and training",
       "Data security and backup"
+    ],
+    responsibilitiesAr: [
+      "صيانة أنظمة تكنولوجيا المعلومات",
+      "إدارة المنصات الرقمية",
+      "الدعم الفني والتدريب",
+      "أمن البيانات والنسخ الاحتياطي"
     ]
   },
   {
@@ -180,6 +240,12 @@ const executiveRoles = [
       "Endowment fund coordination",
       "Donor engagement and partnerships",
       "Resource mobilization"
+    ],
+    responsibilitiesAr: [
+      "تطوير وإدارة المشاريع",
+      "تنسيق صندوق الأوقاف",
+      "إشراك المانحين والشراكات",
+      "تعبئة الموارد"
     ]
   }
 ];
@@ -189,26 +255,31 @@ const executiveCommittee = [
     title: "Chairman",
     titleAr: "الرئيس",
     description: "Leads the Executive Committee and represents AMAANAH at the highest level",
+    descriptionAr: "يقود اللجنة التنفيذية ويمثل الأمانة على أعلى مستوى",
   },
   {
     title: "Vice Chairman",
     titleAr: "نائب الرئيس",
     description: "Supports the Chairman and assumes leadership in the Chairman's absence",
+    descriptionAr: "يدعم الرئيس ويتولى القيادة في غيابه",
   },
   {
     title: "Executive Director",
     titleAr: "المدير التنفيذي",
     description: "Chief executive responsible for day-to-day operations and staff management",
+    descriptionAr: "المسؤول التنفيذي الأول عن العمليات اليومية وإدارة الموظفين",
   },
   {
     title: "Secretary",
     titleAr: "السكرتير",
     description: "Manages official correspondence and maintains institutional records",
+    descriptionAr: "يدير المراسلات الرسمية ويحافظ على السجلات المؤسسية",
   },
   {
     title: "Treasurer",
     titleAr: "أمين الصندوق",
     description: "Oversees financial management and reporting to the Committee",
+    descriptionAr: "يشرف على الإدارة المالية وتقديم التقارير للجنة",
   },
 ];
 
@@ -272,7 +343,7 @@ export default function SeniorExecutives() {
                   <CardTitle className="text-base">{isRTL ? member.titleAr : member.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CardDescription className="text-xs">{member.description}</CardDescription>
+                  <CardDescription className="text-xs">{isRTL ? member.descriptionAr : member.description}</CardDescription>
                 </CardContent>
               </Card>
             ))}
@@ -327,7 +398,7 @@ export default function SeniorExecutives() {
                             {isRTL ? "المسؤوليات الرئيسية:" : "Key Responsibilities:"}
                           </p>
                           <ul className="text-xs text-muted-foreground space-y-1">
-                            {role.responsibilities.map((resp, j) => (
+                            {(isRTL ? role.responsibilitiesAr : role.responsibilities).map((resp, j) => (
                               <li key={j} className="flex items-start gap-2">
                                 <span className="text-primary mt-0.5">•</span>
                                 <span>{resp}</span>
