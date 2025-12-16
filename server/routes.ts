@@ -3623,6 +3623,39 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const regionCol = findColumnIndex(['region', 'regionname']);
       const clusterCol = findColumnIndex(['cluster', 'clustername']);
       const genderCol = findColumnIndex(['gender', 'sex']);
+      
+      // Fetch subjects to detect score columns
+      const allSubjects = await storage.getAllSubjects();
+      const originalHeaders = rawData[0] as string[];
+      
+      // Map subject columns - detect which columns contain subject scores
+      const subjectColumns: { colIndex: number; subjectId: number; subjectName: string }[] = [];
+      for (let colIdx = 0; colIdx < originalHeaders.length; colIdx++) {
+        const header = String(originalHeaders[colIdx] || '').trim();
+        // Skip known non-subject columns
+        if (['school name', 'address', 'region', 'cluster', 'student name', 'gender'].some(
+          skip => header.toLowerCase().includes(skip.toLowerCase().replace(' ', ''))
+        )) continue;
+        
+        // Try to match with subjects (exact or normalized match)
+        const matchedSubject = allSubjects.find(s => 
+          s.name === header || 
+          s.arabicName === header ||
+          normalizeArabicText(s.name) === normalizeArabicText(header) ||
+          normalizeArabicText(s.arabicName || '') === normalizeArabicText(header)
+        );
+        
+        if (matchedSubject) {
+          subjectColumns.push({
+            colIndex: colIdx,
+            subjectId: matchedSubject.id,
+            subjectName: matchedSubject.name
+          });
+        }
+      }
+      
+      console.log(`[BULK UPLOAD] Detected ${subjectColumns.length} subject score columns:`, subjectColumns.map(s => s.subjectName));
+      const hasScores = subjectColumns.length > 0;
 
       if (schoolNameCol === -1) {
         return res.status(400).json({ message: "Could not find 'School Name' column in the file" });
@@ -3777,6 +3810,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const normalizedGender = gender === 'm' || gender === 'male' ? 'male' : 
                                  (gender === 'f' || gender === 'female' ? 'female' : '');
 
+        // Extract scores if present
+        const scores: { subjectId: number; subjectName: string; score: number | null }[] = [];
+        for (const subjCol of subjectColumns) {
+          const rawScore = row[subjCol.colIndex];
+          const scoreValue = rawScore !== undefined && rawScore !== '' ? parseFloat(String(rawScore)) : null;
+          scores.push({
+            subjectId: subjCol.subjectId,
+            subjectName: subjCol.subjectName,
+            score: !isNaN(scoreValue as number) ? scoreValue : null
+          });
+        }
+
         previewResults.push({
           row: i + 2,
           firstName,
@@ -3786,6 +3831,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           regionName,
           clusterName,
           gender: normalizedGender,
+          scores,
           status: bestMatch ? (bestMatch.score >= 0.8 ? 'matched' : 'ambiguous') : 'unmatched',
           message: bestMatch ? 
             (bestMatch.score >= 0.8 ? `Matched to: ${bestMatch.school.name}` : `Possible match: ${bestMatch.school.name} (${Math.round(bestMatch.score * 100)}%)`) :
@@ -3834,6 +3880,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           region: regionMap.get(s.regionId!)?.name,
           cluster: clusterMap.get(s.clusterId!)?.name,
         })),
+        hasScores,
+        subjectColumns: subjectColumns.map(s => ({ subjectId: s.subjectId, subjectName: s.subjectName })),
       });
     } catch (error: any) {
       console.error('Bulk upload preview error:', error);
@@ -4101,6 +4149,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             await storage.updateStudent(newStudent.id, { indexNumber: indexNum });
           }
           
+          // Create results if scores are present
+          if (student.scores && Array.isArray(student.scores) && student.scores.length > 0) {
+            for (const scoreData of student.scores) {
+              if (scoreData.score !== null && scoreData.score !== undefined) {
+                try {
+                  await storage.createStudentResult({
+                    studentId: newStudent.id,
+                    subjectId: scoreData.subjectId,
+                    examYearId: parseInt(examYearId),
+                    examScore: scoreData.score.toString(),
+                    totalScore: scoreData.score.toString(),
+                    status: 'published', // Auto-publish results
+                  });
+                } catch (resultError: any) {
+                  console.error(`Failed to create result for student ${newStudent.id}, subject ${scoreData.subjectId}:`, resultError.message);
+                }
+              }
+            }
+          }
+          
           created.push(newStudent);
           
           // Track student count by school
@@ -4146,6 +4214,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
 
+      // Count results created (students with scores)
+      const studentsWithResults = studentList.filter((s: any) => s.scores && s.scores.length > 0).length;
+      
       res.json({
         success: true,
         created: created.length,
@@ -4155,7 +4226,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         invoicesCreated: invoicesCreated.length,
         schoolsCreated: schoolsCreatedMap.size,
         schoolAdminsCreated: schoolAdminsCreated,
-        message: `${created.length} students, ${schoolsCreatedMap.size} schools, and ${schoolAdminsCreated.length} school admins created`,
+        resultsCreated: studentsWithResults,
+        message: `${created.length} students, ${schoolsCreatedMap.size} schools, ${schoolAdminsCreated.length} school admins${studentsWithResults > 0 ? `, and ${studentsWithResults} results (auto-published)` : ''} created`,
       });
     } catch (error: any) {
       console.error('Bulk upload confirm error:', error);
