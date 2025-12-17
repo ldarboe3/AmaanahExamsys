@@ -186,7 +186,17 @@ export default function Transcripts() {
   });
 
   // Get all students for print/generate all (ensures we get all, not just current page)
-  const allStudentsForBulkOps = eligibleStudents || [];
+  // This uses the filtered list based on region/cluster/school selection
+  const allStudentsForBulkOps = useMemo(() => {
+    return (eligibleStudents || []).filter(s => {
+      const school = schools.find((sch: SchoolType) => sch.id === s.schoolId);
+      if (!school) return false;
+      if (selectedRegion !== "all" && school.regionId !== parseInt(selectedRegion)) return false;
+      if (selectedCluster !== "all" && school.clusterId !== parseInt(selectedCluster)) return false;
+      if (selectedSchool !== "all" && s.schoolId !== parseInt(selectedSchool)) return false;
+      return true;
+    });
+  }, [eligibleStudents, schools, selectedRegion, selectedCluster, selectedSchool]);
 
   // Calculate filter counts based on all eligible students
   const filterCounts = useMemo(() => {
@@ -221,8 +231,12 @@ export default function Transcripts() {
     return allTranscripts?.find(t => t.studentId === studentId && t.examYearId === examYearId);
   };
 
-  // Filter students by school
+  // Filter students by region, cluster, and school
   const filteredStudents = eligibleStudents?.filter(s => {
+    const school = schools.find((sch: SchoolType) => sch.id === s.schoolId);
+    if (!school) return false;
+    if (selectedRegion !== "all" && school.regionId !== parseInt(selectedRegion)) return false;
+    if (selectedCluster !== "all" && school.clusterId !== parseInt(selectedCluster)) return false;
     if (selectedSchool !== "all" && s.schoolId !== parseInt(selectedSchool)) return false;
     return true;
   }).map(s => ({
