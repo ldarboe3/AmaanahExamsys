@@ -3493,7 +3493,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               const adminUser = await storage.getUser(school.adminUserId);
               if (adminUser?.email) {
                 try {
-                  const baseUrl = process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co';
+                  const baseUrl = process.env.PRODUCTION_DOMAIN || 'https://amaanah.gm';
                   await sendStudentUploadConfirmationEmail(
                     adminUser.email,
                     school.name,
@@ -8745,9 +8745,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
             // Send emails using the proper SendGrid connector
             if (emailsToSend.length > 0) {
-              const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-                ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-                : 'https://amaanah.repl.co';
+              const baseUrl = process.env.PRODUCTION_DOMAIN || 'https://amaanah.gm';
               
               for (const emailData of emailsToSend) {
                 try {
@@ -9388,7 +9386,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         
         const qrToken = generateQRToken();
         const certNumber = generateCertificateNumber(activeExamYear.year, student.id);
-        const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/${qrToken}`;
+        const verifyUrl = `${process.env.PRODUCTION_DOMAIN || 'https://amaanah.gm'}/verify/${qrToken}`;
         
         try {
           const pdfPath = await generateCertificatePDF({
@@ -9486,7 +9484,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         
         const qrToken = generateQRToken();
         const certNumber = generateCertificateNumber(activeExamYear.year, student.id);
-        const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/${qrToken}`;
+        const verifyUrl = `${process.env.PRODUCTION_DOMAIN || 'https://amaanah.gm'}/verify/${qrToken}`;
         
         try {
           const pdfPath = await generateCertificatePDF({
@@ -9674,7 +9672,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         
         const qrToken = generateQRToken();
         const certNumber = generateCertificateNumber(targetExamYear.year, student.id);
-        const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/${qrToken}`;
+        const verifyUrl = `${process.env.PRODUCTION_DOMAIN || 'https://amaanah.gm'}/verify/${qrToken}`;
         const qrCodeDataUrl = await generateCertificateQRCodeDataUrl(verifyUrl);
         
         try {
@@ -9875,7 +9873,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         
         const qrToken = generateQRToken();
         const transcriptNumber = `TR-${activeExamYear.year}-${String(student.id).padStart(6, '0')}`;
-        const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/transcript/${qrToken}`;
+        const verifyUrl = `${process.env.PRODUCTION_DOMAIN || 'https://amaanah.gm'}/verify/transcript/${qrToken}`;
         
         try {
           const normalizedSurnameResult = await normalizeSurname(student.lastName);
@@ -9987,7 +9985,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         
         const qrToken = generateQRToken();
         const transcriptNumber = `TR-${activeExamYear.year}-${String(student.id).padStart(6, '0')}`;
-        const verifyUrl = `${process.env.REPLIT_DEV_DOMAIN || 'https://amaanah.repl.co'}/verify/transcript/${qrToken}`;
+        const verifyUrl = `${process.env.PRODUCTION_DOMAIN || 'https://amaanah.gm'}/verify/transcript/${qrToken}`;
         
         try {
           const normalizedSurnameResult = await normalizeSurname(student.lastName);
@@ -10248,9 +10246,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const qrToken = generateQRToken();
           
           // Build verification URL for QR code (frontend page, not API)
-          const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-            : 'https://amaanah.repl.co';
+          // Use production domain for QR codes so they work after deployment
+          const baseUrl = process.env.PRODUCTION_DOMAIN || 'https://amaanah.gm';
           const verifyUrl = `${baseUrl}/verify/transcript/${qrToken}`;
           
           // Generate QR code as data URL
