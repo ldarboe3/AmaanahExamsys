@@ -1,6 +1,7 @@
 import { useLanguage } from "@/lib/i18n/LanguageContext";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { formatNumber } from "@/lib/formatters";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -186,6 +187,33 @@ export default function Transcripts() {
 
   // Get all students for print/generate all (ensures we get all, not just current page)
   const allStudentsForBulkOps = eligibleStudents || [];
+
+  // Calculate filter counts based on all eligible students
+  const filterCounts = useMemo(() => {
+    const regionCounts: Record<number, number> = {};
+    const clusterCounts: Record<number, number> = {};
+    const schoolCounts: Record<number, number> = {};
+    
+    const studentsToCount = eligibleStudents || [];
+    
+    studentsToCount.forEach((student: EligibleStudent) => {
+      const school = schools.find((s: SchoolType) => s.id === student.schoolId);
+      if (school) {
+        // Region counts
+        if (school.regionId) {
+          regionCounts[school.regionId] = (regionCounts[school.regionId] || 0) + 1;
+        }
+        // Cluster counts
+        if (school.clusterId) {
+          clusterCounts[school.clusterId] = (clusterCounts[school.clusterId] || 0) + 1;
+        }
+        // School counts
+        schoolCounts[student.schoolId] = (schoolCounts[student.schoolId] || 0) + 1;
+      }
+    });
+    
+    return { regionCounts, clusterCounts, schoolCounts, total: studentsToCount.length };
+  }, [eligibleStudents, schools]);
 
   // Check if student has a transcript
   const getStudentTranscript = (studentId: number): Transcript | undefined => {
@@ -438,12 +466,17 @@ export default function Transcripts() {
                   <SelectValue placeholder={isRTL ? "الكل" : "All Regions"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{isRTL ? "الكل" : "All Regions"}</SelectItem>
-                  {regions?.map(region => (
-                    <SelectItem key={region.id} value={region.id.toString()}>
-                      {region.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">
+                    {isRTL ? "الكل" : "All Regions"} ({formatNumber(filterCounts.total)})
+                  </SelectItem>
+                  {regions?.map(region => {
+                    const count = filterCounts.regionCounts[region.id] || 0;
+                    return (
+                      <SelectItem key={region.id} value={region.id.toString()}>
+                        {region.name} ({formatNumber(count)})
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -465,12 +498,26 @@ export default function Transcripts() {
                   <SelectValue placeholder={isRTL ? "الكل" : "All Clusters"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{isRTL ? "الكل" : "All Clusters"}</SelectItem>
-                  {filteredClusters.map(cluster => (
-                    <SelectItem key={cluster.id} value={cluster.id.toString()}>
-                      {cluster.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">
+                    {isRTL ? "الكل" : "All Clusters"} ({formatNumber(
+                      selectedRegion === "all" 
+                        ? filterCounts.total 
+                        : Object.entries(filterCounts.clusterCounts)
+                            .filter(([clusterId]) => {
+                              const cluster = clusters?.find(c => c.id === parseInt(clusterId));
+                              return cluster?.regionId === parseInt(selectedRegion);
+                            })
+                            .reduce((sum, [, count]) => sum + count, 0)
+                    )})
+                  </SelectItem>
+                  {filteredClusters.map(cluster => {
+                    const count = filterCounts.clusterCounts[cluster.id] || 0;
+                    return (
+                      <SelectItem key={cluster.id} value={cluster.id.toString()}>
+                        {cluster.name} ({formatNumber(count)})
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -491,12 +538,19 @@ export default function Transcripts() {
                   <SelectValue placeholder={isRTL ? "الكل" : "All Schools"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{isRTL ? "الكل" : "All Schools"}</SelectItem>
-                  {filteredSchools.map(school => (
-                    <SelectItem key={school.id} value={school.id.toString()}>
-                      {school.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">
+                    {isRTL ? "الكل" : "All Schools"} ({formatNumber(
+                      filteredSchools.reduce((sum: number, s: SchoolType) => sum + (filterCounts.schoolCounts[s.id] || 0), 0)
+                    )})
+                  </SelectItem>
+                  {filteredSchools.map(school => {
+                    const count = filterCounts.schoolCounts[school.id] || 0;
+                    return (
+                      <SelectItem key={school.id} value={school.id.toString()}>
+                        {school.name} ({formatNumber(count)})
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
