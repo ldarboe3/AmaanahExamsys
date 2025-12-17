@@ -1199,7 +1199,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         schools = schools.slice(offset, offset + limit);
       }
       
-      res.json({ data: schools, total, limit: limit || total, offset });
+      // Get student counts per school efficiently with a single aggregate query
+      const studentCounts = await db
+        .select({
+          schoolId: students.schoolId,
+          count: sql<number>`count(*)::int`
+        })
+        .from(students)
+        .groupBy(students.schoolId);
+      
+      // Create a map for quick lookup
+      const countMap = new Map(studentCounts.map(sc => [sc.schoolId, sc.count]));
+      
+      // Add studentCount to each school
+      const schoolsWithCounts = schools.map(school => ({
+        ...school,
+        studentCount: countMap.get(school.id) || 0
+      }));
+      
+      res.json({ data: schoolsWithCounts, total, limit: limit || total, offset });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
