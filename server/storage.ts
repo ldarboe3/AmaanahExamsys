@@ -245,10 +245,10 @@ export interface IStorage {
   updateMalpracticeReport(id: number, report: Partial<InsertMalpracticeReport>): Promise<MalpracticeReport | undefined>;
 
   // Analytics
-  getStudentCountBySchool(examYearId: number): Promise<{ schoolId: number; count: number }[]>;
+  getStudentCountBySchool(examYearId: number): Promise<{ schoolId: number; schoolName: string; count: number; regionId: number | null; clusterId: number | null }[]>;
   getStudentCountByRegion(examYearId: number): Promise<{ regionId: number; count: number }[]>;
-  getResultsAggregateBySubject(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number; grade?: number }): Promise<{ subjectId: number; avgScore: number; passRate: number }[]>;
-  getResultsAggregateByGender(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number; grade?: number }): Promise<{ gender: string; avgScore: number; passRate: number }[]>;
+  getResultsAggregateBySubject(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number; grade?: number }): Promise<{ subjectId: number; avgScore: number; passRate: number; totalStudents: number; passCount: number; failCount: number }[]>;
+  getResultsAggregateByGender(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number; grade?: number }): Promise<{ gender: string; avgScore: number; passRate: number; studentCount: number; passCount: number; failCount: number }[]>;
   getPerformanceByRegion(examYearId: number): Promise<{ regionId: number; regionName: string; studentCount: number; avgScore: number; passRate: number }[]>;
   getPerformanceByGrade(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number }): Promise<{ grade: number; studentCount: number; avgScore: number; passRate: number }[]>;
   getDashboardStats(): Promise<{
@@ -1438,13 +1438,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Analytics
-  async getStudentCountBySchool(examYearId: number): Promise<{ schoolId: number; count: number }[]> {
+  async getStudentCountBySchool(examYearId: number): Promise<{ schoolId: number; schoolName: string; count: number; regionId: number | null; clusterId: number | null }[]> {
     const result = await db
-      .select({ schoolId: students.schoolId, count: count() })
+      .select({ 
+        schoolId: students.schoolId, 
+        schoolName: schools.name,
+        regionId: schools.regionId,
+        clusterId: schools.clusterId,
+        count: count() 
+      })
       .from(students)
+      .innerJoin(schools, eq(students.schoolId, schools.id))
       .where(eq(students.examYearId, examYearId))
-      .groupBy(students.schoolId);
-    return result.map(r => ({ schoolId: r.schoolId, count: Number(r.count) }));
+      .groupBy(students.schoolId, schools.name, schools.regionId, schools.clusterId);
+    return result.map(r => ({ 
+      schoolId: r.schoolId, 
+      schoolName: r.schoolName,
+      count: Number(r.count),
+      regionId: r.regionId,
+      clusterId: r.clusterId
+    }));
   }
 
   async getStudentCountByRegion(examYearId: number): Promise<{ regionId: number; count: number }[]> {
@@ -1457,7 +1470,7 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => ({ regionId: r.regionId!, count: Number(r.count) }));
   }
 
-  async getResultsAggregateBySubject(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number; grade?: number }): Promise<{ subjectId: number; avgScore: number; passRate: number }[]> {
+  async getResultsAggregateBySubject(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number; grade?: number }): Promise<{ subjectId: number; avgScore: number; passRate: number; totalStudents: number; passCount: number; failCount: number }[]> {
     let conditions: any[] = [eq(studentResults.examYearId, examYearId)];
     
     if (filters?.schoolId) {
@@ -1502,10 +1515,13 @@ export class DatabaseStorage implements IStorage {
       subjectId: parseInt(id),
       avgScore: stats.count > 0 ? stats.total / stats.count : 0,
       passRate: stats.count > 0 ? (stats.passed / stats.count) * 100 : 0,
+      totalStudents: stats.count,
+      passCount: stats.passed,
+      failCount: stats.count - stats.passed,
     }));
   }
 
-  async getResultsAggregateByGender(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number; grade?: number }): Promise<{ gender: string; avgScore: number; passRate: number }[]> {
+  async getResultsAggregateByGender(examYearId: number, filters?: { regionId?: number; clusterId?: number; schoolId?: number; grade?: number }): Promise<{ gender: string; avgScore: number; passRate: number; studentCount: number; passCount: number; failCount: number }[]> {
     let conditions: any[] = [eq(studentResults.examYearId, examYearId)];
     
     if (filters?.schoolId) {
@@ -1550,6 +1566,9 @@ export class DatabaseStorage implements IStorage {
       gender,
       avgScore: stats.count > 0 ? stats.total / stats.count : 0,
       passRate: stats.count > 0 ? (stats.passed / stats.count) * 100 : 0,
+      studentCount: stats.count,
+      passCount: stats.passed,
+      failCount: stats.count - stats.passed,
     }));
   }
 
