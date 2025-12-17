@@ -9120,14 +9120,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Only approved students
       students = students.filter(s => s.status === 'approved');
       
-      // Get all results and certificates in batch to avoid N+1 queries
-      const studentIds = students.map(s => s.id);
+      // Get all results for the exam year in one query (much faster than N+1)
+      const allResultsForYear = await storage.getResultsByExamYear(targetExamYear.id);
       
-      // Batch fetch all results for these students
-      const allResults = await Promise.all(
-        studentIds.map(id => storage.getResultsByStudent(id))
-      );
-      const resultsMap = new Map(studentIds.map((id, idx) => [id, allResults[idx]]));
+      // Build a map of studentId -> results for fast lookup
+      const resultsMap = new Map<number, typeof allResultsForYear>();
+      for (const result of allResultsForYear) {
+        if (!resultsMap.has(result.studentId)) {
+          resultsMap.set(result.studentId, []);
+        }
+        resultsMap.get(result.studentId)!.push(result);
+      }
       
       // Batch fetch all certificates for the exam year (more efficient)
       const allCertificates = await storage.getCertificatesByExamYear(targetExamYear.id);
