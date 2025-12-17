@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments } from "@shared/schema";
+import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments, studentResults } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
@@ -603,6 +603,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const activeExamYear = await storage.getActiveExamYear();
       
+      // Count published results
+      let resultsPublished = 0;
+      if (activeExamYear) {
+        const publishedResults = await db.select({ count: sql<number>`count(*)` })
+          .from(studentResults)
+          .where(and(
+            eq(studentResults.examYearId, activeExamYear.id),
+            eq(studentResults.status, 'published')
+          ));
+        resultsPublished = publishedResults[0]?.count || 0;
+      }
+      
       res.json({
         totalSchools,
         pendingSchools,
@@ -610,7 +622,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         pendingStudents,
         totalRevenue,
         pendingPayments,
-        resultsPublished: 0,
+        resultsPublished,
         pendingResults,
         activeExamYear: activeExamYear ? {
           id: activeExamYear.id,
