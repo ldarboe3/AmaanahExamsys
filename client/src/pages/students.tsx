@@ -270,6 +270,9 @@ export default function Students() {
     queryKey: ["/api/school/profile"],
     enabled: isSchoolAdmin && !!user?.schoolId,
   });
+  
+  // Use user's schoolId as the effective school ID (handles legacy school ID mismatches)
+  const effectiveSchoolId = schoolProfile?.id ?? user?.schoolId;
 
   // Fetch assigned examination center for school admins
   const { data: assignedCenter } = useQuery<any>({
@@ -281,7 +284,7 @@ export default function Students() {
   const bulkUploadMutation = useMutation({
     mutationFn: async (file: File) => {
       // Validate required IDs before proceeding
-      const schoolId = isSchoolAdmin ? schoolProfile?.id : (schoolFilter !== "all" ? parseInt(schoolFilter) : null);
+      const schoolId = isSchoolAdmin ? effectiveSchoolId : (schoolFilter !== "all" ? parseInt(schoolFilter) : null);
       // Use selected exam year or fallback to active exam year
       const examYearId = selectedExamYear || activeExamYear?.id;
       
@@ -549,8 +552,8 @@ export default function Students() {
       queryParams.set("examYearId", selectedExamYear.toString());
     }
     // For school admins, always filter by their school
-    if (isSchoolAdmin && schoolProfile?.id) {
-      queryParams.set("schoolId", schoolProfile.id.toString());
+    if (isSchoolAdmin && effectiveSchoolId) {
+      queryParams.set("schoolId", effectiveSchoolId.toString());
     } else {
       if (regionFilter !== "all") {
         queryParams.set("regionId", regionFilter);
@@ -572,7 +575,7 @@ export default function Students() {
     
     const queryString = queryParams.toString();
     return queryString ? `/api/students?${queryString}` : "/api/students";
-  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedGrade, selectedExamYear, isSchoolAdmin, schoolProfile?.id, pageSize, currentPage]);
+  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedGrade, selectedExamYear, isSchoolAdmin, effectiveSchoolId, pageSize, currentPage]);
 
   // Fetch all students for counting (without grade filter) - scoped to selected exam year
   const allStudentsUrl = useMemo(() => {
@@ -583,8 +586,8 @@ export default function Students() {
       queryParams.set("examYearId", selectedExamYear.toString());
     }
     // For school admins, always filter by their school
-    if (isSchoolAdmin && schoolProfile?.id) {
-      queryParams.set("schoolId", schoolProfile.id.toString());
+    if (isSchoolAdmin && effectiveSchoolId) {
+      queryParams.set("schoolId", effectiveSchoolId.toString());
     } else {
       if (regionFilter !== "all") queryParams.set("regionId", regionFilter);
       if (clusterFilter !== "all") queryParams.set("clusterId", clusterFilter);
@@ -592,14 +595,14 @@ export default function Students() {
     }
     const queryString = queryParams.toString();
     return queryString ? `/api/students?${queryString}` : "/api/students";
-  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedExamYear, isSchoolAdmin, schoolProfile?.id]);
+  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedExamYear, isSchoolAdmin, effectiveSchoolId]);
 
   // Fetch all students for school across ALL exam years (for past year visibility check)
   // This is NOT scoped by selectedExamYear so we can always check which years have students
   const allSchoolStudentsUrl = useMemo(() => {
-    if (!isSchoolAdmin || !schoolProfile?.id) return null;
-    return `/api/students?schoolId=${schoolProfile.id}`;
-  }, [isSchoolAdmin, schoolProfile?.id]);
+    if (!isSchoolAdmin || !effectiveSchoolId) return null;
+    return `/api/students?schoolId=${effectiveSchoolId}`;
+  }, [isSchoolAdmin, effectiveSchoolId]);
 
   const { data: allStudentsResponse } = useQuery<{ data: StudentWithRelations[]; total: number; limit: number; offset: number }>({
     queryKey: [allStudentsUrl],
@@ -731,7 +734,7 @@ export default function Students() {
   const schools = schoolsResponse?.data || [];
 
   // Fetch invoices to check payment status for the selected school
-  const selectedSchoolId = isSchoolAdmin ? schoolProfile?.id : (schoolFilter !== "all" ? parseInt(schoolFilter) : null);
+  const selectedSchoolId = isSchoolAdmin ? effectiveSchoolId : (schoolFilter !== "all" ? parseInt(schoolFilter) : null);
   const currentExamYearId = selectedExamYear || activeExamYear?.id;
   
   const invoicesQueryUrl = useMemo(() => {
