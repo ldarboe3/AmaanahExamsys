@@ -8017,14 +8017,28 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     // 2) Remove tatweel (kashida) - the extension character ـ
     s = s.replace(/\u0640/g, '');
     
-    // 3) Unify alef forms: أ إ آ → ا
-    s = s.replace(/[\u0622\u0623\u0625]/g, '\u0627');
+    // 3) Strip Arabic diacritics (harakat/tashkeel) for student names
+    // This is CRITICAL for matching Arabic names with/without diacritics
+    // Includes: fatha, kasra, damma, sukun, shadda, tanwin, etc.
+    if (['student', 'default'].includes(fieldType)) {
+      s = s.replace(/[\u064B-\u065F\u0670]/g, ''); // Arabic diacritics range
+      s = s.replace(/[\u0610-\u061A]/g, ''); // Additional marks (small alef, etc.)
+    }
     
-    // 4) Unify taa marbuta & alef maqsura: ة → ه, ى → ي
+    // 4) Unify alef forms: أ إ آ ٱ → ا
+    s = s.replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627');
+    
+    // 5) Unify taa marbuta & alef maqsura: ة → ه, ى → ي
     s = s.replace(/\u0629/g, '\u0647'); // ة → ه
     s = s.replace(/\u0649/g, '\u064A'); // ى → ي
     
-    // 5) Strip punctuation/formatting inside names
+    // 6) Unify hamza variants for student names
+    if (['student', 'default'].includes(fieldType)) {
+      // ء ئ ؤ → remove (hamza on its own or on carriers)
+      s = s.replace(/[\u0621\u0624\u0626]/g, '');
+    }
+    
+    // 7) Strip punctuation/formatting inside names
     // Remove: . ، ؛ / \ | ( ) [ ] { } : ; ' " … — – · and similar
     s = s.replace(/[.،؛/\\|()[\]{};:'"…—–·«»„""''`~!@#$%^&*+=<>?]/g, '');
     // Also remove Arabic comma, semicolon, question mark variants
@@ -8033,14 +8047,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     s = s.replace(/\s+/g, ' ');
     s = s.trim();
     
-    // 6) Remove zero-width & control characters
+    // 8) Remove zero-width & control characters
     s = s.replace(/[\u200B\u200C\u200D\u200E\u200F\uFEFF]/g, '');
     // Remove other invisible formatting characters
     s = s.replace(/[\u2060-\u206F]/g, '');
     // Remove Arabic tatweel/kashida (ـ U+0640) - used for text stretching in Excel/Arabic text
     s = s.replace(/\u0640/g, '');
     
-    // 7) Convert Arabic-Indic digits to ASCII for Region/Cluster fields
+    // 9) Convert Arabic-Indic digits to ASCII for Region/Cluster fields
     // ٠١٢٣٤٥٦٧٨٩ → 0123456789
     if (['region', 'cluster', 'regionClusterCode'].includes(fieldType)) {
       s = s.replace(/[\u0660-\u0669]/g, (c) => String(c.charCodeAt(0) - 0x0660));
@@ -8048,7 +8062,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       s = s.replace(/[\u06F0-\u06F9]/g, (c) => String(c.charCodeAt(0) - 0x06F0));
     }
     
-    // 8) Lowercase Latin text (Arabic is case-less)
+    // 10) Lowercase Latin text (Arabic is case-less)
     s = s.toLowerCase();
     
     return s;
@@ -8315,7 +8329,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           // Find existing student (NO creation - students must exist in system)
           // Uses full-name normalized comparison for robust matching
           const schoolId = matchedSchool.id;
-          const normalizedFullName = normalizeArabicText(fullStudentName);
+          const normalizedFullName = cleanArabicText(fullStudentName, 'student');
           const studentCacheKey = `${schoolId}_${normalizedFullName}_${gradeLevel}`;
           let studentId = studentCache.get(studentCacheKey);
 
@@ -8323,28 +8337,56 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             // Try to find existing student by normalized full name
             const existingStudents = await storage.getStudentsBySchool(schoolId);
             
-            // Match by normalized full name (firstName + lastName concatenated)
-            const existingStudent = existingStudents.find(s => {
+            // Match by normalized full name (firstName + middleName + lastName concatenated)
+            // Use STRICT matching - exact normalized name or with middle name variations only
+            const matchingStudents = existingStudents.filter(s => {
               if (s.grade !== gradeLevel) return false;
               
-              // Build full name from stored first/last name
-              const storedFullName = `${s.firstName || ''} ${s.lastName || ''}`.trim();
-              const normalizedStoredName = normalizeArabicText(storedFullName);
+              // Build full name variations from stored first/middle/last name
+              const storedFullName = `${s.firstName || ''} ${s.middleName || ''} ${s.lastName || ''}`.trim().replace(/\s+/g, ' ');
+              const storedFullNameNoMiddle = `${s.firstName || ''} ${s.lastName || ''}`.trim();
+              const normalizedStoredFull = cleanArabicText(storedFullName, 'student');
+              const normalizedStoredNoMiddle = cleanArabicText(storedFullNameNoMiddle, 'student');
               
-              // Exact full-name match
-              if (normalizedStoredName === normalizedFullName) return true;
+              // Exact full-name match (with or without middle name)
+              if (normalizedStoredFull === normalizedFullName) return true;
+              if (normalizedStoredNoMiddle === normalizedFullName) return true;
               
-              // Also try matching if the CSV name is contained in stored name or vice versa
-              // This handles cases where middle names may be included/excluded
-              if (normalizedStoredName.includes(normalizedFullName) || normalizedFullName.includes(normalizedStoredName)) {
-                // Only accept if at least 80% of the shorter name matches
-                const shorterLen = Math.min(normalizedStoredName.length, normalizedFullName.length);
-                const longerLen = Math.max(normalizedStoredName.length, normalizedFullName.length);
-                if (shorterLen / longerLen >= 0.6) return true;
+              // Also try matching CSV full name against stored full name
+              // Only allow if the difference is just middle name position
+              const csvNameParts = normalizedFullName.split(' ').filter(p => p);
+              const storedNameParts = normalizedStoredFull.split(' ').filter(p => p);
+              
+              // Match if first and last parts are identical
+              if (csvNameParts.length >= 2 && storedNameParts.length >= 2) {
+                const csvFirst = csvNameParts[0];
+                const csvLast = csvNameParts[csvNameParts.length - 1];
+                const storedFirst = storedNameParts[0];
+                const storedLast = storedNameParts[storedNameParts.length - 1];
+                
+                if (csvFirst === storedFirst && csvLast === storedLast) return true;
               }
               
               return false;
             });
+
+            // Check for duplicate matches - if multiple students match, flag as error
+            if (matchingStudents.length > 1) {
+              summary.skippedUnmatchedStudent++;
+              unmatchedStudents.push({
+                rowNumber: i + 2,
+                rawSchoolName: schoolName.trim(),
+                normalizedSchoolName: normalizedSchoolName,
+                rawStudentName: fullStudentName,
+                normalizedStudentName: normalizedFullName,
+                grade: gradeLevel,
+                reason: `DUPLICATE: Found ${matchingStudents.length} students with similar names - manual review required`,
+                duplicateIds: matchingStudents.map(s => s.id).join(', '),
+              });
+              continue;
+            }
+            
+            const existingStudent = matchingStudents[0];
 
             if (existingStudent) {
               studentId = existingStudent.id;
