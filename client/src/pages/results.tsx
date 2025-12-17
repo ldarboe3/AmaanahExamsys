@@ -122,6 +122,47 @@ export default function Results() {
 
   const schools = schoolsResponse?.data || [];
 
+  // Fetch ALL students for this exam year/grade (for counting)
+  const { data: allStudentsForGradeResponse } = useQuery<{ data: StudentWithResults[] }>({
+    queryKey: ["/api/students", "all", selectedExamYear!, selectedGrade!],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedExamYear) params.set("examYearId", String(selectedExamYear));
+      if (selectedGrade) params.set("grade", String(selectedGrade));
+      
+      const response = await fetch(`/api/students?${params}`);
+      return response.json();
+    },
+    enabled: !!selectedExamYear && !!selectedGrade,
+  });
+
+  const allStudentsForGrade = allStudentsForGradeResponse?.data || [];
+
+  // Calculate counts for filters based on all students
+  const filterCounts = useMemo(() => {
+    const regionCounts: Record<number, number> = {};
+    const clusterCounts: Record<number, number> = {};
+    const schoolCounts: Record<number, number> = {};
+    
+    allStudentsForGrade.forEach((student: StudentWithResults) => {
+      const school = schools.find((s: School) => s.id === student.schoolId);
+      if (school) {
+        // Region counts
+        if (school.regionId) {
+          regionCounts[school.regionId] = (regionCounts[school.regionId] || 0) + 1;
+        }
+        // Cluster counts
+        if (school.clusterId) {
+          clusterCounts[school.clusterId] = (clusterCounts[school.clusterId] || 0) + 1;
+        }
+        // School counts
+        schoolCounts[student.schoolId] = (schoolCounts[student.schoolId] || 0) + 1;
+      }
+    });
+    
+    return { regionCounts, clusterCounts, schoolCounts };
+  }, [allStudentsForGrade, schools]);
+
   // Fetch students based on filters
   const { data: studentListResponse, isLoading: studentsLoading } = useQuery<{ data: StudentWithResults[] }>({
     queryKey: ["/api/students", selectedExamYear!, selectedGrade!, regionFilter, clusterFilter, schoolFilter],
@@ -614,14 +655,21 @@ export default function Results() {
                   setClusterFilter("all");
                   setSchoolFilter("all");
                 }}>
-                  <SelectTrigger className="w-[140px]" data-testid="select-region-filter">
+                  <SelectTrigger className="w-[200px]" data-testid="select-region-filter">
                     <SelectValue placeholder={isRTL ? "الإقليم" : "Region"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">{isRTL ? "جميع الأقاليم" : "All Regions"}</SelectItem>
-                    {regions?.map(r => (
-                      <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>
-                    ))}
+                    <SelectItem value="all">
+                      {isRTL ? "جميع الأقاليم" : "All Regions"} ({formatNumber(allStudentsForGrade.length)})
+                    </SelectItem>
+                    {regions?.map(r => {
+                      const count = filterCounts.regionCounts[r.id] || 0;
+                      return (
+                        <SelectItem key={r.id} value={String(r.id)}>
+                          {r.name} ({formatNumber(count)})
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
 
@@ -629,26 +677,51 @@ export default function Results() {
                   setClusterFilter(value);
                   setSchoolFilter("all");
                 }} disabled={regionFilter === "all"}>
-                  <SelectTrigger className="w-[140px]" data-testid="select-cluster-filter">
+                  <SelectTrigger className="w-[200px]" data-testid="select-cluster-filter">
                     <SelectValue placeholder={isRTL ? "العنقود" : "Cluster"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">{isRTL ? "جميع العناقيد" : "All Clusters"}</SelectItem>
-                    {clusters?.filter(c => regionFilter === "all" || c.regionId === parseInt(regionFilter)).map(c => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                    ))}
+                    <SelectItem value="all">
+                      {isRTL ? "جميع العناقيد" : "All Clusters"} ({formatNumber(
+                        regionFilter === "all" 
+                          ? allStudentsForGrade.length 
+                          : Object.entries(filterCounts.clusterCounts)
+                              .filter(([clusterId]) => {
+                                const cluster = clusters?.find(c => c.id === parseInt(clusterId));
+                                return cluster?.regionId === parseInt(regionFilter);
+                              })
+                              .reduce((sum, [, count]) => sum + count, 0)
+                      )})
+                    </SelectItem>
+                    {clusters?.filter(c => regionFilter === "all" || c.regionId === parseInt(regionFilter)).map(c => {
+                      const count = filterCounts.clusterCounts[c.id] || 0;
+                      return (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.name} ({formatNumber(count)})
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
 
                 <Select value={schoolFilter} onValueChange={setSchoolFilter}>
-                  <SelectTrigger className="w-[160px]" data-testid="select-school-filter">
+                  <SelectTrigger className="w-[220px]" data-testid="select-school-filter">
                     <SelectValue placeholder={isRTL ? "المدرسة" : "School"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">{isRTL ? "جميع المدارس" : "All Schools"}</SelectItem>
-                    {filteredSchools.map((s: School) => (
-                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                    ))}
+                    <SelectItem value="all">
+                      {isRTL ? "جميع المدارس" : "All Schools"} ({formatNumber(
+                        filteredSchools.reduce((sum: number, s: School) => sum + (filterCounts.schoolCounts[s.id] || 0), 0)
+                      )})
+                    </SelectItem>
+                    {filteredSchools.map((s: School) => {
+                      const count = filterCounts.schoolCounts[s.id] || 0;
+                      return (
+                        <SelectItem key={s.id} value={String(s.id)}>
+                          {s.name} ({formatNumber(count)})
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
 
