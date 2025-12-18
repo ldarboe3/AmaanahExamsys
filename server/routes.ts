@@ -13958,7 +13958,14 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         const page = await browser.newPage();
         await page.setContent(htmlContent, { waitUntil: 'domcontentloaded', timeout: 30000 });
         
-        const fileName = `school-results-${school.name.replace(/[\\s/\\\\]/g, '-')}-${Date.now()}.pdf`;
+        // Sanitize school name for safe filename (remove non-ASCII characters)
+        const sanitizedSchoolName = school.name
+          .replace(/[^\w\s-]/g, '') // Remove non-word characters except spaces and hyphens
+          .replace(/[\s]+/g, '-') // Replace spaces with hyphens
+          .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+          .slice(0, 50); // Limit length
+        
+        const fileName = `school-results-${sanitizedSchoolName || 'results'}-${Date.now()}.pdf`;
         const filePath = path.join(process.cwd(), 'tmp', fileName);
         
         // Ensure tmp directory exists
@@ -13984,7 +13991,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         await fs.unlink(filePath).catch(() => {});
 
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="school-results-${school.name.replace(/[\\s/\\\\]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf"`);
+        res.setHeader('Content-Disposition', `attachment; filename="school-results-${sanitizedSchoolName || 'results'}-${new Date().toISOString().split('T')[0]}.pdf"`);
         res.setHeader('Content-Length', pdfBuffer.length);
         res.send(pdfBuffer);
       } catch (pdfError: any) {
