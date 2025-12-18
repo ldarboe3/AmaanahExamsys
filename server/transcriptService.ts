@@ -1,9 +1,8 @@
-import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 import QRCode from 'qrcode';
 import crypto from 'crypto';
-import { getChromiumExecutable } from './chromiumHelper';
+import { getSharedBrowser } from './chromiumHelper';
 
 // Arabic to English Transliteration Map
 const ARABIC_TO_ENGLISH_MAP: Record<string, string> = {
@@ -717,19 +716,13 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
 
   const htmlContent = generateTranscriptHTML(data);
 
-  let browser;
+  let page;
   try {
-    const chromiumPath = getChromiumExecutable();
-    console.log(`[Transcript PDF] Launching Chromium from: ${chromiumPath}`);
-    
-    browser = await puppeteer.launch({
-      headless: true,
-      executablePath: chromiumPath,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
-      timeout: 30000
-    });
+    // Use shared browser for performance (avoids launching new browser each time)
+    const browser = await getSharedBrowser();
+    console.log(`[Transcript PDF] Using shared browser instance`);
 
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'domcontentloaded', timeout: 30000 });
     
     const fileName = `transcript_g6_${data.student.indexNumber || data.student.id}_${Date.now()}.pdf`;
@@ -749,11 +742,12 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
     console.error(`[Transcript PDF] Generation error for student ${studentInfo}:`, error.message);
     throw new Error(`Failed to generate transcript PDF: ${error.message}`);
   } finally {
-    if (browser) {
+    // Close the page but keep the browser open for reuse
+    if (page) {
       try {
-        await browser.close();
+        await page.close();
       } catch (e) {
-        console.warn('[Transcript PDF] Error closing browser:', e);
+        console.warn('[Transcript PDF] Error closing page:', e);
       }
     }
   }

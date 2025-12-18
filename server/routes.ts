@@ -11819,12 +11819,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return res.status(400).json({ message: "Index number is required" });
       }
 
-      // Find student by index number
-      const students = await storage.getAllStudents();
-      
-      let student = students.find(s => 
-        s.indexNumber?.toUpperCase() === (indexNumber as string).toUpperCase()
-      );
+      // Find student by index number directly (faster than loading all students)
+      let student = await storage.getStudentByIndexNumber((indexNumber as string).toUpperCase());
 
       // Apply additional filters if provided
       if (student && examYearId) {
@@ -11948,11 +11944,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return res.status(400).json({ message: "Index number is required" });
       }
 
-      // Find student by index number
-      const students = await storage.getAllStudents();
-      let student = students.find(s => 
-        s.indexNumber?.toUpperCase() === (indexNumber as string).toUpperCase()
-      );
+      // Find student by index number directly (faster)
+      let student = await storage.getStudentByIndexNumber((indexNumber as string).toUpperCase());
 
       // Apply additional filters if provided
       if (student && examYearId) {

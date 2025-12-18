@@ -739,7 +739,7 @@ export default function ResultChecker() {
                               {getSubjectName(result)}
                             </TableCell>
                             <TableCell className="text-center">
-                              <span className="font-mono">{result.score}</span>
+                              <span className={`font-mono font-semibold ${result.score < 50 ? 'text-red-600 dark:text-red-400' : ''}`}>{result.score}</span>
                               <span className="text-muted-foreground text-xs">/{result.maxScore}</span>
                             </TableCell>
                             <TableCell className={`text-center font-bold ${getGradeColor(result.grade)}`}>
@@ -760,17 +760,17 @@ export default function ResultChecker() {
                   </CardContent>
                 </Card>
 
-                {/* Transcript Actions Card */}
+                {/* Online Result Actions Card */}
                 <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
                   <CardHeader>
                     <CardTitle className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                       <FileText className="w-5 h-5 text-primary" />
-                      {language === 'ar' ? 'الشهادة الأكاديمية' : 'Academic Transcript'}
+                      {language === 'ar' ? 'النتيجة الإلكترونية' : 'Online Result'}
                     </CardTitle>
                     <CardDescription>
                       {language === 'ar' 
-                        ? 'قم بإنشاء وطباعة الشهادة الأكاديمية الرسمية الخاصة بك'
-                        : 'Generate and print your official academic transcript'}
+                        ? 'قم بإنشاء وطباعة النتيجة الإلكترونية الرسمية الخاصة بك'
+                        : 'Generate and print your official Online Result.'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -778,23 +778,23 @@ export default function ResultChecker() {
                       {resultData.hasTranscript ? (
                         <Button 
                           onClick={handlePrintTranscript}
-                          data-testid="button-print-transcript"
+                          data-testid="button-print-result"
                         >
                           <Printer className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
-                          {language === 'ar' ? 'طباعة الشهادة' : 'Print Transcript'}
+                          {language === 'ar' ? 'طباعة النتيجة' : 'Print Result'}
                         </Button>
                       ) : (
                         <Button 
                           onClick={handleGenerateTranscript}
                           disabled={generatingTranscript}
-                          data-testid="button-generate-transcript"
+                          data-testid="button-generate-result"
                         >
                           {generatingTranscript ? (
                             <Loader2 className={`w-4 h-4 animate-spin ${isRTL ? 'ml-2' : 'mr-2'}`} />
                           ) : (
                             <FileText className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
                           )}
-                          {language === 'ar' ? 'إنشاء الشهادة' : 'Generate Transcript'}
+                          {language === 'ar' ? 'إنشاء النتيجة' : 'Generate Result'}
                         </Button>
                       )}
                     </div>
@@ -843,12 +843,12 @@ export default function ResultChecker() {
                 <CardContent className="pt-6">
                   <FileText className="w-10 h-10 text-chart-3 mx-auto mb-4" />
                   <h3 className="font-semibold mb-2">
-                    {language === 'ar' ? 'شهادات أكاديمية' : 'Academic Transcripts'}
+                    {language === 'ar' ? 'النتائج الإلكترونية' : 'Online Results'}
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     {language === 'ar' 
-                      ? 'قم بإنشاء وتنزيل وطباعة الشهادة الأكاديمية الرسمية الخاصة بك'
-                      : 'Generate, download, and print your official academic transcript'}
+                      ? 'قم بإنشاء وتنزيل وطباعة النتيجة الإلكترونية الرسمية الخاصة بك'
+                      : 'Generate, download, and print your official Online Result'}
                   </p>
                 </CardContent>
               </Card>

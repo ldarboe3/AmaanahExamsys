@@ -1,8 +1,7 @@
-import puppeteer from 'puppeteer';
 import QRCode from 'qrcode';
 import path from 'path';
 import fs from 'fs';
-import { getChromiumExecutable } from './chromiumHelper';
+import { getSharedBrowser } from './chromiumHelper';
 import {
   formatArabicDate,
   formatHijriDate,
@@ -401,14 +400,11 @@ export async function generateGrade6CertificatePDF(data: Grade6CertificateData):
     </html>
   `;
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: getChromiumExecutable(),
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-  });
+  // Use shared browser for performance
+  const browser = await getSharedBrowser();
+  const page = await browser.newPage();
 
   try {
-    const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
     
     const fileName = `grade6_cert_${student.indexNumber || student.id}_${Date.now()}.pdf`;
@@ -424,6 +420,6 @@ export async function generateGrade6CertificatePDF(data: Grade6CertificateData):
     
     return filePath;
   } finally {
-    await browser.close();
+    await page.close();
   }
 }

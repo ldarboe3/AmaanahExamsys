@@ -1,9 +1,8 @@
-import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import QRCode from 'qrcode';
-import { getChromiumExecutable } from './chromiumHelper';
+import { getSharedBrowser } from './chromiumHelper';
 import {
   formatArabicDate,
   formatHijriDate,
@@ -505,21 +504,11 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
   
   const html = generateCertificateHTML(data, templateBase64, logoBase64);
   
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: getChromiumExecutable(),
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--font-render-hinting=none',
-    ],
-  });
+  // Use shared browser for performance
+  const browser = await getSharedBrowser();
+  const page = await browser.newPage();
   
   try {
-    const page = await browser.newPage();
-    
     await page.setViewport({
       width: 3508,
       height: 2480,
@@ -549,7 +538,7 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
     
     return pdfPath;
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
 

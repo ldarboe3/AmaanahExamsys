@@ -1,8 +1,7 @@
-import puppeteer from 'puppeteer';
 import QRCode from 'qrcode';
 import path from 'path';
 import fs from 'fs';
-import { getChromiumExecutable } from './chromiumHelper';
+import { getSharedBrowser } from './chromiumHelper';
 import {
   certificateTemplates,
   getCertificateTemplate,
@@ -368,14 +367,11 @@ export async function generateCertificatePDF(data: CertificateData): Promise<str
     </html>
   `;
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: getChromiumExecutable(),
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-  });
+  // Use shared browser for performance
+  const browser = await getSharedBrowser();
+  const page = await browser.newPage();
 
   try {
-    const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
     
     const fileName = `cert_${student.indexNumber || student.id}_${Date.now()}.pdf`;
@@ -391,7 +387,7 @@ export async function generateCertificatePDF(data: CertificateData): Promise<str
     
     return filePath;
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
 
@@ -764,14 +760,11 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
     </html>
   `;
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: getChromiumExecutable(),
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-  });
+  // Use shared browser for performance
+  const browser = await getSharedBrowser();
+  const page = await browser.newPage();
 
   try {
-    const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
     
     const fileName = `transcript_${student.indexNumber || student.id}_g${student.grade}_${Date.now()}.pdf`;
@@ -786,7 +779,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
     
     return filePath;
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
 
@@ -1202,14 +1195,11 @@ export async function generateResultSlipPDF(data: ResultSlipData): Promise<strin
     </html>
   `;
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: getChromiumExecutable(),
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-  });
+  // Use shared browser for performance
+  const browser = await getSharedBrowser();
+  const page = await browser.newPage();
 
   try {
-    const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
     
     const fileName = `result_slip_${student.indexNumber || 'unknown'}_${Date.now()}.pdf`;
@@ -1224,7 +1214,7 @@ export async function generateResultSlipPDF(data: ResultSlipData): Promise<strin
     
     return filePath;
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
 

@@ -25,7 +25,7 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Frontend**: Developed with React and TypeScript, leveraging `shadcn/ui` for reusable components.
 - **Backend**: Built with Express.js and TypeScript, handling API endpoints, authentication, and business logic.
 - **Database**: PostgreSQL, managed with Drizzle ORM.
-- **PDF Generation**: Utilizes Puppeteer for high-quality HTML-to-PDF rendering of certificates, transcripts, and invoices, including QR code verification.
+- **PDF Generation**: Utilizes Puppeteer with browser pooling for high-quality HTML-to-PDF rendering of certificates, transcripts, and invoices, including QR code verification. Shared browser instance with 1-minute idle timeout dramatically improves performance by avoiding new browser launches for each PDF.
 - **Authentication**: Password-based authentication with bcrypt hashing and session management, supporting six distinct user roles: `super_admin`, `examination_admin`, `logistics_admin`, `school_admin`, `examiner`, and `candidate`.
 - **Email Services**: Integrated with SendGrid for reliable email delivery.
 - **File Handling**: Multer-based file uploads with object storage integration.

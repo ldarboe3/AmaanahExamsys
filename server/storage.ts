@@ -760,7 +760,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getStudentByIndexNumber(indexNumber: string): Promise<Student | undefined> {
-    const [student] = await db.select().from(students).where(eq(students.indexNumber, indexNumber));
+    // Case-insensitive search for index number
+    const [student] = await db.select().from(students).where(
+      sql`UPPER(${students.indexNumber}) = ${indexNumber.toUpperCase()}`
+    );
     return student;
   }
 
