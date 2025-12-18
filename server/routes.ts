@@ -13807,7 +13807,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               width: 100%;
               border-collapse: collapse;
               margin-top: 6px;
-              font-size: 12px;
+              font-size: 10px;
               page-break-inside: avoid;
             }
             thead tr {
@@ -13816,19 +13816,19 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               page-break-inside: avoid;
             }
             th {
-              padding: 6px 4px;
+              padding: 4px 2px;
               text-align: center;
               border: 1px solid #0d9488;
               font-weight: bold;
               word-wrap: break-word;
-              font-size: 11px;
-              line-height: 1.3;
+              font-size: 9px;
+              line-height: 1.2;
             }
             td {
-              padding: 5px 4px;
+              padding: 3px 2px;
               border: 1px solid #ddd;
               text-align: center;
-              font-size: 12px;
+              font-size: 10px;
             }
             tbody tr {
               page-break-inside: avoid;
@@ -13842,7 +13842,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
             .student-name {
               text-align: right;
               font-weight: 500;
-              font-size: 12px;
+              font-size: 10px;
             }
             .footer {
               text-align: center;
