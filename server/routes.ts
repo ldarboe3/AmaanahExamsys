@@ -13608,38 +13608,30 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         ? await storage.getExamYear(examYearId) 
         : await storage.getActiveExamYear();
 
-      // Calculate GLOBAL rankings across ALL schools for this exam year and grade
-      const allSchools = await storage.getAllSchools();
-      const globalStudentTotals: { studentId: number; total: number; subjectCount: number }[] = [];
-
-      // Fetch results for ALL students across ALL schools
-      for (const school of allSchools) {
-        const schoolStudents = await storage.getStudentsBySchool(school.id);
-        for (const student of schoolStudents) {
-          const studentResults = await storage.getResultsByStudent(student.id);
-          const published = studentResults.filter(r => r.status === 'published');
-          
-          // Filter by exam year and grade
-          const filteredResults = published.filter(r => {
-            const yearMatch = examYearId ? r.examYearId === examYearId : true;
-            const gradeMatch = student.grade === students[0]?.grade; // Match grade of this school's students
-            return yearMatch && gradeMatch;
-          });
-          
-          if (filteredResults.length > 0) {
-            const total = filteredResults.reduce((sum, r) => sum + parseFloat(r.totalScore || '0'), 0);
-            globalStudentTotals.push({ studentId: student.id, total, subjectCount: filteredResults.length });
-          }
+      // Calculate GLOBAL rankings efficiently by grouping published results by student
+      // Group results by student ID to calculate totals
+      const studentTotalsMap = new Map<number, { total: number; subjectCount: number }>();
+      
+      for (const result of publishedResults) {
+        if (!studentTotalsMap.has(result.studentId)) {
+          studentTotalsMap.set(result.studentId, { total: 0, subjectCount: 0 });
         }
+        const totals = studentTotalsMap.get(result.studentId)!;
+        totals.total += parseFloat(result.totalScore || '0');
+        totals.subjectCount += 1;
       }
 
-      // Sort globally by total score descending and assign rankings
-      globalStudentTotals.sort((a, b) => b.total - a.total);
+      // Convert to array and sort by total score descending
+      const sortedStudents = Array.from(studentTotalsMap.entries())
+        .map(([studentId, totals]) => ({ studentId, ...totals }))
+        .sort((a, b) => b.total - a.total);
+
+      // Assign global rankings
       const studentRankings = new Map<number, number>();
       const studentTotals = new Map<number, { total: number; subjectCount: number }>();
-      globalStudentTotals.forEach((item, index) => {
+      sortedStudents.forEach((item, index) => {
         studentRankings.set(item.studentId, index + 1);
-        studentTotals.set(item.studentId, item);
+        studentTotals.set(item.studentId, { total: item.total, subjectCount: item.subjectCount });
       });
 
       // Prepare data for PDF - include all subject scores for each student
