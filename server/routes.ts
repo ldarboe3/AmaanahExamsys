@@ -13932,7 +13932,13 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
                     ${pageRows.map((summary, pageRowIdx) => {
                       const totalScore = parseFloat(summary.totalScore.toString());
                       const percentage = parseFloat(summary.percentage);
-                      const finalResultAr = percentage >= 50 ? 'نجح' : 'رسب';
+                      // Arabic grade classification based on percentage
+                      let finalResultAr = 'راسب'; // Default: Fail
+                      if (percentage >= 90) finalResultAr = 'ممتاز'; // Excellent
+                      else if (percentage >= 80) finalResultAr = 'جيد جدا'; // Very Good
+                      else if (percentage >= 70) finalResultAr = 'جيد'; // Good
+                      else if (percentage >= 60) finalResultAr = 'مقبول'; // Acceptable
+                      else if (percentage >= 50) finalResultAr = 'ضعيف'; // Poor
                       const globalIdx = start + pageRowIdx + 1;
                       return `
                         <tr>
