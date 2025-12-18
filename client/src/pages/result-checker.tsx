@@ -220,8 +220,8 @@ export default function ResultChecker() {
         <tr>
           <td style="padding: 4px 5px; border-bottom: 1px solid #e5e7eb; font-size: 11px;">${getSubjectName(result)}</td>
           <td style="padding: 4px 5px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 500; font-size: 11px;">${result.score}/${result.maxScore}</td>
-          <td style="padding: 4px 5px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #059669; font-size: 11px;">${result.grade}</td>
-          <td style="padding: 4px 5px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 10px;">${language === 'ar' ? getGradeStatus(result.grade).ar : getGradeStatus(result.grade).en}</td>
+          <td style="padding: 4px 5px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: ${result.score < 50 ? '#dc2626' : '#059669'}; font-size: 11px;">${result.grade}</td>
+          <td style="padding: 4px 5px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 10px; color: ${result.score < 50 ? '#dc2626' : '#059669'};">${language === 'ar' ? getGradeStatusByScore(result.score).ar : getGradeStatusByScore(result.score).en}</td>
         </tr>
       `).join('');
       
@@ -426,6 +426,16 @@ export default function ResultChecker() {
     return language === 'ar' ? result.statusAr : result.status;
   };
 
+  // Get grade status based on score - any score below 50 is Failed
+  const getGradeStatusByScore = (score: number) => {
+    if (score >= 90) return { en: 'Excellent', ar: 'ممتاز' };
+    if (score >= 80) return { en: 'Very Good', ar: 'جداً جيد' };
+    if (score >= 70) return { en: 'Good', ar: 'جيد' };
+    if (score >= 60) return { en: 'Acceptable', ar: 'مقبول' };
+    if (score >= 50) return { en: 'Pass', ar: 'ناجح' };
+    return { en: 'Failed', ar: 'راسب' };
+  };
+
   const getGradeStatus = (grade: string) => {
     const normalizedGrade = grade.toUpperCase();
     
@@ -434,10 +444,10 @@ export default function ResultChecker() {
       'A': { en: 'Very Good', ar: 'جداً جيد' },
       'B+': { en: 'Good', ar: 'جيد' },
       'B': { en: 'Good', ar: 'جيد' },
-      'C+': { en: 'Fair', ar: 'مقبول' },
-      'C': { en: 'Fair', ar: 'مقبول' },
-      'D+': { en: 'Fair', ar: 'مقبول' },
-      'D': { en: 'Fair', ar: 'مقبول' },
+      'C+': { en: 'Acceptable', ar: 'مقبول' },
+      'C': { en: 'Acceptable', ar: 'مقبول' },
+      'D+': { en: 'Pass', ar: 'ناجح' },
+      'D': { en: 'Pass', ar: 'ناجح' },
       'E': { en: 'Failed', ar: 'راسب' },
       'F': { en: 'Failed', ar: 'راسب' },
     };
@@ -764,10 +774,10 @@ export default function ResultChecker() {
                             </TableCell>
                             <TableCell className="text-center">
                               <Badge 
-                                variant={['A+', 'A', 'B+', 'B', 'C+', 'C', 'D+', 'D'].includes(result.grade.toUpperCase()) ? 'outline' : 'destructive'} 
+                                variant={result.score >= 50 ? 'outline' : 'destructive'} 
                                 className="text-xs"
                               >
-                                {language === 'ar' ? getGradeStatus(result.grade).ar : getGradeStatus(result.grade).en}
+                                {language === 'ar' ? getGradeStatusByScore(result.score).ar : getGradeStatusByScore(result.score).en}
                               </Badge>
                             </TableCell>
                           </TableRow>
