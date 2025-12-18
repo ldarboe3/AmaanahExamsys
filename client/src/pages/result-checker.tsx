@@ -445,6 +445,19 @@ export default function ResultChecker() {
     return statusMap[normalizedGrade] || { en: 'N/A', ar: 'غ.م' };
   };
 
+  // Get final result based on percentage (overall performance grade word)
+  const getFinalResultGrade = (percentage: number) => {
+    if (percentage >= 90) return { en: 'Excellent', ar: 'ممتاز', grade: 'A+', variant: 'default' as const };
+    if (percentage >= 85) return { en: 'Very Good', ar: 'جداً جيد', grade: 'A', variant: 'default' as const };
+    if (percentage >= 80) return { en: 'Good', ar: 'جيد', grade: 'B+', variant: 'default' as const };
+    if (percentage >= 75) return { en: 'Good', ar: 'جيد', grade: 'B', variant: 'default' as const };
+    if (percentage >= 70) return { en: 'Acceptable', ar: 'مقبول', grade: 'C+', variant: 'default' as const };
+    if (percentage >= 65) return { en: 'Acceptable', ar: 'مقبول', grade: 'C', variant: 'default' as const };
+    if (percentage >= 60) return { en: 'Acceptable', ar: 'مقبول', grade: 'D+', variant: 'default' as const };
+    if (percentage >= 50) return { en: 'Acceptable', ar: 'مقبول', grade: 'D', variant: 'default' as const };
+    return { en: 'Failed', ar: 'راسب', grade: 'F', variant: 'destructive' as const };
+  };
+
   const gradeOptions = [
     { value: "3", labelEn: "Grade 3 - Lower Basic", labelAr: "الصف الثالث - المرحلة الابتدائية الدنيا" },
     { value: "6", labelEn: "Grade 6 - Upper Basic", labelAr: "الصف السادس - المرحلة الابتدائية" },
@@ -608,18 +621,22 @@ export default function ResultChecker() {
                         <GraduationCap className="w-5 h-5 text-primary" />
                         {t.resultChecker.studentInformation}
                       </CardTitle>
-                      <Badge variant={resultData.summary.failedCount === 0 ? 'default' : 'destructive'}>
-                        {resultData.summary.failedCount === 0 ? (
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                        ) : (
-                          <AlertCircle className="w-3 h-3 mr-1" />
-                        )}
-                        {resultData.summary.failedCount === 0 ? (
-                          language === 'ar' ? 'ناجح' : 'Passed'
-                        ) : (
-                          language === 'ar' ? 'راسب' : 'Failed'
-                        )}
-                      </Badge>
+                      {(() => {
+                        const percentage = resultData.summary.maxPossibleScore > 0 
+                          ? (resultData.summary.totalScore / resultData.summary.maxPossibleScore) * 100 
+                          : 0;
+                        const finalResult = getFinalResultGrade(percentage);
+                        return (
+                          <Badge variant={finalResult.variant}>
+                            {finalResult.variant === 'default' ? (
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                            ) : (
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                            )}
+                            {language === 'ar' ? finalResult.ar : finalResult.en}
+                          </Badge>
+                        );
+                      })()}
                     </div>
                   </CardHeader>
                   <CardContent>

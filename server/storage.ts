@@ -228,6 +228,7 @@ export interface IStorage {
   getTranscriptsByStudent(studentId: number): Promise<Transcript[]>;
   getTranscriptByStudentAndExamYear(studentId: number, examYearId: number): Promise<Transcript | undefined>;
   getTranscriptsByExamYear(examYearId: number): Promise<Transcript[]>;
+  getTranscriptCountForYear(examYearId: number): Promise<number>;
   updateTranscript(id: number, transcript: Partial<InsertTranscript>): Promise<Transcript | undefined>;
   incrementTranscriptPrintCount(id: number): Promise<Transcript | undefined>;
   deleteTranscript(id: number): Promise<boolean>;
@@ -1381,6 +1382,11 @@ export class DatabaseStorage implements IStorage {
 
   async getTranscriptsByExamYear(examYearId: number): Promise<Transcript[]> {
     return db.select().from(transcripts).where(eq(transcripts.examYearId, examYearId));
+  }
+
+  async getTranscriptCountForYear(examYearId: number): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(transcripts).where(eq(transcripts.examYearId, examYearId));
+    return result[0]?.count || 0;
   }
 
   async updateTranscript(id: number, transcript: Partial<InsertTranscript>): Promise<Transcript | undefined> {
