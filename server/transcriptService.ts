@@ -738,16 +738,18 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
     console.log(`[Transcript PDF] Successfully generated: ${filePath}`);
     return filePath;
   } catch (error: any) {
-    const studentInfo = `${data.student.firstName} ${data.student.lastName} (${data.student.id})`;
+    const studentInfo = `${data.student.firstName} ${data.student.lastName} (${data.student.indexNumber || 'unknown'})`;
     console.error(`[Transcript PDF] Generation error for student ${studentInfo}:`, error.message);
     throw new Error(`Failed to generate transcript PDF: ${error.message}`);
   } finally {
     // Close the page but keep the browser open for reuse
     if (page) {
       try {
-        await page.close();
+        page.close().catch(e => {
+          console.warn('[Transcript PDF] Error closing page:', e.message);
+        });
       } catch (e) {
-        console.warn('[Transcript PDF] Error closing page:', e);
+        console.warn('[Transcript PDF] Error in page cleanup:', e);
       }
     }
   }

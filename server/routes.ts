@@ -12051,6 +12051,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
           firstName: student.firstName || '',
           middleName: student.middleName || '',
           lastName: normalizedLastNamePublic,
+          indexNumber: student.indexNumber || '',
           nationality: student.nationality || 'Gambian',
         },
         school: {
