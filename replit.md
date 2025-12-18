@@ -43,7 +43,12 @@ The system is built on a robust architecture featuring a React-based frontend, a
   - **Comprehensive Results CSV Upload**: Template download, Arabic text cleaning, authoritative school/student matching, and mark validation with detailed error reporting.
   - **Unified Certificate/Transcript Workflow**: Eligibility-based student selection, filtering, bulk generation, preview, and print functionalities. Includes gender-specific templates and QR verification.
   - **Online Result Checker**: Public checker for candidates to search results and generate/download transcripts.
-  - **School Results Dashboard**: Read-only results view with no edit/upload capabilities. Shows student results in table format with examination ranking. Schools can download PDF reports with official Amaanah logo and address.
+  - **School Results Dashboard**: Read-only results view with no edit/upload capabilities. Shows student results in table format with global examination ranking (across all participating schools). Schools can download PDF reports with official Amaanah logo and address. PDF features:
+    - **Global Ranking**: Rankings calculated across all schools for the same exam year and grade (not per-school)
+    - **Arabic Final Result**: Result column displays Arabic text only (نجح for Pass, رسب for Fail)
+    - **Enhanced Readability**: Increased font sizes (12px table body, 11px headers) for better board-level review
+    - **Multi-Page Layout**: Approximately 20 student rows per page, with automatic pagination across multiple pages
+    - **Safe Filenames**: Sanitized school names with special character handling for HTTP compatibility
   - **Result Publication Notifications**: When results are published, automatic email and in-dashboard notifications are sent to all schools with registered students for that examination. Schools without registered students are excluded from notifications.
 - **Administrative Tools**: Comprehensive audit logging, advanced CSV export functionalities, and role-based access control.
 - **Exam Management**: Examiner, subject, timetable, and exam center management.

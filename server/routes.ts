@@ -13608,33 +13608,39 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         ? await storage.getExamYear(examYearId) 
         : await storage.getActiveExamYear();
 
-      // Calculate STUDENT rankings based on total scores (not per-subject)
-      const studentsByGradeAndYear = new Map<string, { studentId: number; total: number; subjectCount: number }[]>();
-      for (const student of students) {
-        const studentResults = publishedResults.filter(r => r.studentId === student.id);
-        if (studentResults.length === 0) continue;
-        
-        const examYearIdForStudent = studentResults[0]?.examYearId;
-        const key = `${examYearIdForStudent}-${student.grade || ''}`;
-        
-        const total = studentResults.reduce((sum, r) => sum + parseFloat(r.totalScore || '0'), 0);
-        
-        if (!studentsByGradeAndYear.has(key)) {
-          studentsByGradeAndYear.set(key, []);
+      // Calculate GLOBAL rankings across ALL schools for this exam year and grade
+      const allSchools = await storage.getAllSchools();
+      const globalStudentTotals: { studentId: number; total: number; subjectCount: number }[] = [];
+
+      // Fetch results for ALL students across ALL schools
+      for (const school of allSchools) {
+        const schoolStudents = await storage.getStudentsBySchool(school.id);
+        for (const student of schoolStudents) {
+          const studentResults = await storage.getResultsByStudent(student.id);
+          const published = studentResults.filter(r => r.status === 'published');
+          
+          // Filter by exam year and grade
+          const filteredResults = published.filter(r => {
+            const yearMatch = examYearId ? r.examYearId === examYearId : true;
+            const gradeMatch = student.grade === students[0]?.grade; // Match grade of this school's students
+            return yearMatch && gradeMatch;
+          });
+          
+          if (filteredResults.length > 0) {
+            const total = filteredResults.reduce((sum, r) => sum + parseFloat(r.totalScore || '0'), 0);
+            globalStudentTotals.push({ studentId: student.id, total, subjectCount: filteredResults.length });
+          }
         }
-        studentsByGradeAndYear.get(key)!.push({ studentId: student.id, total, subjectCount: studentResults.length });
       }
 
-      // Sort by total score descending and assign rankings per student
+      // Sort globally by total score descending and assign rankings
+      globalStudentTotals.sort((a, b) => b.total - a.total);
       const studentRankings = new Map<number, number>();
       const studentTotals = new Map<number, { total: number; subjectCount: number }>();
-      for (const [_, studentsList] of studentsByGradeAndYear) {
-        const sorted = [...studentsList].sort((a, b) => b.total - a.total);
-        sorted.forEach((item, index) => {
-          studentRankings.set(item.studentId, index + 1);
-          studentTotals.set(item.studentId, { total: item.total, subjectCount: item.subjectCount });
-        });
-      }
+      globalStudentTotals.forEach((item, index) => {
+        studentRankings.set(item.studentId, index + 1);
+        studentTotals.set(item.studentId, item);
+      });
 
       // Prepare data for PDF - include all subject scores for each student
       const allSubjectsForGrade = new Set<number>();
@@ -13693,54 +13699,62 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               padding: 0;
               box-sizing: border-box;
             }
-            body {
+            html, body {
               font-family: 'Amiri', 'Arial', sans-serif;
               background: white;
               color: #333;
               line-height: 1.4;
             }
+            body {
+              margin: 0;
+              padding: 0;
+            }
+            .page-break {
+              page-break-after: always;
+              page-break-inside: avoid;
+            }
             .header {
               border-bottom: 3px solid #000;
-              padding: 15px 0;
-              margin-bottom: 12px;
+              padding: 12px 0;
+              margin-bottom: 10px;
               background: white;
             }
             .government-header {
               display: flex;
               justify-content: space-between;
               align-items: flex-start;
-              margin-bottom: 15px;
+              margin-bottom: 12px;
               padding: 0 15px;
               gap: 30px;
             }
             .header-left {
               text-align: left;
               flex: 1;
-              padding-top: 8px;
+              padding-top: 6px;
             }
             .header-left-title {
-              font-size: 13px;
+              font-size: 11px;
               font-weight: bold;
               color: #000;
               margin: 0;
-              line-height: 1.3;
+              line-height: 1.2;
             }
             .header-left-subtitle {
-              font-size: 11px;
+              font-size: 10px;
               color: #000;
-              margin: 3px 0 0 0;
-              line-height: 1.3;
+              margin: 2px 0 0 0;
+              line-height: 1.2;
             }
             .header-center {
               display: flex;
               flex-direction: column;
               align-items: center;
-              gap: 8px;
+              gap: 6px;
               flex-shrink: 0;
             }
             .seal {
-              width: 80px;
-              height: 80px;
+              width: 70px;
+              height: 70px;
               display: flex;
               align-items: center;
               justify-content: center;
@@ -13752,82 +13766,80 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
               max-height: 100%;
               object-fit: contain;
             }
-            .seal-banner {
-              font-size: 9px;
-              color: #000;
-              font-weight: bold;
-              width: 70px;
-              text-align: center;
-              line-height: 1.2;
-              display: none;
-            }
             .header-right {
               text-align: right;
               flex: 1;
-              padding-top: 8px;
+              padding-top: 6px;
             }
             .header-right-title {
-              font-size: 13px;
+              font-size: 11px;
               font-weight: bold;
               color: #000;
               margin: 0;
-              line-height: 1.3;
+              line-height: 1.2;
             }
             .header-right-subtitle {
-              font-size: 11px;
+              font-size: 10px;
               color: #000;
-              margin: 3px 0 0 0;
-              line-height: 1.3;
-            }
-            .amaanah-branding {
-              display: none;
+              margin: 2px 0 0 0;
+              line-height: 1.2;
             }
             .title-section {
               text-align: center;
-              margin: 8px 0 10px 0;
+              margin: 6px 0 8px 0;
             }
             .doc-title {
-              font-size: 18px;
+              font-size: 16px;
               font-weight: bold;
               color: #0d9488;
               margin: 0;
             }
             .subtitle {
-              font-size: 12px;
+              font-size: 11px;
               color: #666;
-              margin-top: 4px;
+              margin-top: 3px;
             }
             .school-info {
               background: #f0f9f7;
-              padding: 8px 12px;
+              padding: 6px 10px;
               border-radius: 4px;
-              margin-bottom: 10px;
+              margin-bottom: 8px;
               font-size: 10px;
-              line-height: 1.5;
+              line-height: 1.4;
               border-left: 4px solid #0d9488;
+            }
+            .results-container {
+              page-break-inside: avoid;
             }
             table {
               width: 100%;
               border-collapse: collapse;
-              margin-top: 8px;
-              font-size: 9px;
+              margin-top: 6px;
+              font-size: 12px;
+              page-break-inside: avoid;
             }
             thead tr {
               background: #0d9488;
               color: white;
+              page-break-inside: avoid;
             }
             th {
-              padding: 5px 3px;
+              padding: 6px 4px;
               text-align: center;
               border: 1px solid #0d9488;
               font-weight: bold;
               word-wrap: break-word;
-              font-size: 8.5px;
+              font-size: 11px;
+              line-height: 1.3;
             }
             td {
-              padding: 4px 3px;
+              padding: 5px 4px;
               border: 1px solid #ddd;
               text-align: center;
+              font-size: 12px;
+            }
+            tbody tr {
+              page-break-inside: avoid;
             }
             tbody tr:nth-child(odd) {
               background: #f9fafb;
@@ -13838,25 +13850,28 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
             .student-name {
               text-align: right;
               font-weight: 500;
-            }
-            .school-name {
-              text-align: right;
-              font-size: 8px;
+              font-size: 12px;
             }
             .footer {
               text-align: center;
-              margin-top: 10px;
-              padding-top: 8px;
+              margin-top: 8px;
+              padding-top: 6px;
               border-top: 1px solid #ddd;
-              font-size: 8px;
+              font-size: 9px;
               color: #666;
+              page-break-inside: avoid;
             }
             .footer p {
-              margin: 3px 0;
+              margin: 2px 0;
             }
             @page {
               size: A4 landscape;
-              margin: 10mm;
+              margin: 8mm 10mm;
+            }
+            @media print {
+              .page-break {
+                page-break-after: always;
+              }
             }
           </style>
         </head>
@@ -13897,42 +13912,61 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
             <div class="subtitle">${school.name} - منطقة ${school.regionId || 'N/A'} | ${activeExamYear?.name || ''} | ${currentDate}</div>
           </div>
 
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Student</th>
-                <th>Index</th>
-                <th>Grade</th>
-                ${sortedSubjects.map(s => `<th>${s.name}</th>`).join('')}
-                <th>Total</th>
-                <th>%</th>
-                <th>Result</th>
-                <th>Rank</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${studentSummaries.map((summary, idx) => {
-                const totalScore = parseFloat(summary.totalScore.toString());
-                const percentage = parseFloat(summary.percentage);
-                const finalResult = percentage >= 50 ? 'Pass' : 'Fail';
-                const finalResultAr = percentage >= 50 ? 'نجح' : 'رسب';
-                return `
-                  <tr>
-                    <td>${idx + 1}</td>
-                    <td class="student-name">${summary.student?.firstName} ${summary.student?.lastName}</td>
-                    <td>${summary.student?.indexNumber || '-'}</td>
-                    <td>${summary.student?.grade || '-'}</td>
-                    ${sortedSubjects.map(s => `<td>${(summary.subjectScores[s.id] || 0).toFixed(1)}</td>`).join('')}
-                    <td><strong>${totalScore.toFixed(1)}</strong></td>
-                    <td><strong>${summary.percentage}</strong></td>
-                    <td>${finalResultAr}/${finalResult}</td>
-                    <td><strong>${summary.ranking || '-'}</strong></td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
+          ${(() => {
+            const rowsPerPage = 20;
+            const pages: string[] = [];
+            
+            for (let pageIdx = 0; pageIdx < Math.ceil(studentSummaries.length / rowsPerPage); pageIdx++) {
+              const start = pageIdx * rowsPerPage;
+              const end = Math.min(start + rowsPerPage, studentSummaries.length);
+              const pageRows = studentSummaries.slice(start, end);
+              
+              pages.push(`
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Student</th>
+                      <th>Index</th>
+                      <th>Grade</th>
+                      ${sortedSubjects.map(s => `<th>${s.name}</th>`).join('')}
+                      <th>Total</th>
+                      <th>%</th>
+                      <th>النتيجة</th>
+                      <th>Rank</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${pageRows.map((summary, pageRowIdx) => {
+                      const totalScore = parseFloat(summary.totalScore.toString());
+                      const percentage = parseFloat(summary.percentage);
+                      const finalResultAr = percentage >= 50 ? 'نجح' : 'رسب';
+                      const globalIdx = start + pageRowIdx + 1;
+                      return `
+                        <tr>
+                          <td>${globalIdx}</td>
+                          <td class="student-name">${summary.student?.firstName} ${summary.student?.lastName}</td>
+                          <td>${summary.student?.indexNumber || '-'}</td>
+                          <td>${summary.student?.grade || '-'}</td>
+                          ${sortedSubjects.map(s => `<td>${(summary.subjectScores[s.id] || 0).toFixed(1)}</td>`).join('')}
+                          <td><strong>${totalScore.toFixed(1)}</strong></td>
+                          <td><strong>${summary.percentage}</strong></td>
+                          <td><strong>${finalResultAr}</strong></td>
+                          <td><strong>${summary.ranking || '-'}</strong></td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              `);
+              
+              if (pageIdx < Math.ceil(studentSummaries.length / rowsPerPage) - 1) {
+                pages.push('<div class="page-break"></div>');
+              }
+            }
+            
+            return pages.join('');
+          })()}
 
           <div class="footer">
             <p>هذا المستند الرسمي يحتوي على سجل الامتحانات الرسمي / This is an official examination record</p>
