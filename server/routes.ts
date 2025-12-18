@@ -1667,6 +1667,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             clusterId,
             status: 'approved' as const, // Auto-approve bulk uploaded schools
             isEmailVerified: true, // No email verification needed
+            registrationFeePaid: true, // Remove payment restrictions for imported schools
           }).returning();
 
           // Link user to school after creation
@@ -1979,6 +1980,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               clusterId,
               status: 'approved' as const,
               isEmailVerified: true, // No email verification needed
+              registrationFeePaid: true, // Remove payment restrictions for imported schools
             }).returning();
 
             // Link user to school after creation

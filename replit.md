@@ -33,7 +33,7 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Website CMS**: Integrated content management system for public-facing content.
 
 ### Feature Specifications
-- **School Management**: Profile management, school badge upload, invitation system for school administrators. Features authoritative Regions & Clusters validation during upload and a specific school admin credential generation process.
+- **School Management**: Profile management, school badge upload, invitation system for school administrators. Features authoritative Regions & Clusters validation during upload and a specific school admin credential generation process. Imported schools (via bulk JSON/CSV upload) are automatically granted complete access with `registrationFeePaid: true`, bypassing payment restrictions and providing immediate dashboard access without requiring payment of the registration fee.
 - **Student Management**: CSV import, index number generation, and a 3-tier registration navigation workflow. Includes a multi-stage student submission workflow with payment confirmation.
   - **Surname Normalization**: Automatic validation and normalization of surnames against an approved Gambian surname list (80+ surnames with alternate spellings). Matching uses: exact lookup → diacritic normalization → fuzzy matching (Levenshtein ≤1) → transliteration for common variants (Diallo→Jallow, Cissé→Ceesay, etc.). Normalized surnames are stored at data entry and used on all official PDFs.
 - **Financial Management**: Three-tier fee structure, auto-invoice generation (including a mandatory registration fee for new schools), bank slip upload, payment confirmation, and professional PDF invoice downloads.
