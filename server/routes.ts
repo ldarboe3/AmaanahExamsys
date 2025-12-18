@@ -12094,7 +12094,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         pdfUrl: pdfPath,
         qrToken,
         status: 'issued',
-        issuedDate: new Date().toISOString().split('T')[0],
+        issuedDate: new Date(),
       });
 
       res.json({
