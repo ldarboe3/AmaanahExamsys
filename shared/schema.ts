@@ -1002,29 +1002,25 @@ export const insertExaminerSchema = createInsertSchema(examiners).pick({
 export const insertExaminerAssignmentSchema = createInsertSchema(examinerAssignments).pick({
   examinerId: true,
   examYearId: true,
-  centerId: true,
   subjectId: true,
-  role: true,
-  assignedDate: true,
-  completedDate: true,
-  scriptsMarked: true,
-  allowanceRate: true,
-  totalAllowance: true,
+  centerId: true,
+  assignedScripts: true,
+  completedScripts: true,
+  dueDate: true,
+  isCompleted: true,
 });
 
 export const insertStudentResultSchema = createInsertSchema(studentResults).pick({
   studentId: true,
   subjectId: true,
   examYearId: true,
-  rawScore: true,
-  scaledScore: true,
-  grade: true,
+  firstTermScore: true,
+  examScore: true,
   totalScore: true,
+  grade: true,
   status: true,
   markedBy: true,
-  markedAt: true,
-  verifiedBy: true,
-  verifiedAt: true,
+  validatedBy: true,
 });
 
 export const insertCertificateSchema = createInsertSchema(certificates).pick({
@@ -1061,34 +1057,41 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).pick({
 
 export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords).pick({
   studentId: true,
-  centerId: true,
+  examYearId: true,
   subjectId: true,
-  examDate: true,
+  centerId: true,
   isPresent: true,
+  checkInTime: true,
   notes: true,
   recordedBy: true,
 });
 
 export const insertMalpracticeReportSchema = createInsertSchema(malpracticeReports).pick({
   studentId: true,
+  examinerId: true,
+  examYearId: true,
   centerId: true,
   subjectId: true,
-  reportType: true,
+  incidentType: true,
+  malpracticeType: true,
   description: true,
-  evidenceUrl: true,
+  evidenceUrls: true,
+  actionTaken: true,
+  status: true,
+  reviewedBy: true,
+  reviewedAt: true,
   reportedBy: true,
-  decision: true,
-  decidedBy: true,
-  decidedAt: true,
 });
 
 export const insertAuditLogSchema = createInsertSchema(auditLogs).pick({
   userId: true,
   action: true,
-  resourceType: true,
-  resourceId: true,
-  details: true,
+  entityType: true,
+  entityId: true,
+  oldData: true,
+  newData: true,
   ipAddress: true,
+  userAgent: true,
 });
 
 export const insertSchoolExamRegistrationSchema = createInsertSchema(schoolExamRegistrations).pick({
@@ -1107,11 +1110,13 @@ export const insertSchoolExamRegistrationSchema = createInsertSchema(schoolExamR
 
 export const insertNotificationSchema = createInsertSchema(notifications).pick({
   userId: true,
+  type: true,
   title: true,
   message: true,
-  type: true,
+  data: true,
   isRead: true,
-  link: true,
+  sentViaEmail: true,
+  sentViaSms: true,
 });
 
 export const insertInvigilatorAssignmentSchema = createInsertSchema(invigilatorAssignments).pick({
