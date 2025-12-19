@@ -555,7 +555,7 @@ export default function Payments() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">{isRTL ? "رسوم التسجيل" : "Registration Fee"}</span>
-                          <span className="font-medium">{formatCurrency(invoice.feePerStudent)}</span>
+                          <span className="font-medium">{formatCurrency(invoice.feePerStudent || '0')}</span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">{isRTL ? "رسوم الشهادة" : "Certificate Fee"}</span>
@@ -1185,7 +1185,7 @@ export default function Payments() {
                   <div className="space-y-1.5 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{isRTL ? "رسوم التسجيل" : "Registration"}</span>
-                      <span>{formatCurrency(selectedInvoice.feePerStudent)}</span>
+                      <span>{formatCurrency(selectedInvoice.feePerStudent || '0')}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{isRTL ? "الشهادة" : "Certificate"}</span>

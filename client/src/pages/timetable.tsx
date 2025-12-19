@@ -332,7 +332,7 @@ export default function Timetable() {
                     <Calendar className="w-4 h-4 text-muted-foreground" />
                     <h3 className="text-lg font-medium">
                       {dateKey === "unscheduled"
-                        ? t.common.unscheduled
+                        ? "Unscheduled"
                         : new Date(dateKey).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     </h3>
                   </div>
@@ -362,7 +362,7 @@ export default function Timetable() {
                               <BookOpen className="w-4 h-4 text-muted-foreground" />
                               <div>
                                 <div className="font-medium">
-                                  {entry.subject?.name || t.common.unknown}
+                                  {entry.subject?.name || "Unknown"}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
                                   {entry.subject?.code}
@@ -374,7 +374,7 @@ export default function Timetable() {
                             <Badge variant="outline">
                               {entry.subject?.grade
                                 ? gradeLabels[entry.subject.grade]
-                                : t.common.unknown}
+                                : "Unknown"}
                             </Badge>
                           </TableCell>
                           <TableCell>{entry.venue || "-"}</TableCell>

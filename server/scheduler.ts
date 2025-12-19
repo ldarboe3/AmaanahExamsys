@@ -66,7 +66,8 @@ async function sendScheduledReminders(baseUrl: string) {
 
     for (const school of approvedSchools) {
       try {
-        const schoolStudents = await storage.getStudentsBySchool(school.id, activeExamYear.id);
+        const allSchoolStudents = await storage.getStudentsBySchool(school.id);
+        const schoolStudents = allSchoolStudents.filter((s: any) => s.examYearId === activeExamYear.id);
         const registeredStudents = schoolStudents?.length || 0;
 
         if (isUrgent) {

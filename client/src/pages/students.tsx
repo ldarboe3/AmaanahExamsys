@@ -1763,7 +1763,7 @@ export default function Students() {
                   })}
                 </div>
                 {/* Progress Line - hidden when registration is complete */}
-                {registrationStage !== 'completed' && (
+                {(registrationStage as string) !== 'completed' && (
                   <div className="relative h-1 bg-muted rounded-full mx-8 mt-[-40px] mb-8">
                     <div 
                       className="absolute h-1 bg-chart-3 rounded-full transition-all"
@@ -1845,7 +1845,7 @@ export default function Students() {
                 </div>
               )}
 
-              {registrationStage === 'completed' && (
+              {(registrationStage as string) === 'completed' && (
                 <div className="text-center" data-testid="stage-completed">
                   <div className="inline-flex items-center gap-2 bg-chart-3/10 text-chart-3 px-4 py-2 rounded-full mb-4">
                     <CheckCircle className="w-4 h-4" />

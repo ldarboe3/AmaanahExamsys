@@ -657,7 +657,7 @@ export default function Regions() {
                   {t.common.cancel}
                 </Button>
                 <Button type="submit" disabled={updateRegionMutation.isPending} data-testid="button-update-region">
-                  {updateRegionMutation.isPending ? t.common.saving : t.common.save}
+                  {updateRegionMutation.isPending ? 'Saving...' : t.common.save}
                 </Button>
               </DialogFooter>
             </form>
@@ -779,7 +779,7 @@ export default function Regions() {
                   {t.common.cancel}
                 </Button>
                 <Button type="submit" disabled={updateClusterMutation.isPending} data-testid="button-update-cluster">
-                  {updateClusterMutation.isPending ? t.common.saving : t.common.save}
+                  {updateClusterMutation.isPending ? 'Saving...' : t.common.save}
                 </Button>
               </DialogFooter>
             </form>
