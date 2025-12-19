@@ -343,7 +343,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           action: 'user_login',
           entityType: 'user',
           entityId: user.id,
-          details: { username: user.username, role: user.role, ip: req.ip },
+          newData: { username: user.username, role: user.role, ip: req.ip },
         });
       } catch (auditError) {
         console.error('Failed to create audit log for login:', auditError);
@@ -408,7 +408,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           action: 'user_created',
           entityType: 'user',
           entityId: user.id,
-          details: { username, email, role: role || 'school_admin', createdBy: req.session.userId || 'self' },
+          newData: { username, email, role: role || 'school_admin', createdBy: req.session.userId || 'self' },
         });
       } catch (auditError) {
         console.error('Failed to create audit log for user creation:', auditError);
@@ -2179,7 +2179,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           action: 'school_verified',
           resourceType: 'school',
           resourceId: school.id,
-          details: { 
+          newData: { 
             schoolName: school.name,
             username,
             status: 'approved',
@@ -2344,7 +2344,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           action: 'password_reset',
           resourceType: 'user',
           resourceId: parseInt(school.adminUserId) || 0,
-          details: { 
+          newData: { 
             schoolName: school.name,
             method: 'email_link'
           },
@@ -2386,7 +2386,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           action: 'school_approved',
           entityType: 'school',
           entityId: school.id.toString(),
-          details: { schoolName: school.name, approvedBy: req.session.userId },
+          newData: { schoolName: school.name, approvedBy: req.session.userId },
         });
       } catch (auditError) {
         console.error('Failed to create audit log for school approval:', auditError);
@@ -2412,7 +2412,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           action: 'school_rejected',
           entityType: 'school',
           entityId: school.id.toString(),
-          details: { schoolName: school.name, rejectedBy: req.session.userId },
+          newData: { schoolName: school.name, rejectedBy: req.session.userId },
         });
       } catch (auditError) {
         console.error('Failed to create audit log for school rejection:', auditError);
@@ -2649,7 +2649,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         entityType: 'school',
         entityId: school.id.toString(),
         userId: user.id,
-        details: { changes: req.body },
+        newData: { changes: req.body },
       });
 
       res.json(school);
@@ -2782,7 +2782,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         entityType: 'school',
         entityId: schoolId.toString(),
         userId: user.id,
-        details: { docType, fileName: file.originalname, fileSize: file.size },
+        newData: { docType, fileName: file.originalname, fileSize: file.size },
       });
 
       res.json({ success: true, path: publicPath, school });
@@ -2828,7 +2828,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         entityType: 'school',
         entityId: schoolId.toString(),
         userId: user.id,
-        details: { docType },
+        newData: { docType },
       });
 
       res.json({ success: true, school });
@@ -2930,7 +2930,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         entityType: 'school_invitation',
         entityId: invitation.id.toString(),
         userId: user.id,
-        details: { email, schoolId },
+        newData: { email, schoolId },
       });
 
       res.json({ success: true, invitation });
@@ -2975,7 +2975,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         entityType: 'school_invitation',
         entityId: invitationId.toString(),
         userId: user.id,
-        details: { email: invitation.email },
+        newData: { email: invitation.email },
       });
 
       res.json({ success: true });
@@ -3040,7 +3040,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         entityType: 'school_invitation',
         entityId: invitationId.toString(),
         userId: user.id,
-        details: { email: invitation.email, schoolId },
+        newData: { email: invitation.email, schoolId },
       });
 
       res.json({ success: true });
@@ -3151,7 +3151,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         entityType: 'user',
         entityId: newUser.id,
         userId: newUser.id,
-        details: { schoolId: invitation.schoolId, invitationId: invitation.id },
+        newData: { schoolId: invitation.schoolId, invitationId: invitation.id },
       });
 
       res.json({ success: true, message: "Account created successfully. You can now log in." });
@@ -10697,7 +10697,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           action: 'user_role_changed',
           entityType: 'user',
           entityId: req.params.id,
-          details: { newRole: role, changedBy: req.session.userId },
+          newData: { newRole: role, changedBy: req.session.userId },
         });
       } catch (auditError) {
         console.error('Failed to create audit log for role change:', auditError);
@@ -10746,7 +10746,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           action: 'user_status_changed',
           entityType: 'user',
           entityId: req.params.id,
-          details: { newStatus: status, previousStatus: targetUser.status, changedBy: req.session.userId },
+          newData: { newStatus: status, previousStatus: targetUser.status, changedBy: req.session.userId },
         });
       } catch (auditError) {
         console.error('Failed to create audit log for status change:', auditError);
@@ -10790,7 +10790,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           action: 'user_deleted',
           entityType: 'user',
           entityId: req.params.id,
-          details: { deletedUsername: targetUser.username, deletedRole: targetUser.role, deletedBy: req.session.userId },
+          newData: { deletedUsername: targetUser.username, deletedRole: targetUser.role, deletedBy: req.session.userId },
         });
       } catch (auditError) {
         console.error('Failed to create audit log for user deletion:', auditError);

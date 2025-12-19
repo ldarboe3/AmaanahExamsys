@@ -149,7 +149,7 @@ export function detectGender(fullName: string): GenderDetectionResult {
   const firstName = extractFirstName(fullName);
   const normalizedFirstName = normalizeArabicName(firstName);
 
-  for (const maleName of MALE_NAMES) {
+  for (const maleName of Array.from(MALE_NAMES)) {
     const normalizedMale = normalizeArabicName(maleName);
     if (normalizedFirstName === normalizedMale || normalizedFullName.startsWith(normalizedMale + ' ')) {
       return { 
@@ -162,7 +162,7 @@ export function detectGender(fullName: string): GenderDetectionResult {
     }
   }
 
-  for (const femaleName of FEMALE_NAMES) {
+  for (const femaleName of Array.from(FEMALE_NAMES)) {
     const normalizedFemale = normalizeArabicName(femaleName);
     if (normalizedFirstName === normalizedFemale || normalizedFullName.startsWith(normalizedFemale + ' ')) {
       return { 
