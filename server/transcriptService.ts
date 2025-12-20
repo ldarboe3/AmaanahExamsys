@@ -374,11 +374,6 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
         doc.image(logoPath, (doc.page.width - 60) / 2, 35, { width: 60 });
       }
       
-      // Add watermark - centered, large, light text
-      doc.fontSize(80).opacity(0.06).fillColor('#999999');
-      doc.text('AMAANAH', leftMargin, 300, { width: pageWidth, align: 'center' });
-      doc.opacity(1);
-      doc.fillColor('#333333');
       
       doc.moveTo(leftMargin, 95).lineTo(rightEdge, 95).stroke('#333333');
       doc.font('Helvetica-Bold').fontSize(12).fillColor('#000000');
