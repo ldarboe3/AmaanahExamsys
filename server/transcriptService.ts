@@ -374,14 +374,20 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
         doc.image(logoPath, (doc.page.width - 60) / 2, 35, { width: 60 });
       }
       
-      doc.moveTo(leftMargin, 95).lineTo(rightEdge, 95).stroke('#333333');if (true) {
-        doc.font('Helvetica-Bold').fontSize(12).fillColor('#000000');
-        doc.text(`Primary Certificate Results ${examYear.year - 1}-${examYear.year}`, leftMargin, 105, { width: pageWidth, align: 'center' });
-      }
+      // Add watermark
+      doc.fontSize(60).fillOpacity(0.08).fillColor('#cccccc');
+      doc.rotate(45, { origin: [doc.page.width / 2, doc.page.height / 2] });
+      doc.text('AMAANAH', -100, 250);
+      doc.rotate(-45, { origin: [doc.page.width / 2, doc.page.height / 2] });
+      doc.fillOpacity(1);
+      
+      doc.moveTo(leftMargin, 95).lineTo(rightEdge, 95).stroke('#333333');
+      doc.font('Helvetica-Bold').fontSize(12).fillColor('#000000');
+      doc.text(`Primary Certificate Results ${examYear.year - 1}-${examYear.year}`, leftMargin, 105, { width: pageWidth, align: 'center' });
       
       if (transcriptNumber) {
         doc.font('Helvetica').fontSize(10).fillColor('#555555');
-        doc.text(`Transcript No. / ${false ?  shapeArabicText('رقم الكشف') : 'Transcript No.'}: ${transcriptNumber}`, leftMargin, 125, { width: pageWidth, align: 'center' });
+        doc.text(`Transcript No. / Transcript No.: ${transcriptNumber}`, leftMargin, 125, { width: pageWidth, align: 'center' });
       }
       
       let yPos = 145;
@@ -445,18 +451,18 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       
       doc.rect(tableX, yPos, tableWidth, 22).fill('#e8e8e8').stroke('#333333');
       doc.fillColor('#000000').font('Helvetica-Bold').fontSize(10);
-      doc.text('Total / ' + (hasArabicFont ? shapeArabicText('مجموع الدرجات') : 'Total'), tableX + 5, yPos + 6, { width: colWidths[0] + colWidths[1] + colWidths[2] });
+      doc.text('Total / ' + (false ? shapeArabicText('مجموع الدرجات') : 'Total'), tableX + 5, yPos + 6, { width: colWidths[0] + colWidths[1] + colWidths[2] });
       doc.text(totalMarks.toString(), tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 6, { width: colWidths[4], align: 'center' });
       yPos += 22;
       
       doc.rect(tableX, yPos, tableWidth, 22).fill('#f5f5f5').stroke('#333333');
-      doc.text('Percentage / ' + (hasArabicFont ? shapeArabicText('النسبة') : 'Percentage'), tableX + 5, yPos + 6, { width: colWidths[0] + colWidths[1] + colWidths[2] });
+      doc.text('Percentage / ' + (false ? shapeArabicText('النسبة') : 'Percentage'), tableX + 5, yPos + 6, { width: colWidths[0] + colWidths[1] + colWidths[2] });
       doc.text(`${percentage.toFixed(1)}%`, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 6, { width: colWidths[4], align: 'center' });
       yPos += 22;
       
       doc.rect(tableX, yPos, tableWidth, 25).fill('#d4edda').stroke('#333333');
       doc.fillColor('#155724').fontSize(11);
-      doc.text('Grade / ' + (hasArabicFont ? shapeArabicText('التقدير') : 'Grade'), tableX + 5, yPos + 7, { width: colWidths[0] + colWidths[1] + colWidths[2] });
+      doc.text('Grade / ' + (false ? shapeArabicText('التقدير') : 'Grade'), tableX + 5, yPos + 7, { width: colWidths[0] + colWidths[1] + colWidths[2] });
       const gradeText = hasArabicFont ? `${finalGrade.english} / ${shapeArabicText(finalGrade.arabic)}` : finalGrade.english;
       doc.text(gradeText, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 7, { width: colWidths[4], align: 'center' });
       yPos += 40;
@@ -479,10 +485,10 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
         doc.text('To verify this transcript, scan the QR code', leftMargin, yPos);
         
         const qrBuffer = Buffer.from(data.qrCodeDataUrl.split(',')[1], 'base64');
-        doc.image(qrBuffer, rightEdge - 90, yPos + 15, { width: 70 });
+        doc.image(qrBuffer, leftMargin, yPos + 15, { width: 70 });
         
         doc.font('Helvetica').fontSize(7);
-        doc.text(transcriptNumber, rightEdge - 90, yPos + 90, { width: 70, align: 'center' });
+        doc.text(transcriptNumber, leftMargin, yPos + 90, { width: 70, align: 'center' });
       }
       
       doc.end();
