@@ -4,7 +4,7 @@ services:
 - name: web
   source_dir: .
   build_command: node build.mjs
-  run_command: NODE_ENV=production node dist/server/index.cjs
+  run_command: NODE_ENV=production node dist/server/index.js
   http_port: 8080
   envs:
   - key: NODE_ENV

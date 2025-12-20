@@ -44,7 +44,7 @@ async function buildAll() {
       platform: "node",
       bundle: true,
       format: "cjs",
-      outfile: "dist/server/index.cjs",
+      outfile: "dist/server/server.cjs",
       define: {
         "process.env.NODE_ENV": '"production"',
       },
@@ -54,13 +54,21 @@ async function buildAll() {
     });
     console.log("✓ Server built successfully");
 
+    // Create ESM wrapper for CommonJS bundle (needed for "type": "module" in package.json)
+    const wrapperCode = `import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+require("./server.cjs");
+`;
+    await import("fs").then(m => m.promises.writeFile("dist/server/index.js", wrapperCode));
+    console.log("✓ ESM wrapper created");
+
     console.log("\n✅ Build complete!");
     console.log("\nTo start production server:");
     console.log("  export NODE_ENV=production");
     console.log("  export PORT=8080");
     console.log("  export DATABASE_URL=your_database_url");
     console.log("  export SESSION_SECRET=your_secret");
-    console.log("  node dist/server/index.cjs");
+    console.log("  node dist/server/index.js");
   } catch (err) {
     console.error("❌ Build failed:", err);
     process.exit(1);
