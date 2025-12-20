@@ -25,7 +25,7 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Frontend**: Developed with React and TypeScript, leveraging `shadcn/ui` for reusable components.
 - **Backend**: Built with Express.js and TypeScript, handling API endpoints, authentication, and business logic.
 - **Database**: PostgreSQL, managed with Drizzle ORM.
-- **PDF Generation**: Utilizes Puppeteer with browser pooling for high-quality HTML-to-PDF rendering of certificates, transcripts, and invoices, including QR code verification. Shared browser instance with 1-minute idle timeout dramatically improves performance by avoiding new browser launches for each PDF.
+- **PDF Generation**: Uses pdfkit (native Node.js) for Grade 6 certificates and transcripts, with Arabic text rendering via arabic-reshaper + bidi-js for proper bidirectional text handling. Shared utility in `server/arabicTextHelper.ts` centralizes Arabic text processing. Primary certificates and invoices use Puppeteer with browser pooling as fallback. QR code verification included in all certificates.
 - **Authentication**: Password-based authentication with bcrypt hashing and session management, supporting six distinct user roles: `super_admin`, `examination_admin`, `logistics_admin`, `school_admin`, `examiner`, and `candidate`.
 - **Email Services**: Integrated with SendGrid for reliable email delivery.
 - **File Handling**: Multer-based file uploads with object storage integration.
@@ -64,7 +64,8 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Database**: PostgreSQL (hosted on Neon)
 - **ORM**: Drizzle ORM
 - **Email Service**: SendGrid (via Replit Connector)
-- **PDF Generation**: Puppeteer
+- **PDF Generation**: pdfkit (primary for Grade 6), Puppeteer (fallback for primary certificates)
+- **Arabic Text Processing**: arabic-reshaper + bidi-js
 - **UI Framework**: shadcn/ui
 - **Frontend Development**: React, TypeScript, Vite
 - **Backend Framework**: Express.js, TypeScript
