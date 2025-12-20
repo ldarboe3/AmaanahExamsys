@@ -1,7 +1,8 @@
 import QRCode from 'qrcode';
 import path from 'path';
 import fs from 'fs';
-import { getSharedBrowser } from './chromiumHelper';
+import PDFDocument from 'pdfkit';
+import { shapeArabicText } from './arabicTextHelper';
 import {
   certificateTemplates,
   getCertificateTemplate,
@@ -16,6 +17,11 @@ import {
 } from './certificateTemplates';
 import { gradeTranscriptConfigs, getGradeConfig, getGradeLabelArabic, isEnglishSubject } from './transcriptTemplates';
 import { generateGrade6CertificatePDF } from './grade6CertificateService';
+
+// Font paths for pdfkit
+const FONT_REGULAR = path.join(process.cwd(), 'fonts', 'Amiri-Regular.ttf');
+const FONT_BOLD = path.join(process.cwd(), 'fonts', 'Amiri-Bold.ttf');
+
 
 interface StudentData {
   id: number;
@@ -119,276 +125,193 @@ export async function generateCertificatePDF(data: CertificateData): Promise<str
   const passedVerb = student.gender === 'male' ? 'نجح' : 'نجحت';
   const gradeResult = student.gender === 'male' ? 'تقديره' : 'تقديرها';
 
-  const arabicText = `
-    تشهد الأمانة العامة بأن ال${genderPrefix}/ ${fullName} ${birthVerb} في ${student.placeOfBirth || ''} بتاريخ: ${dobFormatted} قد ${completeVerb} دراسة ${gradeLevelAr} في مدرسة ${school.name} بعد أن ${passedVerb} في الامتحان النهائي الذي أشرفت عليه الأمانة العامة بالتنسيق مع وزارة التربية والتعليم في غامبيا.
-    ${examWindowText}، وكان ${gradeResult} فيه ${gradeWordAr}.
-    سُجلت هذه الشهادة تحت رقم (${certificateNumber}) بتاريخ: ${issueDateHijri} الموافق ${issueDateGreg}
-  `;
-
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&display=swap');
+  return new Promise((resolve, reject) => {
+    try {
+      const fileName = `cert_${student.indexNumber || student.id}_${Date.now()}.pdf`;
+      const filePath = path.join(outputDir, fileName);
+      
+      const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30 });
+      const stream = fs.createWriteStream(filePath);
+      
+      doc.pipe(stream);
+      
+      const hasArabicFont = fs.existsSync(FONT_REGULAR) && fs.existsSync(FONT_BOLD);
+      if (hasArabicFont) {
+        doc.registerFont('Arabic', FONT_REGULAR);
+        doc.registerFont('ArabicBold', FONT_BOLD);
+      }
+      
+      const pageWidth = doc.page.width;
+      const pageHeight = doc.page.height;
+      const margin = 30;
+      const contentWidth = pageWidth - (margin * 2);
+      const rightEdge = pageWidth - margin;
+      
+      doc.rect(margin, margin, contentWidth, pageHeight - (margin * 2))
+        .lineWidth(3).stroke('#8B4513');
+      doc.rect(margin + 8, margin + 8, contentWidth - 16, pageHeight - (margin * 2) - 16)
+        .lineWidth(1).stroke('#8B4513');
+      
+      let yPos = margin + 25;
+      
+      if (hasArabicFont) {
+        doc.font('ArabicBold').fontSize(16).fillColor('#1a5276');
+        doc.text(shapeArabicText('بسم الله الرحمن الرحيم'), margin, yPos, { width: contentWidth, align: 'center' });
+      }
+      yPos += 30;
+      
+      doc.font('Helvetica').fontSize(9).fillColor('#333333');
+      doc.text('THE REPUBLIC OF THE GAMBIA', margin + 20, yPos);
+      doc.text('DEPARTMENT OF STATE FOR', margin + 20, yPos + 12);
+      doc.text('BASIC AND SECONDARY EDUCATION', margin + 20, yPos + 24);
+      doc.text('The General Secretariat for Islamic/', margin + 20, yPos + 36);
+      doc.text('Arabic Education In The Gambia', margin + 20, yPos + 48);
+      
+      if (hasArabicFont) {
+        doc.font('Arabic').fontSize(10);
+        doc.text(shapeArabicText('جمهورية غامبيا'), rightEdge - 20, yPos, { width: 180, align: 'right' });
+        doc.text(shapeArabicText('وزارة التربية والتعليم الأساسي'), rightEdge - 20, yPos + 14, { width: 180, align: 'right' });
+        doc.text(shapeArabicText('الأمانة العامة للتعليم الإسلامي العربي'), rightEdge - 20, yPos + 28, { width: 180, align: 'right' });
+        doc.text(shapeArabicText('في غامبيا'), rightEdge - 20, yPos + 42, { width: 180, align: 'right' });
+      }
+      
+      yPos += 70;
+      doc.moveTo(margin + 20, yPos).lineTo(rightEdge - 20, yPos).stroke('#dddddd');
+      yPos += 15;
+      
+      doc.font('Helvetica-Bold').fontSize(14).fillColor('#1a5276');
+      doc.text(`GAMBIA MADRASSAH ${gradeLevelEn.toUpperCase()} CERTIFICATE`, margin, yPos, { width: contentWidth, align: 'center' });
+      yPos += 22;
+      
+      if (hasArabicFont) {
+        doc.font('ArabicBold').fontSize(18).fillColor('#1a5276');
+        doc.text(shapeArabicText(`شهادة إتمام دراسة ${gradeLevelAr}`), margin, yPos, { width: contentWidth, align: 'center' });
+      }
+      yPos += 35;
+      
+      if (hasArabicFont) {
+        doc.font('Arabic').fontSize(12).fillColor('#333333');
         
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
+        const line1 = `تشهد الأمانة العامة بأن ال${genderPrefix}`;
+        doc.text(shapeArabicText(line1), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
+        yPos += 18;
         
-        body {
-          font-family: 'Amiri', 'Noto Naskh Arabic', serif;
-          direction: rtl;
-          text-align: right;
-        }
+        doc.font('ArabicBold').fillColor('#c0392b');
+        doc.text(shapeArabicText(fullName), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
+        yPos += 18;
         
-        .certificate {
-          width: 842px;
-          height: 595px;
-          position: relative;
-          background: white;
-          padding: 20px;
-          overflow: hidden;
-        }
+        doc.font('Arabic').fillColor('#333333');
+        const line2 = `${birthVerb} في ${student.placeOfBirth || '______'} بتاريخ: ${dobFormatted}`;
+        doc.text(shapeArabicText(line2), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
+        yPos += 18;
         
-        .border-frame {
-          position: absolute;
-          top: 10px;
-          left: 10px;
-          right: 10px;
-          bottom: 10px;
-          border: 3px double #8B4513;
-          padding: 15px;
-        }
+        const line3 = `قد ${completeVerb} دراسة ${gradeLevelAr} في مدرسة`;
+        doc.text(shapeArabicText(line3), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
+        yPos += 18;
         
-        .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 15px;
-        }
+        doc.font('ArabicBold').fillColor('#c0392b');
+        doc.text(shapeArabicText(school.name), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
+        yPos += 18;
         
-        .header-left, .header-right {
-          width: 40%;
-          font-size: 11px;
-          line-height: 1.4;
-        }
+        doc.font('Arabic').fillColor('#333333');
+        const line4 = `بعد أن ${passedVerb} في الامتحان النهائي الذي أشرفت عليه الأمانة العامة`;
+        doc.text(shapeArabicText(line4), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
+        yPos += 18;
         
-        .header-left {
-          text-align: left;
-          direction: ltr;
-        }
+        doc.text(shapeArabicText('بالتنسيق مع وزارة التربية والتعليم في غامبيا.'), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
+        yPos += 25;
         
-        .header-right {
-          text-align: right;
-        }
-        
-        .bismillah {
-          text-align: center;
-          font-size: 18px;
-          margin-bottom: 10px;
-          color: #1a5276;
-        }
-        
-        .title-english {
-          text-align: center;
-          font-size: 16px;
-          font-weight: bold;
-          color: #1a5276;
-          margin-bottom: 5px;
-          font-family: Arial, sans-serif;
-        }
-        
-        .title-arabic {
-          text-align: center;
-          font-size: 20px;
-          font-weight: bold;
-          color: #1a5276;
-          margin-bottom: 20px;
-        }
-        
-        .content {
-          text-align: right;
-          font-size: 14px;
-          line-height: 2;
-          padding: 0 30px;
-        }
-        
-        .student-name {
-          font-weight: bold;
-          color: #c0392b;
-          font-size: 16px;
-        }
-        
-        .school-name {
-          color: #c0392b;
-        }
-        
-        .grade-word {
-          font-weight: bold;
-          color: #c0392b;
-          font-size: 16px;
-        }
-        
-        .cert-number {
-          color: #c0392b;
-        }
-        
-        .registration-line {
-          margin-top: 15px;
-          font-size: 13px;
-        }
-        
-        .signatures {
-          display: flex;
-          justify-content: space-between;
-          margin-top: 40px;
-          padding: 0 40px;
-          font-size: 12px;
-        }
-        
-        .signature-block {
-          text-align: center;
-        }
-        
-        .signature-line {
-          border-top: 1px dotted #333;
-          width: 150px;
-          margin: 10px auto 5px;
-        }
-        
-        .qr-code {
-          position: absolute;
-          bottom: 60px;
-          left: 40px;
-        }
-        
-        .qr-code img {
-          width: 70px;
-          height: 70px;
-        }
-        
-        .footer-note {
-          text-align: center;
-          font-size: 11px;
-          color: #666;
-          margin-top: 20px;
-        }
-        
-        .reprint-watermark {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%) rotate(-45deg);
-          font-size: 80px;
-          color: rgba(192, 57, 43, 0.15);
-          font-weight: bold;
-          z-index: 1;
-          pointer-events: none;
-        }
-        
-        .official-stamp {
-          position: absolute;
-          bottom: 80px;
-          left: 50%;
-          transform: translateX(-50%);
-          text-align: center;
-          font-size: 11px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="certificate">
-        ${isReprint ? '<div class="reprint-watermark">إعادة طباعة</div>' : ''}
-        <div class="border-frame">
-          <div class="bismillah">بسم الله الرحمن الرحيم</div>
+        if (examWindowText) {
+          const examLine = `${examWindowText}، وكان ${gradeResult} فيه`;
+          doc.text(shapeArabicText(examLine), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
+          yPos += 18;
           
-          <div class="header">
-            <div class="header-left">
-              THE REPUBLIC OF THE GAMBIA<br>
-              DEPARTMENT OF STATE FOR-<br>
-              BASIC AND SECONDARY<br>
-              EDUCATION<br>
-              The General Secretariat for Islamic/<br>
-              Arabic Education<br>
-              In The Gambia
-            </div>
-            <div class="header-right">
-              جمهوريــــــــــة غامبيـــــــــا<br>
-              وزارة التربيـة و التعليم الأساسي<br>
-              الأمانة العامة للتعليم الإسلامي العربي<br>
-              في غامبيا
-            </div>
-          </div>
-          
-          <div class="title-english">GAMBIA MADRASSAH ${gradeLevelEn.toUpperCase()} CERTIFICATE</div>
-          <div class="title-arabic">شهادة إتمام دراسة ${gradeLevelAr}</div>
-          
-          <div class="content">
-            تشهد الأمانة العامة بأن ال${genderPrefix}/ <span class="student-name">${fullName}</span> ${birthVerb} في <span class="cert-number">${student.placeOfBirth || ''}</span> بتاريخ: <span class="cert-number">${dobFormatted}</span> قد ${completeVerb} دراسة ${gradeLevelAr} في مدرسة <span class="school-name">${school.name}</span> بعد أن ${passedVerb} في الامتحان النهائي الذي أشرفت عليه الأمانة العامة بالتنسيق مع وزارة التربية والتعليم في غامبيا.
-            <br>
-            <span class="cert-number">${examWindowText}</span>، وكان ${gradeResult} فيه <span class="grade-word">${gradeWordAr}</span>.
-            
-            <div class="registration-line">
-              سُجلت هذه الشهادة تحت رقم (<span class="cert-number">${certificateNumber}</span>) بتاريخ: <span class="cert-number">${issueDateHijri}</span> الموافق <span class="cert-number">${issueDateGreg}</span>
-            </div>
-          </div>
-          
-          <div class="signatures">
-            <div class="signature-block">
-              توقيع رئيس الأمانة<br>
-              <div class="signature-line"></div>
-              تصديق وزارة التربية والتعليم
-            </div>
-            <div class="signature-block">
-              الختم الرسمي
-            </div>
-            <div class="signature-block">
-              توقيع مدير المدرسة<br>
-              <div class="signature-line"></div>
-              تصديق جهة الإشراف على المدرسة
-            </div>
-          </div>
-          
-          <div class="qr-code">
-            <img src="${qrDataUrl}" alt="QR Code">
-          </div>
-          
-          <div class="footer-note">
-            أي كشط أو تغيير في هذه الشهادة يلغيها
-          </div>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-
-  // Use shared browser for performance
-  const browser = await getSharedBrowser();
-  const page = await browser.newPage();
-
-  try {
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-    
-    const fileName = `cert_${student.indexNumber || student.id}_${Date.now()}.pdf`;
-    const filePath = path.join(outputDir, fileName);
-    
-    await page.pdf({
-      path: filePath,
-      format: 'A4',
-      landscape: true,
-      printBackground: true,
-      margin: { top: '0', right: '0', bottom: '0', left: '0' }
-    });
-    
-    return filePath;
-  } finally {
-    await page.close();
-  }
+          doc.font('ArabicBold').fillColor('#c0392b').fontSize(14);
+          doc.text(shapeArabicText(gradeWordAr), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
+          yPos += 25;
+        }
+        
+        doc.font('Arabic').fontSize(11).fillColor('#333333');
+        const regLine1 = `سُجلت هذه الشهادة تحت رقم ( ${certificateNumber} )`;
+        doc.text(shapeArabicText(regLine1), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
+        yPos += 16;
+        
+        const regLine2 = `بتاريخ: ${issueDateHijri} الموافق ${issueDateGreg}`;
+        doc.text(shapeArabicText(regLine2), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
+      } else {
+        doc.font('Helvetica').fontSize(11).fillColor('#333333');
+        doc.text(`The General Secretariat certifies that the student ${fullName}`, margin + 30, yPos, { width: contentWidth - 60 });
+        yPos += 15;
+        doc.text(`born in ${student.placeOfBirth || '______'} on ${dobFormatted}`, margin + 30, yPos, { width: contentWidth - 60 });
+        yPos += 15;
+        doc.text(`has completed ${gradeLevelEn} at ${school.name}`, margin + 30, yPos, { width: contentWidth - 60 });
+        yPos += 15;
+        doc.text(`and passed the final examination with grade: ${finalGrade}`, margin + 30, yPos, { width: contentWidth - 60 });
+        yPos += 25;
+        doc.text(`Certificate Number: ${certificateNumber}`, margin + 30, yPos, { width: contentWidth - 60 });
+        yPos += 15;
+        doc.text(`Date: ${issueDateGreg}`, margin + 30, yPos, { width: contentWidth - 60 });
+      }
+      
+      yPos = pageHeight - margin - 120;
+      
+      doc.font(hasArabicFont ? 'Arabic' : 'Helvetica').fontSize(9).fillColor('#333333');
+      
+      const sigBlockWidth = (contentWidth - 80) / 3;
+      const sig1X = margin + 30;
+      const sig2X = margin + 30 + sigBlockWidth + 20;
+      const sig3X = margin + 30 + (sigBlockWidth + 20) * 2;
+      
+      if (hasArabicFont) {
+        doc.text(shapeArabicText('توقيع رئيس الأمانة'), sig1X, yPos, { width: sigBlockWidth, align: 'center' });
+        doc.text(shapeArabicText('الختم الرسمي'), sig2X, yPos, { width: sigBlockWidth, align: 'center' });
+        doc.text(shapeArabicText('توقيع مدير المدرسة'), sig3X, yPos, { width: sigBlockWidth, align: 'center' });
+      } else {
+        doc.text('Secretariat Chairman', sig1X, yPos, { width: sigBlockWidth, align: 'center' });
+        doc.text('Official Stamp', sig2X, yPos, { width: sigBlockWidth, align: 'center' });
+        doc.text('School Director', sig3X, yPos, { width: sigBlockWidth, align: 'center' });
+      }
+      
+      yPos += 20;
+      doc.moveTo(sig1X, yPos).lineTo(sig1X + sigBlockWidth - 20, yPos).stroke('#666666');
+      doc.moveTo(sig3X, yPos).lineTo(sig3X + sigBlockWidth - 20, yPos).stroke('#666666');
+      
+      if (qrDataUrl) {
+        const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
+        doc.image(qrBuffer, margin + 30, pageHeight - margin - 100, { width: 70 });
+      }
+      
+      if (hasArabicFont) {
+        doc.font('Arabic').fontSize(9).fillColor('#666666');
+        doc.text(shapeArabicText('أي كشط أو تغيير في هذه الشهادة يلغيها'), margin, pageHeight - margin - 15, { width: contentWidth, align: 'center' });
+      }
+      
+      if (isReprint && hasArabicFont) {
+        doc.save();
+        doc.translate(pageWidth / 2, pageHeight / 2);
+        doc.rotate(-45);
+        doc.font('ArabicBold').fontSize(50).fillColor('rgba(192, 57, 43, 0.1)');
+        doc.text(shapeArabicText('إعادة طباعة'), -120, -25);
+        doc.restore();
+      }
+      
+      doc.end();
+      
+      stream.on('finish', () => {
+        console.log(`[Certificate PDF] Successfully generated: ${filePath}`);
+        resolve(filePath);
+      });
+      
+      stream.on('error', (err) => {
+        console.error(`[Certificate PDF] Stream error:`, err.message);
+        reject(new Error(`Failed to generate certificate PDF: ${err.message}`));
+      });
+      
+    } catch (error: any) {
+      console.error(`[Certificate PDF] Generation error:`, error.message);
+      reject(new Error(`Failed to generate certificate PDF: ${error.message}`));
+    }
+  });
 }
 
 interface TranscriptSubject {

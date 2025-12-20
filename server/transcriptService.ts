@@ -2,7 +2,8 @@ import path from 'path';
 import fs from 'fs';
 import QRCode from 'qrcode';
 import crypto from 'crypto';
-import { getSharedBrowser } from './chromiumHelper';
+import PDFDocument from 'pdfkit';
+import { shapeArabicText } from './arabicTextHelper';
 
 // Arabic to English Transliteration Map
 const ARABIC_TO_ENGLISH_MAP: Record<string, string> = {
@@ -327,432 +328,224 @@ if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }
 
-function generateTranscriptHTML(data: TranscriptData): string {
+// Font paths for pdfkit
+const FONT_REGULAR = path.join(process.cwd(), 'fonts', 'Amiri-Regular.ttf');
+const FONT_BOLD = path.join(process.cwd(), 'fonts', 'Amiri-Bold.ttf');
+
+
+export async function generateTranscriptPDF(data: TranscriptData): Promise<string> {
+  const validation = validateTranscriptRequirements(data);
+  if (!validation.isValid) {
+    throw new Error(`Validation failed: ${validation.errorsAr.join(', ')}`);
+  }
+
   const { student, school, examYear, subjectMarks, totalMarks, percentage, finalGrade } = data;
   
-  // Load and embed logo as base64 data URL
-  let logoDataUrl = '';
-  try {
-    const logoPath = path.join(process.cwd(), 'generated_transcripts', 'logo.png');
-    if (fs.existsSync(logoPath)) {
-      const logoBuffer = fs.readFileSync(logoPath);
-      logoDataUrl = 'data:image/png;base64,' + logoBuffer.toString('base64');
-    }
-  } catch (e) {
-    // Logo not available, continue without it
-  }
-  
-  // Load and embed watermark logo as base64 data URL
-  let watermarkDataUrl = '';
-  try {
-    const watermarkPath = path.join(process.cwd(), 'generated_transcripts', 'watermark_logo.png');
-    if (fs.existsSync(watermarkPath)) {
-      const watermarkBuffer = fs.readFileSync(watermarkPath);
-      watermarkDataUrl = 'data:image/png;base64,' + watermarkBuffer.toString('base64');
-    }
-  } catch (e) {
-    // Watermark not available, continue without it
-  }
-  
-  // Build Arabic full name
-  const fullNameAr = [student.firstName, student.middleName, student.lastName]
-    .filter(Boolean)
-    .join(' ');
-  
-  // Build English full name using transliteration
+  const fullNameAr = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
   const fullNameEn = [
     student.firstNameEn || transliterateArabicToEnglish(student.firstName),
     student.middleNameEn || (student.middleName ? transliterateArabicToEnglish(student.middleName) : null),
     student.lastNameEn || transliterateArabicToEnglish(student.lastName)
   ].filter(Boolean).join(' ');
   
-  // School names with transliteration
   const schoolNameAr = school.name;
   const schoolNameEn = school.nameEn || transliterateArabicToEnglish(school.name);
-  
-  // Get transcript number and QR code from data
-  const transcriptNumber = data.transcriptNumber || '';
-  const qrCodeDataUrl = data.qrCodeDataUrl || '';
-  
-  // Nationality
   const nationalityAr = student.nationality || '';
   const nationalityEn = student.nationalityEn || translateNationality(nationalityAr);
+  const transcriptNumber = data.transcriptNumber || '';
   
-  // Generate subject rows HTML (RTL order: م, المادة, الكبرى, الصغرى, المكتسبة)
-  const subjectRowsHTML = subjectMarks.map((subject, index) => {
-    const markDisplay = subject.mark !== null && subject.mark !== undefined ? subject.mark.toString() : '';
-    return `
-      <tr>
-        <td class="num-cell">${index + 1}</td>
-        <td class="subject-cell">${subject.arabicName}</td>
-        <td class="score-cell">${subject.maxScore}</td>
-        <td class="score-cell">${subject.minScore}</td>
-        <td class="mark-cell">${markDisplay}</td>
-      </tr>
-    `;
-  }).join('');
-
-  return `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    @page { size: A4 portrait; margin: 10mm; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Arial', 'Tahoma', sans-serif;
-      font-size: 12px;
-      direction: rtl;
-      text-align: right;
-      background: white;
-      padding: 15px;
-      position: relative;
-    }
-    .watermark {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      opacity: 0.15;
-      pointer-events: none;
-      z-index: 0;
-      width: 350px;
-      height: 350px;
-    }
-    .watermark img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-    .container {
-      width: 100%;
-      max-width: 210mm;
-      margin: 0 auto;
-      position: relative;
-      z-index: 1;
-    }
-    .header-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 20px;
-      padding-bottom: 15px;
-      border-bottom: 2px solid #333;
-    }
-    .header-table td {
-      border: none;
-      padding: 5px 10px;
-      vertical-align: middle;
-    }
-    .header-left {
-      text-align: left;
-      direction: ltr;
-      width: 30%;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-    .header-center {
-      text-align: center;
-      width: 25%;
-      padding: 10px;
-    }
-    .header-logo {
-      max-width: 90px;
-      height: auto;
-      margin: 0 auto;
-      display: block;
-    }
-    .header-right {
-      text-align: right;
-      direction: rtl;
-      width: 30%;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-    .header-left strong,
-    .header-right strong {
-      display: block;
-      font-weight: bold;
-      margin-bottom: 3px;
-      font-size: 13px;
-    }
-    .header-left div,
-    .header-right div {
-      margin: 2px 0;
-    }
-    .main-title {
-      text-align: center;
-      font-size: 16px;
-      font-weight: bold;
-      color: #000;
-      margin: 10px 0;
-      direction: rtl;
-      line-height: 1.4;
-    }
-    .title {
-      text-align: center;
-      font-size: 18px;
-      font-weight: bold;
-      margin: 20px 0;
-      color: #1a5276;
-    }
-    .identity-section {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 12px;
-      padding: 8px;
-      background: #f9f9f9;
-      border: 1px solid #ddd;
-    }
-    .identity-ar {
-      text-align: right;
-      width: 48%;
-      line-height: 2;
-      font-size: 14px;
-    }
-    .identity-en {
-      text-align: left;
-      direction: ltr;
-      width: 48%;
-      line-height: 2;
-      font-size: 14px;
-    }
-    .identity-label {
-      font-weight: bold;
-    }
-    .identity-value {
-      color: #1a5276;
-    }
-    table.marks-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 10px 0;
-    }
-    table.marks-table th,
-    table.marks-table td {
-      border: 1px solid #333;
-      padding: 6px 4px;
-      text-align: center;
-    }
-    table.marks-table th {
-      background: #e8e8e8;
-      font-weight: bold;
-      font-size: 11px;
-    }
-    .num-cell { width: 8%; text-align: center; }
-    .subject-cell { width: 35%; text-align: right !important; padding-right: 12px; font-weight: bold; }
-    .subject-header { text-align: right !important; padding-right: 12px; }
-    .score-cell { width: 12%; text-align: center; }
-    .mark-cell { width: 15%; font-weight: bold; color: #1a5276; text-align: center; }
-    .summary-row td {
-      background: #f5f5f5;
-      font-weight: bold;
-    }
-    .total-row td {
-      background: #e8e8e8;
-      font-size: 13px;
-    }
-    .grade-row td {
-      background: #d4edda;
-      font-size: 14px;
-      color: #155724;
-    }
-    .signatures {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 15px;
-      padding-top: 10px;
-    }
-    .signature-block {
-      text-align: center;
-      width: 45%;
-    }
-    .signature-label {
-      font-weight: bold;
-      margin-bottom: 15px;
-    }
-    .signature-line {
-      width: 180px;
-      margin: 0 auto;
-      font-size: 10px;
-      letter-spacing: 1px;
-      color: #555;
-    }
-    .qr-section {
-      margin-top: 10px;
-      padding: 8px;
-      border-top: 1px solid #ddd;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .qr-text {
-      text-align: right;
-      direction: rtl;
-      flex: 1;
-    }
-    .qr-text div {
-      font-size: 9px;
-      color: #666;
-      margin-bottom: 2px;
-    }
-    .qr-code-container {
-      text-align: center;
-    }
-    .qr-code-container img {
-      width: 85px;
-      height: 85px;
-      border: 1px solid #ddd;
-      padding: 3px;
-    }
-    .qr-code-container .transcript-num {
-      font-size: 8px;
-      color: #666;
-      margin-top: 3px;
-    }
-  </style>
-</head>
-<body>
-  ${watermarkDataUrl ? `<div class="watermark"><img src="${watermarkDataUrl}" alt="Watermark"></div>` : ''}
-  <div class="container">
-    <table class="header-table">
-      <tr>
-        <td class="header-left">
-          <strong>الأمانة العامة للتعليم الإسلامي العربي</strong>
-          <div>في غامبيا</div>
-          <div style="margin-top: 5px;">قسم الامتحانات</div>
-        </td>
-        <td class="header-center">
-          <img src="${logoDataUrl}" alt="Logo" class="header-logo">
-        </td>
-        <td class="header-right">
-          <strong>The General Secretariat for</strong>
-          <div>Islamic/Arabic Education in</div>
-          <div>The Gambia</div>
-          <div style="margin-top: 5px;">Examination affairs unit</div>
-        </td>
-      </tr>
-    </table>
-
-    <div class="main-title">كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year - 1}-${examYear.year} م</div>
-    
-    ${transcriptNumber ? `<div style="text-align: center; margin-bottom: 15px; font-size: 12px; color: #555;">
-      <span style="font-weight: bold;">Transcript No. / رقم الكشف:</span> ${transcriptNumber}
-    </div>` : ''}
-
-    <div class="identity-section">
-      <div class="identity-ar">
-        <div><span class="identity-label">اسم الطالب/ة:</span> <span class="identity-value">${fullNameAr}</span></div>
-        <div><span class="identity-label">الجنسية:</span> <span class="identity-value">${nationalityAr}</span></div>
-        <div><span class="identity-label">المدرسة:</span> <span class="identity-value">${schoolNameAr}</span></div>
-      </div>
-      <div class="identity-en">
-        <div><span class="identity-label">Student Name:</span> <span class="identity-value">${fullNameEn}</span></div>
-        <div><span class="identity-label">Nationality:</span> <span class="identity-value">${nationalityEn}</span></div>
-        <div><span class="identity-label">School:</span> <span class="identity-value">${schoolNameEn}</span></div>
-      </div>
-    </div>
-
-    <table class="marks-table">
-      <thead>
-        <tr>
-          <th class="num-cell">م</th>
-          <th class="subject-header">المادة</th>
-          <th class="score-cell">الدرجات<br>الكبرى</th>
-          <th class="score-cell">الدرجات<br>الصغرى</th>
-          <th class="mark-cell">الدرجة المكتسبة<br>رقماً</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${subjectRowsHTML}
-        <tr class="summary-row total-row">
-          <td colspan="3" style="text-align:center; font-size:14px;">مجموع الدرجات</td>
-          <td colspan="2" style="text-align:center;">${totalMarks}</td>
-        </tr>
-        <tr class="summary-row">
-          <td colspan="3" style="text-align:center;">النسبة</td>
-          <td colspan="2" style="text-align:center;">${percentage.toFixed(1)}%</td>
-        </tr>
-        <tr class="summary-row grade-row">
-          <td colspan="3" style="text-align:center;">التقدير</td>
-          <td colspan="2" style="text-align:center; font-size:16px;">${finalGrade.arabic}</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div class="signatures">
-      <div class="signature-block">
-        <div class="signature-label">توقيع رئيس لجنة الامتحانات</div>
-        <div class="signature-line">............................</div>
-      </div>
-      <div class="signature-block">
-        <div class="signature-label">توقيع إدارة الأمانة</div>
-        <div class="signature-line">............................</div>
-      </div>
-    </div>
-    
-    ${qrCodeDataUrl ? `
-    <div class="qr-section">
-      <div class="qr-text">
-        <div>للتحقق من صحة هذا الكشف، امسح رمز QR</div>
-        <div>To verify this transcript, scan the QR code</div>
-      </div>
-      <div class="qr-code-container">
-        <img src="${qrCodeDataUrl}" alt="QR Code">
-        <div class="transcript-num">${transcriptNumber}</div>
-      </div>
-    </div>
-    ` : ''}
-  </div>
-</body>
-</html>`;
-}
-
-export async function generateTranscriptPDF(data: TranscriptData): Promise<string> {
-  // Validate first
-  const validation = validateTranscriptRequirements(data);
-  if (!validation.isValid) {
-    throw new Error(`Validation failed: ${validation.errorsAr.join(', ')}`);
-  }
-
-  const htmlContent = generateTranscriptHTML(data);
-
-  let page;
-  try {
-    // Use shared browser for performance (avoids launching new browser each time)
-    const browser = await getSharedBrowser();
-    console.log(`[Transcript PDF] Using shared browser instance`);
-
-    page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    
-    const fileName = `transcript_g6_${data.student.indexNumber || data.student.id}_${Date.now()}.pdf`;
-    const filePath = path.join(outputDir, fileName);
-    
-    await page.pdf({
-      path: filePath,
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
-    });
-    
-    console.log(`[Transcript PDF] Successfully generated: ${filePath}`);
-    return filePath;
-  } catch (error: any) {
-    const studentInfo = `${data.student.firstName} ${data.student.lastName} (${data.student.indexNumber || 'unknown'})`;
-    console.error(`[Transcript PDF] Generation error for student ${studentInfo}:`, error.message);
-    throw new Error(`Failed to generate transcript PDF: ${error.message}`);
-  } finally {
-    // Close the page but keep the browser open for reuse
-    if (page) {
-      try {
-        page.close().catch(e => {
-          console.warn('[Transcript PDF] Error closing page:', e.message);
-        });
-      } catch (e) {
-        console.warn('[Transcript PDF] Error in page cleanup:', e);
+  return new Promise((resolve, reject) => {
+    try {
+      const fileName = `transcript_g6_${data.student.indexNumber || data.student.id}_${Date.now()}.pdf`;
+      const filePath = path.join(outputDir, fileName);
+      
+      const doc = new PDFDocument({ size: 'A4', margin: 40 });
+      const stream = fs.createWriteStream(filePath);
+      
+      doc.pipe(stream);
+      
+      const hasArabicFont = fs.existsSync(FONT_REGULAR) && fs.existsSync(FONT_BOLD);
+      if (hasArabicFont) {
+        doc.registerFont('Arabic', FONT_REGULAR);
+        doc.registerFont('ArabicBold', FONT_BOLD);
       }
+      
+      const pageWidth = doc.page.width - 80;
+      const leftMargin = 40;
+      const rightEdge = doc.page.width - 40;
+      
+      doc.fontSize(10).fillColor('#333333');
+      doc.text('The General Secretariat for', leftMargin, 40);
+      doc.text('Islamic/Arabic Education in The Gambia', leftMargin, 52);
+      doc.text('Examination Affairs Unit', leftMargin, 64);
+      
+      if (hasArabicFont) {
+        doc.font('ArabicBold').fontSize(11);
+        doc.text(shapeArabicText('الأمانة العامة للتعليم الإسلامي العربي'), rightEdge - 200, 40, { width: 200, align: 'right' });
+        doc.font('Arabic').fontSize(10);
+        doc.text(shapeArabicText('في غامبيا - قسم الامتحانات'), rightEdge - 200, 56, { width: 200, align: 'right' });
+      }
+      
+      const logoPath = path.join(process.cwd(), 'generated_transcripts', 'logo.png');
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, (doc.page.width - 60) / 2, 35, { width: 60 });
+      }
+      
+      doc.moveTo(leftMargin, 95).lineTo(rightEdge, 95).stroke('#333333');
+      
+      if (hasArabicFont) {
+        doc.font('ArabicBold').fontSize(14).fillColor('#000000');
+        doc.text(shapeArabicText(`كشف نتائج امتحانات الشهادة الابتدائية للعام ${examYear.year - 1}-${examYear.year} م`), leftMargin, 105, { width: pageWidth, align: 'center' });
+      } else {
+        doc.font('Helvetica-Bold').fontSize(12).fillColor('#000000');
+        doc.text(`Primary Certificate Results ${examYear.year - 1}-${examYear.year}`, leftMargin, 105, { width: pageWidth, align: 'center' });
+      }
+      
+      if (transcriptNumber) {
+        doc.font('Helvetica').fontSize(10).fillColor('#555555');
+        doc.text(`Transcript No. / ${hasArabicFont ? shapeArabicText('رقم الكشف') : 'Transcript No.'}: ${transcriptNumber}`, leftMargin, 125, { width: pageWidth, align: 'center' });
+      }
+      
+      let yPos = 145;
+      doc.rect(leftMargin, yPos, pageWidth, 65).fill('#f9f9f9').stroke('#dddddd');
+      
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(10);
+      doc.text('Student Name:', leftMargin + 10, yPos + 8);
+      doc.text('Nationality:', leftMargin + 10, yPos + 25);
+      doc.text('School:', leftMargin + 10, yPos + 42);
+      
+      doc.font('Helvetica').fillColor('#1a5276');
+      doc.text(fullNameEn, leftMargin + 100, yPos + 8);
+      doc.text(nationalityEn, leftMargin + 100, yPos + 25);
+      doc.text(schoolNameEn, leftMargin + 100, yPos + 42);
+      
+      if (hasArabicFont) {
+        doc.font('ArabicBold').fillColor('#000000');
+        doc.text(shapeArabicText('اسم الطالب/ة:'), rightEdge - 10, yPos + 8, { width: 100, align: 'right' });
+        doc.text(shapeArabicText('الجنسية:'), rightEdge - 10, yPos + 25, { width: 100, align: 'right' });
+        doc.text(shapeArabicText('المدرسة:'), rightEdge - 10, yPos + 42, { width: 100, align: 'right' });
+        
+        doc.font('Arabic').fillColor('#1a5276');
+        doc.text(shapeArabicText(fullNameAr), rightEdge - 120, yPos + 8, { width: 110, align: 'right' });
+        doc.text(shapeArabicText(nationalityAr), rightEdge - 120, yPos + 25, { width: 110, align: 'right' });
+        doc.text(shapeArabicText(schoolNameAr), rightEdge - 120, yPos + 42, { width: 110, align: 'right' });
+      }
+      
+      yPos = 220;
+      const colWidths = [30, 180, 60, 60, 80];
+      const tableWidth = colWidths.reduce((a, b) => a + b, 0);
+      const tableX = (doc.page.width - tableWidth) / 2;
+      
+      doc.rect(tableX, yPos, tableWidth, 25).fill('#e8e8e8').stroke('#333333');
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(9);
+      
+      let xPos = tableX;
+      doc.text('#', xPos, yPos + 8, { width: colWidths[0], align: 'center' });
+      xPos += colWidths[0];
+      doc.text('Subject', xPos, yPos + 8, { width: colWidths[1], align: 'center' });
+      xPos += colWidths[1];
+      doc.text('Max', xPos, yPos + 8, { width: colWidths[2], align: 'center' });
+      xPos += colWidths[2];
+      doc.text('Min', xPos, yPos + 8, { width: colWidths[3], align: 'center' });
+      xPos += colWidths[3];
+      doc.text('Score', xPos, yPos + 8, { width: colWidths[4], align: 'center' });
+      
+      yPos += 25;
+      
+      subjectMarks.forEach((subject, index) => {
+        const rowColor = index % 2 === 0 ? '#ffffff' : '#f5f5f5';
+        doc.rect(tableX, yPos, tableWidth, 20).fill(rowColor).stroke('#333333');
+        
+        doc.fillColor('#000000').font('Helvetica').fontSize(9);
+        xPos = tableX;
+        doc.text((index + 1).toString(), xPos, yPos + 6, { width: colWidths[0], align: 'center' });
+        xPos += colWidths[0];
+        
+        const displayName = hasArabicFont ? `${subject.englishName} / ${shapeArabicText(subject.arabicName)}` : subject.englishName;
+        doc.text(displayName, xPos + 5, yPos + 6, { width: colWidths[1] - 10 });
+        xPos += colWidths[1];
+        
+        doc.text(subject.maxScore.toString(), xPos, yPos + 6, { width: colWidths[2], align: 'center' });
+        xPos += colWidths[2];
+        doc.text(subject.minScore.toString(), xPos, yPos + 6, { width: colWidths[3], align: 'center' });
+        xPos += colWidths[3];
+        
+        const markText = subject.mark !== null && subject.mark !== undefined ? subject.mark.toString() : '-';
+        doc.font('Helvetica-Bold').fillColor('#1a5276');
+        doc.text(markText, xPos, yPos + 6, { width: colWidths[4], align: 'center' });
+        
+        yPos += 20;
+      });
+      
+      doc.rect(tableX, yPos, tableWidth, 22).fill('#e8e8e8').stroke('#333333');
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(10);
+      doc.text('Total / ' + (hasArabicFont ? shapeArabicText('مجموع الدرجات') : 'Total'), tableX + 5, yPos + 6, { width: colWidths[0] + colWidths[1] + colWidths[2] });
+      doc.text(totalMarks.toString(), tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 6, { width: colWidths[4], align: 'center' });
+      yPos += 22;
+      
+      doc.rect(tableX, yPos, tableWidth, 22).fill('#f5f5f5').stroke('#333333');
+      doc.text('Percentage / ' + (hasArabicFont ? shapeArabicText('النسبة') : 'Percentage'), tableX + 5, yPos + 6, { width: colWidths[0] + colWidths[1] + colWidths[2] });
+      doc.text(`${percentage.toFixed(1)}%`, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 6, { width: colWidths[4], align: 'center' });
+      yPos += 22;
+      
+      doc.rect(tableX, yPos, tableWidth, 25).fill('#d4edda').stroke('#333333');
+      doc.fillColor('#155724').fontSize(11);
+      doc.text('Grade / ' + (hasArabicFont ? shapeArabicText('التقدير') : 'Grade'), tableX + 5, yPos + 7, { width: colWidths[0] + colWidths[1] + colWidths[2] });
+      const gradeText = hasArabicFont ? `${finalGrade.english} / ${shapeArabicText(finalGrade.arabic)}` : finalGrade.english;
+      doc.text(gradeText, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 7, { width: colWidths[4], align: 'center' });
+      yPos += 40;
+      
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(10);
+      doc.text('Exam Committee Chairman', leftMargin + 30, yPos);
+      doc.text('Secretariat Administration', rightEdge - 180, yPos);
+      if (hasArabicFont) {
+        doc.font('ArabicBold');
+        doc.text(shapeArabicText('توقيع رئيس لجنة الامتحانات'), leftMargin + 30, yPos + 15);
+        doc.text(shapeArabicText('توقيع إدارة الأمانة'), rightEdge - 180, yPos + 15);
+      }
+      
+      yPos += 35;
+      doc.font('Helvetica').fontSize(8).fillColor('#666666');
+      doc.moveTo(leftMargin + 30, yPos).lineTo(leftMargin + 150, yPos).stroke('#999999');
+      doc.moveTo(rightEdge - 180, yPos).lineTo(rightEdge - 60, yPos).stroke('#999999');
+      
+      if (data.qrCodeDataUrl) {
+        yPos += 20;
+        doc.moveTo(leftMargin, yPos).lineTo(rightEdge, yPos).stroke('#dddddd');
+        yPos += 10;
+        
+        doc.fontSize(8).fillColor('#666666');
+        doc.text('To verify this transcript, scan the QR code', leftMargin, yPos);
+        if (hasArabicFont) {
+          doc.font('Arabic');
+          doc.text(shapeArabicText('للتحقق من صحة هذا الكشف، امسح رمز QR'), rightEdge - 200, yPos, { width: 200, align: 'right' });
+        }
+        
+        const qrBuffer = Buffer.from(data.qrCodeDataUrl.split(',')[1], 'base64');
+        doc.image(qrBuffer, rightEdge - 90, yPos + 15, { width: 70 });
+        
+        doc.font('Helvetica').fontSize(7);
+        doc.text(transcriptNumber, rightEdge - 90, yPos + 90, { width: 70, align: 'center' });
+      }
+      
+      doc.end();
+      
+      stream.on('finish', () => {
+        console.log(`[Transcript PDF] Successfully generated: ${filePath}`);
+        resolve(filePath);
+      });
+      
+      stream.on('error', (err) => {
+        console.error(`[Transcript PDF] Stream error:`, err.message);
+        reject(new Error(`Failed to generate transcript PDF: ${err.message}`));
+      });
+      
+    } catch (error: any) {
+      const studentInfo = `${data.student.firstName} ${data.student.lastName} (${data.student.indexNumber || 'unknown'})`;
+      console.error(`[Transcript PDF] Generation error for student ${studentInfo}:`, error.message);
+      reject(new Error(`Failed to generate transcript PDF: ${error.message}`));
     }
-  }
+  });
 }
 
 // Helper to build TranscriptData from database records
