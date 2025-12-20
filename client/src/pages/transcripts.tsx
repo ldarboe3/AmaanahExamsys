@@ -272,18 +272,32 @@ export default function Transcripts() {
       const generated = data.generated || 0;
       const errors = data.errors || [];
       
-      toast({
-        title: isRTL ? "تم إنشاء كشوف الدرجات" : "Transcripts Generated",
-        description: isRTL 
-          ? `تم إنشاء ${generated} كشف درجات بنجاح${errors.length > 0 ? `. ${errors.length} فشل.` : ''}`
-          : `Successfully generated ${generated} transcript(s)${errors.length > 0 ? `. ${errors.length} failed.` : ''}`,
-        variant: errors.length > generated ? "destructive" : "default",
-      });
+      console.error('Transcript generation response:', { data, errors });
+      
+      if (errors.length > 0) {
+        const errorMessages = errors.map((err: any) => `${err.studentName || err.studentId}: ${err.error}`).join('\n');
+        toast({
+          title: isRTL ? "خطأ في الإنشاء" : "Generation Failed",
+          description: isRTL 
+            ? `تم إنشاء ${generated} فقط. الأخطاء:\n${errorMessages}`
+            : `Only generated ${generated}. Errors:\n${errorMessages}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: isRTL ? "تم إنشاء كشوف الدرجات" : "Transcripts Generated",
+          description: isRTL 
+            ? `تم إنشاء ${generated} كشف درجات بنجاح`
+            : `Successfully generated ${generated} transcript(s)`,
+          variant: "default",
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/transcripts/eligible-g6-students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transcripts"] });
       setSelectedStudents([]);
     },
     onError: (error: Error) => {
+      console.error('Transcript generation error:', error);
       toast({
         title: isRTL ? "خطأ في الإنشاء" : "Generation Error",
         description: error.message,
