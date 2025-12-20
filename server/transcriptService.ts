@@ -393,30 +393,16 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       let yPos = 145;
       doc.rect(leftMargin, yPos, pageWidth, 75).fill('#f9f9f9').stroke('#dddddd');
       
-      // Student details - Bilingual
+      // Student details - Arabic only on right
       doc.fillColor('#000000').font('Helvetica-Bold').fontSize(9);
-      doc.text('Student Name:', leftMargin + 10, yPos + 5);
-      doc.text(shapeArabicText('اسم الطالب:'), rightEdge - 70, yPos + 5);
+      doc.text(shapeArabicText('اسم الطالب:'), rightEdge - 80, yPos + 10);
+      doc.text(shapeArabicText('الجنسية:'), rightEdge - 80, yPos + 28);
+      doc.text(shapeArabicText('المدرسة:'), rightEdge - 80, yPos + 46);
       
       doc.font('Helvetica').fillColor('#1a5276').fontSize(9);
-      doc.text(fullNameEn, leftMargin + 100, yPos + 5);
-      doc.text(shapeArabicText(fullNameAr), rightEdge - 190, yPos + 5);
-      
-      doc.font('Helvetica-Bold').fillColor('#000000').fontSize(9);
-      doc.text('Nationality:', leftMargin + 10, yPos + 20);
-      doc.text(shapeArabicText('الجنسية:'), rightEdge - 70, yPos + 20);
-      
-      doc.font('Helvetica').fillColor('#1a5276').fontSize(9);
-      doc.text(nationalityEn, leftMargin + 100, yPos + 20);
-      doc.text(shapeArabicText(nationalityAr), rightEdge - 190, yPos + 20);
-      
-      doc.font('Helvetica-Bold').fillColor('#000000').fontSize(9);
-      doc.text('School:', leftMargin + 10, yPos + 35);
-      doc.text(shapeArabicText('المدرسة:'), rightEdge - 70, yPos + 35);
-      
-      doc.font('Helvetica').fillColor('#1a5276').fontSize(9);
-      doc.text(schoolNameEn, leftMargin + 100, yPos + 35);
-      doc.text(shapeArabicText(schoolNameAr), rightEdge - 190, yPos + 35);
+      doc.text(shapeArabicText(fullNameAr), rightEdge - 240, yPos + 10);
+      doc.text(shapeArabicText(nationalityAr), rightEdge - 240, yPos + 28);
+      doc.text(shapeArabicText(schoolNameAr), rightEdge - 240, yPos + 46);
       
       yPos = 230;
       const colWidths = [30, 150, 60, 60, 80];
