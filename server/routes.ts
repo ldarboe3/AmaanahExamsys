@@ -10324,7 +10324,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         } catch (e: any) {
           const errorMsg = e.message || String(e);
           const stack = e.stack || '';
-          console.error(`Failed to generate G6 Arabic transcript for student ${studentId}:`, errorMsg, stack);
+          console.error(`❌ FAILED G6 TRANSCRIPT - Student ${studentId} (${student.firstName} ${student.lastName}):`);
+          console.error(`   Error: ${errorMsg}`);
+          console.error(`   Stack: ${stack}`);
+          console.error(`   Full error object:`, e);
           errors.push({ 
             studentId, 
             studentName: `${student.firstName} ${student.lastName}`, 
