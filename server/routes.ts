@@ -9939,10 +9939,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           generatedTranscripts.push(transcript);
         } catch (e: any) {
           console.error(`Failed to generate transcript for student ${studentId}:`, e.message, e.stack);
+          errors.push({ 
+            studentId, 
+            studentName: `${student.firstName} ${student.lastName}`, 
+            error: e.message,
+            errorAr: 'فشل في إنشاء كشف الدرجات'
+          });
         }
       }
       
-      res.json({ generated: generatedTranscripts.length, transcripts: generatedTranscripts });
+      res.json({ 
+        generated: generatedTranscripts.length, 
+        transcripts: generatedTranscripts,
+        failed: errors.length,
+        errors 
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
