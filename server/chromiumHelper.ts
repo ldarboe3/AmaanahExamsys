@@ -35,6 +35,18 @@ export function getChromiumExecutable(): string {
     }
   }
   
+  // Try to use bundled Puppeteer Chromium as last resort
+  try {
+    const puppeteerChrome = require('puppeteer').executablePath?.();
+    if (typeof puppeteerChrome === 'string' && existsSync(puppeteerChrome)) {
+      cachedChromiumPath = puppeteerChrome;
+      console.log('[Chromium] Using bundled Puppeteer Chromium:', cachedChromiumPath);
+      return cachedChromiumPath;
+    }
+  } catch (err) {
+    console.debug('[Chromium] Could not find bundled Puppeteer Chrome:', err);
+  }
+  
   // If no executable found, throw with helpful error
   const errorMsg = 'Could not find Chromium executable. Tried: ' + candidates.join(', ') + 
                    '. Set PUPPETEER_EXECUTABLE_PATH environment variable or ensure chromium is installed.';
