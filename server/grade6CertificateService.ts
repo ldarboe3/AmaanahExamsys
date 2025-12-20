@@ -174,10 +174,6 @@ export async function generateGrade6CertificatePDF(data: Grade6CertificateData):
         yPos += 18;
         
         doc.font('Arabic').fillColor('#333333');
-        const line2 = `${birthLabel} في ${student.placeOfBirth || '______'} بتاريخ: ${dobFormatted}`;
-        doc.text(shapeArabicText(line2), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
-        yPos += 18;
-        
         const line3 = `${completedVerb} دراسة المرحلة الابتدائية العليا في مدرسة`;
         doc.text(shapeArabicText(line3), margin + 30, yPos, { width: contentWidth - 60, align: 'right' });
         yPos += 18;
@@ -214,8 +210,6 @@ export async function generateGrade6CertificatePDF(data: Grade6CertificateData):
       } else {
         doc.font('Helvetica').fontSize(11).fillColor('#333333');
         doc.text(`The General Secretariat certifies that the student ${fullName}`, margin + 30, yPos, { width: contentWidth - 60 });
-        yPos += 15;
-        doc.text(`born in ${student.placeOfBirth || '______'} on ${dobFormatted}`, margin + 30, yPos, { width: contentWidth - 60 });
         yPos += 15;
         doc.text(`has completed the Higher Primary Stage at ${school.name}`, margin + 30, yPos, { width: contentWidth - 60 });
         yPos += 15;
