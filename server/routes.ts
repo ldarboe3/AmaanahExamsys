@@ -10054,7 +10054,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
       
-      res.json({ generated: generatedTranscripts.length, total: students.length });
+      res.json({ generated: generatedTranscripts.length, errors: [] });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
