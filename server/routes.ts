@@ -9890,6 +9890,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const verifyUrl = `${process.env.PRODUCTION_DOMAIN || 'https://amaanah.gm'}/verify/transcript/${qrToken}`;
         
         try {
+          // Skip students with no results
+          if (results.length === 0) {
+            console.warn(`Student ${studentId} has no results, skipping transcript generation`);
+            continue;
+          }
+
           const normalizedSurnameResult = await normalizeSurname(student.lastName);
           const normalizedLastName = normalizedSurnameResult.normalizedSurname;
           
@@ -9932,7 +9938,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           });
           generatedTranscripts.push(transcript);
         } catch (e: any) {
-          console.error(`Failed to generate transcript for student ${studentId}:`, e.message);
+          console.error(`Failed to generate transcript for student ${studentId}:`, e.message, e.stack);
         }
       }
       
