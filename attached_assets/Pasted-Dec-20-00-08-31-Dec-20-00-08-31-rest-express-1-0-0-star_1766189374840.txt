@@ -1,0 +1,53 @@
+Dec 20 00:08:31  
+Dec 20 00:08:31  > rest-express@1.0.0 start
+Dec 20 00:08:31  > NODE_ENV=production node dist/server/index.js
+Dec 20 00:08:31  
+Dec 20 00:08:31  node:internal/modules/cjs/loader:1404
+Dec 20 00:08:31    throw err;
+Dec 20 00:08:31    ^
+Dec 20 00:08:31  
+Dec 20 00:08:31  Error: Cannot find module '/workspace/dist/server/index.js'
+Dec 20 00:08:31      at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)
+Dec 20 00:08:31      at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)
+Dec 20 00:08:31      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)
+Dec 20 00:08:31      at Function._load (node:internal/modules/cjs/loader:1211:37)
+Dec 20 00:08:31      at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+Dec 20 00:08:31      at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+Dec 20 00:08:31      at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+Dec 20 00:08:31      at node:internal/main/run_main_module:36:49 {
+Dec 20 00:08:31    code: 'MODULE_NOT_FOUND',
+Dec 20 00:08:31    requireStack: []
+Dec 20 00:08:31  }
+Dec 20 00:08:31  
+Dec 20 00:08:31  Node.js v22.16.0
+Dec 20 00:08:31  npm notice
+Dec 20 00:08:31  npm notice New major version of npm available! 10.9.2 -> 11.7.0
+Dec 20 00:08:31  npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.7.0
+Dec 20 00:08:31  npm notice To update run: npm install -g npm@11.7.0
+Dec 20 00:08:31  npm notice
+Dec 20 00:08:23  
+Dec 20 00:08:23  > rest-express@1.0.0 start
+Dec 20 00:08:23  > NODE_ENV=production node dist/server/index.js
+Dec 20 00:08:23  
+Dec 20 00:08:23  node:internal/modules/cjs/loader:1404
+Dec 20 00:08:23    throw err;
+Dec 20 00:08:23    ^
+Dec 20 00:08:23  
+Dec 20 00:08:23  Error: Cannot find module '/workspace/dist/server/index.js'
+Dec 20 00:08:23      at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)
+Dec 20 00:08:23      at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)
+Dec 20 00:08:23      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)
+Dec 20 00:08:23      at Function._load (node:internal/modules/cjs/loader:1211:37)
+Dec 20 00:08:23      at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+Dec 20 00:08:23      at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+Dec 20 00:08:23      at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+Dec 20 00:08:23      at node:internal/main/run_main_module:36:49 {
+Dec 20 00:08:23    code: 'MODULE_NOT_FOUND',
+Dec 20 00:08:23    requireStack: []
+Dec 20 00:08:23  }
+Dec 20 00:08:23  
+Dec 20 00:08:23  Node.js v22.16.0
+Dec 20 00:08:24  ERROR failed health checks after 8 attempts with error Readiness probe failed: dial tcp 10.244.16.247:8080: connect: connection refused
+Dec 20 00:08:31  ERROR failed health checks after 8 attempts with error Readiness probe failed: dial tcp 10.244.95.139:8080: connect: connection refused
+Dec 20 00:08:54  ERROR component terminated with non-zero exit code: 1,
+Dec 20 00:08:32  ERROR component terminated with non-zero exit code: 1,
