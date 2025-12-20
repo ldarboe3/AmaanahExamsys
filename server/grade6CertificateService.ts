@@ -3,10 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import PDFDocument from 'pdfkit';
 import { shapeArabicText } from './arabicTextHelper';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 import {
   formatArabicDate,
   formatHijriDate,
@@ -16,8 +12,8 @@ import {
 } from './certificateTemplates';
 
 // Font paths for pdfkit
-const FONT_REGULAR = path.join(__dirname, '..', 'fonts', 'Amiri-Regular.ttf');
-const FONT_BOLD = path.join(__dirname, '..', 'fonts', 'Amiri-Bold.ttf');
+const FONT_REGULAR = path.resolve(process.cwd(), 'fonts', 'Amiri-Regular.ttf');
+const FONT_BOLD = path.resolve(process.cwd(), 'fonts', 'Amiri-Bold.ttf');
 
 
 interface StudentData {
