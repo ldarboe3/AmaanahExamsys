@@ -7,7 +7,6 @@ const allowlist = [
   "@google-cloud/storage",
   "@neondatabase/serverless",
   "@sendgrid/mail",
-  "bcrypt",
   "connect-pg-simple",
   "date-fns",
   "drizzle-orm",
@@ -18,9 +17,7 @@ const allowlist = [
   "multer",
   "passport",
   "passport-local",
-  "puppeteer",
   "ws",
-  "xlsx",
   "zod",
   "zod-validation-error",
 ];
@@ -46,8 +43,8 @@ async function buildAll() {
       entryPoints: ["server/index.ts"],
       platform: "node",
       bundle: true,
-      format: "esm",
-      outfile: "dist/server/index.js",
+      format: "cjs",
+      outfile: "dist/server/index.cjs",
       define: {
         "process.env.NODE_ENV": '"production"',
       },
@@ -63,7 +60,7 @@ async function buildAll() {
     console.log("  export PORT=8080");
     console.log("  export DATABASE_URL=your_database_url");
     console.log("  export SESSION_SECRET=your_secret");
-    console.log("  node dist/server/index.js");
+    console.log("  node dist/server/index.cjs");
   } catch (err) {
     console.error("❌ Build failed:", err);
     process.exit(1);

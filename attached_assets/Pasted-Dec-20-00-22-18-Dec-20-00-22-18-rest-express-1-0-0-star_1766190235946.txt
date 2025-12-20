@@ -1,0 +1,56 @@
+Dec 20 00:22:18  
+Dec 20 00:22:18  > rest-express@1.0.0 start
+Dec 20 00:22:18  > NODE_ENV=production node dist/server/index.js
+Dec 20 00:22:18  
+Dec 20 00:22:18  file:///workspace/dist/server/index.js:1
+Dec 20 00:22:18  var CXe=Object.create;var QS=Object.defineProperty;var EXe=Object.getOwnPropertyDescriptor;var BXe=Object.getOwnPropertyNames;var yXe=Object.getPrototypeOf,QXe=Object.prototype.hasOwnProperty;var xe=(i=>typeof require<"u"?require:typeof Proxy<"u"?new Proxy(i,{get:(e,t)=>(typeof require<"u"?require:e)[t]}):i)(function(i){if(typeof require<"u")return require.apply(this,arguments);throw Error('Dynamic require of "'+i+'" is not supported')});var Qe=(i,e)=>()=>(i&&(e=i(i=0)),e);var L=(i,e)=>()=>(e||i((e={exports:{}}).exports,e),e.exports),Oa=(i,e)=>{for(var t in e)QS(i,t,{get:e[t],enumerable:!0})},Dae=(i,e,t,r)=>{if(e&&typeof e=="object"||typeof e=="function")for(let n of BXe(e))!QXe.call(i,n)&&n!==t&&QS(i,n,{get:()=>e[n],enumerable:!(r=EXe(e,n))||r.enumerable});return i};var Rr=(i,e,t)=>(t=i!=null?CXe(yXe(i)):{},Dae(e||!i||!i.__esModule?QS(t,"default",{value:i,enumerable:!0}):t,i)),$n=i=>Dae(QS({},"__esModule",{value:!0}),i);var $c=L((CVt,Rae)=>{var wXe=xe("path").relative;Rae.exports=SXe;var vXe=process.cwd();function Fae(i,e){for(var t=i.split(/[ ,]+/),r=String(e).toLowerCase(),n=0;n<t.length;n++){var s=t[n];if(s&&(s==="*"||s.toLowerCase()===r))return!0}return!1}function xXe(i,e,t){var r=Object.getOwnPropertyDescriptor(i,e),n=r.value;return r.get=function(){return n},r.writable&&(r.set=function(a){return n=a}),delete r.value,delete r.writable,Object.defineProperty(i,e,r),r}function bXe(i){for(var e="",t=0;t<i;t++)e+=", arg"+t;return e.substr(2)}function DXe(i){var e=this.name+": "+this.namespace;this.message&&(e+=" deprecated "+this.message);for(var t=0;t<i.length;t++)e+=`
+Dec 20 00:22:18                                                                                                                                                                                                                                                                                                                                                                                                     ^
+Dec 20 00:22:18  
+Dec 20 00:22:18  Error: Dynamic require of "path" is not supported
+Dec 20 00:22:18      at file:///workspace/dist/server/index.js:1:388
+Dec 20 00:22:18      at file:///workspace/dist/server/index.js:1:965
+Dec 20 00:22:18      at file:///workspace/dist/server/index.js:1:500
+Dec 20 00:22:18      at file:///workspace/dist/server/index.js:20:18116
+Dec 20 00:22:18      at file:///workspace/dist/server/index.js:1:500
+Dec 20 00:22:18      at file:///workspace/dist/server/index.js:63:591
+Dec 20 00:22:18      at file:///workspace/dist/server/index.js:1:500
+Dec 20 00:22:18      at file:///workspace/dist/server/index.js:63:1695
+Dec 20 00:22:18      at file:///workspace/dist/server/index.js:1:500
+Dec 20 00:22:18      at file:///workspace/dist/server/index.js:2448:9973
+Dec 20 00:22:18  
+Dec 20 00:22:18  Node.js v22.16.0
+Dec 20 00:22:19  npm notice
+Dec 20 00:22:19  npm notice New major version of npm available! 10.9.2 -> 11.7.0
+Dec 20 00:22:19  npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.7.0
+Dec 20 00:22:19  npm notice To update run: npm install -g npm@11.7.0
+Dec 20 00:22:19  npm notice
+Dec 20 00:22:13  
+Dec 20 00:22:13  > rest-express@1.0.0 start
+Dec 20 00:22:13  > NODE_ENV=production node dist/server/index.js
+Dec 20 00:22:13  
+Dec 20 00:22:13  file:///workspace/dist/server/index.js:1
+Dec 20 00:22:13  var CXe=Object.create;var QS=Object.defineProperty;var EXe=Object.getOwnPropertyDescriptor;var BXe=Object.getOwnPropertyNames;var yXe=Object.getPrototypeOf,QXe=Object.prototype.hasOwnProperty;var xe=(i=>typeof require<"u"?require:typeof Proxy<"u"?new Proxy(i,{get:(e,t)=>(typeof require<"u"?require:e)[t]}):i)(function(i){if(typeof require<"u")return require.apply(this,arguments);throw Error('Dynamic require of "'+i+'" is not supported')});var Qe=(i,e)=>()=>(i&&(e=i(i=0)),e);var L=(i,e)=>()=>(e||i((e={exports:{}}).exports,e),e.exports),Oa=(i,e)=>{for(var t in e)QS(i,t,{get:e[t],enumerable:!0})},Dae=(i,e,t,r)=>{if(e&&typeof e=="object"||typeof e=="function")for(let n of BXe(e))!QXe.call(i,n)&&n!==t&&QS(i,n,{get:()=>e[n],enumerable:!(r=EXe(e,n))||r.enumerable});return i};var Rr=(i,e,t)=>(t=i!=null?CXe(yXe(i)):{},Dae(e||!i||!i.__esModule?QS(t,"default",{value:i,enumerable:!0}):t,i)),$n=i=>Dae(QS({},"__esModule",{value:!0}),i);var $c=L((CVt,Rae)=>{var wXe=xe("path").relative;Rae.exports=SXe;var vXe=process.cwd();function Fae(i,e){for(var t=i.split(/[ ,]+/),r=String(e).toLowerCase(),n=0;n<t.length;n++){var s=t[n];if(s&&(s==="*"||s.toLowerCase()===r))return!0}return!1}function xXe(i,e,t){var r=Object.getOwnPropertyDescriptor(i,e),n=r.value;return r.get=function(){return n},r.writable&&(r.set=function(a){return n=a}),delete r.value,delete r.writable,Object.defineProperty(i,e,r),r}function bXe(i){for(var e="",t=0;t<i;t++)e+=", arg"+t;return e.substr(2)}function DXe(i){var e=this.name+": "+this.namespace;this.message&&(e+=" deprecated "+this.message);for(var t=0;t<i.length;t++)e+=`
+Dec 20 00:22:13                                                                                                                                                                                                                                                                                                                                                                                                     ^
+Dec 20 00:22:13  
+Dec 20 00:22:13  Error: Dynamic require of "path" is not supported
+Dec 20 00:22:13      at file:///workspace/dist/server/index.js:1:388
+Dec 20 00:22:13      at file:///workspace/dist/server/index.js:1:965
+Dec 20 00:22:13      at file:///workspace/dist/server/index.js:1:500
+Dec 20 00:22:13      at file:///workspace/dist/server/index.js:20:18116
+Dec 20 00:22:13      at file:///workspace/dist/server/index.js:1:500
+Dec 20 00:22:13      at file:///workspace/dist/server/index.js:63:591
+Dec 20 00:22:13      at file:///workspace/dist/server/index.js:1:500
+Dec 20 00:22:13      at file:///workspace/dist/server/index.js:63:1695
+Dec 20 00:22:13      at file:///workspace/dist/server/index.js:1:500
+Dec 20 00:22:13      at file:///workspace/dist/server/index.js:2448:9973
+Dec 20 00:22:13  
+Dec 20 00:22:13  Node.js v22.16.0
+Dec 20 00:22:13  npm notice
+Dec 20 00:22:13  npm notice New major version of npm available! 10.9.2 -> 11.7.0
+Dec 20 00:22:13  npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.7.0
+Dec 20 00:22:13  npm notice To update run: npm install -g npm@11.7.0
+Dec 20 00:22:13  npm notice
+Dec 20 00:22:13  ERROR failed health checks after 7 attempts with error Readiness probe failed: dial tcp 10.244.24.219:8080: connect: connection refused
+Dec 20 00:22:17  ERROR failed health checks after 6 attempts with error Readiness probe failed: dial tcp 10.244.38.55:8080: connect: connection refused
+Dec 20 00:22:44  ERROR component terminated with non-zero exit code: 1,
+Dec 20 00:22:19  ERROR component terminated with non-zero exit code: 1,
