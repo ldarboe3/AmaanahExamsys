@@ -364,51 +364,72 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       const leftMargin = 40;
       const rightEdge = doc.page.width - 40;
       
-      doc.fontSize(10).fillColor('#333333');
-      doc.text('The General Secretariat for', leftMargin, 40);
-      doc.text('Islamic/Arabic Education in The Gambia', leftMargin, 52);
-      doc.text('Examination Affairs Unit', leftMargin, 64);
-      
       const logoPath = path.join(process.cwd(), 'generated_transcripts', 'logo.png');
       if (fs.existsSync(logoPath)) {
         doc.image(logoPath, (doc.page.width - 60) / 2, 35, { width: 60 });
       }
+
+      // Arabic header
+      doc.fontSize(12).fillColor('#8B6914').font('Helvetica-Bold');
+      doc.text(shapeArabicText('الأمانة العامة للتعليم الإسلامي والعربي بجمهورية غامبيا'), leftMargin, 40, { width: pageWidth, align: 'center' });
+      doc.fontSize(10).fillColor('#333333');
+      doc.text(shapeArabicText('وحدة شؤون الامتحانات'), leftMargin, 53, { width: pageWidth, align: 'center' });
       
+      // English header
+      doc.fontSize(10).fillColor('#333333').font('Helvetica');
+      doc.text('The General Secretariat for', leftMargin, 68);
+      doc.text('Islamic/Arabic Education in The Gambia', leftMargin, 78);
+      doc.text('Examination Affairs Unit', leftMargin, 88);
       
-      doc.moveTo(leftMargin, 95).lineTo(rightEdge, 95).stroke('#333333');
+      doc.moveTo(leftMargin, 100).lineTo(rightEdge, 100).stroke('#333333');
       doc.font('Helvetica-Bold').fontSize(12).fillColor('#000000');
-      doc.text(`Primary Certificate Results ${examYear.year - 1}-${examYear.year}`, leftMargin, 105, { width: pageWidth, align: 'center' });
+      doc.text(`Primary Certificate Results ${examYear.year - 1}-${examYear.year}`, leftMargin, 110, { width: pageWidth, align: 'center' });
       
       if (transcriptNumber) {
         doc.font('Helvetica').fontSize(10).fillColor('#555555');
-        doc.text(`Transcript No. / Transcript No.: ${transcriptNumber}`, leftMargin, 125, { width: pageWidth, align: 'center' });
+        doc.text(`Transcript No. / رقم الشهادة: ${transcriptNumber}`, leftMargin, 127, { width: pageWidth, align: 'center' });
       }
       
       let yPos = 145;
-      doc.rect(leftMargin, yPos, pageWidth, 65).fill('#f9f9f9').stroke('#dddddd');
+      doc.rect(leftMargin, yPos, pageWidth, 75).fill('#f9f9f9').stroke('#dddddd');
       
-      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(10);
-      doc.text('Student Name:', leftMargin + 10, yPos + 8);
-      doc.text('Nationality:', leftMargin + 10, yPos + 25);
-      doc.text('School:', leftMargin + 10, yPos + 42);
+      // Student details - Bilingual
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(9);
+      doc.text('Student Name:', leftMargin + 10, yPos + 5);
+      doc.text(shapeArabicText('اسم الطالب:'), rightEdge - 70, yPos + 5);
       
-      doc.font('Helvetica').fillColor('#1a5276');
-      doc.text(fullNameEn, leftMargin + 100, yPos + 8);
-      doc.text(nationalityEn, leftMargin + 100, yPos + 25);
-      doc.text(schoolNameEn, leftMargin + 100, yPos + 42);
+      doc.font('Helvetica').fillColor('#1a5276').fontSize(9);
+      doc.text(fullNameEn, leftMargin + 100, yPos + 5);
+      doc.text(shapeArabicText(fullNameAr), rightEdge - 190, yPos + 5);
       
-      yPos = 220;
-      const colWidths = [30, 180, 60, 60, 80];
+      doc.font('Helvetica-Bold').fillColor('#000000').fontSize(9);
+      doc.text('Nationality:', leftMargin + 10, yPos + 20);
+      doc.text(shapeArabicText('الجنسية:'), rightEdge - 70, yPos + 20);
+      
+      doc.font('Helvetica').fillColor('#1a5276').fontSize(9);
+      doc.text(nationalityEn, leftMargin + 100, yPos + 20);
+      doc.text(shapeArabicText(nationalityAr), rightEdge - 190, yPos + 20);
+      
+      doc.font('Helvetica-Bold').fillColor('#000000').fontSize(9);
+      doc.text('School:', leftMargin + 10, yPos + 35);
+      doc.text(shapeArabicText('المدرسة:'), rightEdge - 70, yPos + 35);
+      
+      doc.font('Helvetica').fillColor('#1a5276').fontSize(9);
+      doc.text(schoolNameEn, leftMargin + 100, yPos + 35);
+      doc.text(shapeArabicText(schoolNameAr), rightEdge - 190, yPos + 35);
+      
+      yPos = 230;
+      const colWidths = [30, 150, 60, 60, 80];
       const tableWidth = colWidths.reduce((a, b) => a + b, 0);
-      const tableX = (doc.page.width - tableWidth) / 2;
+      const tableX = leftMargin;
       
       doc.rect(tableX, yPos, tableWidth, 25).fill('#e8e8e8').stroke('#333333');
-      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(9);
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(8);
       
       let xPos = tableX;
       doc.text('#', xPos, yPos + 8, { width: colWidths[0], align: 'center' });
       xPos += colWidths[0];
-      doc.text('Subject', xPos, yPos + 8, { width: colWidths[1], align: 'center' });
+      doc.text('Subject / المادة', xPos, yPos + 8, { width: colWidths[1], align: 'center' });
       xPos += colWidths[1];
       doc.text('Max', xPos, yPos + 8, { width: colWidths[2], align: 'center' });
       xPos += colWidths[2];
@@ -420,45 +441,47 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       
       subjectMarks.forEach((subject, index) => {
         const rowColor = index % 2 === 0 ? '#ffffff' : '#f5f5f5';
-        doc.rect(tableX, yPos, tableWidth, 20).fill(rowColor).stroke('#333333');
+        doc.rect(tableX, yPos, tableWidth, 22).fill(rowColor).stroke('#333333');
         
-        doc.fillColor('#000000').font('Helvetica').fontSize(9);
+        doc.fillColor('#000000').font('Helvetica').fontSize(8);
         xPos = tableX;
-        doc.text((index + 1).toString(), xPos, yPos + 6, { width: colWidths[0], align: 'center' });
+        doc.text((index + 1).toString(), xPos, yPos + 7, { width: colWidths[0], align: 'center' });
         xPos += colWidths[0];
         
-        const displayName = subject.englishName;
-        doc.text(displayName, xPos + 5, yPos + 6, { width: colWidths[1] - 10 });
+        const displayName = `${subject.englishName} / ${shapeArabicText(subject.arabicName)}`;
+        doc.fontSize(7.5);
+        doc.text(displayName, xPos + 3, yPos + 7, { width: colWidths[1] - 6 });
+        doc.fontSize(8);
         xPos += colWidths[1];
         
-        doc.text(subject.maxScore.toString(), xPos, yPos + 6, { width: colWidths[2], align: 'center' });
+        doc.text(subject.maxScore.toString(), xPos, yPos + 7, { width: colWidths[2], align: 'center' });
         xPos += colWidths[2];
-        doc.text(subject.minScore.toString(), xPos, yPos + 6, { width: colWidths[3], align: 'center' });
+        doc.text(subject.minScore.toString(), xPos, yPos + 7, { width: colWidths[3], align: 'center' });
         xPos += colWidths[3];
         
         const markText = subject.mark !== null && subject.mark !== undefined ? subject.mark.toString() : '-';
         doc.font('Helvetica-Bold').fillColor('#1a5276');
-        doc.text(markText, xPos, yPos + 6, { width: colWidths[4], align: 'center' });
+        doc.text(markText, xPos, yPos + 7, { width: colWidths[4], align: 'center' });
         
-        yPos += 20;
+        yPos += 22;
       });
       
       doc.rect(tableX, yPos, tableWidth, 22).fill('#e8e8e8').stroke('#333333');
-      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(10);
-      doc.text('Total', tableX + 5, yPos + 6, { width: colWidths[0] + colWidths[1] + colWidths[2] });
-      doc.text(totalMarks.toString(), tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 6, { width: colWidths[4], align: 'center' });
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(9);
+      doc.text('Total / المجموع', tableX + 3, yPos + 7, { width: colWidths[0] + colWidths[1], align: 'left' });
+      doc.text(totalMarks.toString(), tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 7, { width: colWidths[4], align: 'center' });
       yPos += 22;
       
       doc.rect(tableX, yPos, tableWidth, 22).fill('#f5f5f5').stroke('#333333');
-      doc.text('Percentage', tableX + 5, yPos + 6, { width: colWidths[0] + colWidths[1] + colWidths[2] });
-      doc.text(`${percentage.toFixed(1)}%`, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 6, { width: colWidths[4], align: 'center' });
+      doc.text('Percentage / النسبة', tableX + 3, yPos + 7, { width: colWidths[0] + colWidths[1], align: 'left' });
+      doc.text(`${percentage.toFixed(1)}%`, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 7, { width: colWidths[4], align: 'center' });
       yPos += 22;
       
       doc.rect(tableX, yPos, tableWidth, 25).fill('#d4edda').stroke('#333333');
-      doc.fillColor('#155724').fontSize(11);
-      doc.text('Grade', tableX + 5, yPos + 7, { width: colWidths[0] + colWidths[1] + colWidths[2] });
-      const gradeText = finalGrade.english;
-      doc.text(gradeText, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 7, { width: colWidths[4], align: 'center' });
+      doc.fillColor('#155724').fontSize(10);
+      doc.text('Grade / التقدير', tableX + 3, yPos + 8, { width: colWidths[0] + colWidths[1], align: 'left' });
+      const gradeText = `${finalGrade.english} / ${shapeArabicText(finalGrade.arabic)}`;
+      doc.text(gradeText, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 8, { width: colWidths[4], align: 'center' });
       yPos += 40;
       
       doc.fillColor('#000000').font('Helvetica-Bold').fontSize(10);
