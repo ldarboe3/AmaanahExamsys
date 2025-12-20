@@ -10311,8 +10311,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             finalGrade: transcriptData.finalGrade.arabic,
           });
         } catch (e: any) {
-          console.error(`Failed to generate G6 Arabic transcript for student ${studentId}:`, e.message);
-          errors.push({ studentId, studentName: `${student.firstName} ${student.lastName}`, error: e.message, errorAr: 'فشل في إنشاء كشف الدرجات' });
+          const errorMsg = e.message || String(e);
+          const stack = e.stack || '';
+          console.error(`Failed to generate G6 Arabic transcript for student ${studentId}:`, errorMsg, stack);
+          errors.push({ 
+            studentId, 
+            studentName: `${student.firstName} ${student.lastName}`, 
+            error: errorMsg, 
+            errorAr: 'فشل في إنشاء كشف الدرجات'
+          });
         }
       }
       

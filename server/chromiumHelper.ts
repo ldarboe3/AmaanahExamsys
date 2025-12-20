@@ -19,6 +19,23 @@ export function getChromiumExecutable(): string {
     }
   }
   
+  // Direct path checks for common locations (especially in Docker)
+  const directPaths = [
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/snap/bin/chromium',
+  ];
+  
+  for (const path of directPaths) {
+    if (existsSync(path)) {
+      cachedChromiumPath = path;
+      console.log('[Chromium] Found executable at:', cachedChromiumPath);
+      return cachedChromiumPath;
+    }
+  }
+  
   // Try to find chromium in PATH
   const candidates = ['chromium', 'chromium-browser', 'google-chrome', 'chrome'];
   for (const cmd of candidates) {
@@ -31,13 +48,14 @@ export function getChromiumExecutable(): string {
       }
     } catch (err) {
       // Command not found, try next
-      console.debug(`[Chromium] ${cmd} not found`);
+      console.debug(`[Chromium] ${cmd} not found in PATH`);
     }
   }
   
   // Try to use bundled Puppeteer Chromium as last resort
   try {
-    const puppeteerChrome = require('puppeteer').executablePath?.();
+    const puppeteer = require('puppeteer');
+    const puppeteerChrome = puppeteer.executablePath?.();
     if (typeof puppeteerChrome === 'string' && existsSync(puppeteerChrome)) {
       cachedChromiumPath = puppeteerChrome;
       console.log('[Chromium] Using bundled Puppeteer Chromium:', cachedChromiumPath);
@@ -48,8 +66,7 @@ export function getChromiumExecutable(): string {
   }
   
   // If no executable found, throw with helpful error
-  const errorMsg = 'Could not find Chromium executable. Tried: ' + candidates.join(', ') + 
-                   '. Set PUPPETEER_EXECUTABLE_PATH environment variable or ensure chromium is installed.';
+  const errorMsg = 'Could not find Chromium executable. Checked: direct paths, PATH env, bundled Puppeteer. Set PUPPETEER_EXECUTABLE_PATH environment variable or ensure chromium is installed.';
   console.error('[Chromium] ' + errorMsg);
   throw new Error(errorMsg);
 }
