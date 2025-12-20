@@ -11,3 +11,5 @@ services:
     value: production
   - key: PORT
     value: "8080"
+  - key: SESSION_SECRET
+    scope: RUN_AND_BUILD_TIME
