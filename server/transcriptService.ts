@@ -326,9 +326,8 @@ if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }
 
-// Font paths for pdfkit - same as certificate service
-const FONT_REGULAR = path.resolve(process.cwd(), 'fonts', 'Amiri-Regular.ttf');
-const FONT_BOLD = path.resolve(process.cwd(), 'fonts', 'Amiri-Bold.ttf');
+// Note: Font files at /fonts/Amiri-Regular.ttf and /fonts/Amiri-Bold.ttf are corrupted (contain HTML).
+// Using Helvetica for reliable English rendering.
 
 export async function generateTranscriptPDF(data: TranscriptData): Promise<string> {
   const validation = validateTranscriptRequirements(data);
@@ -360,12 +359,6 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       const stream = fs.createWriteStream(filePath);
       
       doc.pipe(stream);
-      
-      const hasArabicFont = fs.existsSync(FONT_REGULAR) && fs.existsSync(FONT_BOLD);
-      if (hasArabicFont) {
-        doc.registerFont('Arabic', FONT_REGULAR);
-        doc.registerFont('ArabicBold', FONT_BOLD);
-      }
       
       const pageWidth = doc.page.width - 80;
       const leftMargin = 40;
@@ -434,7 +427,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
         doc.text((index + 1).toString(), xPos, yPos + 6, { width: colWidths[0], align: 'center' });
         xPos += colWidths[0];
         
-        const displayName = hasArabicFont ? `${subject.englishName} / ${shapeArabicText(subject.arabicName)}` : subject.englishName;
+        const displayName = subject.englishName;
         doc.text(displayName, xPos + 5, yPos + 6, { width: colWidths[1] - 10 });
         xPos += colWidths[1];
         
@@ -452,19 +445,19 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       
       doc.rect(tableX, yPos, tableWidth, 22).fill('#e8e8e8').stroke('#333333');
       doc.fillColor('#000000').font('Helvetica-Bold').fontSize(10);
-      doc.text('Total / ' + (hasArabicFont ? shapeArabicText('مجموع الدرجات') : 'Total'), tableX + 5, yPos + 6, { width: colWidths[0] + colWidths[1] + colWidths[2] });
+      doc.text('Total', tableX + 5, yPos + 6, { width: colWidths[0] + colWidths[1] + colWidths[2] });
       doc.text(totalMarks.toString(), tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 6, { width: colWidths[4], align: 'center' });
       yPos += 22;
       
       doc.rect(tableX, yPos, tableWidth, 22).fill('#f5f5f5').stroke('#333333');
-      doc.text('Percentage / ' + (hasArabicFont ? shapeArabicText('النسبة') : 'Percentage'), tableX + 5, yPos + 6, { width: colWidths[0] + colWidths[1] + colWidths[2] });
+      doc.text('Percentage', tableX + 5, yPos + 6, { width: colWidths[0] + colWidths[1] + colWidths[2] });
       doc.text(`${percentage.toFixed(1)}%`, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 6, { width: colWidths[4], align: 'center' });
       yPos += 22;
       
       doc.rect(tableX, yPos, tableWidth, 25).fill('#d4edda').stroke('#333333');
       doc.fillColor('#155724').fontSize(11);
-      doc.text('Grade / ' + (hasArabicFont ? shapeArabicText('التقدير') : 'Grade'), tableX + 5, yPos + 7, { width: colWidths[0] + colWidths[1] + colWidths[2] });
-      const gradeText = hasArabicFont ? `${finalGrade.english} / ${shapeArabicText(finalGrade.arabic)}` : finalGrade.english;
+      doc.text('Grade', tableX + 5, yPos + 7, { width: colWidths[0] + colWidths[1] + colWidths[2] });
+      const gradeText = finalGrade.english;
       doc.text(gradeText, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], yPos + 7, { width: colWidths[4], align: 'center' });
       yPos += 40;
       
