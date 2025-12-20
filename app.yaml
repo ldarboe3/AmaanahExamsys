@@ -3,7 +3,7 @@ name: amaanah-examination-system
 services:
 - name: web
   source_dir: .
-  build_command: node build.mjs
+  build_command: npm ci && node build.mjs
   run_command: NODE_ENV=production node dist/server/index.js
   http_port: 8080
   envs:
