@@ -4,6 +4,10 @@ import QRCode from 'qrcode';
 import crypto from 'crypto';
 import PDFDocument from 'pdfkit';
 import { shapeArabicText } from './arabicTextHelper';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Arabic to English Transliteration Map
 const ARABIC_TO_ENGLISH_MAP: Record<string, string> = {
@@ -329,8 +333,8 @@ if (!fs.existsSync(outputDir)) {
 }
 
 // Font paths for pdfkit
-const FONT_REGULAR = path.join(process.cwd(), 'fonts', 'Amiri-Regular.ttf');
-const FONT_BOLD = path.join(process.cwd(), 'fonts', 'Amiri-Bold.ttf');
+const FONT_REGULAR = path.join(__dirname, '..', 'fonts', 'Amiri-Regular.ttf');
+const FONT_BOLD = path.join(__dirname, '..', 'fonts', 'Amiri-Bold.ttf');
 
 
 export async function generateTranscriptPDF(data: TranscriptData): Promise<string> {
