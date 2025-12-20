@@ -13,3 +13,5 @@ services:
     value: "8080"
   - key: SESSION_SECRET
     value: ${SESSION_SECRET}
+  - key: DATABASE_URL
+    value: ${DATABASE_URL}
