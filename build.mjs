@@ -46,8 +46,8 @@ async function buildAll() {
       entryPoints: ["server/index.ts"],
       platform: "node",
       bundle: true,
-      format: "cjs",
-      outfile: "dist/index.cjs",
+      format: "esm",
+      outfile: "dist/server/index.js",
       define: {
         "process.env.NODE_ENV": '"production"',
       },
@@ -63,7 +63,7 @@ async function buildAll() {
     console.log("  export PORT=8080");
     console.log("  export DATABASE_URL=your_database_url");
     console.log("  export SESSION_SECRET=your_secret");
-    console.log("  node dist/index.cjs");
+    console.log("  node dist/server/index.js");
   } catch (err) {
     console.error("❌ Build failed:", err);
     process.exit(1);
