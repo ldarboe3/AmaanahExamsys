@@ -332,6 +332,26 @@ if (!fs.existsSync(outputDir)) {
 const FONT_REGULAR = path.resolve(process.cwd(), 'fonts', 'Amiri-Regular.ttf');
 const FONT_BOLD = path.resolve(process.cwd(), 'fonts', 'Amiri-Bold.ttf');
 
+// Load fonts as buffers for better compatibility
+let fontBuffers: { regular: Buffer | null; bold: Buffer | null } = { regular: null, bold: null };
+
+function loadFontBuffers() {
+  try {
+    if (fs.existsSync(FONT_REGULAR)) {
+      fontBuffers.regular = fs.readFileSync(FONT_REGULAR);
+      console.log(`✓ Loaded Amiri-Regular.ttf (${fontBuffers.regular.length} bytes)`);
+    }
+    if (fs.existsSync(FONT_BOLD)) {
+      fontBuffers.bold = fs.readFileSync(FONT_BOLD);
+      console.log(`✓ Loaded Amiri-Bold.ttf (${fontBuffers.bold.length} bytes)`);
+    }
+  } catch (err) {
+    console.error('Error loading font buffers:', err);
+  }
+}
+
+// Load fonts on module initialization
+loadFontBuffers();
 
 export async function generateTranscriptPDF(data: TranscriptData): Promise<string> {
   const validation = validateTranscriptRequirements(data);
@@ -364,10 +384,18 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       
       doc.pipe(stream);
       
-      const hasArabicFont = fs.existsSync(FONT_REGULAR) && fs.existsSync(FONT_BOLD);
-      if (hasArabicFont) {
-        doc.registerFont('Arabic', FONT_REGULAR);
-        doc.registerFont('ArabicBold', FONT_BOLD);
+      const hasArabicFont = fontBuffers.regular && fontBuffers.bold;
+      let fontRegistrationSuccess = false;
+      if (fontRegistrationSuccess) {
+        try {
+          doc.registerFont('Arabic', fontBuffers.regular!);
+          doc.registerFont('ArabicBold', fontBuffers.bold!);
+          fontRegistrationSuccess = true;
+          console.log('✓ Arabic fonts registered successfully');
+        } catch (fontErr) {
+          console.warn('⚠️  Failed to register Arabic fonts, will use default fonts:', fontErr instanceof Error ? fontErr.message : String(fontErr));
+          fontRegistrationSuccess = false;
+        }
       }
       
       const pageWidth = doc.page.width - 80;
@@ -379,7 +407,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       doc.text('Islamic/Arabic Education in The Gambia', leftMargin, 52);
       doc.text('Examination Affairs Unit', leftMargin, 64);
       
-      if (hasArabicFont) {
+      if (fontRegistrationSuccess) {
         doc.font('ArabicBold').fontSize(11);
         doc.text(shapeArabicText('الأمانة العامة للتعليم الإسلامي العربي'), rightEdge - 200, 40, { width: 200, align: 'right' });
         doc.font('Arabic').fontSize(10);
@@ -393,7 +421,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       
       doc.moveTo(leftMargin, 95).lineTo(rightEdge, 95).stroke('#333333');
       
-      if (hasArabicFont) {
+      if (fontRegistrationSuccess) {
         doc.font('ArabicBold').fontSize(14).fillColor('#000000');
         doc.text(shapeArabicText(`كشف نتائج امتحانات الشهادة الابتدائية للعام ${examYear.year - 1}-${examYear.year} م`), leftMargin, 105, { width: pageWidth, align: 'center' });
       } else {
@@ -419,7 +447,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       doc.text(nationalityEn, leftMargin + 100, yPos + 25);
       doc.text(schoolNameEn, leftMargin + 100, yPos + 42);
       
-      if (hasArabicFont) {
+      if (fontRegistrationSuccess) {
         doc.font('ArabicBold').fillColor('#000000');
         doc.text(shapeArabicText('اسم الطالب/ة:'), rightEdge - 10, yPos + 8, { width: 100, align: 'right' });
         doc.text(shapeArabicText('الجنسية:'), rightEdge - 10, yPos + 25, { width: 100, align: 'right' });
@@ -498,7 +526,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       doc.fillColor('#000000').font('Helvetica-Bold').fontSize(10);
       doc.text('Exam Committee Chairman', leftMargin + 30, yPos);
       doc.text('Secretariat Administration', rightEdge - 180, yPos);
-      if (hasArabicFont) {
+      if (fontRegistrationSuccess) {
         doc.font('ArabicBold');
         doc.text(shapeArabicText('توقيع رئيس لجنة الامتحانات'), leftMargin + 30, yPos + 15);
         doc.text(shapeArabicText('توقيع إدارة الأمانة'), rightEdge - 180, yPos + 15);
@@ -516,7 +544,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
         
         doc.fontSize(8).fillColor('#666666');
         doc.text('To verify this transcript, scan the QR code', leftMargin, yPos);
-        if (hasArabicFont) {
+        if (fontRegistrationSuccess) {
           doc.font('Arabic');
           doc.text(shapeArabicText('للتحقق من صحة هذا الكشف، امسح رمز QR'), rightEdge - 200, yPos, { width: 200, align: 'right' });
         }
