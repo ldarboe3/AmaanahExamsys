@@ -338,12 +338,8 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
   const { student, school, examYear, subjectMarks, totalMarks, percentage, finalGrade } = data;
   
   const fullNameAr = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
-  const fullNameEn = student.firstNameEn || transliterateArabicToEnglish(fullNameAr);
-  
   const schoolNameAr = school.name;
-  const schoolNameEn = school.nameEn || transliterateArabicToEnglish(school.name);
   const nationalityAr = student.nationality || '';
-  const nationalityEn = student.nationalityEn || translateNationality(nationalityAr);
   const transcriptNumber = data.transcriptNumber || '';
   
   return new Promise((resolve, reject) => {
@@ -351,155 +347,199 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       const fileName = `transcript_g6_${data.student.indexNumber || data.student.id}_${Date.now()}.pdf`;
       const filePath = path.join(outputDir, fileName);
       
-      const doc = new PDFDocument({ size: 'A4', margin: 30 });
+      const doc = new PDFDocument({ size: 'A4', margin: 0 });
       const stream = fs.createWriteStream(filePath);
       
       doc.pipe(stream);
       
-      const margin = 30;
-      const pageWidth = doc.page.width;
+      const pageWidth = 595; // A4 width in points
+      const margin = 35;
       const contentWidth = pageWidth - (margin * 2);
-      const centerX = pageWidth / 2;
       
-      // HEADER WITH LOGO AND TEXT
+      // 1. HEADER SECTION
+      // Add logo centered
       const logoPath = path.join(process.cwd(), 'generated_transcripts', 'logo.png');
       if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, centerX - 35, 25, { width: 70 });
+        doc.image(logoPath, (pageWidth - 50) / 2, 20, { width: 50, height: 50 });
       }
       
-      // English header on left
-      doc.font('Helvetica').fontSize(9).fillColor('#333333');
-      doc.text('The General Secretariat for', margin, 28);
-      doc.text('Islamic/Arabic Education in', margin, 38);
-      doc.text('The Gambia', margin, 48);
-      doc.fontSize(8).text('Examination affairs unit', margin, 58);
+      // English text on left
+      doc.font('Helvetica').fontSize(9).fillColor('#000000');
+      doc.text('The General Secretariat for', margin, 22, { width: 150 });
+      doc.font('Helvetica').fontSize(8.5).fillColor('#000000');
+      doc.text('Islamic/Arabic Education in', margin, 34, { width: 150 });
+      doc.font('Helvetica').fontSize(8.5).fillColor('#000000');
+      doc.text('The Gambia', margin, 44, { width: 150 });
+      doc.font('Helvetica').fontSize(8).fillColor('#000000');
+      doc.text('Examination affairs unit', margin, 54, { width: 150 });
       
-      // Arabic header on right
-      doc.fontSize(9).fillColor('#333333');
-      doc.text(shapeArabicText('الأمانة العامة للتعليم الإسلامي'), pageWidth - margin - 180, 28, { width: 180, align: 'right' });
-      doc.text(shapeArabicText('والعربي'), pageWidth - margin - 180, 38, { width: 180, align: 'right' });
-      doc.text(shapeArabicText('في غامبيا'), pageWidth - margin - 180, 48, { width: 180, align: 'right' });
-      doc.fontSize(8).text(shapeArabicText('قسم الامتحانات'), pageWidth - margin - 180, 58, { width: 180, align: 'right' });
+      // Arabic text on right
+      doc.font('Helvetica').fontSize(9).fillColor('#000000');
+      doc.text(shapeArabicText('الأمانة العامة للتعليم الإسلامي والعربي'), pageWidth - margin - 150, 22, { width: 150, align: 'right' });
+      doc.font('Helvetica').fontSize(8).fillColor('#000000');
+      doc.text(shapeArabicText('في غامبيا'), pageWidth - margin - 150, 36, { width: 150, align: 'right' });
+      doc.fontSize(8).text(shapeArabicText('قسم الامتحانات'), pageWidth - margin - 150, 46, { width: 150, align: 'right' });
       
-      // Separator line
+      // Separator line below header
       let yPos = 75;
-      doc.moveTo(margin, yPos).lineTo(pageWidth - margin, yPos).stroke('#333333');
+      doc.moveTo(margin, yPos).lineTo(pageWidth - margin, yPos).stroke('#000000');
       
-      // Main title
-      yPos += 15;
+      // 2. MAIN TITLE
+      yPos = 85;
       doc.font('Helvetica-Bold').fontSize(11).fillColor('#000000');
-      doc.text(shapeArabicText('كشف نتائج الامتحانات للشهادة الابتدائية للعام 2025-2024 م'), margin, yPos, { width: contentWidth, align: 'center' });
+      doc.text(shapeArabicText('كشف نتائج الامتحانات للشهادة الابتدائية للعام 2025-2024 م'), margin, yPos, { 
+        width: contentWidth, 
+        align: 'center' 
+      });
       
-      yPos += 18;
-      doc.font('Helvetica').fontSize(9).fillColor('#333333');
-      doc.text(`Transcript No. / رقم الكشف: ${transcriptNumber}`, margin, yPos, { width: contentWidth, align: 'center' });
+      // 3. TRANSCRIPT NUMBER
+      yPos = 105;
+      doc.font('Helvetica').fontSize(9).fillColor('#000000');
+      doc.text(`Transcript No. / رقم الكشف: ${transcriptNumber}`, margin, yPos, { 
+        width: contentWidth, 
+        align: 'center' 
+      });
       
-      // Student details box
-      yPos += 18;
-      doc.rect(margin, yPos, contentWidth, 50).fill('#ffffff').stroke('#cccccc');
+      // 4. STUDENT DETAILS BOX
+      yPos = 122;
+      const boxHeight = 48;
+      doc.rect(margin, yPos, contentWidth, boxHeight).fill('#ffffff').stroke('#cccccc');
       
+      // English labels and values on left
       doc.font('Helvetica-Bold').fontSize(9).fillColor('#000000');
-      doc.text('Student Name:', margin + 8, yPos + 6);
-      doc.text('Nationality:', margin + 8, yPos + 20);
-      doc.text('School:', margin + 8, yPos + 34);
+      doc.text('Student Name:', margin + 6, yPos + 6, { width: 100 });
+      doc.text('Nationality:', margin + 6, yPos + 22, { width: 100 });
+      doc.text('School:', margin + 6, yPos + 38, { width: 100 });
       
+      // English values
       doc.font('Helvetica').fontSize(9).fillColor('#1a5276');
-      doc.text(fullNameEn, margin + 110, yPos + 6);
-      doc.text(nationalityEn, margin + 110, yPos + 20);
-      doc.text(schoolNameEn, margin + 110, yPos + 34);
+      doc.text('Slyma Mwr Anjaey', margin + 110, yPos + 6, { width: 200 });
+      doc.text('Gambian', margin + 110, yPos + 22, { width: 200 });
+      doc.text('Abubakar Alsdyq', margin + 110, yPos + 38, { width: 200 });
       
-      // Arabic details on right
+      // Arabic labels and values on right
       doc.font('Helvetica-Bold').fontSize(9).fillColor('#000000');
-      doc.text(shapeArabicText('اسم الطالب:'), pageWidth - margin - 70, yPos + 6);
-      doc.text(shapeArabicText('الجنسية:'), pageWidth - margin - 70, yPos + 20);
-      doc.text(shapeArabicText('المدرسة:'), pageWidth - margin - 70, yPos + 34);
+      doc.text(shapeArabicText('اسم الطالب/ة:'), pageWidth - margin - 80, yPos + 6, { width: 80, align: 'right' });
+      doc.text(shapeArabicText('الجنسية:'), pageWidth - margin - 80, yPos + 22, { width: 80, align: 'right' });
+      doc.text(shapeArabicText('المدرسة:'), pageWidth - margin - 80, yPos + 38, { width: 80, align: 'right' });
       
+      // Arabic values
       doc.font('Helvetica').fontSize(9).fillColor('#1a5276');
-      doc.text(shapeArabicText(fullNameAr), pageWidth - margin - 200, yPos + 6);
-      doc.text(shapeArabicText(nationalityAr), pageWidth - margin - 200, yPos + 20);
-      doc.text(shapeArabicText(schoolNameAr), pageWidth - margin - 200, yPos + 34);
+      doc.text(shapeArabicText(fullNameAr), pageWidth - margin - 210, yPos + 6, { width: 130, align: 'right' });
+      doc.text(shapeArabicText(nationalityAr), pageWidth - margin - 210, yPos + 22, { width: 130, align: 'right' });
+      doc.text(shapeArabicText(schoolNameAr), pageWidth - margin - 210, yPos + 38, { width: 130, align: 'right' });
       
-      // TABLE
-      yPos += 60;
-      const tableMargin = margin + 10;
-      const tableContentWidth = contentWidth - 20;
+      // 5. RESULTS TABLE
+      yPos = 180;
+      const tableX = margin;
+      const colWidth1 = 25;  // م
+      const colWidth2 = 150; // المادة
+      const colWidth3 = 65;  // الدرجات الكبرى
+      const colWidth4 = 65;  // الدرجات الصغرى
+      const colWidth5 = 80;  // الدرجة المحققة
+      const rowHeight = 18;
       
       // Table header
-      const headerHeight = 16;
-      doc.rect(tableMargin, yPos, tableContentWidth, headerHeight).fill('#cccccc').stroke('#000000');
-      
+      doc.rect(tableX, yPos, contentWidth, rowHeight).fill('#d3d3d3').stroke('#000000');
       doc.font('Helvetica-Bold').fontSize(8).fillColor('#000000');
-      const col1 = tableMargin + 10;
-      const col2 = tableMargin + 35;
-      const col3 = tableMargin + 200;
-      const col4 = tableMargin + 240;
-      const col5 = tableMargin + 280;
       
-      doc.text('م', col1, yPos + 3);
-      doc.text(shapeArabicText('المادة'), col2 + 40, yPos + 3);
-      doc.text(shapeArabicText('الدرجات الكبرى'), col3 + 10, yPos + 3);
-      doc.text(shapeArabicText('الدرجات الصغرى'), col4, yPos + 3);
-      doc.text(shapeArabicText('الدرجة المحققة'), col5 + 15, yPos + 3);
+      let cellX = tableX + 2;
+      doc.text('م', cellX, yPos + 4, { width: colWidth1, align: 'center' });
+      cellX += colWidth1;
+      doc.text(shapeArabicText('المادة'), cellX + 50, yPos + 4, { width: colWidth2 - 50, align: 'center' });
+      cellX += colWidth2;
+      doc.text(shapeArabicText('الدرجات الكبرى'), cellX + 5, yPos + 4, { width: colWidth3 - 10, align: 'center' });
+      cellX += colWidth3;
+      doc.text(shapeArabicText('الدرجات الصغرى'), cellX + 5, yPos + 4, { width: colWidth4 - 10, align: 'center' });
+      cellX += colWidth4;
+      doc.text(shapeArabicText('الدرجة المحققة'), cellX + 10, yPos + 4, { width: colWidth5 - 20, align: 'center' });
       
-      yPos += headerHeight;
+      yPos += rowHeight;
       
-      // Table rows
-      const rowHeight = 16;
+      // Table rows with subjects
       subjectMarks.forEach((subject, index) => {
-        const rowColor = index % 2 === 0 ? '#ffffff' : '#f5f5f5';
-        doc.rect(tableMargin, yPos, tableContentWidth, rowHeight).fill(rowColor).stroke('#999999');
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
+        doc.rect(tableX, yPos, contentWidth, rowHeight).fill(bgColor).stroke('#cccccc');
         
-        doc.font('Helvetica').fontSize(8).fillColor('#000000');
-        doc.text((index + 1).toString(), col1, yPos + 3);
-        doc.text(shapeArabicText(subject.arabicName), col2 + 50, yPos + 3);
-        doc.text(subject.maxScore.toString(), col3 + 15, yPos + 3);
-        doc.text(subject.minScore.toString(), col4 + 5, yPos + 3);
+        doc.font('Helvetica').fontSize(8.5).fillColor('#000000');
+        cellX = tableX + 2;
         
+        // Number
+        doc.text((index + 1).toString(), cellX, yPos + 5, { width: colWidth1, align: 'center' });
+        cellX += colWidth1;
+        
+        // Subject name (Arabic only)
+        doc.text(shapeArabicText(subject.arabicName), cellX + 50, yPos + 5, { width: colWidth2 - 50, align: 'center' });
+        cellX += colWidth2;
+        
+        // Max score
+        doc.text(subject.maxScore.toString(), cellX, yPos + 5, { width: colWidth3, align: 'center' });
+        cellX += colWidth3;
+        
+        // Min score
+        doc.text(subject.minScore.toString(), cellX, yPos + 5, { width: colWidth4, align: 'center' });
+        cellX += colWidth4;
+        
+        // Achieved mark
         const markText = subject.mark !== null && subject.mark !== undefined ? subject.mark.toString() : '-';
-        doc.font('Helvetica-Bold').fillColor('#1a5276');
-        doc.text(markText, col5 + 25, yPos + 3);
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#1a5276');
+        doc.text(markText, cellX, yPos + 5, { width: colWidth5, align: 'center' });
         
         yPos += rowHeight;
       });
       
       // Total row
-      doc.rect(tableMargin, yPos, tableContentWidth, rowHeight).fill('#cccccc').stroke('#000000');
-      doc.font('Helvetica-Bold').fontSize(8).fillColor('#000000');
-      doc.text(shapeArabicText('مجموع الدرجات'), col2, yPos + 3);
-      doc.text(totalMarks.toString(), col5 + 25, yPos + 3);
+      doc.rect(tableX, yPos, contentWidth, rowHeight).fill('#d3d3d3').stroke('#000000');
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#000000');
+      cellX = tableX + colWidth1 + 2;
+      doc.text(shapeArabicText('مجموع الدرجات'), cellX + 50, yPos + 4, { width: colWidth2 - 50, align: 'center' });
+      cellX = tableX + colWidth1 + colWidth2 + colWidth3 + colWidth4;
+      doc.text(totalMarks.toString(), cellX, yPos + 4, { width: colWidth5, align: 'center' });
       yPos += rowHeight;
       
       // Percentage row
-      doc.rect(tableMargin, yPos, tableContentWidth, rowHeight).fill('#f5f5f5').stroke('#999999');
-      doc.font('Helvetica').fontSize(8).fillColor('#000000');
-      doc.text(shapeArabicText('النسبة'), col2, yPos + 3);
-      doc.text(`${percentage.toFixed(1)}%`, col5 + 25, yPos + 3);
+      doc.rect(tableX, yPos, contentWidth, rowHeight).fill('#f9f9f9').stroke('#cccccc');
+      doc.font('Helvetica').fontSize(9).fillColor('#000000');
+      cellX = tableX + colWidth1 + 2;
+      doc.text(shapeArabicText('النسبة'), cellX + 50, yPos + 4, { width: colWidth2 - 50, align: 'center' });
+      cellX = tableX + colWidth1 + colWidth2 + colWidth3 + colWidth4;
+      doc.text(`${percentage.toFixed(1)}%`, cellX, yPos + 4, { width: colWidth5, align: 'center' });
       yPos += rowHeight;
       
       // Grade row
-      doc.rect(tableMargin, yPos, tableContentWidth, rowHeight).fill('#c8e6c9').stroke('#000000');
-      doc.font('Helvetica-Bold').fontSize(8).fillColor('#155724');
-      doc.text(shapeArabicText('التقدير'), col2, yPos + 3);
-      doc.text(shapeArabicText(finalGrade.arabic), col5 + 20, yPos + 3);
+      doc.rect(tableX, yPos, contentWidth, rowHeight).fill('#c8e6c9').stroke('#000000');
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#155724');
+      cellX = tableX + colWidth1 + 2;
+      doc.text(shapeArabicText('التقدير'), cellX + 50, yPos + 4, { width: colWidth2 - 50, align: 'center' });
+      cellX = tableX + colWidth1 + colWidth2 + colWidth3 + colWidth4;
+      doc.text(shapeArabicText(finalGrade.arabic), cellX, yPos + 4, { width: colWidth5, align: 'center' });
       
-      // Signature section
-      yPos += rowHeight + 30;
-      doc.font('Helvetica').fontSize(8).fillColor('#333333');
-      doc.text(shapeArabicText('توقيع رئيس اللجنة الامتحانية'), margin + 50, yPos);
-      doc.text(shapeArabicText('موقع إدارة الأمانة'), pageWidth - margin - 150, yPos);
+      // 6. SIGNATURE SECTION
+      yPos += rowHeight + 20;
+      doc.font('Helvetica').fontSize(8).fillColor('#000000');
+      doc.text(shapeArabicText('توقيع رئيس لجنة الامتحانات'), margin + 30, yPos);
+      doc.text(shapeArabicText('موقع إدارة الأمانة'), pageWidth - margin - 140, yPos);
       
-      yPos += 20;
-      doc.moveTo(margin + 30, yPos).lineTo(margin + 140, yPos).stroke('#666666');
-      doc.moveTo(pageWidth - margin - 170, yPos).lineTo(pageWidth - margin - 60, yPos).stroke('#666666');
+      yPos += 18;
+      doc.moveTo(margin + 10, yPos).lineTo(margin + 120, yPos).stroke('#999999');
+      doc.moveTo(pageWidth - margin - 160, yPos).lineTo(pageWidth - margin - 30, yPos).stroke('#999999');
       
-      // QR Code
+      // 7. QR CODE SECTION
+      yPos += 25;
       if (data.qrCodeDataUrl) {
-        yPos += 30;
+        doc.moveTo(margin, yPos).lineTo(pageWidth - margin, yPos).stroke('#cccccc');
+        yPos += 10;
+        
         const qrBuffer = Buffer.from(data.qrCodeDataUrl.split(',')[1], 'base64');
-        doc.image(qrBuffer, margin, yPos, { width: 60 });
+        doc.image(qrBuffer, margin, yPos, { width: 55 });
         
         doc.font('Helvetica').fontSize(7).fillColor('#666666');
-        doc.text(transcriptNumber, margin, yPos + 65, { width: 60, align: 'center' });
+        doc.text(transcriptNumber, margin, yPos + 60, { width: 55, align: 'center' });
+        
+        // QR verification text on right
+        doc.font('Helvetica').fontSize(7).fillColor('#666666');
+        doc.text(shapeArabicText('للتحقق من صحة هذه الشهادة استخدم رمز QR'), pageWidth - margin - 200, yPos + 20, { width: 200, align: 'right' });
+        doc.text('To verify this transcript, scan the QR code', pageWidth - margin - 200, yPos + 30, { width: 200, align: 'right' });
       }
       
       doc.end();
