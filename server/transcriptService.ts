@@ -373,7 +373,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     .page {
       width: 210mm;
       height: 297mm;
-      padding: 10mm 12mm;
+      padding: 8mm 12mm 38mm 12mm;
       position: relative;
       display: flex;
       flex-direction: column;
@@ -546,54 +546,84 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       margin: 0 auto;
     }
     
-    /* BOTTOM FOOTER - absolute positioned at bottom */
-    .bottom-footer {
+    /* FOOTER - fixed at bottom with gray background */
+    .footer {
       position: absolute;
-      bottom: 10mm;
-      left: 12mm;
-      right: 12mm;
-      border-top: 1px solid #ccc;
-      padding-top: 4mm;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+    .footer-bar {
+      background: #f2f2f2;
+      padding: 4mm 12mm 3mm;
+      border-top: 1px solid #d0d0d0;
+    }
+    .footer-content {
       display: flex;
-      justify-content: space-between;
       align-items: flex-start;
+      justify-content: space-between;
+      gap: 8mm;
       direction: ltr;
     }
-    
-    .qr-section {
+    .footer-left {
       display: flex;
+      flex-direction: column;
       align-items: flex-start;
+      gap: 1mm;
     }
-    .qr-code-box {
-      text-align: left;
-    }
-    .qr-code-box img {
+    .qr-frame {
       width: 22mm;
       height: 22mm;
-      border: 1px solid #ddd;
+      border: 1px solid #c8c8c8;
+      padding: 1mm;
+      background: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
-    .qr-transcript-number {
-      font-family: monospace;
+    .qr-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .transcript-code {
+      font-family: 'Times New Roman', serif;
       font-size: 8pt;
-      margin-top: 1mm;
+      letter-spacing: 0.3pt;
       color: #333;
     }
-    
-    .verify-section {
+    .footer-divider {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0;
+      padding-top: 2mm;
+    }
+    .divider-green {
+      width: 4mm;
+      height: 10mm;
+      background: #2f9b57;
+    }
+    .divider-red {
+      width: 4mm;
+      height: 10mm;
+      background: #c73333;
+    }
+    .footer-right {
       display: flex;
       flex-direction: column;
       align-items: flex-end;
-      gap: 2mm;
+      gap: 1.5mm;
       text-align: right;
       direction: rtl;
     }
     .verify-ar {
-      font-size: 10pt;
-      color: #333;
+      font-size: 9pt;
+      color: #222;
     }
     .verify-en {
       font-family: 'Times New Roman', serif;
-      font-size: 9pt;
+      font-size: 8pt;
       color: #555;
     }
   </style>
@@ -690,19 +720,25 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       </div>
     </div>
     
-    <!-- BOTTOM FOOTER with QR -->
-    <div class="bottom-footer">
-      <div class="qr-section">
-        <div class="qr-code-box">
-          <img src="${qrCodeDataUrl}" alt="QR">
-          <div class="qr-transcript-number">${transcriptNumber}</div>
+    <!-- FOOTER with QR, color bar, and verification text -->
+    <footer class="footer">
+      <div class="footer-bar">
+        <div class="footer-content">
+          <div class="footer-left">
+            <div class="qr-frame"><img src="${qrCodeDataUrl}" alt="QR"></div>
+            <div class="transcript-code">${transcriptNumber}</div>
+          </div>
+          <div class="footer-divider">
+            <span class="divider-green"></span>
+            <span class="divider-red"></span>
+          </div>
+          <div class="footer-right">
+            <p class="verify-ar">للتحقق من صحة هذا الكشف، امسح رمز QR</p>
+            <p class="verify-en">To verify this transcript, scan the QR code</p>
+          </div>
         </div>
       </div>
-      <div class="verify-section">
-        <div class="verify-ar">للتحقق من صحة هذا الكشف، امسح رمز QR</div>
-        <div class="verify-en">To verify this transcript, scan the QR code</div>
-      </div>
-    </div>
+    </footer>
   </div>
 </body>
 </html>`;
