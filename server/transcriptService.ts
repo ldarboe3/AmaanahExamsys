@@ -453,16 +453,15 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     .transcript-number {
       text-align: center;
       font-size: 11pt;
-      margin-bottom: 4mm;
+      margin-bottom: 3mm;
       direction: rtl;
     }
     
-    /* STUDENT INFO BOX */
+    /* STUDENT INFO BOX - transparent for watermark */
     .student-box {
       border: 1px solid #ccc;
-      background: #f8f8f8;
-      padding: 3mm 4mm;
-      margin-bottom: 4mm;
+      padding: 2mm 4mm;
+      margin-bottom: 3mm;
       display: flex;
       justify-content: space-between;
       direction: ltr;
@@ -472,7 +471,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       text-align: left;
       font-family: 'Times New Roman', serif;
       font-size: 12pt;
-      line-height: 2;
+      line-height: 1.6;
     }
     .student-left .label { font-weight: bold; }
     .student-left .value { color: #1a5276; font-weight: bold; }
@@ -480,7 +479,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     .student-right {
       text-align: right;
       font-size: 13pt;
-      line-height: 2;
+      line-height: 1.6;
       direction: rtl;
     }
     .student-right .label { font-weight: bold; }
@@ -525,7 +524,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     
     /* SIGNATURE SECTION - above the footer separator */
     .signature-section {
-      margin-top: 10mm;
+      margin-top: 6mm;
       display: flex;
       justify-content: space-around;
       direction: rtl;
@@ -538,7 +537,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     .sig-label {
       font-size: 11pt;
       direction: rtl;
-      margin-bottom: 12mm;
+      margin-bottom: 8mm;
     }
     
     .sig-line {
