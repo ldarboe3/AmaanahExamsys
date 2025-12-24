@@ -2,8 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import QRCode from 'qrcode';
 import crypto from 'crypto';
-import PDFDocument from 'pdfkit';
-import { shapeArabicText } from './arabicTextHelper';
+import { getSharedBrowser } from './chromiumHelper';
 
 // Arabic to English Transliteration Map
 const ARABIC_TO_ENGLISH_MAP: Record<string, string> = {
@@ -326,8 +325,226 @@ if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }
 
-// Note: Font files at /fonts/Amiri-Regular.ttf and /fonts/Amiri-Bold.ttf are corrupted (contain HTML).
-// Using Helvetica for reliable English rendering.
+// HTML template-based transcript generation using Puppeteer for proper Arabic text rendering
+function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCodeDataUrl: string): string {
+  const { student, school, examYear, subjectMarks, totalMarks, percentage, finalGrade } = data;
+  
+  const fullNameAr = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
+  const nationalityAr = student.nationality || 'غامبي';
+  const schoolNameAr = school.name;
+  const transcriptNumber = data.transcriptNumber || '';
+  
+  const subjectRows = subjectMarks.map((subject, index) => `
+    <tr class="${index % 2 === 0 ? 'even' : 'odd'}">
+      <td class="score">${subject.mark !== null && subject.mark !== undefined ? subject.mark : '-'}</td>
+      <td class="number">${subject.minScore}</td>
+      <td class="number">${subject.maxScore}</td>
+      <td class="subject">${subject.arabicName}</td>
+      <td class="index">${index + 1}</td>
+    </tr>
+  `).join('');
+
+  return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap');
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @page { size: A4; margin: 0; }
+    html, body {
+      width: 210mm; height: 297mm; margin: 0; padding: 0;
+      font-family: 'Amiri', 'Traditional Arabic', serif;
+      background: white;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .container {
+      width: 210mm; height: 297mm; padding: 15mm 15mm 10mm 15mm;
+      position: relative;
+    }
+    .watermark {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.06; z-index: 0; pointer-events: none;
+    }
+    .watermark img { width: 180mm; }
+    .content { position: relative; z-index: 1; }
+    .header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 8mm;
+    }
+    .header-english {
+      text-align: left; font-family: 'Times New Roman', serif;
+      font-size: 10pt; line-height: 1.4; width: 45mm;
+    }
+    .header-logo { text-align: center; width: 30mm; }
+    .header-logo img { width: 20mm; height: 20mm; }
+    .header-arabic {
+      text-align: right; font-size: 12pt; line-height: 1.5;
+      width: 55mm; direction: rtl;
+    }
+    .header-separator { border-top: 1px solid #333; margin: 4mm 0; }
+    .main-title {
+      text-align: center; font-size: 16pt; font-weight: bold;
+      margin-bottom: 4mm; direction: rtl;
+    }
+    .transcript-number {
+      text-align: center; font-size: 10pt; margin-bottom: 6mm; direction: rtl;
+    }
+    .student-info {
+      display: flex; justify-content: space-between;
+      margin-bottom: 6mm; padding: 3mm;
+      border: 1px solid #ddd; background: #fafafa;
+    }
+    .student-info-left { text-align: left; font-size: 10pt; line-height: 1.8; }
+    .student-info-right { text-align: right; font-size: 11pt; line-height: 1.8; direction: rtl; }
+    .student-info .label { color: #333; }
+    .student-info .value { color: #1a5276; font-weight: bold; }
+    table {
+      width: 100%; border-collapse: collapse;
+      margin-bottom: 6mm; direction: rtl;
+    }
+    table th {
+      background: #d5d5d5; padding: 2.5mm; border: 1px solid #999;
+      font-size: 10pt; font-weight: bold; text-align: center;
+    }
+    table td {
+      padding: 2mm; border: 1px solid #ccc;
+      font-size: 10pt; text-align: center;
+    }
+    table tr.even { background: #fff; }
+    table tr.odd { background: #f5f5f5; }
+    table td.subject { text-align: right; padding-right: 4mm; }
+    table td.score { color: #1a5276; font-weight: bold; }
+    table td.index { width: 8mm; }
+    table td.number { width: 15mm; }
+    .summary-row { background: #d5d5d5 !important; font-weight: bold; }
+    .percentage-row { background: #f5f5f5 !important; }
+    .grade-row { background: #c8e6c9 !important; }
+    .grade-row td { color: #155724; font-weight: bold; font-size: 12pt; }
+    .signatures {
+      display: flex; justify-content: space-between;
+      margin-top: 8mm; padding-top: 4mm;
+    }
+    .signature-block { text-align: center; width: 45%; }
+    .signature-line {
+      border-top: 1px solid #999;
+      margin: 8mm auto 2mm auto; width: 80%;
+    }
+    .signature-label-en {
+      font-family: 'Times New Roman', serif; font-size: 9pt; margin-bottom: 2mm;
+    }
+    .signature-label-ar { font-size: 10pt; direction: rtl; }
+    .footer {
+      display: flex; justify-content: space-between;
+      align-items: flex-end; margin-top: 10mm;
+    }
+    .qr-section { text-align: left; }
+    .qr-section img { width: 18mm; height: 18mm; }
+    .qr-number { font-size: 8pt; margin-top: 2mm; font-family: monospace; }
+    .verify-text { text-align: right; font-size: 9pt; color: #666; direction: rtl; }
+    .verify-text-ar { margin-bottom: 2mm; }
+    .verify-text-en { font-family: 'Times New Roman', serif; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="watermark">
+      <img src="data:image/png;base64,${logoBase64}" alt="watermark">
+    </div>
+    <div class="content">
+      <div class="header">
+        <div class="header-english">
+          The General Secretariat for<br>
+          Islamic/Arabic Education in<br>
+          The Gambia<br>
+          Examination affairs unit
+        </div>
+        <div class="header-logo">
+          <img src="data:image/png;base64,${logoBase64}" alt="logo">
+        </div>
+        <div class="header-arabic">
+          الأمانة العامة للتعليم الإسلامي العربي<br>
+          في غامبيا<br>
+          قسم الامتحانات
+        </div>
+      </div>
+      <div class="header-separator"></div>
+      <div class="main-title">
+        كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year}-${examYear.year - 1} م
+      </div>
+      <div class="transcript-number">
+        Transcript No. / رقم الكشف: ${transcriptNumber}
+      </div>
+      <div class="student-info">
+        <div class="student-info-left">
+          <div><span class="label">Student Name:</span> <span class="value">${transliterateArabicToEnglish(fullNameAr)}</span></div>
+          <div><span class="label">Nationality:</span> <span class="value">${transliterateArabicToEnglish(nationalityAr)}</span></div>
+          <div><span class="label">School:</span> <span class="value">${transliterateArabicToEnglish(schoolNameAr)}</span></div>
+        </div>
+        <div class="student-info-right">
+          <div><span class="label">اسم الطالب/ة:</span> <span class="value">${fullNameAr}</span></div>
+          <div><span class="label">الجنسية:</span> <span class="value">${nationalityAr}</span></div>
+          <div><span class="label">المدرسة:</span> <span class="value">${schoolNameAr}</span></div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 70px;">الدرجة المحققة</th>
+            <th style="width: 60px;">الدرجات الصغرى</th>
+            <th style="width: 60px;">الدرجات الكبرى</th>
+            <th>المادة</th>
+            <th style="width: 30px;">م</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${subjectRows}
+          <tr class="summary-row">
+            <td colspan="1">${totalMarks}</td>
+            <td colspan="3">مجموع الدرجات</td>
+            <td></td>
+          </tr>
+          <tr class="percentage-row">
+            <td colspan="1">${percentage.toFixed(1)}%</td>
+            <td colspan="3">النسبة</td>
+            <td></td>
+          </tr>
+          <tr class="grade-row">
+            <td colspan="1">${finalGrade.arabic}</td>
+            <td colspan="3">التقدير</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="signatures">
+        <div class="signature-block">
+          <div class="signature-label-en">Exam Committee Chairman</div>
+          <div class="signature-label-ar">توقيع رئيس لجنة الامتحانات</div>
+          <div class="signature-line"></div>
+        </div>
+        <div class="signature-block">
+          <div class="signature-label-en">Secretariat Administration</div>
+          <div class="signature-label-ar">توقيع إدارة الأمانة</div>
+          <div class="signature-line"></div>
+        </div>
+      </div>
+      <div class="footer">
+        <div class="qr-section">
+          <img src="${qrCodeDataUrl}" alt="QR Code">
+          <div class="qr-number">${transcriptNumber}</div>
+        </div>
+        <div class="verify-text">
+          <div class="verify-text-ar">للتحقق من صحة هذا الكشف، استخدم رمز QR</div>
+          <div class="verify-text-en">To verify this transcript, scan the QR code</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
 
 export async function generateTranscriptPDF(data: TranscriptData): Promise<string> {
   const validation = validateTranscriptRequirements(data);
@@ -335,248 +552,46 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
     throw new Error(`Validation failed: ${validation.errorsAr.join(', ')}`);
   }
 
-  const { student, school, examYear, subjectMarks, totalMarks, percentage, finalGrade } = data;
+  // Load logo for embedding
+  const logoPath = path.join(process.cwd(), 'public', 'amaanah-logo.png');
+  let logoBase64 = '';
+  if (fs.existsSync(logoPath)) {
+    const logoBuffer = fs.readFileSync(logoPath);
+    logoBase64 = logoBuffer.toString('base64');
+  }
   
-  const fullNameAr = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
-  const schoolNameAr = school.name;
-  const nationalityAr = student.nationality || '';
-  const transcriptNumber = data.transcriptNumber || '';
-  
-  return new Promise((resolve, reject) => {
-    try {
-      const fileName = `transcript_g6_${data.student.indexNumber || data.student.id}_${Date.now()}.pdf`;
-      const filePath = path.join(outputDir, fileName);
-      
-      const doc = new PDFDocument({ size: 'A4', margin: 0 });
-      const stream = fs.createWriteStream(filePath);
-      
-      doc.pipe(stream);
-      
-      // Register Arabic fonts for proper text rendering
-      const amiriRegularPath = path.join(process.cwd(), 'fonts', 'Amiri-Regular.ttf');
-      const amiriBoldPath = path.join(process.cwd(), 'fonts', 'Amiri-Bold.ttf');
-      
-      if (fs.existsSync(amiriRegularPath) && fs.existsSync(amiriBoldPath)) {
-        doc.registerFont('Amiri', amiriRegularPath);
-        doc.registerFont('Amiri-Bold', amiriBoldPath);
-      }
-      
-      const pageWidth = 595; // A4 width in points
-      const pageHeight = 842; // A4 height in points
-      const margin = 35;
-      const contentWidth = pageWidth - (margin * 2);
-      
-      // 1. HEADER SECTION
-      // Add logo centered
-      const logoPath = path.join(process.cwd(), 'public', 'amaanah-logo.png');
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, (pageWidth - 60) / 2, 15, { width: 60, height: 60 });
-      }
-      
-      // Add watermark in center of page (behind content)
-      doc.save();
-      doc.opacity(0.08);
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, (pageWidth - 200) / 2, 300, { width: 200 });
-      }
-      doc.restore();
-      
-      // English text on left
-      doc.font('Helvetica').fontSize(9).fillColor('#000000');
-      doc.text('The General Secretariat for', margin, 22, { width: 150 });
-      doc.font('Helvetica').fontSize(8.5).fillColor('#000000');
-      doc.text('Islamic/Arabic Education in', margin, 34, { width: 150 });
-      doc.font('Helvetica').fontSize(8.5).fillColor('#000000');
-      doc.text('The Gambia', margin, 44, { width: 150 });
-      doc.font('Helvetica').fontSize(8).fillColor('#000000');
-      doc.text('Examination affairs unit', margin, 54, { width: 150 });
-      
-      // Arabic text on right
-      doc.font('Amiri').fontSize(9).fillColor('#000000');
-      doc.text(shapeArabicText('الأمانة العامة للتعليم الإسلامي والعربي'), pageWidth - margin - 150, 22, { width: 150, align: 'right' });
-      doc.font('Amiri').fontSize(8).fillColor('#000000');
-      doc.text(shapeArabicText('في غامبيا'), pageWidth - margin - 150, 36, { width: 150, align: 'right' });
-      doc.font('Amiri').fontSize(8).text(shapeArabicText('قسم الامتحانات'), pageWidth - margin - 150, 46, { width: 150, align: 'right' });
-      
-      // Separator line below header
-      let yPos = 75;
-      doc.moveTo(margin, yPos).lineTo(pageWidth - margin, yPos).stroke('#000000');
-      
-      // 2. MAIN TITLE
-      yPos = 85;
-      doc.font('Amiri-Bold').fontSize(11).fillColor('#000000');
-      doc.text(shapeArabicText('كشف نتائج الامتحانات للشهادة الابتدائية للعام 2025-2024 م'), margin, yPos, { 
-        width: contentWidth, 
-        align: 'center' 
-      });
-      
-      // 3. TRANSCRIPT NUMBER
-      yPos = 105;
-      doc.font('Helvetica').fontSize(9).fillColor('#000000');
-      doc.text(`Transcript No. / رقم الكشف: ${transcriptNumber}`, margin, yPos, { 
-        width: contentWidth, 
-        align: 'center' 
-      });
-      
-      // 4. STUDENT DETAILS BOX
-      yPos = 122;
-      const boxHeight = 48;
-      doc.rect(margin, yPos, contentWidth, boxHeight).fill('#ffffff').stroke('#cccccc');
-      
-      // English labels and values on left
-      doc.font('Helvetica').fontSize(9).fillColor('#000000');
-      doc.text('Student Name:', margin + 6, yPos + 6, { width: 100 });
-      doc.text('Nationality:', margin + 6, yPos + 22, { width: 100 });
-      doc.text('School:', margin + 6, yPos + 38, { width: 100 });
-      
-      // English values
-      doc.font('Helvetica').fontSize(9).fillColor('#1a5276');
-      doc.text(transliterateArabicToEnglish(fullNameAr), margin + 110, yPos + 6, { width: 200 });
-      doc.text(transliterateArabicToEnglish(nationalityAr), margin + 110, yPos + 22, { width: 200 });
-      doc.text(transliterateArabicToEnglish(schoolNameAr), margin + 110, yPos + 38, { width: 200 });
-      
-      // Arabic labels and values on right
-      doc.font('Amiri').fontSize(9).fillColor('#000000');
-      doc.text(shapeArabicText('اسم الطالب/ة:'), pageWidth - margin - 80, yPos + 6, { width: 80, align: 'right' });
-      doc.text(shapeArabicText('الجنسية:'), pageWidth - margin - 80, yPos + 22, { width: 80, align: 'right' });
-      doc.text(shapeArabicText('المدرسة:'), pageWidth - margin - 80, yPos + 38, { width: 80, align: 'right' });
-      
-      // Arabic values
-      doc.font('Amiri').fontSize(9).fillColor('#1a5276');
-      doc.text(shapeArabicText(fullNameAr), pageWidth - margin - 210, yPos + 6, { width: 130, align: 'right' });
-      doc.text(shapeArabicText(nationalityAr), pageWidth - margin - 210, yPos + 22, { width: 130, align: 'right' });
-      doc.text(shapeArabicText(schoolNameAr), pageWidth - margin - 210, yPos + 38, { width: 130, align: 'right' });
-      
-      // 5. RESULTS TABLE - RTL Layout (columns from right: م, المادة, الكبرى, الصغرى, المحققة)
-      yPos = 180;
-      const tableX = margin;
-      const colScore = 70;     // الدرجة المحققة (leftmost)
-      const colMin = 65;       // الدرجات الصغرى
-      const colMax = 65;       // الدرجات الكبرى
-      const colSubject = 150;  // المادة
-      const colNum = 35;       // م (rightmost)
-      const rowHeight = 20;
-      
-      // Calculate column positions from RIGHT to LEFT
-      const col5X = pageWidth - margin - colNum;           // م
-      const col4X = col5X - colSubject;                    // المادة
-      const col3X = col4X - colMax;                        // الكبرى
-      const col2X = col3X - colMin;                        // الصغرى
-      const col1X = margin;                                // المحققة
-      
-      // Table header
-      doc.rect(tableX, yPos, contentWidth, rowHeight).fill('#d5d5d5').stroke('#000000');
-      doc.font('Amiri').fontSize(9).fillColor('#000000');
-      
-      // RTL header columns
-      doc.text(shapeArabicText('الدرجة المحققة'), col1X, yPos + 5, { width: colScore, align: 'center' });
-      doc.text(shapeArabicText('الدرجات الصغرى'), col2X, yPos + 5, { width: colMin, align: 'center' });
-      doc.text(shapeArabicText('الدرجات الكبرى'), col3X, yPos + 5, { width: colMax, align: 'center' });
-      doc.text(shapeArabicText('المادة'), col4X, yPos + 5, { width: colSubject, align: 'center' });
-      doc.text(shapeArabicText('م'), col5X, yPos + 5, { width: colNum, align: 'center' });
-      
-      yPos += rowHeight;
-      
-      // Table rows with subjects - RTL layout
-      subjectMarks.forEach((subject, index) => {
-        const bgColor = index % 2 === 0 ? '#ffffff' : '#f5f5f5';
-        doc.rect(tableX, yPos, contentWidth, rowHeight).fill(bgColor).stroke('#cccccc');
-        
-        // Achieved mark (leftmost column)
-        const markText = subject.mark !== null && subject.mark !== undefined ? subject.mark.toString() : '-';
-        doc.font('Helvetica-Bold').fontSize(9).fillColor('#1a5276');
-        doc.text(markText, col1X, yPos + 5, { width: colScore, align: 'center' });
-        
-        // Min score
-        doc.font('Helvetica').fontSize(9).fillColor('#000000');
-        doc.text(subject.minScore.toString(), col2X, yPos + 5, { width: colMin, align: 'center' });
-        
-        // Max score
-        doc.text(subject.maxScore.toString(), col3X, yPos + 5, { width: colMax, align: 'center' });
-        
-        // Subject name (Arabic)
-        doc.font('Amiri').fontSize(9).fillColor('#000000');
-        doc.text(shapeArabicText(subject.arabicName), col4X, yPos + 5, { width: colSubject, align: 'center' });
-        
-        // Number (rightmost)
-        doc.font('Helvetica').fontSize(9).fillColor('#000000');
-        doc.text((index + 1).toString(), col5X, yPos + 5, { width: colNum, align: 'center' });
-        
-        yPos += rowHeight;
-      });
-      
-      // Total row
-      doc.rect(tableX, yPos, contentWidth, rowHeight).fill('#d5d5d5').stroke('#000000');
-      doc.font('Amiri').fontSize(9).fillColor('#000000');
-      doc.text(shapeArabicText('مجموع الدرجات'), col4X, yPos + 5, { width: colSubject, align: 'center' });
-      doc.font('Helvetica-Bold').fontSize(9).fillColor('#000000');
-      doc.text(totalMarks.toString(), col1X, yPos + 5, { width: colScore, align: 'center' });
-      yPos += rowHeight;
-      
-      // Percentage row
-      doc.rect(tableX, yPos, contentWidth, rowHeight).fill('#f5f5f5').stroke('#cccccc');
-      doc.font('Amiri').fontSize(9).fillColor('#000000');
-      doc.text(shapeArabicText('النسبة'), col4X, yPos + 5, { width: colSubject, align: 'center' });
-      doc.font('Helvetica').fontSize(9).fillColor('#000000');
-      doc.text(`${percentage.toFixed(1)}%`, col1X, yPos + 5, { width: colScore, align: 'center' });
-      yPos += rowHeight;
-      
-      // Grade row
-      doc.rect(tableX, yPos, contentWidth, rowHeight).fill('#c8e6c9').stroke('#000000');
-      doc.font('Amiri').fontSize(9).fillColor('#155724');
-      doc.text(shapeArabicText('التقدير'), col4X, yPos + 5, { width: colSubject, align: 'center' });
-      doc.font('Amiri-Bold').fontSize(10).fillColor('#155724');
-      doc.text(shapeArabicText(finalGrade.arabic), col1X, yPos + 5, { width: colScore, align: 'center' });
-      
-      // 6. SIGNATURE SECTION
-      yPos += rowHeight + 20;
-      doc.font('Helvetica').fontSize(8).fillColor('#000000');
-      doc.text('Exam Committee Chairman', margin + 30, yPos);
-      doc.font('Amiri').text(shapeArabicText('توقيع رئيس لجنة الامتحانات'), margin + 30, yPos + 12);
-      doc.font('Helvetica').text('Secretariat Administration', pageWidth - margin - 140, yPos);
-      doc.font('Amiri').text(shapeArabicText('توقيع إدارة الأمانة'), pageWidth - margin - 140, yPos + 12);
-      
-      yPos += 32;
-      doc.moveTo(margin + 10, yPos).lineTo(margin + 120, yPos).stroke('#999999');
-      doc.moveTo(pageWidth - margin - 160, yPos).lineTo(pageWidth - margin - 30, yPos).stroke('#999999');
-      
-      // 7. QR CODE SECTION
-      yPos += 25;
-      if (data.qrCodeDataUrl) {
-        doc.moveTo(margin, yPos).lineTo(pageWidth - margin, yPos).stroke('#cccccc');
-        yPos += 10;
-        
-        const qrBuffer = Buffer.from(data.qrCodeDataUrl.split(',')[1], 'base64');
-        doc.image(qrBuffer, margin, yPos, { width: 55 });
-        
-        doc.font('Helvetica').fontSize(7).fillColor('#666666');
-        doc.text(transcriptNumber, margin, yPos + 60, { width: 55, align: 'center' });
-        
-        // QR verification text on right
-        doc.font('Amiri').fontSize(7).fillColor('#666666');
-        doc.text(shapeArabicText('للتحقق من صحة هذه الشهادة استخدم رمز QR'), pageWidth - margin - 200, yPos + 20, { width: 200, align: 'right' });
-        doc.font('Helvetica').fontSize(7).fillColor('#666666');
-        doc.text('To verify this transcript, scan the QR code', pageWidth - margin - 200, yPos + 30, { width: 200, align: 'right' });
-      }
-      
-      doc.end();
-      
-      stream.on('finish', () => {
-        console.log(`[Transcript PDF] Successfully generated: ${filePath}`);
-        resolve(filePath);
-      });
-      
-      stream.on('error', (err) => {
-        console.error(`[Transcript PDF] Stream error:`, err.message);
-        reject(new Error(`Failed to generate transcript PDF: ${err.message}`));
-      });
-      
-    } catch (error: any) {
-      const studentInfo = `${data.student.firstName} ${data.student.lastName} (${data.student.indexNumber || 'unknown'})`;
-      console.error(`[Transcript PDF] Generation error for student ${studentInfo}:`, error.message);
-      reject(new Error(`Failed to generate transcript PDF: ${error.message}`));
-    }
+  // Generate QR code
+  const verifyUrl = `https://amaanah.gm/verify/${data.qrToken || 'preview'}`;
+  const qrCodeDataUrl = data.qrCodeDataUrl || await QRCode.toDataURL(verifyUrl, {
+    width: 150,
+    margin: 1,
+    color: { dark: '#000000', light: '#ffffff' }
   });
+  
+  const html = generateTranscriptHTML(data, logoBase64, qrCodeDataUrl);
+  
+  const fileName = `transcript_g6_${data.student.indexNumber || data.student.id}_${Date.now()}.pdf`;
+  const filePath = path.join(outputDir, fileName);
+  
+  // Use Puppeteer for proper Arabic text rendering
+  const browser = await getSharedBrowser();
+  const page = await browser.newPage();
+  
+  try {
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    
+    await page.pdf({
+      path: filePath,
+      format: 'A4',
+      printBackground: true,
+      preferCSSPageSize: true
+    });
+    
+    console.log(`[Transcript PDF] Successfully generated: ${filePath}`);
+    return filePath;
+  } finally {
+    await page.close();
+  }
 }
 
 // Helper to build TranscriptData from database records
