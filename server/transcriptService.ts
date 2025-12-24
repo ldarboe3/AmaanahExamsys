@@ -592,23 +592,6 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       letter-spacing: 0.3pt;
       color: #333;
     }
-    .footer-divider {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 0;
-      padding-top: 2mm;
-    }
-    .divider-green {
-      width: 4mm;
-      height: 10mm;
-      background: #2f9b57;
-    }
-    .divider-red {
-      width: 4mm;
-      height: 10mm;
-      background: #c73333;
-    }
     .footer-right {
       display: flex;
       flex-direction: column;
@@ -727,10 +710,6 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
           <div class="footer-left">
             <div class="qr-frame"><img src="${qrCodeDataUrl}" alt="QR"></div>
             <div class="transcript-code">${transcriptNumber}</div>
-          </div>
-          <div class="footer-divider">
-            <span class="divider-green"></span>
-            <span class="divider-red"></span>
           </div>
           <div class="footer-right">
             <p class="verify-ar">للتحقق من صحة هذا الكشف، امسح رمز QR</p>
