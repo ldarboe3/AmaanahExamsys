@@ -9,6 +9,7 @@
     "start": "NODE_ENV=production node dist/server/index.js"
   },
   "dependencies": {
+    "@fontsource/noto-naskh-arabic": "^5.2.10",
     "@google-cloud/storage": "^7.17.3",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",

@@ -352,6 +352,15 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       
       doc.pipe(stream);
       
+      // Register Arabic fonts for proper text rendering
+      const amiriRegularPath = path.join(process.cwd(), 'fonts', 'Amiri-Regular.ttf');
+      const amiriBoldPath = path.join(process.cwd(), 'fonts', 'Amiri-Bold.ttf');
+      
+      if (fs.existsSync(amiriRegularPath) && fs.existsSync(amiriBoldPath)) {
+        doc.registerFont('Amiri', amiriRegularPath);
+        doc.registerFont('Amiri-Bold', amiriBoldPath);
+      }
+      
       const pageWidth = 595; // A4 width in points
       const margin = 35;
       const contentWidth = pageWidth - (margin * 2);
@@ -374,11 +383,11 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       doc.text('Examination affairs unit', margin, 54, { width: 150 });
       
       // Arabic text on right
-      doc.font('Helvetica').fontSize(9).fillColor('#000000');
+      doc.font('Amiri').fontSize(9).fillColor('#000000');
       doc.text(shapeArabicText('الأمانة العامة للتعليم الإسلامي والعربي'), pageWidth - margin - 150, 22, { width: 150, align: 'right' });
-      doc.font('Helvetica').fontSize(8).fillColor('#000000');
+      doc.font('Amiri').fontSize(8).fillColor('#000000');
       doc.text(shapeArabicText('في غامبيا'), pageWidth - margin - 150, 36, { width: 150, align: 'right' });
-      doc.fontSize(8).text(shapeArabicText('قسم الامتحانات'), pageWidth - margin - 150, 46, { width: 150, align: 'right' });
+      doc.font('Amiri').fontSize(8).text(shapeArabicText('قسم الامتحانات'), pageWidth - margin - 150, 46, { width: 150, align: 'right' });
       
       // Separator line below header
       let yPos = 75;
@@ -386,7 +395,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       
       // 2. MAIN TITLE
       yPos = 85;
-      doc.font('Helvetica-Bold').fontSize(11).fillColor('#000000');
+      doc.font('Amiri-Bold').fontSize(11).fillColor('#000000');
       doc.text(shapeArabicText('كشف نتائج الامتحانات للشهادة الابتدائية للعام 2025-2024 م'), margin, yPos, { 
         width: contentWidth, 
         align: 'center' 
@@ -418,13 +427,13 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       doc.text(transliterateArabicToEnglish(schoolNameAr), margin + 110, yPos + 38, { width: 200 });
       
       // Arabic labels and values on right
-      doc.font('Helvetica').fontSize(9).fillColor('#000000');
+      doc.font('Amiri').fontSize(9).fillColor('#000000');
       doc.text(shapeArabicText('اسم الطالب/ة:'), pageWidth - margin - 80, yPos + 6, { width: 80, align: 'right' });
       doc.text(shapeArabicText('الجنسية:'), pageWidth - margin - 80, yPos + 22, { width: 80, align: 'right' });
       doc.text(shapeArabicText('المدرسة:'), pageWidth - margin - 80, yPos + 38, { width: 80, align: 'right' });
       
       // Arabic values
-      doc.font('Helvetica').fontSize(9).fillColor('#1a5276');
+      doc.font('Amiri').fontSize(9).fillColor('#1a5276');
       doc.text(shapeArabicText(fullNameAr), pageWidth - margin - 210, yPos + 6, { width: 130, align: 'right' });
       doc.text(shapeArabicText(nationalityAr), pageWidth - margin - 210, yPos + 22, { width: 130, align: 'right' });
       doc.text(shapeArabicText(schoolNameAr), pageWidth - margin - 210, yPos + 38, { width: 130, align: 'right' });
@@ -444,15 +453,15 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       doc.font('Helvetica').fontSize(8).fillColor('#000000');
       
       let cellX = tableX + 2;
-      doc.text('م', cellX, yPos + 4, { width: colWidth1, align: 'center' });
+      doc.font('Amiri').text(shapeArabicText('م'), cellX, yPos + 4, { width: colWidth1, align: 'center' });
       cellX += colWidth1;
-      doc.font('Helvetica').text(shapeArabicText('المادة'), cellX + 50, yPos + 4, { width: colWidth2 - 50, align: 'center' });
+      doc.font('Amiri').text(shapeArabicText('المادة'), cellX + 50, yPos + 4, { width: colWidth2 - 50, align: 'center' });
       cellX += colWidth2;
-      doc.font('Helvetica').text(shapeArabicText('الدرجات الكبرى'), cellX + 5, yPos + 4, { width: colWidth3 - 10, align: 'center' });
+      doc.font('Amiri').text(shapeArabicText('الدرجات الكبرى'), cellX + 5, yPos + 4, { width: colWidth3 - 10, align: 'center' });
       cellX += colWidth3;
-      doc.font('Helvetica').text(shapeArabicText('الدرجات الصغرى'), cellX + 5, yPos + 4, { width: colWidth4 - 10, align: 'center' });
+      doc.font('Amiri').text(shapeArabicText('الدرجات الصغرى'), cellX + 5, yPos + 4, { width: colWidth4 - 10, align: 'center' });
       cellX += colWidth4;
-      doc.font('Helvetica').text(shapeArabicText('الدرجة المحققة'), cellX + 10, yPos + 4, { width: colWidth5 - 20, align: 'center' });
+      doc.font('Amiri').text(shapeArabicText('الدرجة المحققة'), cellX + 10, yPos + 4, { width: colWidth5 - 20, align: 'center' });
       
       yPos += rowHeight;
       
@@ -469,7 +478,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
         cellX += colWidth1;
         
         // Subject name (Arabic only)
-        doc.font('Helvetica').text(shapeArabicText(subject.arabicName), cellX + 50, yPos + 5, { width: colWidth2 - 50, align: 'center' });
+        doc.font('Amiri').text(shapeArabicText(subject.arabicName), cellX + 50, yPos + 5, { width: colWidth2 - 50, align: 'center' });
         cellX += colWidth2;
         
         // Max score
@@ -490,37 +499,37 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       
       // Total row
       doc.rect(tableX, yPos, contentWidth, rowHeight).fill('#d3d3d3').stroke('#000000');
-      doc.font('Helvetica').fontSize(9).fillColor('#000000');
+      doc.font('Amiri').fontSize(9).fillColor('#000000');
       cellX = tableX + colWidth1 + 2;
-      doc.font('Helvetica').text(shapeArabicText('مجموع الدرجات'), cellX + 50, yPos + 4, { width: colWidth2 - 50, align: 'center' });
+      doc.font('Amiri').text(shapeArabicText('مجموع الدرجات'), cellX + 50, yPos + 4, { width: colWidth2 - 50, align: 'center' });
       cellX = tableX + colWidth1 + colWidth2 + colWidth3 + colWidth4;
       doc.font('Helvetica').text(totalMarks.toString(), cellX, yPos + 4, { width: colWidth5, align: 'center' });
       yPos += rowHeight;
       
       // Percentage row
       doc.rect(tableX, yPos, contentWidth, rowHeight).fill('#f9f9f9').stroke('#cccccc');
-      doc.font('Helvetica').fontSize(9).fillColor('#000000');
+      doc.font('Amiri').fontSize(9).fillColor('#000000');
       cellX = tableX + colWidth1 + 2;
-      doc.font('Helvetica').text(shapeArabicText('النسبة'), cellX + 50, yPos + 4, { width: colWidth2 - 50, align: 'center' });
+      doc.font('Amiri').text(shapeArabicText('النسبة'), cellX + 50, yPos + 4, { width: colWidth2 - 50, align: 'center' });
       cellX = tableX + colWidth1 + colWidth2 + colWidth3 + colWidth4;
       doc.font('Helvetica').text(`${percentage.toFixed(1)}%`, cellX, yPos + 4, { width: colWidth5, align: 'center' });
       yPos += rowHeight;
       
       // Grade row
       doc.rect(tableX, yPos, contentWidth, rowHeight).fill('#c8e6c9').stroke('#000000');
-      doc.font('Helvetica-Bold').fontSize(9).fillColor('#155724');
+      doc.font('Amiri-Bold').fontSize(9).fillColor('#155724');
       cellX = tableX + colWidth1 + 2;
-      doc.font('Helvetica').text(shapeArabicText('التقدير'), cellX + 50, yPos + 4, { width: colWidth2 - 50, align: 'center' });
+      doc.font('Amiri').text(shapeArabicText('التقدير'), cellX + 50, yPos + 4, { width: colWidth2 - 50, align: 'center' });
       cellX = tableX + colWidth1 + colWidth2 + colWidth3 + colWidth4;
-      doc.font('Helvetica').text(shapeArabicText(finalGrade.arabic), cellX, yPos + 4, { width: colWidth5, align: 'center' });
+      doc.font('Amiri').text(shapeArabicText(finalGrade.arabic), cellX, yPos + 4, { width: colWidth5, align: 'center' });
       
       // 6. SIGNATURE SECTION
       yPos += rowHeight + 20;
       doc.font('Helvetica').fontSize(8).fillColor('#000000');
       doc.text('Exam Committee Chairman', margin + 30, yPos);
-      doc.text(shapeArabicText('توقيع رئيس لجنة الامتحانات'), margin + 30, yPos + 12);
-      doc.text('Secretariat Administration', pageWidth - margin - 140, yPos);
-      doc.text(shapeArabicText('موقع إدارة الأمانة'), pageWidth - margin - 140, yPos + 12);
+      doc.font('Amiri').text(shapeArabicText('توقيع رئيس لجنة الامتحانات'), margin + 30, yPos + 12);
+      doc.font('Helvetica').text('Secretariat Administration', pageWidth - margin - 140, yPos);
+      doc.font('Amiri').text(shapeArabicText('توقيع إدارة الأمانة'), pageWidth - margin - 140, yPos + 12);
       
       yPos += 32;
       doc.moveTo(margin + 10, yPos).lineTo(margin + 120, yPos).stroke('#999999');
@@ -539,10 +548,10 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
         doc.text(transcriptNumber, margin, yPos + 60, { width: 55, align: 'center' });
         
         // QR verification text on right
+        doc.font('Amiri').fontSize(7).fillColor('#666666');
+        doc.text(shapeArabicText('للتحقق من صحة هذه الشهادة استخدم رمز QR'), pageWidth - margin - 200, yPos + 20, { width: 200, align: 'right' });
         doc.font('Helvetica').fontSize(7).fillColor('#666666');
         doc.text('To verify this transcript, scan the QR code', pageWidth - margin - 200, yPos + 30, { width: 200, align: 'right' });
-        doc.fontSize(7).fillColor('#666666');
-        doc.text(shapeArabicText('للتحقق من صحة هذه الشهادة استخدم رمز QR'), pageWidth - margin - 200, yPos + 20, { width: 200, align: 'right' });
       }
       
       doc.end();
