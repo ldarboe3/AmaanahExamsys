@@ -495,32 +495,32 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     }
     
     table th {
-      padding: 2.5mm 1.5mm;
+      padding: 1.5mm 1mm;
       border: 1px solid #999;
-      font-size: 11pt;
+      font-size: 10pt;
       font-weight: bold;
       text-align: center;
     }
     
     table td {
-      padding: 2mm 1.5mm;
+      padding: 1mm 1mm;
       border: 1px solid #bbb;
-      font-size: 11pt;
+      font-size: 10pt;
       text-align: center;
     }
     
     .col-index { width: 8mm; }
-    .col-subject { width: auto; text-align: right; padding-right: 3mm !important; font-weight: bold; font-size: 11pt; }
-    .col-max { width: 22mm; }
-    .col-min { width: 22mm; }
-    .col-score { width: 24mm; font-weight: bold; }
+    .col-subject { width: auto; text-align: right; padding-right: 2mm !important; font-weight: bold; font-size: 10pt; }
+    .col-max { width: 20mm; }
+    .col-min { width: 20mm; }
+    .col-score { width: 22mm; font-weight: bold; }
     
     /* Summary rows - no backgrounds */
     .summary-row td { font-weight: bold; border-top: 2px solid #999; }
-    .summary-label { text-align: right !important; padding-right: 3mm !important; }
-    .summary-value { text-align: center; font-weight: bold; font-size: 12pt; }
+    .summary-label { text-align: right !important; padding-right: 2mm !important; }
+    .summary-value { text-align: center; font-weight: bold; font-size: 11pt; }
     .percentage-row td { font-weight: bold; }
-    .grade-row td { color: #155724; font-weight: bold; font-size: 12pt; }
+    .grade-row td { color: #155724; font-weight: bold; font-size: 11pt; }
     
     /* SIGNATURE SECTION - above the footer separator */
     .signature-section {
