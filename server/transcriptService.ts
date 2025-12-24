@@ -379,18 +379,18 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       flex-direction: column;
     }
     
-    /* Watermark - behind everything */
+    /* Watermark - behind everything, NO background on table cells */
     .watermark {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      opacity: 0.12;
+      opacity: 0.10;
       z-index: 0;
       pointer-events: none;
     }
     .watermark img {
-      width: 100mm;
+      width: 110mm;
     }
     
     .content {
@@ -411,7 +411,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     .header-english {
       width: 55mm;
       font-family: 'Times New Roman', serif;
-      font-size: 9pt;
+      font-size: 11pt;
       line-height: 1.5;
       text-align: left;
     }
@@ -421,13 +421,13 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       text-align: center;
     }
     .header-logo img {
-      width: 22mm;
-      height: 22mm;
+      width: 24mm;
+      height: 24mm;
     }
     
     .header-arabic {
       width: 60mm;
-      font-size: 11pt;
+      font-size: 12pt;
       font-weight: bold;
       line-height: 1.6;
       text-align: right;
@@ -443,7 +443,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     /* TITLE - Arabic centered */
     .main-title {
       text-align: center;
-      font-size: 14pt;
+      font-size: 16pt;
       font-weight: bold;
       margin-bottom: 2mm;
       direction: rtl;
@@ -452,7 +452,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     /* Transcript number */
     .transcript-number {
       text-align: center;
-      font-size: 9pt;
+      font-size: 11pt;
       margin-bottom: 4mm;
       direction: rtl;
     }
@@ -471,7 +471,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     .student-left {
       text-align: left;
       font-family: 'Times New Roman', serif;
-      font-size: 11pt;
+      font-size: 12pt;
       line-height: 2;
     }
     .student-left .label { font-weight: bold; }
@@ -479,14 +479,14 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     
     .student-right {
       text-align: right;
-      font-size: 12pt;
+      font-size: 13pt;
       line-height: 2;
       direction: rtl;
     }
     .student-right .label { font-weight: bold; }
     .student-right .value { color: #1a5276; font-weight: bold; }
     
-    /* MARKS TABLE */
+    /* MARKS TABLE - NO BACKGROUND COLORS for watermark visibility */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -496,42 +496,36 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     }
     
     table th {
-      background: #d0d0d0;
-      padding: 2mm 1mm;
+      padding: 2.5mm 1.5mm;
       border: 1px solid #999;
-      font-size: 9pt;
+      font-size: 11pt;
       font-weight: bold;
       text-align: center;
     }
     
     table td {
-      padding: 1.5mm 1mm;
+      padding: 2mm 1.5mm;
       border: 1px solid #bbb;
-      font-size: 9pt;
+      font-size: 11pt;
       text-align: center;
-      background: rgba(255,255,255,0.85);
     }
     
-    table tbody tr:nth-child(odd) td { background: rgba(255,255,255,0.85); }
-    table tbody tr:nth-child(even) td { background: rgba(245,245,245,0.85); }
-    
     .col-index { width: 8mm; }
-    .col-subject { width: auto; text-align: right; padding-right: 3mm !important; font-weight: bold; font-size: 10pt; }
+    .col-subject { width: auto; text-align: right; padding-right: 3mm !important; font-weight: bold; font-size: 11pt; }
     .col-max { width: 22mm; }
     .col-min { width: 22mm; }
     .col-score { width: 24mm; font-weight: bold; }
-    .col-score.highlight { background: rgba(255,248,220,0.9); }
     
-    /* Summary rows */
-    .summary-row td { background: rgba(208,208,208,0.9) !important; font-weight: bold; }
+    /* Summary rows - no backgrounds */
+    .summary-row td { font-weight: bold; border-top: 2px solid #999; }
     .summary-label { text-align: right !important; padding-right: 3mm !important; }
-    .summary-value { text-align: center; font-weight: bold; }
-    .percentage-row td { background: rgba(240,240,240,0.9) !important; }
-    .grade-row td { background: rgba(214,245,214,0.9) !important; color: #155724; font-weight: bold; font-size: 10pt; }
+    .summary-value { text-align: center; font-weight: bold; font-size: 12pt; }
+    .percentage-row td { font-weight: bold; }
+    .grade-row td { color: #155724; font-weight: bold; font-size: 12pt; }
     
     /* SIGNATURE SECTION - above the footer separator */
     .signature-section {
-      margin-top: 8mm;
+      margin-top: 10mm;
       display: flex;
       justify-content: space-around;
       direction: rtl;
@@ -542,7 +536,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     }
     
     .sig-label {
-      font-size: 10pt;
+      font-size: 11pt;
       direction: rtl;
       margin-bottom: 12mm;
     }
@@ -581,29 +575,26 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     }
     .qr-transcript-number {
       font-family: monospace;
-      font-size: 7pt;
+      font-size: 8pt;
       margin-top: 1mm;
       color: #333;
     }
-    .qr-color-bar {
-      width: 3mm;
-      height: 22mm;
-      margin-left: 2mm;
-      background: linear-gradient(to bottom, #006400 50%, #8B0000 50%);
-    }
     
     .verify-section {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2mm;
       text-align: right;
       direction: rtl;
     }
     .verify-ar {
-      font-size: 9pt;
+      font-size: 10pt;
       color: #333;
-      margin-bottom: 2mm;
     }
     .verify-en {
       font-family: 'Times New Roman', serif;
-      font-size: 8pt;
+      font-size: 9pt;
       color: #555;
     }
   </style>
@@ -707,7 +698,6 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
           <img src="${qrCodeDataUrl}" alt="QR">
           <div class="qr-transcript-number">${transcriptNumber}</div>
         </div>
-        <div class="qr-color-bar"></div>
       </div>
       <div class="verify-section">
         <div class="verify-ar">للتحقق من صحة هذا الكشف، امسح رمز QR</div>
