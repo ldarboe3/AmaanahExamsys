@@ -738,7 +738,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
   }
   
   // Generate QR code
-  const verifyUrl = `https://amaanah.gm/verify/${data.transcriptNumber || 'preview'}`;
+  const verifyUrl = `https://amaanah.gm/verify/transcript/${data.transcriptNumber || 'preview'}`;
   const qrCodeDataUrl = data.qrCodeDataUrl || await QRCode.toDataURL(verifyUrl, {
     width: 150,
     margin: 1,
