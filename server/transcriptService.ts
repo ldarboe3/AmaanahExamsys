@@ -375,26 +375,28 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       height: 297mm;
       padding: 10mm 12mm;
       position: relative;
-      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     
-    /* Watermark - subtle, visible through table */
+    /* Watermark - behind everything */
     .watermark {
       position: absolute;
-      top: 45%;
+      top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      opacity: 0.06;
-      z-index: 1;
+      opacity: 0.12;
+      z-index: 0;
       pointer-events: none;
     }
     .watermark img {
-      width: 120mm;
+      width: 100mm;
     }
     
     .content {
       position: relative;
       z-index: 1;
+      flex: 1;
     }
     
     /* HEADER - English LEFT, Logo CENTER, Arabic RIGHT */
@@ -490,6 +492,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       border-collapse: collapse;
       margin-bottom: 0;
       direction: rtl;
+      background: transparent;
     }
     
     table th {
@@ -506,29 +509,29 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       border: 1px solid #bbb;
       font-size: 9pt;
       text-align: center;
+      background: rgba(255,255,255,0.85);
     }
     
-    table tbody tr:nth-child(odd) { background: #fff; }
-    table tbody tr:nth-child(even) { background: #f5f5f5; }
+    table tbody tr:nth-child(odd) td { background: rgba(255,255,255,0.85); }
+    table tbody tr:nth-child(even) td { background: rgba(245,245,245,0.85); }
     
     .col-index { width: 8mm; }
     .col-subject { width: auto; text-align: right; padding-right: 3mm !important; font-weight: bold; font-size: 10pt; }
     .col-max { width: 22mm; }
     .col-min { width: 22mm; }
     .col-score { width: 24mm; font-weight: bold; }
-    .col-score.highlight { background: #fff8dc; }
+    .col-score.highlight { background: rgba(255,248,220,0.9); }
     
-    /* Summary rows - labels aligned right */
-    .summary-row td { background: #d0d0d0; font-weight: bold; }
-    .summary-row .col-subject { text-align: right !important; }
-    .percentage-row td { background: #f0f0f0; }
-    .percentage-row .col-subject { text-align: right !important; }
-    .grade-row td { background: #d6f5d6; color: #155724; font-weight: bold; font-size: 10pt; }
-    .grade-row .col-subject { text-align: right !important; }
+    /* Summary rows */
+    .summary-row td { background: rgba(208,208,208,0.9) !important; font-weight: bold; }
+    .summary-label { text-align: right !important; padding-right: 3mm !important; }
+    .summary-value { text-align: center; font-weight: bold; }
+    .percentage-row td { background: rgba(240,240,240,0.9) !important; }
+    .grade-row td { background: rgba(214,245,214,0.9) !important; color: #155724; font-weight: bold; font-size: 10pt; }
     
-    /* SIGNATURE SECTION - Arabic labels centered above lines */
-    .signatures {
-      margin-top: 10mm;
+    /* SIGNATURE SECTION - above the footer separator */
+    .signature-section {
+      margin-top: 8mm;
       display: flex;
       justify-content: space-around;
       direction: rtl;
@@ -541,7 +544,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     .sig-label {
       font-size: 10pt;
       direction: rtl;
-      margin-bottom: 2mm;
+      margin-bottom: 12mm;
     }
     
     .sig-line {
@@ -550,47 +553,46 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       margin: 0 auto;
     }
     
-    /* FOOTER with QR - matches reference exactly */
-    .footer {
+    /* BOTTOM FOOTER - absolute positioned at bottom */
+    .bottom-footer {
       position: absolute;
-      bottom: 8mm;
+      bottom: 10mm;
       left: 12mm;
       right: 12mm;
+      border-top: 1px solid #ccc;
+      padding-top: 4mm;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       direction: ltr;
-      border-top: 1px solid #ccc;
-      padding-top: 4mm;
-      margin-top: 12mm;
     }
     
-    .qr-block {
+    .qr-section {
       display: flex;
       align-items: flex-start;
     }
-    .qr-wrapper {
+    .qr-code-box {
       text-align: left;
     }
-    .qr-wrapper img {
+    .qr-code-box img {
       width: 22mm;
       height: 22mm;
       border: 1px solid #ddd;
     }
-    .qr-number {
+    .qr-transcript-number {
       font-family: monospace;
       font-size: 7pt;
       margin-top: 1mm;
       color: #333;
     }
-    .color-bar {
+    .qr-color-bar {
       width: 3mm;
       height: 22mm;
-      margin-left: 1mm;
+      margin-left: 2mm;
       background: linear-gradient(to bottom, #006400 50%, #8B0000 50%);
     }
     
-    .verify-block {
+    .verify-section {
       text-align: right;
       direction: rtl;
     }
@@ -671,31 +673,22 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
         <tbody>
           ${subjectRows}
           <tr class="summary-row">
-            <td></td>
-            <td class="col-subject">مجموع الدرجات</td>
-            <td></td>
-            <td></td>
-            <td class="col-score">${totalMarks}</td>
+            <td colspan="4" class="summary-label">مجموع الدرجات</td>
+            <td class="summary-value">${totalMarks}</td>
           </tr>
           <tr class="percentage-row">
-            <td></td>
-            <td class="col-subject">النسبة</td>
-            <td></td>
-            <td></td>
-            <td class="col-score">${percentage.toFixed(1)}%</td>
+            <td colspan="4" class="summary-label">النسبة</td>
+            <td class="summary-value">${percentage.toFixed(1)}%</td>
           </tr>
           <tr class="grade-row">
-            <td></td>
-            <td class="col-subject">التقدير</td>
-            <td></td>
-            <td></td>
-            <td class="col-score">${finalGrade.arabic}</td>
+            <td colspan="4" class="summary-label">التقدير</td>
+            <td class="summary-value">${finalGrade.arabic}</td>
           </tr>
         </tbody>
       </table>
       
       <!-- SIGNATURE SECTION -->
-      <div class="signatures">
+      <div class="signature-section">
         <div class="sig-block">
           <div class="sig-label">توقيع رئيس لجنة الامتحانات</div>
           <div class="sig-line"></div>
@@ -707,16 +700,16 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       </div>
     </div>
     
-    <!-- FOOTER -->
-    <div class="footer">
-      <div class="qr-block">
-        <div class="qr-wrapper">
+    <!-- BOTTOM FOOTER with QR -->
+    <div class="bottom-footer">
+      <div class="qr-section">
+        <div class="qr-code-box">
           <img src="${qrCodeDataUrl}" alt="QR">
-          <div class="qr-number">${transcriptNumber}</div>
+          <div class="qr-transcript-number">${transcriptNumber}</div>
         </div>
-        <div class="color-bar"></div>
+        <div class="qr-color-bar"></div>
       </div>
-      <div class="verify-block">
+      <div class="verify-section">
         <div class="verify-ar">للتحقق من صحة هذا الكشف، امسح رمز QR</div>
         <div class="verify-en">To verify this transcript, scan the QR code</div>
       </div>
