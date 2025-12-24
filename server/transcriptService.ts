@@ -378,14 +378,14 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       overflow: hidden;
     }
     
-    /* Watermark - centered behind content */
+    /* Watermark - centered behind content, visible through table */
     .watermark {
       position: absolute;
       top: 45%;
       left: 50%;
       transform: translate(-50%, -50%);
-      opacity: 0.08;
-      z-index: 0;
+      opacity: 0.15;
+      z-index: 1;
       pointer-events: none;
     }
     .watermark img {
@@ -469,16 +469,16 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     .student-left {
       text-align: left;
       font-family: 'Times New Roman', serif;
-      font-size: 9pt;
-      line-height: 1.9;
+      font-size: 11pt;
+      line-height: 2;
     }
     .student-left .label { font-weight: bold; }
-    .student-left .value { color: #1a5276; }
+    .student-left .value { color: #1a5276; font-weight: bold; }
     
     .student-right {
       text-align: right;
-      font-size: 10pt;
-      line-height: 1.9;
+      font-size: 12pt;
+      line-height: 2;
       direction: rtl;
     }
     .student-right .label { font-weight: bold; }
@@ -512,7 +512,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     table tbody tr:nth-child(even) { background: #f5f5f5; }
     
     .col-index { width: 8mm; }
-    .col-subject { width: auto; text-align: right; padding-right: 3mm !important; }
+    .col-subject { width: auto; text-align: right; padding-right: 3mm !important; font-weight: bold; font-size: 10pt; }
     .col-max { width: 22mm; }
     .col-min { width: 22mm; }
     .col-score { width: 24mm; font-weight: bold; }
@@ -525,7 +525,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     
     /* SIGNATURE SECTION - with space for actual signatures */
     .signatures {
-      margin-top: 6mm;
+      margin-top: 8mm;
       display: flex;
       justify-content: space-between;
       direction: ltr;
@@ -538,7 +538,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     
     .sig-label {
       font-size: 9pt;
-      margin-bottom: 15mm;
+      margin-bottom: 20mm;
       direction: rtl;
     }
     
@@ -546,12 +546,13 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       border-top: 1px solid #666;
       width: 70%;
       margin: 0 auto;
+      margin-bottom: 15mm;
     }
     
     /* FOOTER with QR */
     .footer {
       position: absolute;
-      bottom: 8mm;
+      bottom: 10mm;
       left: 12mm;
       right: 12mm;
       display: flex;
