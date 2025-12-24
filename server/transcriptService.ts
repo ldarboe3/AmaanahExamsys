@@ -378,18 +378,18 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       overflow: hidden;
     }
     
-    /* Watermark - centered behind content, visible through table */
+    /* Watermark - subtle, visible through table */
     .watermark {
       position: absolute;
       top: 45%;
       left: 50%;
       transform: translate(-50%, -50%);
-      opacity: 0.15;
+      opacity: 0.06;
       z-index: 1;
       pointer-events: none;
     }
     .watermark img {
-      width: 140mm;
+      width: 120mm;
     }
     
     .content {
@@ -518,57 +518,64 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     .col-score { width: 24mm; font-weight: bold; }
     .col-score.highlight { background: #fff8dc; }
     
-    /* Summary rows */
+    /* Summary rows - labels aligned right */
     .summary-row td { background: #d0d0d0; font-weight: bold; }
+    .summary-row .col-subject { text-align: right !important; }
     .percentage-row td { background: #f0f0f0; }
+    .percentage-row .col-subject { text-align: right !important; }
     .grade-row td { background: #d6f5d6; color: #155724; font-weight: bold; font-size: 10pt; }
+    .grade-row .col-subject { text-align: right !important; }
     
-    /* SIGNATURE SECTION - with space for actual signatures */
+    /* SIGNATURE SECTION - Arabic labels centered above lines */
     .signatures {
-      margin-top: 8mm;
+      margin-top: 10mm;
       display: flex;
-      justify-content: space-between;
-      direction: ltr;
+      justify-content: space-around;
+      direction: rtl;
     }
     
     .sig-block {
-      width: 45%;
       text-align: center;
     }
     
     .sig-label {
-      font-size: 9pt;
-      margin-bottom: 20mm;
+      font-size: 10pt;
       direction: rtl;
+      margin-bottom: 2mm;
     }
     
     .sig-line {
       border-top: 1px solid #666;
-      width: 70%;
+      width: 50mm;
       margin: 0 auto;
-      margin-bottom: 15mm;
     }
     
-    /* FOOTER with QR */
+    /* FOOTER with QR - matches reference exactly */
     .footer {
       position: absolute;
-      bottom: 10mm;
+      bottom: 8mm;
       left: 12mm;
       right: 12mm;
       display: flex;
       justify-content: space-between;
-      align-items: flex-end;
+      align-items: flex-start;
       direction: ltr;
-      border-top: 1px solid #ddd;
-      padding-top: 3mm;
+      border-top: 1px solid #ccc;
+      padding-top: 4mm;
+      margin-top: 12mm;
     }
     
     .qr-block {
+      display: flex;
+      align-items: flex-start;
+    }
+    .qr-wrapper {
       text-align: left;
     }
-    .qr-block img {
-      width: 20mm;
-      height: 20mm;
+    .qr-wrapper img {
+      width: 22mm;
+      height: 22mm;
+      border: 1px solid #ddd;
     }
     .qr-number {
       font-family: monospace;
@@ -576,20 +583,26 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       margin-top: 1mm;
       color: #333;
     }
+    .color-bar {
+      width: 3mm;
+      height: 22mm;
+      margin-left: 1mm;
+      background: linear-gradient(to bottom, #006400 50%, #8B0000 50%);
+    }
     
     .verify-block {
       text-align: right;
       direction: rtl;
     }
     .verify-ar {
-      font-size: 8pt;
-      color: #555;
-      margin-bottom: 1mm;
+      font-size: 9pt;
+      color: #333;
+      margin-bottom: 2mm;
     }
     .verify-en {
       font-family: 'Times New Roman', serif;
-      font-size: 7pt;
-      color: #666;
+      font-size: 8pt;
+      color: #555;
     }
   </style>
 </head>
@@ -659,21 +672,21 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
           ${subjectRows}
           <tr class="summary-row">
             <td></td>
-            <td class="col-subject" style="text-align: center;">مجموع الدرجات</td>
+            <td class="col-subject">مجموع الدرجات</td>
             <td></td>
             <td></td>
             <td class="col-score">${totalMarks}</td>
           </tr>
           <tr class="percentage-row">
             <td></td>
-            <td class="col-subject" style="text-align: center;">النسبة</td>
+            <td class="col-subject">النسبة</td>
             <td></td>
             <td></td>
             <td class="col-score">${percentage.toFixed(1)}%</td>
           </tr>
           <tr class="grade-row">
             <td></td>
-            <td class="col-subject" style="text-align: center;">التقدير</td>
+            <td class="col-subject">التقدير</td>
             <td></td>
             <td></td>
             <td class="col-score">${finalGrade.arabic}</td>
@@ -697,8 +710,11 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     <!-- FOOTER -->
     <div class="footer">
       <div class="qr-block">
-        <img src="${qrCodeDataUrl}" alt="QR">
-        <div class="qr-number">${transcriptNumber}</div>
+        <div class="qr-wrapper">
+          <img src="${qrCodeDataUrl}" alt="QR">
+          <div class="qr-number">${transcriptNumber}</div>
+        </div>
+        <div class="color-bar"></div>
       </div>
       <div class="verify-block">
         <div class="verify-ar">للتحقق من صحة هذا الكشف، امسح رمز QR</div>
