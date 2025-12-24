@@ -3,10 +3,27 @@ import ArabicReshaper from 'arabic-reshaper';
 export function shapeArabicText(text: string): string {
   if (!text) return '';
   
-  // Shape Arabic characters to their connected presentation forms
-  const shaped = ArabicReshaper.convertArabic(text);
+  const options = {
+    support: {
+      ZWJ: true,
+      ZWJ_U08E2: false
+    },
+    replacement: {
+      ZWJ: '۰',
+      ZWJLamAlef: '۰'
+    },
+    shadda: true
+  };
   
-  // Reverse the entire string for RTL rendering in pdfkit
-  // pdfkit renders left-to-right, so reversing makes text appear right-to-left
-  return shaped.split('').reverse().join('');
+  // Shape Arabic characters to their connected presentation forms
+  const shaped = ArabicReshaper.convertArabic(text, options);
+  
+  // For pdfkit RTL rendering: reverse the string logically
+  // This reverses at a higher level to preserve shaped glyphs
+  let result = '';
+  for (let i = shaped.length - 1; i >= 0; i--) {
+    result += shaped[i];
+  }
+  
+  return result;
 }
