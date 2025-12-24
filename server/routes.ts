@@ -10408,7 +10408,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.get("/api/verify/transcript/:token", async (req, res) => {
     try {
-      const transcript = await storage.getTranscriptByQrToken(req.params.token);
+      // Try to find by qrToken first, then by transcript number
+      let transcript = await storage.getTranscriptByQrToken(req.params.token);
+      if (!transcript) {
+        transcript = await storage.getTranscriptByNumber(req.params.token);
+      }
       if (!transcript) {
         return res.status(404).json({ valid: false, message: "Transcript not found or invalid" });
       }
