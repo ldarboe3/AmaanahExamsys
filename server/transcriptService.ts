@@ -326,6 +326,7 @@ if (!fs.existsSync(outputDir)) {
 }
 
 // HTML template-based transcript generation using Puppeteer for proper Arabic text rendering
+// Matches EXACTLY the reference screenshot layout
 function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCodeDataUrl: string): string {
   const { student, school, examYear, subjectMarks, totalMarks, percentage, finalGrade } = data;
   
@@ -334,15 +335,19 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
   const schoolNameAr = school.name;
   const transcriptNumber = data.transcriptNumber || '';
   
-  const subjectRows = subjectMarks.map((subject, index) => `
-    <tr class="${index % 2 === 0 ? 'even' : 'odd'}">
-      <td class="score">${subject.mark !== null && subject.mark !== undefined ? subject.mark : '-'}</td>
-      <td class="number">${subject.minScore}</td>
-      <td class="number">${subject.maxScore}</td>
-      <td class="subject">${subject.arabicName}</td>
-      <td class="index">${index + 1}</td>
-    </tr>
-  `).join('');
+  // Build subject rows - RTL table with columns: م | المادة | الدرجات الكبرى | الدرجات الصغرى | الدرجة المحققة
+  const subjectRows = subjectMarks.map((subject, index) => {
+    const markValue = subject.mark !== null && subject.mark !== undefined ? subject.mark : '-';
+    const hasYellowHighlight = typeof subject.mark === 'number' && subject.mark >= 50;
+    return `
+    <tr>
+      <td class="col-index">${index + 1}</td>
+      <td class="col-subject">${subject.arabicName}</td>
+      <td class="col-max">${subject.maxScore}</td>
+      <td class="col-min">${subject.minScore}</td>
+      <td class="col-score ${hasYellowHighlight ? 'highlight' : ''}">${markValue}</td>
+    </tr>`;
+  }).join('');
 
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -353,107 +358,249 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
     
     * { margin: 0; padding: 0; box-sizing: border-box; }
     @page { size: A4; margin: 0; }
+    
     html, body {
-      width: 210mm; height: 297mm; margin: 0; padding: 0;
-      font-family: 'Amiri', 'Traditional Arabic', serif;
+      width: 210mm;
+      height: 297mm;
+      margin: 0;
+      padding: 0;
+      font-family: 'Amiri', serif;
       background: white;
-      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
-    .container {
-      width: 210mm; height: 297mm; padding: 15mm 15mm 10mm 15mm;
+    
+    .page {
+      width: 210mm;
+      height: 297mm;
+      padding: 10mm 12mm;
       position: relative;
+      overflow: hidden;
     }
+    
+    /* Watermark - centered behind content */
     .watermark {
-      position: absolute; top: 50%; left: 50%;
+      position: absolute;
+      top: 45%;
+      left: 50%;
       transform: translate(-50%, -50%);
-      opacity: 0.06; z-index: 0; pointer-events: none;
+      opacity: 0.08;
+      z-index: 0;
+      pointer-events: none;
     }
-    .watermark img { width: 180mm; }
-    .content { position: relative; z-index: 1; }
+    .watermark img {
+      width: 140mm;
+    }
+    
+    .content {
+      position: relative;
+      z-index: 1;
+    }
+    
+    /* HEADER - English LEFT, Logo CENTER, Arabic RIGHT */
     .header {
-      display: flex; justify-content: space-between; align-items: flex-start;
-      margin-bottom: 8mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 3mm;
+      direction: ltr;
     }
+    
     .header-english {
-      text-align: left; font-family: 'Times New Roman', serif;
-      font-size: 10pt; line-height: 1.4; width: 45mm;
+      width: 55mm;
+      font-family: 'Times New Roman', serif;
+      font-size: 9pt;
+      line-height: 1.5;
+      text-align: left;
     }
-    .header-logo { text-align: center; width: 30mm; }
-    .header-logo img { width: 20mm; height: 20mm; }
+    
+    .header-logo {
+      width: 28mm;
+      text-align: center;
+    }
+    .header-logo img {
+      width: 22mm;
+      height: 22mm;
+    }
+    
     .header-arabic {
-      text-align: right; font-size: 12pt; line-height: 1.5;
-      width: 55mm; direction: rtl;
+      width: 60mm;
+      font-size: 11pt;
+      font-weight: bold;
+      line-height: 1.6;
+      text-align: right;
+      direction: rtl;
     }
-    .header-separator { border-top: 1px solid #333; margin: 4mm 0; }
+    
+    /* Header separator */
+    .header-line {
+      border-top: 1px solid #333;
+      margin: 2mm 0 4mm 0;
+    }
+    
+    /* TITLE - Arabic centered */
     .main-title {
-      text-align: center; font-size: 16pt; font-weight: bold;
-      margin-bottom: 4mm; direction: rtl;
+      text-align: center;
+      font-size: 14pt;
+      font-weight: bold;
+      margin-bottom: 2mm;
+      direction: rtl;
     }
+    
+    /* Transcript number */
     .transcript-number {
-      text-align: center; font-size: 10pt; margin-bottom: 6mm; direction: rtl;
+      text-align: center;
+      font-size: 9pt;
+      margin-bottom: 4mm;
+      direction: rtl;
     }
-    .student-info {
-      display: flex; justify-content: space-between;
-      margin-bottom: 6mm; padding: 3mm;
-      border: 1px solid #ddd; background: #fafafa;
+    
+    /* STUDENT INFO BOX */
+    .student-box {
+      border: 1px solid #ccc;
+      background: #f8f8f8;
+      padding: 3mm 4mm;
+      margin-bottom: 4mm;
+      display: flex;
+      justify-content: space-between;
+      direction: ltr;
     }
-    .student-info-left { text-align: left; font-size: 10pt; line-height: 1.8; }
-    .student-info-right { text-align: right; font-size: 11pt; line-height: 1.8; direction: rtl; }
-    .student-info .label { color: #333; }
-    .student-info .value { color: #1a5276; font-weight: bold; }
+    
+    .student-left {
+      text-align: left;
+      font-family: 'Times New Roman', serif;
+      font-size: 9pt;
+      line-height: 1.9;
+    }
+    .student-left .label { font-weight: bold; }
+    .student-left .value { color: #1a5276; }
+    
+    .student-right {
+      text-align: right;
+      font-size: 10pt;
+      line-height: 1.9;
+      direction: rtl;
+    }
+    .student-right .label { font-weight: bold; }
+    .student-right .value { color: #1a5276; font-weight: bold; }
+    
+    /* MARKS TABLE */
     table {
-      width: 100%; border-collapse: collapse;
-      margin-bottom: 6mm; direction: rtl;
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 0;
+      direction: rtl;
     }
+    
     table th {
-      background: #d5d5d5; padding: 2.5mm; border: 1px solid #999;
-      font-size: 10pt; font-weight: bold; text-align: center;
+      background: #d0d0d0;
+      padding: 2mm 1mm;
+      border: 1px solid #999;
+      font-size: 9pt;
+      font-weight: bold;
+      text-align: center;
     }
+    
     table td {
-      padding: 2mm; border: 1px solid #ccc;
-      font-size: 10pt; text-align: center;
+      padding: 1.5mm 1mm;
+      border: 1px solid #bbb;
+      font-size: 9pt;
+      text-align: center;
     }
-    table tr.even { background: #fff; }
-    table tr.odd { background: #f5f5f5; }
-    table td.subject { text-align: right; padding-right: 4mm; }
-    table td.score { color: #1a5276; font-weight: bold; }
-    table td.index { width: 8mm; }
-    table td.number { width: 15mm; }
-    .summary-row { background: #d5d5d5 !important; font-weight: bold; }
-    .percentage-row { background: #f5f5f5 !important; }
-    .grade-row { background: #c8e6c9 !important; }
-    .grade-row td { color: #155724; font-weight: bold; font-size: 12pt; }
+    
+    table tbody tr:nth-child(odd) { background: #fff; }
+    table tbody tr:nth-child(even) { background: #f5f5f5; }
+    
+    .col-index { width: 8mm; }
+    .col-subject { width: auto; text-align: right; padding-right: 3mm !important; }
+    .col-max { width: 22mm; }
+    .col-min { width: 22mm; }
+    .col-score { width: 24mm; font-weight: bold; }
+    .col-score.highlight { background: #fff8dc; }
+    
+    /* Summary rows */
+    .summary-row td { background: #d0d0d0; font-weight: bold; }
+    .percentage-row td { background: #f0f0f0; }
+    .grade-row td { background: #d6f5d6; color: #155724; font-weight: bold; font-size: 10pt; }
+    
+    /* SIGNATURE SECTION - with space for actual signatures */
     .signatures {
-      display: flex; justify-content: space-between;
-      margin-top: 8mm; padding-top: 4mm;
+      margin-top: 6mm;
+      display: flex;
+      justify-content: space-between;
+      direction: ltr;
     }
-    .signature-block { text-align: center; width: 45%; }
-    .signature-line {
-      border-top: 1px solid #999;
-      margin: 8mm auto 2mm auto; width: 80%;
+    
+    .sig-block {
+      width: 45%;
+      text-align: center;
     }
-    .signature-label-en {
-      font-family: 'Times New Roman', serif; font-size: 9pt; margin-bottom: 2mm;
+    
+    .sig-label {
+      font-size: 9pt;
+      margin-bottom: 15mm;
+      direction: rtl;
     }
-    .signature-label-ar { font-size: 10pt; direction: rtl; }
+    
+    .sig-line {
+      border-top: 1px solid #666;
+      width: 70%;
+      margin: 0 auto;
+    }
+    
+    /* FOOTER with QR */
     .footer {
-      display: flex; justify-content: space-between;
-      align-items: flex-end; margin-top: 10mm;
+      position: absolute;
+      bottom: 8mm;
+      left: 12mm;
+      right: 12mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      direction: ltr;
+      border-top: 1px solid #ddd;
+      padding-top: 3mm;
     }
-    .qr-section { text-align: left; }
-    .qr-section img { width: 18mm; height: 18mm; }
-    .qr-number { font-size: 8pt; margin-top: 2mm; font-family: monospace; }
-    .verify-text { text-align: right; font-size: 9pt; color: #666; direction: rtl; }
-    .verify-text-ar { margin-bottom: 2mm; }
-    .verify-text-en { font-family: 'Times New Roman', serif; }
+    
+    .qr-block {
+      text-align: left;
+    }
+    .qr-block img {
+      width: 20mm;
+      height: 20mm;
+    }
+    .qr-number {
+      font-family: monospace;
+      font-size: 7pt;
+      margin-top: 1mm;
+      color: #333;
+    }
+    
+    .verify-block {
+      text-align: right;
+      direction: rtl;
+    }
+    .verify-ar {
+      font-size: 8pt;
+      color: #555;
+      margin-bottom: 1mm;
+    }
+    .verify-en {
+      font-family: 'Times New Roman', serif;
+      font-size: 7pt;
+      color: #666;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="page">
+    <!-- Watermark -->
     <div class="watermark">
-      <img src="data:image/png;base64,${logoBase64}" alt="watermark">
+      <img src="data:image/png;base64,${logoBase64}" alt="">
     </div>
+    
     <div class="content">
+      <!-- HEADER -->
       <div class="header">
         <div class="header-english">
           The General Secretariat for<br>
@@ -462,7 +609,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
           Examination affairs unit
         </div>
         <div class="header-logo">
-          <img src="data:image/png;base64,${logoBase64}" alt="logo">
+          <img src="data:image/png;base64,${logoBase64}" alt="">
         </div>
         <div class="header-arabic">
           الأمانة العامة للتعليم الإسلامي العربي<br>
@@ -470,75 +617,91 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
           قسم الامتحانات
         </div>
       </div>
-      <div class="header-separator"></div>
+      
+      <div class="header-line"></div>
+      
+      <!-- TITLE -->
       <div class="main-title">
-        كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year}-${examYear.year - 1} م
+        كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year - 1}-${examYear.year} م
       </div>
+      
       <div class="transcript-number">
         Transcript No. / رقم الكشف: ${transcriptNumber}
       </div>
-      <div class="student-info">
-        <div class="student-info-left">
+      
+      <!-- STUDENT INFO -->
+      <div class="student-box">
+        <div class="student-left">
           <div><span class="label">Student Name:</span> <span class="value">${transliterateArabicToEnglish(fullNameAr)}</span></div>
-          <div><span class="label">Nationality:</span> <span class="value">${transliterateArabicToEnglish(nationalityAr)}</span></div>
+          <div><span class="label">Nationality:</span> <span class="value">Gambian</span></div>
           <div><span class="label">School:</span> <span class="value">${transliterateArabicToEnglish(schoolNameAr)}</span></div>
         </div>
-        <div class="student-info-right">
+        <div class="student-right">
           <div><span class="label">اسم الطالب/ة:</span> <span class="value">${fullNameAr}</span></div>
           <div><span class="label">الجنسية:</span> <span class="value">${nationalityAr}</span></div>
           <div><span class="label">المدرسة:</span> <span class="value">${schoolNameAr}</span></div>
         </div>
       </div>
+      
+      <!-- MARKS TABLE -->
       <table>
         <thead>
           <tr>
-            <th style="width: 70px;">الدرجة المحققة</th>
-            <th style="width: 60px;">الدرجات الصغرى</th>
-            <th style="width: 60px;">الدرجات الكبرى</th>
-            <th>المادة</th>
-            <th style="width: 30px;">م</th>
+            <th class="col-index">م</th>
+            <th class="col-subject">المادة</th>
+            <th class="col-max">الدرجات الكبرى</th>
+            <th class="col-min">الدرجات الصغرى</th>
+            <th class="col-score">الدرجة المحققة</th>
           </tr>
         </thead>
         <tbody>
           ${subjectRows}
           <tr class="summary-row">
-            <td colspan="1">${totalMarks}</td>
-            <td colspan="3">مجموع الدرجات</td>
             <td></td>
+            <td class="col-subject" style="text-align: center;">مجموع الدرجات</td>
+            <td></td>
+            <td></td>
+            <td class="col-score">${totalMarks}</td>
           </tr>
           <tr class="percentage-row">
-            <td colspan="1">${percentage.toFixed(1)}%</td>
-            <td colspan="3">النسبة</td>
             <td></td>
+            <td class="col-subject" style="text-align: center;">النسبة</td>
+            <td></td>
+            <td></td>
+            <td class="col-score">${percentage.toFixed(1)}%</td>
           </tr>
           <tr class="grade-row">
-            <td colspan="1">${finalGrade.arabic}</td>
-            <td colspan="3">التقدير</td>
             <td></td>
+            <td class="col-subject" style="text-align: center;">التقدير</td>
+            <td></td>
+            <td></td>
+            <td class="col-score">${finalGrade.arabic}</td>
           </tr>
         </tbody>
       </table>
+      
+      <!-- SIGNATURE SECTION -->
       <div class="signatures">
-        <div class="signature-block">
-          <div class="signature-label-en">Exam Committee Chairman</div>
-          <div class="signature-label-ar">توقيع رئيس لجنة الامتحانات</div>
-          <div class="signature-line"></div>
+        <div class="sig-block">
+          <div class="sig-label">توقيع رئيس لجنة الامتحانات</div>
+          <div class="sig-line"></div>
         </div>
-        <div class="signature-block">
-          <div class="signature-label-en">Secretariat Administration</div>
-          <div class="signature-label-ar">توقيع إدارة الأمانة</div>
-          <div class="signature-line"></div>
+        <div class="sig-block">
+          <div class="sig-label">توقيع إدارة الأمانة</div>
+          <div class="sig-line"></div>
         </div>
       </div>
-      <div class="footer">
-        <div class="qr-section">
-          <img src="${qrCodeDataUrl}" alt="QR Code">
-          <div class="qr-number">${transcriptNumber}</div>
-        </div>
-        <div class="verify-text">
-          <div class="verify-text-ar">للتحقق من صحة هذا الكشف، استخدم رمز QR</div>
-          <div class="verify-text-en">To verify this transcript, scan the QR code</div>
-        </div>
+    </div>
+    
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="qr-block">
+        <img src="${qrCodeDataUrl}" alt="QR">
+        <div class="qr-number">${transcriptNumber}</div>
+      </div>
+      <div class="verify-block">
+        <div class="verify-ar">للتحقق من صحة هذا الكشف، امسح رمز QR</div>
+        <div class="verify-en">To verify this transcript, scan the QR code</div>
       </div>
     </div>
   </div>
@@ -561,7 +724,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
   }
   
   // Generate QR code
-  const verifyUrl = `https://amaanah.gm/verify/${data.qrToken || 'preview'}`;
+  const verifyUrl = `https://amaanah.gm/verify/${data.transcriptNumber || 'preview'}`;
   const qrCodeDataUrl = data.qrCodeDataUrl || await QRCode.toDataURL(verifyUrl, {
     width: 150,
     margin: 1,
