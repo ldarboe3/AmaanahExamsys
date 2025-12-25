@@ -650,12 +650,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       
       <!-- STUDENT INFO -->
       <div class="student-box">
-        <div class="student-left">
-          <div><span class="label">Student Name:</span> <span class="value">${transliterateArabicToEnglish(fullNameAr)}</span></div>
-          <div><span class="label">Nationality:</span> <span class="value">Gambian</span></div>
-          <div><span class="label">School:</span> <span class="value">${transliterateArabicToEnglish(schoolNameAr)}</span></div>
-        </div>
-        <div class="student-right">
+        <div class="student-right" style="width: 100%; text-align: right;">
           <div><span class="label">اسم الطالب/ة:</span> <span class="value">${fullNameAr}</span></div>
           <div><span class="label">الجنسية:</span> <span class="value">${nationalityAr}</span></div>
           <div><span class="label">المدرسة:</span> <span class="value">${schoolNameAr}</span></div>
