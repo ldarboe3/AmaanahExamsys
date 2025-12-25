@@ -1,14 +1,16 @@
 import { execSync } from "child_process";
 import { existsSync } from "fs";
-import puppeteer, { Browser } from "puppeteer";
+import puppeteerCore, { Browser } from "puppeteer-core";
 
-// Helper to find Chromium executable for Puppeteer
 let cachedChromiumPath: string | null = null;
+let useSparticuzChromium = false;
 
-export function getChromiumExecutable(): string {
+export async function getChromiumExecutable(): Promise<string> {
   if (cachedChromiumPath) return cachedChromiumPath;
   
-  // Check environment variable first
+  const isProduction = process.env.NODE_ENV === 'production';
+  console.log('[Chromium] Environment:', isProduction ? 'production' : 'development');
+  
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     if (existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
       cachedChromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH;
@@ -19,7 +21,6 @@ export function getChromiumExecutable(): string {
     }
   }
   
-  // Try `which chromium` first - works reliably with Nix environments
   try {
     const whichChromium = execSync('which chromium', { encoding: 'utf8', timeout: 5000 }).trim();
     if (whichChromium && existsSync(whichChromium)) {
@@ -31,7 +32,6 @@ export function getChromiumExecutable(): string {
     console.debug('[Chromium] which chromium failed');
   }
   
-  // Direct path checks for common locations (Docker, standard Linux)
   const directPaths = [
     '/usr/bin/chromium-browser',
     '/usr/bin/chromium',
@@ -48,23 +48,20 @@ export function getChromiumExecutable(): string {
     }
   }
   
-  // Try to find chromium in PATH
-  const candidates = ['chromium', 'chromium-browser', 'google-chrome', 'chrome'];
-  for (const cmd of candidates) {
-    try {
-      const path = execSync(`which ${cmd}`, { encoding: 'utf8' }).trim();
-      if (path && existsSync(path)) {
-        cachedChromiumPath = path;
-        console.log('[Chromium] Found executable at:', cachedChromiumPath);
-        return cachedChromiumPath;
-      }
-    } catch (err) {
-      // Command not found, try next
-      console.debug(`[Chromium] ${cmd} not found in PATH`);
+  try {
+    console.log('[Chromium] Trying @sparticuz/chromium for serverless...');
+    const chromium = await import('@sparticuz/chromium');
+    const execPath = await chromium.default.executablePath();
+    if (execPath && existsSync(execPath)) {
+      cachedChromiumPath = execPath;
+      useSparticuzChromium = true;
+      console.log('[Chromium] Using @sparticuz/chromium:', cachedChromiumPath);
+      return cachedChromiumPath;
     }
+  } catch (err) {
+    console.debug('[Chromium] @sparticuz/chromium not available:', err);
   }
   
-  // Try to use bundled Puppeteer Chromium as last resort
   try {
     const puppeteer = require('puppeteer');
     const puppeteerChrome = puppeteer.executablePath?.();
@@ -77,69 +74,71 @@ export function getChromiumExecutable(): string {
     console.debug('[Chromium] Could not find bundled Puppeteer Chrome:', err);
   }
   
-  // If no executable found, throw with helpful error
-  const errorMsg = 'Could not find Chromium executable. Checked: direct paths, PATH env, bundled Puppeteer. Set PUPPETEER_EXECUTABLE_PATH environment variable or ensure chromium is installed.';
+  const errorMsg = 'Could not find Chromium executable. Checked: direct paths, PATH env, @sparticuz/chromium, bundled Puppeteer. Set PUPPETEER_EXECUTABLE_PATH environment variable or ensure chromium is installed.';
   console.error('[Chromium] ' + errorMsg);
   throw new Error(errorMsg);
 }
 
-// Shared browser instance for performance optimization
 let sharedBrowser: Browser | null = null;
 let browserLastUsed: number = Date.now();
-let browserLaunchPromise: Promise<Browser> | null = null; // Mutex for concurrent launches
-const BROWSER_IDLE_TIMEOUT = 60000; // Close after 1 minute of inactivity
+let browserLaunchPromise: Promise<Browser> | null = null;
+const BROWSER_IDLE_TIMEOUT = 60000;
 
 export async function getSharedBrowser(): Promise<Browser> {
   browserLastUsed = Date.now();
   
-  // Return existing connected browser if still healthy
   if (sharedBrowser) {
     if (sharedBrowser.connected) {
       return sharedBrowser;
     }
-    // Browser disconnected - clear stale reference
     console.log('[Chromium] Browser disconnected, clearing stale reference');
     sharedBrowser = null;
   }
   
-  // If browser is being launched, wait for that launch to complete
   if (browserLaunchPromise) {
     return browserLaunchPromise;
   }
   
-  // Launch browser with mutex to prevent concurrent launches
   browserLaunchPromise = (async () => {
     try {
-      const chromiumPath = getChromiumExecutable();
+      const chromiumPath = await getChromiumExecutable();
       console.log('[Chromium] Launching shared browser from:', chromiumPath);
       
-      const browser = await puppeteer.launch({
+      let launchArgs = [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox', 
+        '--disable-dev-shm-usage', 
+        '--disable-gpu', 
+        '--single-process',
+        '--no-zygote',
+        '--disable-extensions',
+        '--disable-background-networking',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--disable-translate'
+      ];
+      
+      if (useSparticuzChromium) {
+        try {
+          const chromium = await import('@sparticuz/chromium');
+          launchArgs = chromium.default.args;
+        } catch (e) {
+          console.debug('[Chromium] Could not get sparticuz args, using defaults');
+        }
+      }
+      
+      const browser = await puppeteerCore.launch({
         headless: true,
         executablePath: chromiumPath,
-        args: [
-          '--no-sandbox', 
-          '--disable-setuid-sandbox', 
-          '--disable-dev-shm-usage', 
-          '--disable-gpu', 
-          '--single-process',
-          '--no-zygote',
-          '--disable-extensions',
-          '--disable-background-networking',
-          '--disable-default-apps',
-          '--disable-sync',
-          '--disable-translate'
-        ],
+        args: launchArgs,
         timeout: 30000
       });
       
       sharedBrowser = browser;
-      
-      // Set up idle timeout to close browser when not in use
       scheduleIdleCheck();
       
       return browser;
     } catch (error) {
-      // On launch failure, ensure stale reference is cleared
       sharedBrowser = null;
       console.error('[Chromium] Failed to launch browser:', error);
       throw error;
@@ -159,7 +158,6 @@ function scheduleIdleCheck() {
       try {
         await sharedBrowser.close();
       } catch (e) {
-        // Browser might already be closed
       }
       sharedBrowser = null;
     } else if (sharedBrowser) {
@@ -173,7 +171,6 @@ export async function closeBrowser(): Promise<void> {
     try {
       await sharedBrowser.close();
     } catch (e) {
-      // Browser might already be closed
     }
     sharedBrowser = null;
   }

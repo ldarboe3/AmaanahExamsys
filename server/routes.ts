@@ -5556,7 +5556,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const browser = await puppeteer.launch({
         headless: true,
-        executablePath: getChromiumExecutable(),
+        executablePath: await getChromiumExecutable(),
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
@@ -6025,7 +6025,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const browser = await puppeteer.launch({
         headless: true,
-        executablePath: getChromiumExecutable(),
+        executablePath: await getChromiumExecutable(),
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
@@ -13996,7 +13996,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       try {
         browser = await puppeteer.launch({
           headless: true,
-          executablePath: getChromiumExecutable(),
+          executablePath: await getChromiumExecutable(),
           args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
           timeout: 30000
         });

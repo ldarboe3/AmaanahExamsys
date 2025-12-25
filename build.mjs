@@ -17,6 +17,7 @@ const allowlist = [
   "multer",
   "passport",
   "passport-local",
+  "puppeteer",
   "ws",
   "zod",
   "zod-validation-error",
