@@ -1,12 +1,11 @@
 import { execSync } from "child_process";
 import { existsSync } from "fs";
-import puppeteerCore, { Browser } from "puppeteer-core";
+import type { Browser } from "puppeteer";
 
 let cachedChromiumPath: string | null = null;
-let useSparticuzChromium = false;
-let cachedSparticuzModule: any = null;
+let cachedPuppeteer: any = null;
 
-export async function getChromiumExecutable(): Promise<string> {
+export async function getChromiumExecutable(): Promise<string | undefined> {
   if (cachedChromiumPath) return cachedChromiumPath;
   
   const isProduction = process.env.NODE_ENV === 'production';
@@ -45,25 +44,15 @@ export async function getChromiumExecutable(): Promise<string> {
     }
   }
   
-  try {
-    console.log('[Chromium] Loading @sparticuz/chromium...');
-    if (!cachedSparticuzModule) {
-      cachedSparticuzModule = await import('@sparticuz/chromium');
-    }
-    const execPath = await cachedSparticuzModule.default.executablePath();
-    if (execPath) {
-      cachedChromiumPath = execPath;
-      useSparticuzChromium = true;
-      console.log('[Chromium] Using @sparticuz/chromium:', cachedChromiumPath);
-      return execPath;
-    }
-  } catch (err) {
-    console.error('[Chromium] @sparticuz/chromium failed:', err);
-  }
-  
-  const errorMsg = 'Could not find Chromium executable';
-  console.error('[Chromium] ' + errorMsg);
-  throw new Error(errorMsg);
+  // In production, let puppeteer use its bundled chromium
+  console.log('[Chromium] Using bundled Puppeteer Chromium');
+  return undefined;
+}
+
+async function getPuppeteer() {
+  if (cachedPuppeteer) return cachedPuppeteer;
+  cachedPuppeteer = await import('puppeteer');
+  return cachedPuppeteer;
 }
 
 let sharedBrowser: Browser | null = null;
@@ -95,10 +84,12 @@ export async function getSharedBrowser(): Promise<Browser> {
 
 async function launchBrowser(): Promise<Browser> {
   try {
+    const puppeteer = await getPuppeteer();
     const chromiumPath = await getChromiumExecutable();
-    console.log('[Chromium] Launching browser from:', chromiumPath);
     
-    let launchArgs = [
+    console.log('[Chromium] Launching browser...');
+    
+    const launchArgs = [
       '--no-sandbox', 
       '--disable-setuid-sandbox', 
       '--disable-dev-shm-usage', 
@@ -114,18 +105,17 @@ async function launchBrowser(): Promise<Browser> {
       '--mute-audio'
     ];
     
-    if (useSparticuzChromium && cachedSparticuzModule) {
-      try {
-        launchArgs = cachedSparticuzModule.default.args;
-      } catch (e) {}
+    const launchOptions: any = {
+      headless: true,
+      args: launchArgs,
+      timeout: 120000
+    };
+    
+    if (chromiumPath) {
+      launchOptions.executablePath = chromiumPath;
     }
     
-    const browser = await puppeteerCore.launch({
-      headless: true,
-      executablePath: chromiumPath,
-      args: launchArgs,
-      timeout: 60000
-    });
+    const browser = await puppeteer.default.launch(launchOptions);
     
     sharedBrowser = browser;
     browserLaunchPromise = null;

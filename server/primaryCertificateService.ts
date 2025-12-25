@@ -428,8 +428,7 @@ function generateCertificateHTML(data: PrimaryCertificateData, templateBase64: s
       <!-- Main paragraph - 60px -->
       <div class="body-content">
         <p>
-          تشهد الأمانة العامّة بأنّ ${studentLabel}/ <span class="highlight">${fullName}</span> ${bornLabel} في <span class="highlight">${student.placeOfBirth || ''}</span> بتاريخ :
-          <span class="highlight">${dobFormatted}</span> م قد ${completedLabel} دراسة المرحلة الابتدائية في <span class="highlight">${schoolWithAddress}</span> بعد أن ${passedLabel}
+          تشهد الأمانة العامّة بأنّ ${studentLabel}/ <span class="highlight">${fullName}</span> قد ${completedLabel} دراسة المرحلة الابتدائية في <span class="highlight">${schoolNameAr}</span> بعد أن ${passedLabel}
           في الامتحان النهائي الذي أشرفت عليه الأمانة العامّة بالتنسيق مع وزارة التربية والتعليم في غامبيا.
         </p>
         <p>
@@ -562,14 +561,6 @@ export function validateCertificateRequirements(student: StudentData): {
   if (!student.grade) {
     errors.push('Grade is required');
     errorsAr.push('الصف مطلوب');
-  }
-  if (!student.dateOfBirth) {
-    errors.push('Date of birth is required');
-    errorsAr.push('تاريخ الميلاد مطلوب');
-  }
-  if (!student.placeOfBirth) {
-    errors.push('Place of birth is required');
-    errorsAr.push('مكان الميلاد مطلوب');
   }
   if (!student.indexNumber) {
     errors.push('Index number is required');
