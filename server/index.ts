@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { warmBrowser } from "./chromiumHelper";
 
 const app = express();
 
@@ -110,6 +111,13 @@ app.use((req, res, next) => {
       },
       () => {
         log(`serving on port ${port}`);
+        
+        // Warm up browser in background after server starts
+        setImmediate(() => {
+          warmBrowser().catch(err => {
+            console.error('[Startup] Browser warm-up failed:', err.message);
+          });
+        });
       },
     );
   } catch (error) {
