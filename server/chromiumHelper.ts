@@ -19,7 +19,19 @@ export function getChromiumExecutable(): string {
     }
   }
   
-  // Direct path checks for common locations (especially in Docker)
+  // Try `which chromium` first - works reliably with Nix environments
+  try {
+    const whichChromium = execSync('which chromium', { encoding: 'utf8', timeout: 5000 }).trim();
+    if (whichChromium && existsSync(whichChromium)) {
+      cachedChromiumPath = whichChromium;
+      console.log('[Chromium] Found via which:', cachedChromiumPath);
+      return cachedChromiumPath;
+    }
+  } catch (err) {
+    console.debug('[Chromium] which chromium failed');
+  }
+  
+  // Direct path checks for common locations (Docker, standard Linux)
   const directPaths = [
     '/usr/bin/chromium-browser',
     '/usr/bin/chromium',
