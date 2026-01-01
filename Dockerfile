@@ -118,6 +118,7 @@ COPY --from=builder /app/dist ./dist
 # Set environment variables
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

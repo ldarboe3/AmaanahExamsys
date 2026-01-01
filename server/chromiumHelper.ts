@@ -8,44 +8,42 @@ let cachedPuppeteer: any = null;
 export async function getChromiumExecutable(): Promise<string | undefined> {
   if (cachedChromiumPath) return cachedChromiumPath;
   
-  const isProduction = process.env.NODE_ENV === 'production';
-  
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     if (existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
       cachedChromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH;
       console.log('[Chromium] Using PUPPETEER_EXECUTABLE_PATH:', cachedChromiumPath);
       return cachedChromiumPath;
     }
+    console.log('[Chromium] PUPPETEER_EXECUTABLE_PATH set but file not found:', process.env.PUPPETEER_EXECUTABLE_PATH);
   }
   
-  if (!isProduction) {
-    try {
-      const whichChromium = execSync('which chromium', { encoding: 'utf8', timeout: 3000 }).trim();
-      if (whichChromium && existsSync(whichChromium)) {
-        cachedChromiumPath = whichChromium;
-        console.log('[Chromium] Found via which:', cachedChromiumPath);
-        return cachedChromiumPath;
-      }
-    } catch (err) {}
-    
-    const directPaths = [
-      '/usr/bin/chromium-browser',
-      '/usr/bin/chromium',
-      '/usr/bin/google-chrome',
-      '/usr/bin/google-chrome-stable',
-    ];
-    
-    for (const path of directPaths) {
-      if (existsSync(path)) {
-        cachedChromiumPath = path;
-        console.log('[Chromium] Found executable at:', cachedChromiumPath);
-        return cachedChromiumPath;
-      }
+  const directPaths = [
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+  ];
+  
+  for (const path of directPaths) {
+    if (existsSync(path)) {
+      cachedChromiumPath = path;
+      console.log('[Chromium] Found executable at:', cachedChromiumPath);
+      return cachedChromiumPath;
     }
   }
   
-  // In production, let puppeteer use its bundled chromium
-  console.log('[Chromium] Using bundled Puppeteer Chromium');
+  try {
+    const whichChromium = execSync('which chromium || which chromium-browser || which google-chrome', { encoding: 'utf8', timeout: 3000 }).trim();
+    if (whichChromium && existsSync(whichChromium)) {
+      cachedChromiumPath = whichChromium;
+      console.log('[Chromium] Found via which:', cachedChromiumPath);
+      return cachedChromiumPath;
+    }
+  } catch (err) {
+    console.log('[Chromium] which command failed, using bundled chromium');
+  }
+  
+  console.log('[Chromium] No system chromium found, using bundled Puppeteer Chromium');
   return undefined;
 }
 
