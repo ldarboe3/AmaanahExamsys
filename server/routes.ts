@@ -44,7 +44,7 @@ import bcrypt from "bcrypt";
 import multer from "multer";
 import { randomBytes } from "crypto";
 import * as XLSX from "xlsx";
-import { getChromiumExecutable } from "./chromiumHelper";
+import { getChromiumExecutable, getSharedBrowser } from "./chromiumHelper";
 
 const schoolDocUploadConfig = multer({
   storage: multer.memoryStorage(),
@@ -5554,15 +5554,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         </html>
       `;
       
-      const browser = await puppeteer.launch({
-        headless: true,
-        executablePath: await getChromiumExecutable(),
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-      });
+      const browser = await getSharedBrowser();
+      const page = await browser.newPage();
       
       try {
-        const page = await browser.newPage();
-        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+        await page.setContent(htmlContent, { waitUntil: 'domcontentloaded', timeout: 30000 });
         
         const pdfBuffer = await page.pdf({
           format: 'A4',
@@ -5574,7 +5570,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`);
         res.send(Buffer.from(pdfBuffer));
       } finally {
-        await browser.close();
+        await page.close();
       }
     } catch (error: any) {
       console.error("Invoice PDF generation error:", error);
@@ -6023,15 +6019,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         </html>
       `;
       
-      const browser = await puppeteer.launch({
-        headless: true,
-        executablePath: await getChromiumExecutable(),
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-      });
+      const browser = await getSharedBrowser();
+      const page = await browser.newPage();
       
       try {
-        const page = await browser.newPage();
-        await page.setContent(finalHtml, { waitUntil: 'networkidle0' });
+        await page.setContent(finalHtml, { waitUntil: 'domcontentloaded', timeout: 30000 });
         
         const pdfBuffer = await page.pdf({
           format: 'A4',
@@ -6043,7 +6035,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         res.setHeader('Content-Disposition', `attachment; filename="exam-cards.pdf"`);
         res.send(Buffer.from(pdfBuffer));
       } finally {
-        await browser.close();
+        await page.close();
       }
     } catch (error: any) {
       console.error("Exam cards PDF generation error:", error);
@@ -9848,7 +9840,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const { generateTranscriptPDF, generateQRToken } = await import('./certificateService');
 
-      const generatedTranscripts = [];
+      const generatedTranscripts: any[] = [];
+      const errors: any[] = [];
       for (const studentId of studentIds) {
         const student = await storage.getStudent(studentId);
         if (!student) continue;

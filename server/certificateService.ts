@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import PDFDocument from 'pdfkit';
 import { shapeArabicText } from './arabicTextHelper';
+import { getSharedBrowser } from './chromiumHelper';
 import {
   certificateTemplates,
   getCertificateTemplate,
@@ -688,7 +689,7 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
   const page = await browser.newPage();
 
   try {
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    await page.setContent(htmlContent, { waitUntil: 'domcontentloaded', timeout: 30000 });
     
     const fileName = `transcript_${student.indexNumber || student.id}_g${student.grade}_${Date.now()}.pdf`;
     const filePath = path.join(outputDir, fileName);
@@ -1123,7 +1124,7 @@ export async function generateResultSlipPDF(data: ResultSlipData): Promise<strin
   const page = await browser.newPage();
 
   try {
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    await page.setContent(htmlContent, { waitUntil: 'domcontentloaded', timeout: 30000 });
     
     const fileName = `result_slip_${student.indexNumber || 'unknown'}_${Date.now()}.pdf`;
     const filePath = path.join(outputDir, fileName);

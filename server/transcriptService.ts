@@ -750,13 +750,16 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
   const page = await browser.newPage();
   
   try {
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    // Use 'domcontentloaded' instead of 'networkidle0' for much faster loading
+    // All images are base64 embedded so no network requests needed
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
     
     await page.pdf({
       path: filePath,
       format: 'A4',
       printBackground: true,
-      preferCSSPageSize: true
+      preferCSSPageSize: true,
+      timeout: 30000
     });
     
     console.log(`[Transcript PDF] Successfully generated: ${filePath}`);

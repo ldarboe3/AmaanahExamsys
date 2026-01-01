@@ -515,13 +515,11 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
     });
     
     await page.setContent(html, { 
-      waitUntil: ['networkidle0', 'domcontentloaded'],
-      timeout: 60000
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
     });
     
     await page.evaluateHandle('document.fonts.ready');
-    
-    await new Promise(resolve => setTimeout(resolve, 2000));
     
     const filename = `primary_cert_${student.id}_${certificateNumber.replace(/\//g, '-')}_${Date.now()}.pdf`;
     const pdfPath = path.join(outputDir, filename);

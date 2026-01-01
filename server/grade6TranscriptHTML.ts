@@ -500,7 +500,7 @@ export async function generateGrade6TranscriptHTML(data: TranscriptData): Promis
   const page = await browser.newPage();
   
   try {
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
     
     await page.pdf({
       path: filePath,
