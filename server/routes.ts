@@ -10451,7 +10451,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const fs = await import('fs');
       const path = await import('path');
       
-      if (!fs.existsSync(certificate.pdfUrl)) {
+      // Handle both absolute and relative paths
+      const pdfPath = certificate.pdfUrl.startsWith('/') 
+        ? certificate.pdfUrl 
+        : path.join(process.cwd(), certificate.pdfUrl);
+
+      if (!fs.existsSync(pdfPath)) {
+        console.error(`[PDF Download] File not found at path: ${pdfPath}`);
         return res.status(404).json({ message: "PDF file not found" });
       }
       
@@ -10459,7 +10465,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${certificate.certificateNumber.replace('/', '-')}.pdf"`);
-      fs.createReadStream(certificate.pdfUrl).pipe(res);
+      fs.createReadStream(pdfPath).pipe(res);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -10474,7 +10480,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       const fs = await import('fs');
       
-      if (!fs.existsSync(transcript.pdfUrl)) {
+      // Handle both absolute and relative paths
+      const pdfPath = transcript.pdfUrl.startsWith('/') 
+        ? transcript.pdfUrl 
+        : path.join(process.cwd(), transcript.pdfUrl);
+
+      if (!fs.existsSync(pdfPath)) {
+        console.error(`[PDF Download] File not found at path: ${pdfPath}`);
         return res.status(404).json({ message: "PDF file not found" });
       }
       
@@ -10482,7 +10494,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${transcript.transcriptNumber.replace('/', '-')}.pdf"`);
-      fs.createReadStream(transcript.pdfUrl).pipe(res);
+      fs.createReadStream(pdfPath).pipe(res);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
