@@ -18,10 +18,11 @@ export async function getChromiumExecutable(): Promise<string | undefined> {
   }
   
   const directPaths = [
-    '/usr/bin/chromium-browser',
     '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
     '/usr/bin/google-chrome',
     '/usr/bin/google-chrome-stable',
+    '/usr/lib/chromium/chromium',
   ];
   
   for (const path of directPaths) {
