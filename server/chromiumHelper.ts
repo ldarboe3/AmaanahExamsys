@@ -121,7 +121,7 @@ let browserLastUsed: number = Date.now();
 let browserLaunchPromise: Promise<Browser> | null = null;
 let keepAliveInterval: NodeJS.Timeout | null = null;
 
-const BROWSER_IDLE_TIMEOUT = 300000;
+const BROWSER_IDLE_TIMEOUT = process.env.NODE_ENV === 'production' ? 600000 : 300000;
 
 export async function getSharedBrowser(): Promise<Browser> {
   browserLastUsed = Date.now();
@@ -154,16 +154,17 @@ async function launchBrowser(): Promise<Browser> {
       '--no-sandbox', 
       '--disable-setuid-sandbox', 
       '--disable-dev-shm-usage', 
-      '--disable-gpu', 
-      '--single-process',
-      '--no-zygote',
+      '--disable-gpu',
       '--disable-extensions',
       '--disable-background-networking',
       '--disable-default-apps',
       '--disable-sync',
       '--disable-translate',
       '--hide-scrollbars',
-      '--mute-audio'
+      '--mute-audio',
+      '--disable-software-rasterizer',
+      '--disable-features=TranslateUI',
+      '--disable-ipc-flooding-protection'
     ];
     
     const launchOptions: any = {
