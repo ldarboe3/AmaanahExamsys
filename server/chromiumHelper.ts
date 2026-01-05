@@ -1,9 +1,56 @@
 import { execSync } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, readdirSync } from "fs";
+import { join } from "path";
 import type { Browser } from "puppeteer";
 
 let cachedChromiumPath: string | null = null;
 let cachedPuppeteer: any = null;
+
+function findChromiumInCacheDir(cacheDir: string): string | null {
+  try {
+    if (!existsSync(cacheDir)) return null;
+    
+    const entries = readdirSync(cacheDir);
+    for (const entry of entries) {
+      if (entry.startsWith('chromium')) {
+        const chromiumDir = join(cacheDir, entry);
+        const possiblePaths = [
+          join(chromiumDir, 'chrome-linux', 'chrome'),
+          join(chromiumDir, 'chrome-linux64', 'chrome'),
+          join(chromiumDir, 'chrome'),
+        ];
+        
+        for (const p of possiblePaths) {
+          if (existsSync(p)) {
+            console.log('[Chromium] Found in cache directory:', p);
+            return p;
+          }
+        }
+        
+        try {
+          const subEntries = readdirSync(chromiumDir);
+          for (const sub of subEntries) {
+            const subPath = join(chromiumDir, sub);
+            const chromePaths = [
+              join(subPath, 'chrome-linux', 'chrome'),
+              join(subPath, 'chrome-linux64', 'chrome'),
+              join(subPath, 'chrome'),
+            ];
+            for (const cp of chromePaths) {
+              if (existsSync(cp)) {
+                console.log('[Chromium] Found in nested cache directory:', cp);
+                return cp;
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    }
+  } catch (err) {
+    console.log('[Chromium] Error scanning cache directory:', err);
+  }
+  return null;
+}
 
 export async function getChromiumExecutable(): Promise<string | undefined> {
   if (cachedChromiumPath) return cachedChromiumPath;
@@ -15,6 +62,21 @@ export async function getChromiumExecutable(): Promise<string | undefined> {
       return cachedChromiumPath;
     }
     console.log('[Chromium] PUPPETEER_EXECUTABLE_PATH set but file not found:', process.env.PUPPETEER_EXECUTABLE_PATH);
+  }
+  
+  const cacheDirs = [
+    process.env.PUPPETEER_CACHE_DIR,
+    '/opt/chromium',
+    join(process.cwd(), '.cache', 'puppeteer'),
+    '/workspace/.cache/puppeteer',
+  ].filter(Boolean) as string[];
+  
+  for (const cacheDir of cacheDirs) {
+    const found = findChromiumInCacheDir(cacheDir);
+    if (found) {
+      cachedChromiumPath = found;
+      return cachedChromiumPath;
+    }
   }
   
   const directPaths = [
@@ -41,10 +103,10 @@ export async function getChromiumExecutable(): Promise<string | undefined> {
       return cachedChromiumPath;
     }
   } catch (err) {
-    console.log('[Chromium] which command failed, using bundled chromium');
+    console.log('[Chromium] which command failed');
   }
   
-  console.log('[Chromium] No system chromium found, using bundled Puppeteer Chromium');
+  console.log('[Chromium] No chromium found, will use bundled Puppeteer Chromium');
   return undefined;
 }
 

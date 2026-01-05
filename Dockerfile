@@ -3,10 +3,8 @@ FROM node:20-bullseye AS builder
 
 WORKDIR /app
 
-# Install system dependencies needed for Puppeteer/Chromium
+# Install system dependencies needed for Puppeteer/Chromium (shared libraries only)
 RUN apt-get update && apt-get install -y \
-    chromium-browser \
-    chromium \
     ca-certificates \
     fontconfig \
     fonts-noto-cjk \
@@ -25,7 +23,6 @@ RUN apt-get update && apt-get install -y \
     libicu67 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
-    libpango-1.0-0 \
     libx11-6 \
     libxcb1 \
     libxcomposite1 \
@@ -42,6 +39,7 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     libnss3 \
     libnspr4 \
+    libasound2 \
     xdg-utils \
     wget \
     && rm -rf /var/lib/apt/lists/*
@@ -52,6 +50,9 @@ COPY package-lock.json ./
 
 # Install dependencies
 RUN npm ci
+
+# Download Chromium using Puppeteer's browser installer
+RUN npx @puppeteer/browsers install chromium@stable --path /opt/chromium
 
 # Copy source code
 COPY . .
@@ -64,10 +65,8 @@ FROM node:20-bullseye
 
 WORKDIR /app
 
-# Install only runtime dependencies for Chromium
+# Install only runtime dependencies for Chromium (shared libraries only)
 RUN apt-get update && apt-get install -y \
-    chromium-browser \
-    chromium \
     ca-certificates \
     fontconfig \
     fonts-noto-cjk \
@@ -86,7 +85,6 @@ RUN apt-get update && apt-get install -y \
     libicu67 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
-    libpango-1.0-0 \
     libx11-6 \
     libxcb1 \
     libxcomposite1 \
@@ -103,8 +101,12 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     libnss3 \
     libnspr4 \
+    libasound2 \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
+
+# Copy Chromium from builder stage
+COPY --from=builder /opt/chromium /opt/chromium
 
 # Copy package.json
 COPY package*.json ./
@@ -119,6 +121,7 @@ COPY --from=builder /app/dist ./dist
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_CACHE_DIR=/opt/chromium
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
