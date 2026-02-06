@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import amanahLogo from "@assets/Amana_Logo_1765129635267.png";
+import amanahLogo from "@assets/Amana_Logo_1770390631299.jpeg";
 
 const setupSchema = z.object({
   username: z.string()

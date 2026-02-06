@@ -17,7 +17,7 @@ import {
   Shield,
   Award,
 } from "lucide-react";
-import amaanahLogo from "@assets/Amana_Logo_1765234375172.png";
+import amaanahLogo from "@assets/Amana_Logo_1770390631299.jpeg";
 
 interface TranscriptVerification {
   valid: boolean;

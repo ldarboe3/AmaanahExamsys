@@ -35,7 +35,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { apiRequest } from "@/lib/queryClient";
-import amaanahLogo from "@assets/amaanah-logo-BXDbf4ee_1764613882774.png";
+import amaanahLogo from "@assets/Amana_Logo_1770390631299.jpeg";
 import {
   Table,
   TableBody,

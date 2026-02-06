@@ -22,7 +22,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { LanguageToggle } from "@/components/language-toggle";
 import { Link } from "wouter";
-import amaanahLogo from "@assets/amaanah-logo-BXDbf4ee_1764613882774.png";
+import amaanahLogo from "@assets/Amana_Logo_1770390631299.jpeg";
 import studentsBg from "@assets/generated_images/african_islamic_students_in_classroom.png";
 
 const loginSchema = z.object({

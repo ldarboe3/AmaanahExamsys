@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import type { NewsArticle, ImpactStat, NewsCategory } from "@shared/schema";
-import amaanahLogo from "@assets/amaanah-logo-BXDbf4ee_1764613882774.png";
+import amaanahLogo from "@assets/Amana_Logo_1770390631299.jpeg";
 import heroImage from "@assets/generated_images/african_madrassah_students_studying.png";
 import teacherImage from "@assets/generated_images/islamic_teacher_teaching_students.png";
 import graduationImage from "@assets/generated_images/islamic_school_graduation_ceremony.png";

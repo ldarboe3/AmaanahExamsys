@@ -12,7 +12,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import amanahLogo from "@assets/Amana_Logo_1765125084736.png";
+import amanahLogo from "@assets/Amana_Logo_1770390631299.jpeg";
 import {
   LayoutDashboard,
   School,

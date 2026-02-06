@@ -37,7 +37,7 @@ import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
-import amaanahLogo from "@assets/Amana_Logo_1765237832354.png";
+import amaanahLogo from "@assets/Amana_Logo_1770390631299.jpeg";
 
 const verifySchema = z.object({
   indexNumber: z.string().min(6, "Index number must be at least 6 characters"),

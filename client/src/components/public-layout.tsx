@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import amaanahLogo from "@assets/amaanah-logo-BXDbf4ee_1764613882774.png";
+import amaanahLogo from "@assets/Amana_Logo_1770390631299.jpeg";
 
 const navigation = [
   { name: "Home", nameAr: "الرئيسية", href: "/" },
