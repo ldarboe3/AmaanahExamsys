@@ -5214,7 +5214,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       try {
         const assetsDir = path.join(process.cwd(), 'attached_assets');
         const files = fs.readdirSync(assetsDir);
-        const logoFiles = files.filter(f => f.startsWith('Amana_Logo') && (f.endsWith('.png') || f.endsWith('.PNG')));
+        const logoFiles = files.filter(f => f.startsWith('Amana_Logo') && (f.endsWith('.png') || f.endsWith('.PNG') || f.endsWith('.jpeg') || f.endsWith('.jpg')));
         
         if (logoFiles.length > 0) {
           // Sort by timestamp in filename and get the most recent
@@ -5631,7 +5631,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Read logo
       let logoBase64 = '';
       try {
-        const logoPath = path.join(process.cwd(), 'attached_assets/Amana_Logo_1764714323051.PNG');
+        const logoPath = path.join(process.cwd(), 'attached_assets/Amana_Logo_1770390631299.jpeg');
         const logoBuffer = fs.readFileSync(logoPath);
         logoBase64 = logoBuffer.toString('base64');
       } catch (e) {

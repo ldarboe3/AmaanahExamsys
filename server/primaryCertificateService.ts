@@ -487,7 +487,7 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
   const { student, certificateNumber } = data;
   
   let logoBase64 = '';
-  const logoPath = path.join(process.cwd(), 'attached_assets', 'Amana_Logo_1765049398386.png');
+  const logoPath = path.join(process.cwd(), 'attached_assets', 'Amana_Logo_1770390631299.jpeg');
   if (fs.existsSync(logoPath)) {
     const logoBuffer = fs.readFileSync(logoPath);
     logoBase64 = logoBuffer.toString('base64');
