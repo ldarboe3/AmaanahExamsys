@@ -15427,6 +15427,203 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ===== Exam Day Workflow Routes =====
+
+  app.get("/api/exam-day/packet-lookup", isAuthenticated, async (req, res) => {
+    try {
+      const barcode = req.query.barcode as string;
+      if (!barcode) return res.status(400).json({ message: "Barcode required" });
+
+      const packet = await storage.getExamPacketByBarcode(barcode.trim());
+      if (!packet) return res.status(404).json({ message: "Packet not found" });
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const today = new Date().toISOString().split("T")[0];
+      const schedules = await storage.getSchedulesForCenterAndDate(packet.destinationCenterId, today);
+
+      const matchingSchedule = schedules.find(
+        (s) => s.subjectId === packet.subjectId && s.grade === packet.grade
+      );
+
+      const mismatchReasons: string[] = [];
+      let assignedCenterId: number | null = null;
+
+      if (user.role === "examiner") {
+        const examinerRecord = await storage.getExaminerByUserId(user.id);
+        if (examinerRecord) {
+          const assignments = await storage.getExaminerAssignments(examinerRecord.id);
+          if (assignments.length > 0) {
+            assignedCenterId = assignments[0].centerId;
+            if (packet.destinationCenterId !== assignedCenterId) {
+              mismatchReasons.push("Packet is not assigned to your exam center");
+            }
+          }
+        }
+      }
+
+      if (!matchingSchedule) {
+        mismatchReasons.push("No matching exam scheduled for today");
+      } else {
+        if (matchingSchedule.subjectId !== packet.subjectId) {
+          mismatchReasons.push("Subject mismatch with today's schedule");
+        }
+        if (matchingSchedule.grade !== packet.grade) {
+          mismatchReasons.push("Grade mismatch with today's schedule");
+        }
+      }
+
+      const subject = await storage.getSubject(packet.subjectId);
+      const center = await storage.getExamCenter(packet.destinationCenterId);
+      const examYear = await storage.getExamYear(packet.examYearId);
+
+      res.json({
+        packet,
+        schedule: matchingSchedule || null,
+        mismatchReasons,
+        assignedCenterId,
+        subject: subject ? { id: subject.id, name: subject.name } : null,
+        center: center ? { id: center.id, name: center.name } : null,
+        examYear: examYear ? { id: examYear.id, year: examYear.year } : null,
+        todaySchedules: schedules,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-day/verify", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const verifySchema = z.object({
+        packetId: z.coerce.number().int().positive(),
+        scheduleId: z.coerce.number().int().positive().optional().nullable(),
+        centerId: z.coerce.number().int().positive(),
+        isMatch: z.boolean(),
+        mismatchReasons: z.array(z.string()).optional().default([]),
+        expectedGrade: z.coerce.number().optional().nullable(),
+        expectedSubjectId: z.coerce.number().optional().nullable(),
+        expectedCenterId: z.coerce.number().optional().nullable(),
+        expectedExamDate: z.string().optional().nullable(),
+        gpsLatitude: z.string().optional().nullable(),
+        gpsLongitude: z.string().optional().nullable(),
+        deviceInfo: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+      });
+
+      const parsed = verifySchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+
+      const verification = await storage.createExamPacketVerification({
+        ...parsed.data,
+        examinerId: user.id,
+        scheduleId: parsed.data.scheduleId ?? null,
+        expectedGrade: parsed.data.expectedGrade ?? null,
+        expectedSubjectId: parsed.data.expectedSubjectId ?? null,
+        expectedCenterId: parsed.data.expectedCenterId ?? null,
+        expectedExamDate: parsed.data.expectedExamDate ?? null,
+        gpsLatitude: parsed.data.gpsLatitude ?? null,
+        gpsLongitude: parsed.data.gpsLongitude ?? null,
+        deviceInfo: parsed.data.deviceInfo ?? null,
+        notes: parsed.data.notes ?? null,
+      } as any);
+
+      res.json(verification);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-day/video-upload-url", isAuthenticated, async (req, res) => {
+    try {
+      const { ObjectStorageService } = await import("./objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      const { uploadURL, objectPath } = await objectStorageService.getObjectEntityUploadURL("envelope-evidence.webm");
+      res.json({ uploadURL, objectPath });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-day/sync-video", isAuthenticated, async (req, res) => {
+    try {
+      const syncSchema = z.object({
+        verificationId: z.coerce.number().int().positive(),
+        videoObjectPath: z.string().min(1),
+        videoDurationSec: z.coerce.number().int().min(1),
+        recordedAt: z.string(),
+        recordedBeforeScheduled: z.boolean().optional().default(false),
+      });
+
+      const parsed = syncSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+
+      const updated = await storage.updateExamPacketVerification(parsed.data.verificationId, {
+        videoObjectPath: parsed.data.videoObjectPath,
+        videoDurationSec: parsed.data.videoDurationSec,
+        recordedAt: new Date(parsed.data.recordedAt),
+        recordedBeforeScheduled: parsed.data.recordedBeforeScheduled,
+        isVideoMissing: false,
+        videoSyncStatus: "synced" as any,
+      });
+
+      if (!updated) return res.status(404).json({ message: "Verification not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-day/verifications", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const allowedRoles = ["super_admin", "examination_admin", "logistics_admin", "examiner"];
+      if (!allowedRoles.includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const filters: any = {};
+      if (req.query.centerId) filters.centerId = parseInt(req.query.centerId as string);
+      if (req.query.examinerId) filters.examinerId = req.query.examinerId as string;
+      if (req.query.packetId) filters.packetId = parseInt(req.query.packetId as string);
+
+      if (user.role === "examiner") {
+        filters.examinerId = user.id;
+      }
+
+      const verifications = await storage.getExamPacketVerifications(filters);
+      res.json(verifications);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-day/flags", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const verifications = await storage.getExamPacketVerifications({});
+      const flags = {
+        missingVideo: verifications.filter((v) => v.isVideoMissing),
+        earlyRecording: verifications.filter((v) => v.recordedBeforeScheduled),
+        mismatches: verifications.filter((v) => !v.isMatch),
+        totalVerifications: verifications.length,
+      };
+
+      res.json(flags);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }
 

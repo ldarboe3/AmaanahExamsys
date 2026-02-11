@@ -1664,6 +1664,56 @@ export const insertExamSessionLogSchema = createInsertSchema(examSessionLogs).pi
   notes: true,
 });
 
+// Exam Day Verification & Evidence
+export const videoSyncStatusEnum = pgEnum('video_sync_status', ['pending', 'uploading', 'synced', 'failed']);
+
+export const examPacketVerifications = pgTable("exam_packet_verifications", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  packetId: integer("packet_id").notNull().references(() => examPackets.id),
+  scheduleId: integer("schedule_id").references(() => examSchedules.id),
+  centerId: integer("center_id").notNull().references(() => examCenters.id),
+  examinerId: varchar("examiner_id").notNull().references(() => users.id),
+  verifiedAt: timestamp("verified_at").notNull().defaultNow(),
+  isMatch: boolean("is_match").notNull().default(true),
+  mismatchReasons: text("mismatch_reasons").array().default([]),
+  expectedGrade: integer("expected_grade"),
+  expectedSubjectId: integer("expected_subject_id"),
+  expectedCenterId: integer("expected_center_id"),
+  expectedExamDate: date("expected_exam_date"),
+  videoObjectPath: text("video_object_path"),
+  videoDurationSec: integer("video_duration_sec"),
+  recordedAt: timestamp("recorded_at"),
+  recordedBeforeScheduled: boolean("recorded_before_scheduled").default(false),
+  isVideoMissing: boolean("is_video_missing").default(true),
+  videoSyncStatus: videoSyncStatusEnum("video_sync_status").default('pending'),
+  gpsLatitude: varchar("gps_latitude", { length: 20 }),
+  gpsLongitude: varchar("gps_longitude", { length: 20 }),
+  deviceInfo: text("device_info"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertExamPacketVerificationSchema = createInsertSchema(examPacketVerifications).pick({
+  packetId: true,
+  scheduleId: true,
+  centerId: true,
+  examinerId: true,
+  isMatch: true,
+  mismatchReasons: true,
+  expectedGrade: true,
+  expectedSubjectId: true,
+  expectedCenterId: true,
+  expectedExamDate: true,
+  videoDurationSec: true,
+  recordedAt: true,
+  recordedBeforeScheduled: true,
+  gpsLatitude: true,
+  gpsLongitude: true,
+  deviceInfo: true,
+  notes: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1761,3 +1811,7 @@ export type InsertExamSchedule = z.infer<typeof insertExamScheduleSchema>;
 export type ExamSchedule = typeof examSchedules.$inferSelect;
 export type InsertExamSessionLog = z.infer<typeof insertExamSessionLogSchema>;
 export type ExamSessionLog = typeof examSessionLogs.$inferSelect;
+
+// Exam Day Verification Types
+export type InsertExamPacketVerification = z.infer<typeof insertExamPacketVerificationSchema>;
+export type ExamPacketVerification = typeof examPacketVerifications.$inferSelect;

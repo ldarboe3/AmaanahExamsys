@@ -40,6 +40,8 @@ import {
   examSchedules, examSessionLogs,
   type ExamSchedule, type InsertExamSchedule,
   type ExamSessionLog, type InsertExamSessionLog,
+  examPacketVerifications,
+  type ExamPacketVerification, type InsertExamPacketVerification,
 } from "@shared/schema";
 import { randomBytes } from "crypto";
 import bcrypt from "bcrypt";
@@ -443,6 +445,12 @@ export interface IStorage {
   getExamSessionLogs(filters?: { scheduleId?: number; centerId?: number; status?: string }): Promise<ExamSessionLog[]>;
   updateExamSessionLog(id: number, data: Partial<ExamSessionLog>): Promise<ExamSessionLog | undefined>;
   getMonitoringData(examYearId: number, examDate?: string): Promise<any>;
+
+  createExamPacketVerification(data: InsertExamPacketVerification): Promise<ExamPacketVerification>;
+  getExamPacketVerification(id: number): Promise<ExamPacketVerification | undefined>;
+  getExamPacketVerifications(filters?: { centerId?: number; examinerId?: string; packetId?: number }): Promise<ExamPacketVerification[]>;
+  updateExamPacketVerification(id: number, data: Partial<ExamPacketVerification>): Promise<ExamPacketVerification | undefined>;
+  getSchedulesForCenterAndDate(centerId: number, examDate: string): Promise<ExamSchedule[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2589,6 +2597,53 @@ export class DatabaseStorage implements IStorage {
     };
 
     return { schedules, sessions, summary };
+  }
+
+  async createExamPacketVerification(data: InsertExamPacketVerification): Promise<ExamPacketVerification> {
+    const [verification] = await db.insert(examPacketVerifications).values(data).returning();
+    return verification;
+  }
+
+  async getExamPacketVerification(id: number): Promise<ExamPacketVerification | undefined> {
+    const [verification] = await db.select().from(examPacketVerifications).where(eq(examPacketVerifications.id, id));
+    return verification;
+  }
+
+  async getExamPacketVerifications(filters?: { centerId?: number; examinerId?: string; packetId?: number }): Promise<ExamPacketVerification[]> {
+    const conditions = [];
+    if (filters?.centerId) conditions.push(eq(examPacketVerifications.centerId, filters.centerId));
+    if (filters?.examinerId) conditions.push(eq(examPacketVerifications.examinerId, filters.examinerId));
+    if (filters?.packetId) conditions.push(eq(examPacketVerifications.packetId, filters.packetId));
+    return db.select().from(examPacketVerifications)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(examPacketVerifications.createdAt));
+  }
+
+  async updateExamPacketVerification(id: number, data: Partial<ExamPacketVerification>): Promise<ExamPacketVerification | undefined> {
+    const [updated] = await db.update(examPacketVerifications)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(examPacketVerifications.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getSchedulesForCenterAndDate(centerId: number, examDate: string): Promise<ExamSchedule[]> {
+    const centerRecord = await db.select().from(examCenters).where(eq(examCenters.id, centerId));
+    if (centerRecord.length === 0) return [];
+
+    const allSchedules = await db.select().from(examSchedules)
+      .where(and(
+        eq(examSchedules.examDate, examDate),
+        eq(examSchedules.isPublished, true)
+      ))
+      .orderBy(asc(examSchedules.scheduledStartTime));
+
+    const centerGrades = centerRecord[0].grades;
+    if (centerGrades && Array.isArray(centerGrades) && centerGrades.length > 0) {
+      return allSchedules.filter(s => centerGrades.includes(s.grade));
+    }
+
+    return allSchedules;
   }
 }
 

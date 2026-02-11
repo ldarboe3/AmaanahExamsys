@@ -81,6 +81,16 @@ The system is built on a robust architecture featuring a React-based frontend, a
   - **HQ Monitoring Dashboard**: Real-time view of on-time/late starts, late ends, in-progress sessions, and per-center status.
   - **Access Control**: HQ roles (super_admin, examination_admin) for schedule management; all roles for session recording.
   - **Key Files**: client/src/pages/exam-scheduling.tsx, server/routes.ts (exam-schedules section), shared/schema.ts (examSchedules, examSessionLogs)
+- **Exam Day Workflow (Phase 4)**:
+  - **Packet Verification via Barcode**: Scan/enter packet barcode, lookup against database, validate against assigned exam center and today's schedule.
+  - **Mismatch Detection**: Automatic warnings for center assignment mismatches, missing schedules, subject/grade discrepancies. Center-grade filtering ensures only relevant schedules are compared.
+  - **Live Video Evidence Capture**: 10-second live camera recording using MediaRecorder API (no gallery upload). Auto-stop after 10 seconds with progress indicator.
+  - **IndexedDB Offline Storage**: Video blobs stored in IndexedDB for offline capability. Sync banner shows pending count with manual sync trigger.
+  - **Object Storage Sync**: Videos uploaded to object storage via signed URLs. Partial failure handling preserves unsynchronized items.
+  - **System Flags**: Admin dashboard showing missing video evidence, early recordings (before scheduled time), and packet mismatches.
+  - **GPS & Device Logging**: Automatic GPS coordinate capture and device info logging for each verification.
+  - **Access Control**: Examiner + HQ admin roles (super_admin, examination_admin, logistics_admin) for exam day workflow. Examiners see only their own verifications.
+  - **Key Files**: client/src/pages/exam-day.tsx, server/routes.ts (exam-day section), shared/schema.ts (examPacketVerifications), server/storage.ts
 - **Administrative Tools**: Comprehensive audit logging, advanced CSV export functionalities, and role-based access control.
 - **Exam Management**: Examiner, subject, timetable, and exam center management.
 - **Website Management**: Public-facing website content management system.
