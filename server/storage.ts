@@ -37,6 +37,9 @@ import {
   examPackets, handoverLogs,
   type ExamPacket, type InsertExamPacket,
   type HandoverLog, type InsertHandoverLog,
+  examSchedules, examSessionLogs,
+  type ExamSchedule, type InsertExamSchedule,
+  type ExamSessionLog, type InsertExamSessionLog,
 } from "@shared/schema";
 import { randomBytes } from "crypto";
 import bcrypt from "bcrypt";
@@ -428,6 +431,18 @@ export interface IStorage {
   getHandoverLogs(packetId: number): Promise<HandoverLog[]>;
   getHandoverLogByClientEventId(clientEventId: string): Promise<HandoverLog | undefined>;
   bulkSyncHandoverLogs(logs: InsertHandoverLog[]): Promise<HandoverLog[]>;
+
+  // ===== Exam Scheduling & Time Enforcement =====
+  createExamSchedule(schedule: InsertExamSchedule): Promise<ExamSchedule>;
+  getExamSchedule(id: number): Promise<ExamSchedule | undefined>;
+  getExamSchedules(filters?: { examYearId?: number; grade?: number; isPublished?: boolean }): Promise<ExamSchedule[]>;
+  updateExamSchedule(id: number, data: Partial<ExamSchedule>): Promise<ExamSchedule | undefined>;
+  deleteExamSchedule(id: number): Promise<boolean>;
+  createExamSessionLog(log: InsertExamSessionLog): Promise<ExamSessionLog>;
+  getExamSessionLog(id: number): Promise<ExamSessionLog | undefined>;
+  getExamSessionLogs(filters?: { scheduleId?: number; centerId?: number; status?: string }): Promise<ExamSessionLog[]>;
+  updateExamSessionLog(id: number, data: Partial<ExamSessionLog>): Promise<ExamSessionLog | undefined>;
+  getMonitoringData(examYearId: number, examDate?: string): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2495,6 +2510,85 @@ export class DatabaseStorage implements IStorage {
       results.push(created);
     }
     return results;
+  }
+  // ===== Exam Scheduling & Time Enforcement =====
+  async createExamSchedule(schedule: InsertExamSchedule): Promise<ExamSchedule> {
+    const [created] = await db.insert(examSchedules).values(schedule).returning();
+    return created;
+  }
+
+  async getExamSchedule(id: number): Promise<ExamSchedule | undefined> {
+    const [schedule] = await db.select().from(examSchedules).where(eq(examSchedules.id, id));
+    return schedule;
+  }
+
+  async getExamSchedules(filters?: { examYearId?: number; grade?: number; isPublished?: boolean }): Promise<ExamSchedule[]> {
+    const conditions: any[] = [];
+    if (filters?.examYearId) conditions.push(eq(examSchedules.examYearId, filters.examYearId));
+    if (filters?.grade) conditions.push(eq(examSchedules.grade, filters.grade));
+    if (filters?.isPublished !== undefined) conditions.push(eq(examSchedules.isPublished, filters.isPublished));
+    if (conditions.length === 0) return db.select().from(examSchedules).orderBy(asc(examSchedules.examDate), asc(examSchedules.scheduledStartTime));
+    return db.select().from(examSchedules).where(and(...conditions)).orderBy(asc(examSchedules.examDate), asc(examSchedules.scheduledStartTime));
+  }
+
+  async updateExamSchedule(id: number, data: Partial<ExamSchedule>): Promise<ExamSchedule | undefined> {
+    const [updated] = await db.update(examSchedules).set({ ...data, updatedAt: new Date() }).where(eq(examSchedules.id, id)).returning();
+    return updated;
+  }
+
+  async deleteExamSchedule(id: number): Promise<boolean> {
+    const result = await db.delete(examSchedules).where(eq(examSchedules.id, id));
+    return true;
+  }
+
+  async createExamSessionLog(log: InsertExamSessionLog): Promise<ExamSessionLog> {
+    const [created] = await db.insert(examSessionLogs).values(log).returning();
+    return created;
+  }
+
+  async getExamSessionLog(id: number): Promise<ExamSessionLog | undefined> {
+    const [log] = await db.select().from(examSessionLogs).where(eq(examSessionLogs.id, id));
+    return log;
+  }
+
+  async getExamSessionLogs(filters?: { scheduleId?: number; centerId?: number; status?: string }): Promise<ExamSessionLog[]> {
+    const conditions: any[] = [];
+    if (filters?.scheduleId) conditions.push(eq(examSessionLogs.scheduleId, filters.scheduleId));
+    if (filters?.centerId) conditions.push(eq(examSessionLogs.centerId, filters.centerId));
+    if (filters?.status) conditions.push(eq(examSessionLogs.status, filters.status as any));
+    if (conditions.length === 0) return db.select().from(examSessionLogs).orderBy(desc(examSessionLogs.createdAt));
+    return db.select().from(examSessionLogs).where(and(...conditions)).orderBy(desc(examSessionLogs.createdAt));
+  }
+
+  async updateExamSessionLog(id: number, data: Partial<ExamSessionLog>): Promise<ExamSessionLog | undefined> {
+    const [updated] = await db.update(examSessionLogs).set({ ...data, updatedAt: new Date() }).where(eq(examSessionLogs.id, id)).returning();
+    return updated;
+  }
+
+  async getMonitoringData(examYearId: number, examDate?: string): Promise<any> {
+    const scheduleConditions: any[] = [eq(examSchedules.examYearId, examYearId)];
+    if (examDate) scheduleConditions.push(eq(examSchedules.examDate, examDate));
+
+    const schedules = await db.select().from(examSchedules).where(and(...scheduleConditions)).orderBy(asc(examSchedules.examDate), asc(examSchedules.scheduledStartTime));
+    const scheduleIds = schedules.map(s => s.id);
+
+    if (scheduleIds.length === 0) {
+      return { schedules: [], sessions: [], summary: { total: 0, onTime: 0, lateStart: 0, lateEnd: 0, notStarted: 0, inProgress: 0, completed: 0 } };
+    }
+
+    const sessions = await db.select().from(examSessionLogs).where(inArray(examSessionLogs.scheduleId, scheduleIds)).orderBy(desc(examSessionLogs.createdAt));
+
+    const summary = {
+      total: sessions.length,
+      onTime: sessions.filter(s => s.status === 'started_on_time' || (s.status === 'completed' && !s.startedLate)).length,
+      lateStart: sessions.filter(s => s.startedLate).length,
+      lateEnd: sessions.filter(s => s.endedLate).length,
+      notStarted: sessions.filter(s => s.status === 'scheduled').length,
+      inProgress: sessions.filter(s => ['started_on_time', 'started_late', 'in_progress'].includes(s.status || '')).length,
+      completed: sessions.filter(s => ['completed', 'ended_on_time', 'ended_late'].includes(s.status || '')).length,
+    };
+
+    return { schedules, sessions, summary };
   }
 }
 

@@ -64,6 +64,7 @@ import VerifyCertificate from "@/pages/verify-certificate";
 import StaffIdentity from "@/pages/staff-identity";
 import VerifyStaff from "@/pages/verify-staff";
 import PacketTracking from "@/pages/packet-tracking";
+import ExamScheduling from "@/pages/exam-scheduling";
 
 function LoadingScreen() {
   return (
@@ -104,6 +105,7 @@ function AuthenticatedRoutes() {
       <Route path="/packet-tracking">
         {() => <ProtectedRoute component={PacketTracking} allowedRoles={["super_admin", "examination_admin", "logistics_admin"]} />}
       </Route>
+      <Route path="/exam-scheduling" component={ExamScheduling} />
       <Route path="/users">
         {() => <ProtectedRoute component={UsersPage} allowedRoles={["super_admin"]} />}
       </Route>

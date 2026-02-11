@@ -67,6 +67,15 @@ The system is built on a robust architecture featuring a React-based frontend, a
   - **Dashboard Stats**: Real-time overview of packet counts by status and location type.
   - **Access Control**: super_admin, examination_admin, logistics_admin roles for packet management.
   - **Key Files**: client/src/pages/packet-tracking.tsx, shared/schema.ts (examPackets, handoverLogs), server/routes.ts (exam-packets section)
+- **Exam Scheduling & Time Enforcement**:
+  - **Schedule Creation**: HQ creates exam schedules (date, start time, duration, subject, grade) with publish workflow.
+  - **Pre-sync API**: Published schedules available via `/api/exam-schedules/sync` for mobile app consumption.
+  - **Start/End Recording**: Examiner devices record actual start/end times via API with automatic late detection (>5 min threshold).
+  - **Late Start Tracking**: 10 reason codes (transport_delay, weather, security_incident, etc.) with detailed notes.
+  - **Late End Tracking**: Automatic delay calculation with reason logging.
+  - **HQ Monitoring Dashboard**: Real-time view of on-time/late starts, late ends, in-progress sessions, and per-center status.
+  - **Access Control**: HQ roles (super_admin, examination_admin) for schedule management; all roles for session recording.
+  - **Key Files**: client/src/pages/exam-scheduling.tsx, server/routes.ts (exam-schedules section), shared/schema.ts (examSchedules, examSessionLogs)
 - **Administrative Tools**: Comprehensive audit logging, advanced CSV export functionalities, and role-based access control.
 - **Exam Management**: Examiner, subject, timetable, and exam center management.
 - **Website Management**: Public-facing website content management system.

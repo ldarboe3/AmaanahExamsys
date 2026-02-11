@@ -33,6 +33,7 @@ import {
   Globe,
   Shield,
   Package,
+  Timer,
   type LucideIcon,
 } from "lucide-react";
 
@@ -55,6 +56,7 @@ const adminMenuDefs: MenuItemDef[] = [
   { key: "examiners", url: "/examiners", icon: UserCheck },
   { key: "staffIdentity", url: "/staff-identity", icon: Shield },
   { key: "packetTracking", url: "/packet-tracking", icon: Package },
+  { key: "examScheduling", url: "/exam-scheduling", icon: Timer },
   { key: "analytics", url: "/analytics", icon: BarChart3 },
 ];
 

@@ -15016,6 +15016,321 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ===== Exam Scheduling & Time Enforcement Routes =====
+
+  const examScheduleCreateSchema = z.object({
+    examYearId: z.coerce.number().int().positive(),
+    subjectId: z.coerce.number().int().positive(),
+    grade: z.coerce.number().int().min(1).max(12),
+    examDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+    scheduledStartTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be HH:MM"),
+    durationMinutes: z.coerce.number().int().min(10).max(480),
+    scheduledEndTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be HH:MM"),
+    isPublished: z.boolean().optional(),
+    notes: z.string().optional().nullable(),
+  });
+
+  const examScheduleUpdateSchema = examScheduleCreateSchema.partial();
+
+  const sessionRecordStartSchema = z.object({
+    scheduleId: z.coerce.number().int().positive(),
+    centerId: z.coerce.number().int().positive(),
+    actualStartTime: z.string(),
+    candidateCount: z.coerce.number().int().min(0).optional(),
+    lateStartReasonCode: z.enum(['transport_delay', 'weather', 'security_incident', 'materials_late', 'staff_absence', 'technical_issue', 'venue_issue', 'student_delay', 'communication_gap', 'other']).optional().nullable(),
+    lateStartReasonDetails: z.string().optional().nullable(),
+    gpsLatitude: z.string().optional().nullable(),
+    gpsLongitude: z.string().optional().nullable(),
+    deviceInfo: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+  });
+
+  const sessionRecordEndSchema = z.object({
+    actualEndTime: z.string(),
+    lateEndReasonDetails: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+  });
+
+  app.get("/api/exam-schedules", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(403).json({ message: "Access denied" });
+      const filters: any = {};
+      if (req.query.examYearId) filters.examYearId = parseInt(req.query.examYearId as string);
+      if (req.query.grade) filters.grade = parseInt(req.query.grade as string);
+      if (req.query.isPublished !== undefined) filters.isPublished = req.query.isPublished === 'true';
+      const schedules = await storage.getExamSchedules(filters);
+      res.json(schedules);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-schedules/sync", isAuthenticated, async (req, res) => {
+    try {
+      const filters: any = { isPublished: true };
+      if (req.query.examYearId) filters.examYearId = parseInt(req.query.examYearId as string);
+      if (req.query.grade) filters.grade = parseInt(req.query.grade as string);
+      const schedules = await storage.getExamSchedules(filters);
+      res.json(schedules);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-schedules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const schedule = await storage.getExamSchedule(parseInt(req.params.id));
+      if (!schedule) return res.status(404).json({ message: "Schedule not found" });
+      res.json(schedule);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-schedules", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const parsed = examScheduleCreateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const examYear = await storage.getExamYear(parsed.data.examYearId);
+      const subject = await storage.getSubject(parsed.data.subjectId);
+      if (!examYear || !subject) {
+        return res.status(400).json({ message: "Invalid exam year or subject" });
+      }
+
+      const schedule = await storage.createExamSchedule({
+        ...parsed.data,
+        createdBy: user.id,
+      });
+
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "create",
+        entityType: "exam_schedule",
+        entityId: schedule.id.toString(),
+        newData: { details: `Created exam schedule for ${subject.name} grade ${parsed.data.grade} on ${parsed.data.examDate}` },
+      });
+
+      res.status(201).json(schedule);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/exam-schedules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const parsed = examScheduleUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const schedule = await storage.updateExamSchedule(parseInt(req.params.id), parsed.data);
+      if (!schedule) return res.status(404).json({ message: "Schedule not found" });
+
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "update",
+        entityType: "exam_schedule",
+        entityId: schedule.id.toString(),
+        newData: { details: `Updated exam schedule ${schedule.id}` },
+      });
+
+      res.json(schedule);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-schedules/:id/publish", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const schedule = await storage.updateExamSchedule(parseInt(req.params.id), { isPublished: true });
+      if (!schedule) return res.status(404).json({ message: "Schedule not found" });
+
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "update",
+        entityType: "exam_schedule",
+        entityId: schedule.id.toString(),
+        newData: { details: `Published exam schedule ${schedule.id}` },
+      });
+
+      res.json(schedule);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/exam-schedules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      await storage.deleteExamSchedule(parseInt(req.params.id));
+      res.json({ message: "Schedule deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-sessions", isAuthenticated, async (req, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.scheduleId) filters.scheduleId = parseInt(req.query.scheduleId as string);
+      if (req.query.centerId) filters.centerId = parseInt(req.query.centerId as string);
+      if (req.query.status) filters.status = req.query.status as string;
+      const sessions = await storage.getExamSessionLogs(filters);
+      res.json(sessions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-sessions/record-start", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(403).json({ message: "Access denied" });
+
+      const parsed = sessionRecordStartSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const schedule = await storage.getExamSchedule(parsed.data.scheduleId);
+      if (!schedule) return res.status(404).json({ message: "Schedule not found" });
+
+      const actualStart = new Date(parsed.data.actualStartTime);
+      const [schedHour, schedMin] = schedule.scheduledStartTime.split(':').map(Number);
+      const scheduledStart = new Date(actualStart);
+      scheduledStart.setHours(schedHour, schedMin, 0, 0);
+
+      const diffMs = actualStart.getTime() - scheduledStart.getTime();
+      const diffMinutes = Math.ceil(diffMs / 60000);
+      const isLate = diffMs > 5 * 60 * 1000;
+
+      let status: string = isLate ? 'started_late' : 'started_on_time';
+
+      if (isLate && !parsed.data.lateStartReasonCode) {
+        return res.status(400).json({ message: "Late start reason code is required when starting late (more than 5 minutes)" });
+      }
+
+      const sessionLog = await storage.createExamSessionLog({
+        scheduleId: parsed.data.scheduleId,
+        centerId: parsed.data.centerId,
+        examinerId: user.id,
+        status: status as any,
+        actualStartTime: actualStart,
+        startedLate: isLate,
+        lateStartMinutes: isLate ? diffMinutes : 0,
+        lateStartReasonCode: isLate ? parsed.data.lateStartReasonCode : null,
+        lateStartReasonDetails: isLate ? parsed.data.lateStartReasonDetails || null : null,
+        candidateCount: parsed.data.candidateCount || null,
+        gpsLatitude: parsed.data.gpsLatitude || null,
+        gpsLongitude: parsed.data.gpsLongitude || null,
+        deviceInfo: parsed.data.deviceInfo || null,
+        notes: parsed.data.notes || null,
+      });
+
+      res.status(201).json(sessionLog);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-sessions/:id/record-end", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(403).json({ message: "Access denied" });
+
+      const parsed = sessionRecordEndSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const sessionLog = await storage.getExamSessionLog(parseInt(req.params.id));
+      if (!sessionLog) return res.status(404).json({ message: "Session not found" });
+
+      const schedule = await storage.getExamSchedule(sessionLog.scheduleId);
+      if (!schedule) return res.status(404).json({ message: "Schedule not found" });
+
+      const actualEnd = new Date(parsed.data.actualEndTime);
+      const [schedEndHour, schedEndMin] = schedule.scheduledEndTime.split(':').map(Number);
+      const scheduledEnd = new Date(actualEnd);
+      scheduledEnd.setHours(schedEndHour, schedEndMin, 0, 0);
+
+      const diffEndMs = actualEnd.getTime() - scheduledEnd.getTime();
+      const diffMinutes = Math.ceil(diffEndMs / 60000);
+      const isLateEnd = diffEndMs > 5 * 60 * 1000;
+
+      const updated = await storage.updateExamSessionLog(sessionLog.id, {
+        actualEndTime: actualEnd,
+        endedLate: isLateEnd,
+        lateEndMinutes: isLateEnd ? diffMinutes : 0,
+        lateEndReasonDetails: isLateEnd ? parsed.data.lateEndReasonDetails || null : null,
+        status: isLateEnd ? 'ended_late' : 'completed',
+        notes: parsed.data.notes || sessionLog.notes,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-scheduling/monitoring", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const examYearId = parseInt(req.query.examYearId as string);
+      if (!examYearId) return res.status(400).json({ message: "examYearId required" });
+
+      const examDate = req.query.examDate as string | undefined;
+      const data = await storage.getMonitoringData(examYearId, examDate);
+
+      const centers = await storage.getAllExamCenters();
+      const subjects = await storage.getAllSubjects();
+
+      const enrichedSessions = data.sessions.map((s: any) => ({
+        ...s,
+        center: centers.find((c: any) => c.id === s.centerId),
+        schedule: data.schedules.find((sch: any) => sch.id === s.scheduleId),
+        subject: (() => {
+          const sch = data.schedules.find((sch: any) => sch.id === s.scheduleId);
+          return sch ? subjects.find((sub: any) => sub.id === sch.subjectId) : null;
+        })(),
+      }));
+
+      res.json({
+        ...data,
+        sessions: enrichedSessions,
+        centers,
+        subjects,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }
 
