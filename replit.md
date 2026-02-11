@@ -50,6 +50,13 @@ The system is built on a robust architecture featuring a React-based frontend, a
     - **Multi-Page Layout**: Approximately 20 student rows per page, with automatic pagination across multiple pages
     - **Safe Filenames**: Sanitized school names with special character handling for HTTP compatibility
   - **Result Publication Notifications**: When results are published, automatic email and in-dashboard notifications are sent to all schools with registered students for that examination. Schools without registered students are excluded from notifications.
+- **AIITS (Staff Identity & Trust System)**:
+  - **Staff Profile Management**: Create, edit, search, filter staff profiles with photo upload. Staff ID numbers auto-generated (AMS-00001 format) with confirmation codes.
+  - **ID Card Lifecycle**: Status transitions: Created → Printed → Issued → Activated → Suspended/Revoked. Full audit trail via staff_id_events table.
+  - **Staff ID Card PDF**: pdfkit-based ID card generation with logo, photo, name (English/Arabic), role, region/cluster, QR code, and confirmation code.
+  - **Public Staff Verification**: Public page at /verify-staff/:staffId for QR-based or manual staff identity verification.
+  - **Access Control**: HQ-only access (super_admin, examination_admin) for staff profile management.
+  - **Key Files**: server/staffIdCardService.ts, client/src/pages/staff-identity.tsx, client/src/pages/verify-staff.tsx
 - **Administrative Tools**: Comprehensive audit logging, advanced CSV export functionalities, and role-based access control.
 - **Exam Management**: Examiner, subject, timetable, and exam center management.
 - **Website Management**: Public-facing website content management system.
