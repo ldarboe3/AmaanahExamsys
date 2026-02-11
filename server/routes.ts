@@ -14560,6 +14560,462 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ===== Exam Paper Logistics & Tracking Routes =====
+
+  const validPacketStatuses = ['created', 'packed', 'dispatched_to_region', 'at_region', 'dispatched_to_cluster', 'at_cluster', 'dispatched_to_center', 'at_center', 'opened', 'administered', 'collected', 'returned_to_cluster', 'returned_to_region', 'returned_to_hq', 'completed', 'missing', 'damaged'] as const;
+  const validLocationTypes = ['hq', 'region', 'cluster', 'center'] as const;
+
+  const allowedStatusTransitions: Record<string, string[]> = {
+    created: ['packed', 'missing', 'damaged'],
+    packed: ['dispatched_to_region', 'dispatched_to_cluster', 'dispatched_to_center', 'missing', 'damaged'],
+    dispatched_to_region: ['at_region', 'missing', 'damaged'],
+    at_region: ['dispatched_to_cluster', 'dispatched_to_center', 'missing', 'damaged'],
+    dispatched_to_cluster: ['at_cluster', 'missing', 'damaged'],
+    at_cluster: ['dispatched_to_center', 'missing', 'damaged'],
+    dispatched_to_center: ['at_center', 'missing', 'damaged'],
+    at_center: ['opened', 'missing', 'damaged'],
+    opened: ['administered', 'missing', 'damaged'],
+    administered: ['collected', 'missing', 'damaged'],
+    collected: ['returned_to_cluster', 'returned_to_region', 'returned_to_hq', 'missing', 'damaged'],
+    returned_to_cluster: ['returned_to_region', 'returned_to_hq', 'missing', 'damaged'],
+    returned_to_region: ['returned_to_hq', 'missing', 'damaged'],
+    returned_to_hq: ['completed'],
+    completed: [],
+    missing: ['created'],
+    damaged: ['created'],
+  };
+
+  const packetCreateSchema = z.object({
+    examYearId: z.coerce.number().int().positive(),
+    subjectId: z.coerce.number().int().positive(),
+    grade: z.coerce.number().int().min(1).max(12),
+    destinationCenterId: z.coerce.number().int().positive(),
+    destinationRegionId: z.coerce.number().int().positive().optional().nullable(),
+    destinationClusterId: z.coerce.number().int().positive().optional().nullable(),
+    paperCount: z.coerce.number().int().min(0).default(0),
+    securitySealNumber: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+  });
+
+  const packetStatusUpdateSchema = z.object({
+    status: z.enum(validPacketStatuses),
+    currentLocationType: z.enum(validLocationTypes).optional(),
+    currentRegionId: z.coerce.number().int().positive().optional().nullable(),
+    currentClusterId: z.coerce.number().int().positive().optional().nullable(),
+    currentCenterId: z.coerce.number().int().positive().optional().nullable(),
+    notes: z.string().optional().nullable(),
+    securitySealNumber: z.string().optional().nullable(),
+  });
+
+  const handoverCreateSchema = z.object({
+    clientEventId: z.string().optional().nullable(),
+    senderStaffId: z.coerce.number().int().positive().optional().nullable(),
+    receiverStaffId: z.coerce.number().int().positive().optional().nullable(),
+    direction: z.enum(['forward', 'return']),
+    fromLocationType: z.enum(validLocationTypes),
+    toLocationType: z.enum(validLocationTypes),
+    fromRegionId: z.coerce.number().int().positive().optional().nullable(),
+    fromClusterId: z.coerce.number().int().positive().optional().nullable(),
+    fromCenterId: z.coerce.number().int().positive().optional().nullable(),
+    toRegionId: z.coerce.number().int().positive().optional().nullable(),
+    toClusterId: z.coerce.number().int().positive().optional().nullable(),
+    toCenterId: z.coerce.number().int().positive().optional().nullable(),
+    statusAtHandover: z.enum(validPacketStatuses),
+    handoverTime: z.string().optional().nullable(),
+    gpsLatitude: z.string().optional().nullable(),
+    gpsLongitude: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+  });
+
+  const locationOrder = { hq: 0, region: 1, cluster: 2, center: 3 };
+
+  function validateHandoverDirection(direction: string, from: string, to: string): boolean {
+    if (direction === 'forward') return locationOrder[to as keyof typeof locationOrder] > locationOrder[from as keyof typeof locationOrder];
+    if (direction === 'return') return locationOrder[to as keyof typeof locationOrder] < locationOrder[from as keyof typeof locationOrder];
+    return false;
+  }
+
+  app.get("/api/exam-packets", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const filters: any = {};
+      if (req.query.examYearId) filters.examYearId = parseInt(req.query.examYearId as string);
+      if (req.query.grade) filters.grade = parseInt(req.query.grade as string);
+      if (req.query.status) filters.status = req.query.status as string;
+      if (req.query.centerId) filters.centerId = parseInt(req.query.centerId as string);
+      const packets = await storage.getExamPackets(filters);
+      res.json(packets);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-packets/dashboard/stats", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      const allPackets = await storage.getExamPackets(examYearId ? { examYearId } : {});
+
+      const statusCounts: Record<string, number> = {};
+      const locationCounts: Record<string, number> = {};
+      for (const p of allPackets) {
+        statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
+        locationCounts[p.currentLocationType] = (locationCounts[p.currentLocationType] || 0) + 1;
+      }
+
+      res.json({
+        total: allPackets.length,
+        statusCounts,
+        locationCounts,
+        recentPackets: allPackets.slice(0, 10),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-packets/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const packet = await storage.getExamPacket(parseInt(req.params.id));
+      if (!packet) return res.status(404).json({ message: "Packet not found" });
+      res.json(packet);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-packets/barcode/:barcode", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const packet = await storage.getExamPacketByBarcode(req.params.barcode);
+      if (!packet) return res.status(404).json({ message: "Packet not found" });
+      res.json(packet);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-packets", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const parsed = packetCreateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+      }
+      const { examYearId, subjectId, grade, destinationCenterId, destinationRegionId, destinationClusterId, paperCount, securitySealNumber, notes } = parsed.data;
+
+      const examYear = await storage.getExamYear(examYearId);
+      const subject = await storage.getSubject(subjectId);
+      if (!examYear || !subject) {
+        return res.status(400).json({ message: "Invalid exam year or subject" });
+      }
+
+      const subjectCode = (subject.code || subject.name.substring(0, 3)).toUpperCase().replace(/\s/g, '');
+      let barcode: string;
+      let attempts = 0;
+      do {
+        const existing = await storage.getExamPackets({ examYearId, grade });
+        const sequence = String(existing.length + 1 + attempts).padStart(3, '0');
+        barcode = `PKT-${examYear.year}-G${grade}-${subjectCode}-C${destinationCenterId}-${sequence}`;
+        const dup = await storage.getExamPacketByBarcode(barcode);
+        if (!dup) break;
+        attempts++;
+      } while (attempts < 100);
+
+      const packet = await storage.createExamPacket({
+        examYearId, subjectId, grade, destinationCenterId,
+        destinationRegionId: destinationRegionId || null,
+        destinationClusterId: destinationClusterId || null,
+        paperCount: paperCount || 0,
+        securitySealNumber: securitySealNumber || null,
+        notes: notes || null,
+        barcode,
+        createdBy: user.id,
+      });
+
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "create",
+        entityType: "exam_packet",
+        entityId: packet.id.toString(),
+        newData: { details: `Created exam packet ${barcode}` },
+      });
+
+      res.status(201).json(packet);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-packets/bulk", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const bulkSchema = z.object({
+        examYearId: z.coerce.number().int().positive(),
+        grade: z.coerce.number().int().min(1).max(12),
+        subjectId: z.coerce.number().int().positive(),
+        centers: z.array(z.object({
+          centerId: z.coerce.number().int().positive(),
+          regionId: z.coerce.number().int().positive().optional().nullable(),
+          clusterId: z.coerce.number().int().positive().optional().nullable(),
+          paperCount: z.coerce.number().int().min(0).optional(),
+        })).min(1, "At least one center required"),
+      });
+
+      const parsed = bulkSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+      }
+      const { examYearId, grade, subjectId, centers } = parsed.data;
+
+      const examYear = await storage.getExamYear(examYearId);
+      const subject = await storage.getSubject(subjectId);
+      if (!examYear || !subject) {
+        return res.status(400).json({ message: "Invalid exam year or subject" });
+      }
+
+      const subjectCode = (subject.code || subject.name.substring(0, 3)).toUpperCase().replace(/\s/g, '');
+      const created: any[] = [];
+      let baseSeq = (await storage.getExamPackets({ examYearId, grade })).length;
+
+      for (const c of centers) {
+        baseSeq++;
+        let barcode: string;
+        let attempts = 0;
+        do {
+          const sequence = String(baseSeq + attempts).padStart(3, '0');
+          barcode = `PKT-${examYear.year}-G${grade}-${subjectCode}-C${c.centerId}-${sequence}`;
+          const dup = await storage.getExamPacketByBarcode(barcode);
+          if (!dup) break;
+          attempts++;
+        } while (attempts < 100);
+
+        const packet = await storage.createExamPacket({
+          examYearId, subjectId, grade,
+          destinationCenterId: c.centerId,
+          destinationRegionId: c.regionId || null,
+          destinationClusterId: c.clusterId || null,
+          paperCount: c.paperCount || 0,
+          securitySealNumber: null,
+          notes: null,
+          barcode,
+          createdBy: user.id,
+        });
+        created.push(packet);
+      }
+
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "create",
+        entityType: "exam_packet",
+        entityId: "bulk",
+        newData: { details: `Bulk created ${created.length} exam packets for grade ${grade}` },
+      });
+
+      res.status(201).json({ created: created.length, packets: created });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/exam-packets/:id/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const parsed = packetStatusUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const packet = await storage.getExamPacket(parseInt(req.params.id));
+      if (!packet) return res.status(404).json({ message: "Packet not found" });
+
+      const allowed = allowedStatusTransitions[packet.status];
+      if (allowed && !allowed.includes(parsed.data.status)) {
+        return res.status(400).json({ message: `Cannot transition from '${packet.status}' to '${parsed.data.status}'. Allowed: ${allowed.join(', ')}` });
+      }
+
+      const updateData: any = { status: parsed.data.status };
+      if (parsed.data.currentLocationType) updateData.currentLocationType = parsed.data.currentLocationType;
+      if (parsed.data.currentRegionId !== undefined) updateData.currentRegionId = parsed.data.currentRegionId;
+      if (parsed.data.currentClusterId !== undefined) updateData.currentClusterId = parsed.data.currentClusterId;
+      if (parsed.data.currentCenterId !== undefined) updateData.currentCenterId = parsed.data.currentCenterId;
+      if (parsed.data.notes) updateData.notes = parsed.data.notes;
+      if (parsed.data.securitySealNumber) updateData.securitySealNumber = parsed.data.securitySealNumber;
+
+      const updated = await storage.updateExamPacket(packet.id, updateData);
+
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "update",
+        entityType: "exam_packet",
+        entityId: packet.id.toString(),
+        newData: { details: `Updated packet ${packet.barcode} status from ${packet.status} to ${parsed.data.status}` },
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-packets/:id/handovers", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const logs = await storage.getHandoverLogs(parseInt(req.params.id));
+      res.json(logs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-packets/:id/handover", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const parsed = handoverCreateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const packetId = parseInt(req.params.id);
+      const packet = await storage.getExamPacket(packetId);
+      if (!packet) return res.status(404).json({ message: "Packet not found" });
+
+      const { clientEventId, senderStaffId, receiverStaffId, direction, fromLocationType, toLocationType, statusAtHandover, handoverTime, gpsLatitude, gpsLongitude, notes, fromRegionId, fromClusterId, fromCenterId, toRegionId, toClusterId, toCenterId } = parsed.data;
+
+      if (clientEventId) {
+        const existing = await storage.getHandoverLogByClientEventId(clientEventId);
+        if (existing) return res.json(existing);
+      }
+
+      if (!validateHandoverDirection(direction, fromLocationType, toLocationType)) {
+        return res.status(400).json({ message: `Invalid handover: direction '${direction}' is inconsistent with ${fromLocationType} -> ${toLocationType}` });
+      }
+
+      const allowed = allowedStatusTransitions[packet.status];
+      if (allowed && !allowed.includes(statusAtHandover)) {
+        return res.status(400).json({ message: `Cannot transition from '${packet.status}' to '${statusAtHandover}'. Allowed: ${allowed.join(', ')}` });
+      }
+
+      const log = await storage.createHandoverLog({
+        clientEventId: clientEventId || null,
+        packetId,
+        senderStaffId: senderStaffId || null,
+        receiverStaffId: receiverStaffId || null,
+        direction,
+        fromLocationType,
+        toLocationType,
+        fromRegionId: fromRegionId || null,
+        fromClusterId: fromClusterId || null,
+        fromCenterId: fromCenterId || null,
+        toRegionId: toRegionId || null,
+        toClusterId: toClusterId || null,
+        toCenterId: toCenterId || null,
+        statusAtHandover,
+        handoverTime: handoverTime ? new Date(handoverTime) : new Date(),
+        gpsLatitude: gpsLatitude || null,
+        gpsLongitude: gpsLongitude || null,
+        notes: notes || null,
+      });
+
+      await storage.updateExamPacket(packetId, {
+        status: statusAtHandover,
+        currentLocationType: toLocationType,
+        currentRegionId: toRegionId || null,
+        currentClusterId: toClusterId || null,
+        currentCenterId: toCenterId || null,
+        lastHandoverId: log.id,
+        lastHandoverAt: log.handoverTime,
+      });
+
+      res.status(201).json(log);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-packets/sync-handovers", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const syncSchema = z.object({
+        handovers: z.array(handoverCreateSchema.extend({ packetId: z.coerce.number().int().positive() })).min(1),
+      });
+      const parsed = syncSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const results = await storage.bulkSyncHandoverLogs(parsed.data.handovers.map(h => ({
+        ...h,
+        clientEventId: h.clientEventId || null,
+        senderStaffId: h.senderStaffId || null,
+        receiverStaffId: h.receiverStaffId || null,
+        fromRegionId: h.fromRegionId || null,
+        fromClusterId: h.fromClusterId || null,
+        fromCenterId: h.fromCenterId || null,
+        toRegionId: h.toRegionId || null,
+        toClusterId: h.toClusterId || null,
+        toCenterId: h.toCenterId || null,
+        handoverTime: h.handoverTime ? new Date(h.handoverTime) : new Date(),
+        gpsLatitude: h.gpsLatitude || null,
+        gpsLongitude: h.gpsLongitude || null,
+        notes: h.notes || null,
+      })));
+
+      for (const log of results) {
+        await storage.updateExamPacket(log.packetId, {
+          status: log.statusAtHandover as any,
+          currentLocationType: log.toLocationType as any,
+          currentRegionId: log.toRegionId,
+          currentClusterId: log.toClusterId,
+          currentCenterId: log.toCenterId,
+          lastHandoverId: log.id,
+          lastHandoverAt: log.handoverTime,
+        });
+      }
+
+      res.json({ synced: results.length, handovers: results });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }
 

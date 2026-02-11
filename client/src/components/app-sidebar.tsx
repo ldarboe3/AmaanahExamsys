@@ -32,6 +32,7 @@ import {
   FileDown,
   Globe,
   Shield,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,6 +54,7 @@ const adminMenuDefs: MenuItemDef[] = [
   { key: "transcripts", url: "/transcripts", icon: BookOpen },
   { key: "examiners", url: "/examiners", icon: UserCheck },
   { key: "staffIdentity", url: "/staff-identity", icon: Shield },
+  { key: "packetTracking", url: "/packet-tracking", icon: Package },
   { key: "analytics", url: "/analytics", icon: BarChart3 },
 ];
 

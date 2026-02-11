@@ -34,6 +34,9 @@ import {
   type SchoolExamRegistration, type InsertSchoolExamRegistration,
   type StaffProfile, type InsertStaffProfile,
   type StaffIdEvent, type InsertStaffIdEvent,
+  examPackets, handoverLogs,
+  type ExamPacket, type InsertExamPacket,
+  type HandoverLog, type InsertHandoverLog,
 } from "@shared/schema";
 import { randomBytes } from "crypto";
 import bcrypt from "bcrypt";
@@ -414,6 +417,17 @@ export interface IStorage {
   deleteStaffProfile(id: number): Promise<boolean>;
   createStaffIdEvent(event: InsertStaffIdEvent): Promise<StaffIdEvent>;
   getStaffIdEvents(staffProfileId: number): Promise<StaffIdEvent[]>;
+
+  // ===== Exam Paper Logistics =====
+  createExamPacket(packet: InsertExamPacket & { barcode: string; createdBy: string }): Promise<ExamPacket>;
+  getExamPacket(id: number): Promise<ExamPacket | undefined>;
+  getExamPacketByBarcode(barcode: string): Promise<ExamPacket | undefined>;
+  getExamPackets(filters?: { examYearId?: number; grade?: number; status?: string; centerId?: number }): Promise<ExamPacket[]>;
+  updateExamPacket(id: number, data: Partial<ExamPacket>): Promise<ExamPacket | undefined>;
+  createHandoverLog(log: InsertHandoverLog): Promise<HandoverLog>;
+  getHandoverLogs(packetId: number): Promise<HandoverLog[]>;
+  getHandoverLogByClientEventId(clientEventId: string): Promise<HandoverLog | undefined>;
+  bulkSyncHandoverLogs(logs: InsertHandoverLog[]): Promise<HandoverLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2411,6 +2425,76 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(staffIdEvents)
       .where(eq(staffIdEvents.staffProfileId, staffProfileId))
       .orderBy(desc(staffIdEvents.createdAt));
+  }
+
+  // ===== Exam Paper Logistics =====
+  async createExamPacket(packet: InsertExamPacket & { barcode: string; createdBy: string }): Promise<ExamPacket> {
+    const [created] = await db.insert(examPackets).values(packet).returning();
+    return created;
+  }
+
+  async getExamPacket(id: number): Promise<ExamPacket | undefined> {
+    const [packet] = await db.select().from(examPackets).where(eq(examPackets.id, id));
+    return packet;
+  }
+
+  async getExamPacketByBarcode(barcode: string): Promise<ExamPacket | undefined> {
+    const [packet] = await db.select().from(examPackets).where(eq(examPackets.barcode, barcode));
+    return packet;
+  }
+
+  async getExamPackets(filters?: { examYearId?: number; grade?: number; status?: string; centerId?: number }): Promise<ExamPacket[]> {
+    const conditions: any[] = [];
+    if (filters?.examYearId) conditions.push(eq(examPackets.examYearId, filters.examYearId));
+    if (filters?.grade) conditions.push(eq(examPackets.grade, filters.grade));
+    if (filters?.status) conditions.push(eq(examPackets.status, filters.status as any));
+    if (filters?.centerId) conditions.push(eq(examPackets.destinationCenterId, filters.centerId));
+
+    if (conditions.length > 0) {
+      return db.select().from(examPackets).where(and(...conditions)).orderBy(desc(examPackets.createdAt));
+    }
+    return db.select().from(examPackets).orderBy(desc(examPackets.createdAt));
+  }
+
+  async updateExamPacket(id: number, data: Partial<ExamPacket>): Promise<ExamPacket | undefined> {
+    const [updated] = await db.update(examPackets)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(examPackets.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createHandoverLog(log: InsertHandoverLog): Promise<HandoverLog> {
+    const [created] = await db.insert(handoverLogs).values(log).returning();
+    return created;
+  }
+
+  async getHandoverLogs(packetId: number): Promise<HandoverLog[]> {
+    return db.select().from(handoverLogs)
+      .where(eq(handoverLogs.packetId, packetId))
+      .orderBy(asc(handoverLogs.handoverTime));
+  }
+
+  async getHandoverLogByClientEventId(clientEventId: string): Promise<HandoverLog | undefined> {
+    const [log] = await db.select().from(handoverLogs)
+      .where(eq(handoverLogs.clientEventId, clientEventId));
+    return log;
+  }
+
+  async bulkSyncHandoverLogs(logs: InsertHandoverLog[]): Promise<HandoverLog[]> {
+    const results: HandoverLog[] = [];
+    for (const log of logs) {
+      if (log.clientEventId) {
+        const existing = await this.getHandoverLogByClientEventId(log.clientEventId);
+        if (existing) {
+          results.push(existing);
+          continue;
+        }
+      }
+      const created = await this.createHandoverLog(log);
+      results.push(created);
+    }
+    return results;
   }
 }
 
