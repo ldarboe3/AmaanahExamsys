@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,9 +22,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
+  Tabs, TabsContent, TabsList, TabsTrigger,
+} from "@/components/ui/tabs";
+import {
   Search, Plus, Package, MapPin, ArrowRight, ArrowLeft,
   Clock, CheckCircle, AlertTriangle, Truck, Building2,
   Eye, BarChart3, RefreshCw, Send, ArrowDownRight, ArrowUpRight,
+  Download, Upload, WifiOff, Wifi,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -43,24 +47,6 @@ const packetFormSchema = z.object({
 });
 
 type PacketFormData = z.infer<typeof packetFormSchema>;
-
-const handoverFormSchema = z.object({
-  senderStaffId: z.coerce.number().optional().nullable(),
-  receiverStaffId: z.coerce.number().optional().nullable(),
-  direction: z.enum(["forward", "return"]),
-  fromLocationType: z.enum(["hq", "region", "cluster", "center"]),
-  toLocationType: z.enum(["hq", "region", "cluster", "center"]),
-  fromRegionId: z.coerce.number().optional().nullable(),
-  fromClusterId: z.coerce.number().optional().nullable(),
-  fromCenterId: z.coerce.number().optional().nullable(),
-  toRegionId: z.coerce.number().optional().nullable(),
-  toClusterId: z.coerce.number().optional().nullable(),
-  toCenterId: z.coerce.number().optional().nullable(),
-  statusAtHandover: z.string().min(1, "Status required"),
-  notes: z.string().optional(),
-});
-
-type HandoverFormData = z.infer<typeof handoverFormSchema>;
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof Package }> = {
   created: { label: "Created", variant: "secondary", icon: Package },
@@ -88,6 +74,90 @@ const locationLabels: Record<string, string> = {
   cluster: "Cluster",
   center: "Center",
 };
+
+const LOCATION_HIERARCHY = ["hq", "region", "cluster", "center"];
+
+const OFFLINE_QUEUE_KEY = "offlineHandoverQueue";
+
+interface OfflineHandoverEvent {
+  packetId: number;
+  clientEventId: string;
+  clientTimestamp: string;
+  senderStaffId: number | null;
+  receiverStaffId: number | null;
+  direction: "forward" | "return";
+  fromLocationType: string;
+  toLocationType: string;
+  fromRegionId: number | null;
+  fromClusterId: number | null;
+  fromCenterId: number | null;
+  toRegionId: number | null;
+  toClusterId: number | null;
+  toCenterId: number | null;
+  statusAtHandover: string;
+  notes: string;
+  gpsLatitude: number | null;
+  gpsLongitude: number | null;
+  handoverTime: string;
+}
+
+function getOfflineQueue(): OfflineHandoverEvent[] {
+  try {
+    const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveOfflineQueue(queue: OfflineHandoverEvent[]) {
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+function getLocationLevel(locType: string): number {
+  return LOCATION_HIERARCHY.indexOf(locType);
+}
+
+function determineDirection(fromLocationType: string, toLocationType: string): "forward" | "return" {
+  const fromLevel = getLocationLevel(fromLocationType);
+  const toLevel = getLocationLevel(toLocationType);
+  if (toLevel > fromLevel) return "forward";
+  if (toLevel < fromLevel) return "return";
+  return "forward";
+}
+
+function determineReceiveStatus(toLocationType: string, direction: "forward" | "return"): string {
+  if (direction === "forward") {
+    if (toLocationType === "region") return "at_region";
+    if (toLocationType === "cluster") return "at_cluster";
+    if (toLocationType === "center") return "at_center";
+    if (toLocationType === "hq") return "at_hq";
+  } else {
+    if (toLocationType === "cluster") return "returned_to_cluster";
+    if (toLocationType === "region") return "returned_to_region";
+    if (toLocationType === "hq") return "returned_to_hq";
+  }
+  return "at_region";
+}
+
+function determineDispatchStatus(toLocationType: string, direction: "forward" | "return"): string {
+  if (direction === "forward") {
+    if (toLocationType === "region") return "dispatched_to_region";
+    if (toLocationType === "cluster") return "dispatched_to_cluster";
+    if (toLocationType === "center") return "dispatched_to_center";
+  } else {
+    return "collected";
+  }
+  return "dispatched_to_region";
+}
+
+function isLocationSelectionValid(locationType: string, regionId: number | null, clusterId: number | null, centerId: number | null): boolean {
+  if (locationType === "hq") return true;
+  if (locationType === "region") return regionId !== null;
+  if (locationType === "cluster") return regionId !== null && clusterId !== null;
+  if (locationType === "center") return regionId !== null && clusterId !== null && centerId !== null;
+  return false;
+}
 
 function StatusBadge({ status }: { status: string }) {
   const config = statusConfig[status] || { label: status, variant: "secondary" as const, icon: Package };
@@ -134,16 +204,248 @@ function DashboardStats({ stats }: { stats: any }) {
   );
 }
 
+function LogisticsChainVisualization({ packet, handoverLogs }: { packet: ExamPacket; handoverLogs: any[] }) {
+  const stages = ["hq", "region", "cluster", "center"];
+  const stageLabels = ["HQ", "Region", "Cluster", "Center"];
+  const currentLevel = getLocationLevel(packet.currentLocationType);
+
+  const forwardCompleted = new Set<string>();
+  const returnCompleted = new Set<string>();
+
+  if (Array.isArray(handoverLogs)) {
+    handoverLogs.forEach((log: any) => {
+      if (log.direction === "forward") {
+        forwardCompleted.add(log.toLocationType);
+      } else {
+        returnCompleted.add(log.toLocationType);
+      }
+    });
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">Logistics Chain</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="relative py-4">
+          <div className="flex items-center justify-between gap-2" data-testid="logistics-chain">
+            {stages.map((stage, i) => {
+              const isCurrent = i === currentLevel;
+              const isForwardDone = forwardCompleted.has(stage);
+              const isReturnDone = returnCompleted.has(stage);
+              return (
+                <div key={stage} className="flex flex-col items-center flex-1 relative">
+                  {i < stages.length - 1 && (
+                    <div className="absolute top-5 left-1/2 w-full h-0.5 bg-border z-0" />
+                  )}
+                  <div className="relative z-10 flex flex-col items-center">
+                    {isForwardDone && (
+                      <span className="text-[10px] text-chart-1 mb-1">FWD</span>
+                    )}
+                    {!isForwardDone && <span className="text-[10px] text-transparent mb-1">-</span>}
+                    <div
+                      className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
+                        isCurrent
+                          ? "bg-primary border-primary text-primary-foreground"
+                          : i <= currentLevel
+                          ? "bg-primary/20 border-primary/50 text-primary"
+                          : "bg-muted border-border text-muted-foreground"
+                      }`}
+                      data-testid={`chain-node-${stage}`}
+                    >
+                      {i + 1}
+                    </div>
+                    {isReturnDone && (
+                      <span className="text-[10px] text-chart-4 mt-1">RET</span>
+                    )}
+                    {!isReturnDone && <span className="text-[10px] text-transparent mt-1">-</span>}
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-1">{stageLabels[i]}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function useGeoLocation() {
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => setCoords(null)
+      );
+    }
+  }, []);
+
+  return coords;
+}
+
+function useOnlineStatus() {
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  return isOnline;
+}
+
+function LocationDropdowns({
+  locationType,
+  regionId,
+  clusterId,
+  centerId,
+  onRegionChange,
+  onClusterChange,
+  onCenterChange,
+  regions,
+  clusters,
+  centers,
+  prefix,
+}: {
+  locationType: string;
+  regionId: number | null;
+  clusterId: number | null;
+  centerId: number | null;
+  onRegionChange: (v: number | null) => void;
+  onClusterChange: (v: number | null) => void;
+  onCenterChange: (v: number | null) => void;
+  regions: Region[];
+  clusters: Cluster[];
+  centers: ExamCenter[];
+  prefix: string;
+}) {
+  const filteredClusters = regionId ? clusters.filter((c: Cluster) => c.regionId === regionId) : clusters;
+  const filteredCenters = clusterId ? centers.filter((c: ExamCenter) => c.clusterId === clusterId) : (regionId ? centers.filter((c: ExamCenter) => c.regionId === regionId) : centers);
+
+  if (locationType === "hq") return null;
+
+  return (
+    <div className="space-y-3">
+      {(locationType === "region" || locationType === "cluster" || locationType === "center") && (
+        <div>
+          <label className="text-sm font-medium">Region</label>
+          <Select
+            value={regionId?.toString() || ""}
+            onValueChange={(v) => { onRegionChange(v ? parseInt(v) : null); onClusterChange(null); onCenterChange(null); }}
+          >
+            <SelectTrigger data-testid={`select-${prefix}-region`}><SelectValue placeholder="Select region" /></SelectTrigger>
+            <SelectContent>
+              {regions.map((r: Region) => (
+                <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      {(locationType === "cluster" || locationType === "center") && (
+        <div>
+          <label className="text-sm font-medium">Cluster</label>
+          <Select
+            value={clusterId?.toString() || ""}
+            onValueChange={(v) => { onClusterChange(v ? parseInt(v) : null); onCenterChange(null); }}
+          >
+            <SelectTrigger data-testid={`select-${prefix}-cluster`}><SelectValue placeholder="Select cluster" /></SelectTrigger>
+            <SelectContent>
+              {filteredClusters.map((c: Cluster) => (
+                <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      {locationType === "center" && (
+        <div>
+          <label className="text-sm font-medium">Center</label>
+          <Select
+            value={centerId?.toString() || ""}
+            onValueChange={(v) => onCenterChange(v ? parseInt(v) : null)}
+          >
+            <SelectTrigger data-testid={`select-${prefix}-center`}><SelectValue placeholder="Select center" /></SelectTrigger>
+            <SelectContent>
+              {filteredCenters.map((c: ExamCenter) => (
+                <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OfflineBanner({ queueCount, onSync, isSyncing }: { queueCount: number; onSync: () => void; isSyncing: boolean }) {
+  if (queueCount === 0) return null;
+  return (
+    <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md p-3 flex items-center justify-between gap-2 flex-wrap" data-testid="offline-banner">
+      <div className="flex items-center gap-2">
+        <WifiOff className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+        <span className="text-sm text-amber-800 dark:text-amber-200">{queueCount} event{queueCount !== 1 ? "s" : ""} pending sync</span>
+      </div>
+      <Button size="sm" onClick={onSync} disabled={isSyncing} data-testid="button-sync-now">
+        <RefreshCw className={`w-4 h-4 mr-1 ${isSyncing ? "animate-spin" : ""}`} />
+        {isSyncing ? "Syncing..." : "Sync Now"}
+      </Button>
+    </div>
+  );
+}
+
 export default function PacketTrackingPage() {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showHandoverDialog, setShowHandoverDialog] = useState(false);
   const [selectedPacket, setSelectedPacket] = useState<ExamPacket | null>(null);
   const [showDetailView, setShowDetailView] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterExamYear, setFilterExamYear] = useState<string>("all");
   const [filterGrade, setFilterGrade] = useState<string>("all");
+
+  const [receiveBarcode, setReceiveBarcode] = useState("");
+  const [receivePacket, setReceivePacket] = useState<ExamPacket | null>(null);
+  const [receiveLocationType, setReceiveLocationType] = useState("region");
+  const [receiveRegionId, setReceiveRegionId] = useState<number | null>(null);
+  const [receiveClusterId, setReceiveClusterId] = useState<number | null>(null);
+  const [receiveCenterId, setReceiveCenterId] = useState<number | null>(null);
+  const [receiveSenderId, setReceiveSenderId] = useState<number | null>(null);
+  const [receiveReceiverId, setReceiveReceiverId] = useState<number | null>(null);
+  const [receiveNotes, setReceiveNotes] = useState("");
+  const [receiveLookupLoading, setReceiveLookupLoading] = useState(false);
+
+  const [dispatchBarcode, setDispatchBarcode] = useState("");
+  const [dispatchPacket, setDispatchPacket] = useState<ExamPacket | null>(null);
+  const [dispatchLocationType, setDispatchLocationType] = useState("region");
+  const [dispatchRegionId, setDispatchRegionId] = useState<number | null>(null);
+  const [dispatchClusterId, setDispatchClusterId] = useState<number | null>(null);
+  const [dispatchCenterId, setDispatchCenterId] = useState<number | null>(null);
+  const [dispatchSenderId, setDispatchSenderId] = useState<number | null>(null);
+  const [dispatchReceiverId, setDispatchReceiverId] = useState<number | null>(null);
+  const [dispatchNotes, setDispatchNotes] = useState("");
+  const [dispatchLookupLoading, setDispatchLookupLoading] = useState(false);
+
+  const [offlineQueue, setOfflineQueue] = useState<OfflineHandoverEvent[]>(getOfflineQueue());
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const isOnline = useOnlineStatus();
+  const gps = useGeoLocation();
+
+  useEffect(() => {
+    setOfflineQueue(getOfflineQueue());
+  }, [isOnline]);
 
   const { data: packets = [], isLoading: packetsLoading } = useQuery<ExamPacket[]>({
     queryKey: ["/api/exam-packets"],
@@ -196,17 +498,6 @@ export default function PacketTrackingPage() {
     },
   });
 
-  const handoverForm = useForm<HandoverFormData>({
-    resolver: zodResolver(handoverFormSchema),
-    defaultValues: {
-      direction: "forward",
-      fromLocationType: "hq",
-      toLocationType: "region",
-      statusAtHandover: "dispatched_to_region",
-      notes: "",
-    },
-  });
-
   const createMutation = useMutation({
     mutationFn: async (data: PacketFormData) => {
       const res = await apiRequest("POST", "/api/exam-packets", data);
@@ -215,27 +506,9 @@ export default function PacketTrackingPage() {
     onSuccess: () => {
       toast({ title: "Packet created", description: "Exam packet created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets/dashboard/stats"] });
       setShowCreateDialog(false);
       createForm.reset();
-    },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const handoverMutation = useMutation({
-    mutationFn: async (data: HandoverFormData) => {
-      if (!selectedPacket) throw new Error("No packet selected");
-      const res = await apiRequest("POST", `/api/exam-packets/${selectedPacket.id}/handover`, data);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Handover recorded", description: "Chain of custody updated" });
-      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets", selectedPacket?.id, "handovers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets/dashboard/stats"] });
-      setShowHandoverDialog(false);
-      handoverForm.reset();
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -268,26 +541,262 @@ export default function PacketTrackingPage() {
   const getExamYearLabel = (id: number) => examYears.find((y: ExamYear) => y.id === id)?.year || id;
   const getSubjectLabel = (id: number) => subjects.find((s: Subject) => s.id === id)?.name || id;
   const getCenterLabel = (id: number | null) => {
-    if (!id) return "—";
+    if (!id) return "--";
     return centers.find((c: ExamCenter) => c.id === id)?.name || `Center ${id}`;
   };
   const getRegionLabel = (id: number | null) => {
-    if (!id) return "—";
+    if (!id) return "--";
     return regions.find((r: Region) => r.id === id)?.name || `Region ${id}`;
   };
   const getClusterLabel = (id: number | null) => {
-    if (!id) return "—";
+    if (!id) return "--";
     return clusters.find((c: Cluster) => c.id === id)?.name || `Cluster ${id}`;
   };
   const getStaffLabel = (id: number | null) => {
-    if (!id) return "—";
+    if (!id) return "--";
     const s = staffProfiles.find((sp: StaffProfile) => sp.id === id);
     return s ? `${s.firstName} ${s.lastName}` : `Staff ${id}`;
   };
 
+  const lookupBarcode = useCallback(async (barcode: string): Promise<ExamPacket | null> => {
+    if (!barcode.trim()) return null;
+    try {
+      const res = await apiRequest("GET", `/api/exam-packets/barcode/${encodeURIComponent(barcode.trim())}`);
+      return await res.json();
+    } catch {
+      toast({ title: "Not found", description: `No packet found with barcode "${barcode}"`, variant: "destructive" });
+      return null;
+    }
+  }, [toast]);
+
+  const handleReceiveLookup = async () => {
+    setReceiveLookupLoading(true);
+    const pkt = await lookupBarcode(receiveBarcode);
+    setReceivePacket(pkt);
+    setReceiveLookupLoading(false);
+  };
+
+  const handleDispatchLookup = async () => {
+    setDispatchLookupLoading(true);
+    const pkt = await lookupBarcode(dispatchBarcode);
+    setDispatchPacket(pkt);
+    setDispatchLookupLoading(false);
+  };
+
+  const buildHandoverPayload = (
+    packet: ExamPacket,
+    mode: "receive" | "dispatch",
+    locationType: string,
+    regionId: number | null,
+    clusterId: number | null,
+    centerId: number | null,
+    senderId: number | null,
+    receiverId: number | null,
+    notes: string
+  ): OfflineHandoverEvent => {
+    const direction = determineDirection(packet.currentLocationType, locationType);
+    const statusAtHandover = mode === "receive"
+      ? determineReceiveStatus(locationType, direction)
+      : determineDispatchStatus(locationType, direction);
+
+    const now = new Date().toISOString();
+    return {
+      packetId: packet.id,
+      clientEventId: crypto.randomUUID(),
+      clientTimestamp: now,
+      handoverTime: now,
+      senderStaffId: senderId,
+      receiverStaffId: receiverId,
+      direction,
+      fromLocationType: packet.currentLocationType,
+      toLocationType: locationType,
+      fromRegionId: packet.currentRegionId ?? null,
+      fromClusterId: packet.currentClusterId ?? null,
+      fromCenterId: packet.currentCenterId ?? null,
+      toRegionId: regionId,
+      toClusterId: clusterId,
+      toCenterId: centerId,
+      statusAtHandover,
+      notes,
+      gpsLatitude: gps?.lat ?? null,
+      gpsLongitude: gps?.lng ?? null,
+    };
+  };
+
+  const submitHandover = async (payload: OfflineHandoverEvent) => {
+    if (!isOnline) {
+      const queue = getOfflineQueue();
+      queue.push(payload);
+      saveOfflineQueue(queue);
+      setOfflineQueue(queue);
+      toast({ title: "Saved offline", description: "Event queued for sync when back online" });
+      return true;
+    }
+
+    try {
+      const { packetId, ...rest } = payload;
+      await apiRequest("POST", `/api/exam-packets/${packetId}/handover`, rest);
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets/dashboard/stats"] });
+      toast({ title: "Handover recorded", description: "Chain of custody updated" });
+      return true;
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      return false;
+    }
+  };
+
+  const receiveLocationValid = isLocationSelectionValid(receiveLocationType, receiveRegionId, receiveClusterId, receiveCenterId);
+  const dispatchLocationValid = isLocationSelectionValid(dispatchLocationType, dispatchRegionId, dispatchClusterId, dispatchCenterId);
+
+  const handleReceiveSubmit = async () => {
+    if (!receivePacket) return;
+    if (!receiveLocationValid) {
+      toast({ title: "Missing location", description: "Please select all required location fields", variant: "destructive" });
+      return;
+    }
+    const payload = buildHandoverPayload(
+      receivePacket, "receive", receiveLocationType,
+      receiveRegionId, receiveClusterId, receiveCenterId,
+      receiveSenderId, receiveReceiverId, receiveNotes
+    );
+    const ok = await submitHandover(payload);
+    if (ok) {
+      setReceivePacket(null);
+      setReceiveBarcode("");
+      setReceiveNotes("");
+      setReceiveSenderId(null);
+      setReceiveReceiverId(null);
+      setReceiveRegionId(null);
+      setReceiveClusterId(null);
+      setReceiveCenterId(null);
+    }
+  };
+
+  const handleDispatchSubmit = async () => {
+    if (!dispatchPacket) return;
+    if (!dispatchLocationValid) {
+      toast({ title: "Missing location", description: "Please select all required location fields", variant: "destructive" });
+      return;
+    }
+    const payload = buildHandoverPayload(
+      dispatchPacket, "dispatch", dispatchLocationType,
+      dispatchRegionId, dispatchClusterId, dispatchCenterId,
+      dispatchSenderId, dispatchReceiverId, dispatchNotes
+    );
+    const ok = await submitHandover(payload);
+    if (ok) {
+      setDispatchPacket(null);
+      setDispatchBarcode("");
+      setDispatchNotes("");
+      setDispatchSenderId(null);
+      setDispatchReceiverId(null);
+      setDispatchRegionId(null);
+      setDispatchClusterId(null);
+      setDispatchCenterId(null);
+    }
+  };
+
+  const handleSync = async () => {
+    const queue = getOfflineQueue();
+    if (queue.length === 0) return;
+    setIsSyncing(true);
+    try {
+      await apiRequest("POST", "/api/exam-packets/sync-handovers", { handovers: queue });
+      saveOfflineQueue([]);
+      setOfflineQueue([]);
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets/dashboard/stats"] });
+      toast({ title: "Sync complete", description: `${queue.length} event(s) synced successfully` });
+    } catch {
+      let syncedCount = 0;
+      const remaining: OfflineHandoverEvent[] = [];
+      for (const event of queue) {
+        try {
+          const { packetId, ...rest } = event;
+          await apiRequest("POST", `/api/exam-packets/${packetId}/handover`, rest);
+          syncedCount++;
+        } catch {
+          remaining.push(event);
+        }
+      }
+      saveOfflineQueue(remaining);
+      setOfflineQueue(remaining);
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets/dashboard/stats"] });
+      if (remaining.length === 0) {
+        toast({ title: "Sync complete", description: `${syncedCount} event(s) synced successfully` });
+      } else if (syncedCount > 0) {
+        toast({ title: "Partial sync", description: `${syncedCount} synced, ${remaining.length} failed and remain in queue`, variant: "destructive" });
+      } else {
+        toast({ title: "Sync failed", description: `All ${remaining.length} events failed to sync`, variant: "destructive" });
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handoverMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (!selectedPacket) throw new Error("No packet selected");
+      const res = await apiRequest("POST", `/api/exam-packets/${selectedPacket.id}/handover`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Handover recorded", description: "Chain of custody updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets", selectedPacket?.id, "handovers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets/dashboard/stats"] });
+      setShowHandoverDialog(false);
+      handoverForm.reset();
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const [showHandoverDialog, setShowHandoverDialog] = useState(false);
+
+  const handoverFormSchema = z.object({
+    senderStaffId: z.coerce.number().optional().nullable(),
+    receiverStaffId: z.coerce.number().optional().nullable(),
+    direction: z.enum(["forward", "return"]),
+    fromLocationType: z.enum(["hq", "region", "cluster", "center"]),
+    toLocationType: z.enum(["hq", "region", "cluster", "center"]),
+    fromRegionId: z.coerce.number().optional().nullable(),
+    fromClusterId: z.coerce.number().optional().nullable(),
+    fromCenterId: z.coerce.number().optional().nullable(),
+    toRegionId: z.coerce.number().optional().nullable(),
+    toClusterId: z.coerce.number().optional().nullable(),
+    toCenterId: z.coerce.number().optional().nullable(),
+    statusAtHandover: z.string().min(1, "Status required"),
+    notes: z.string().optional(),
+  });
+
+  const handoverForm = useForm<z.infer<typeof handoverFormSchema>>({
+    resolver: zodResolver(handoverFormSchema),
+    defaultValues: {
+      senderStaffId: null,
+      receiverStaffId: null,
+      direction: "forward" as const,
+      fromLocationType: "hq" as const,
+      toLocationType: "region" as const,
+      fromRegionId: null,
+      fromClusterId: null,
+      fromCenterId: null,
+      toRegionId: null,
+      toClusterId: null,
+      toCenterId: null,
+      statusAtHandover: "dispatched_to_region",
+      notes: "",
+    },
+  });
+
   if (showDetailView && selectedPacket) {
     return (
       <div className="p-4 md:p-6 space-y-4 max-w-5xl mx-auto">
+        <OfflineBanner queueCount={offlineQueue.length} onSync={handleSync} isSyncing={isSyncing} />
+
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant="ghost" onClick={() => { setShowDetailView(false); setSelectedPacket(null); }} data-testid="button-back-to-list">
             <ArrowLeft className="w-4 h-4 mr-1" /> Back
@@ -296,18 +805,20 @@ export default function PacketTrackingPage() {
           <StatusBadge status={selectedPacket.status} />
         </div>
 
+        <LogisticsChainVisualization packet={selectedPacket} handoverLogs={handoverLogs} />
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Packet Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Exam Year</span><span>{getExamYearLabel(selectedPacket.examYearId)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Grade</span><span>{selectedPacket.grade}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Subject</span><span>{getSubjectLabel(selectedPacket.subjectId)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Paper Count</span><span>{selectedPacket.paperCount}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Seal #</span><span>{selectedPacket.securitySealNumber || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Destination</span><span>{getCenterLabel(selectedPacket.destinationCenterId)}</span></div>
+              <div className="flex justify-between gap-2"><span className="text-muted-foreground">Exam Year</span><span>{getExamYearLabel(selectedPacket.examYearId)}</span></div>
+              <div className="flex justify-between gap-2"><span className="text-muted-foreground">Grade</span><span>{selectedPacket.grade}</span></div>
+              <div className="flex justify-between gap-2"><span className="text-muted-foreground">Subject</span><span>{getSubjectLabel(selectedPacket.subjectId)}</span></div>
+              <div className="flex justify-between gap-2"><span className="text-muted-foreground">Paper Count</span><span>{selectedPacket.paperCount}</span></div>
+              <div className="flex justify-between gap-2"><span className="text-muted-foreground">Seal #</span><span>{selectedPacket.securitySealNumber || "--"}</span></div>
+              <div className="flex justify-between gap-2"><span className="text-muted-foreground">Destination</span><span>{getCenterLabel(selectedPacket.destinationCenterId)}</span></div>
             </CardContent>
           </Card>
 
@@ -316,11 +827,11 @@ export default function PacketTrackingPage() {
               <CardTitle className="text-sm">Current Location</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Type</span><Badge variant="outline">{locationLabels[selectedPacket.currentLocationType]}</Badge></div>
-              {selectedPacket.currentRegionId && <div className="flex justify-between"><span className="text-muted-foreground">Region</span><span>{getRegionLabel(selectedPacket.currentRegionId)}</span></div>}
-              {selectedPacket.currentClusterId && <div className="flex justify-between"><span className="text-muted-foreground">Cluster</span><span>{getClusterLabel(selectedPacket.currentClusterId)}</span></div>}
-              {selectedPacket.currentCenterId && <div className="flex justify-between"><span className="text-muted-foreground">Center</span><span>{getCenterLabel(selectedPacket.currentCenterId)}</span></div>}
-              {selectedPacket.lastHandoverAt && <div className="flex justify-between"><span className="text-muted-foreground">Last Handover</span><span>{new Date(selectedPacket.lastHandoverAt).toLocaleString()}</span></div>}
+              <div className="flex justify-between gap-2"><span className="text-muted-foreground">Type</span><Badge variant="outline">{locationLabels[selectedPacket.currentLocationType]}</Badge></div>
+              {selectedPacket.currentRegionId && <div className="flex justify-between gap-2"><span className="text-muted-foreground">Region</span><span>{getRegionLabel(selectedPacket.currentRegionId)}</span></div>}
+              {selectedPacket.currentClusterId && <div className="flex justify-between gap-2"><span className="text-muted-foreground">Cluster</span><span>{getClusterLabel(selectedPacket.currentClusterId)}</span></div>}
+              {selectedPacket.currentCenterId && <div className="flex justify-between gap-2"><span className="text-muted-foreground">Center</span><span>{getCenterLabel(selectedPacket.currentCenterId)}</span></div>}
+              {selectedPacket.lastHandoverAt && <div className="flex justify-between gap-2"><span className="text-muted-foreground">Last Handover</span><span>{new Date(selectedPacket.lastHandoverAt).toLocaleString()}</span></div>}
             </CardContent>
           </Card>
         </div>
@@ -481,50 +992,17 @@ export default function PacketTrackingPage() {
                   )} />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField control={handoverForm.control} name="toRegionId" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>To Region</FormLabel>
-                      <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : null)} value={field.value?.toString() || ""}>
-                        <FormControl><SelectTrigger data-testid="select-to-region"><SelectValue placeholder="Optional" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {regions.map((r: Region) => (
-                            <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-
-                  <FormField control={handoverForm.control} name="toClusterId" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>To Cluster</FormLabel>
-                      <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : null)} value={field.value?.toString() || ""}>
-                        <FormControl><SelectTrigger data-testid="select-to-cluster"><SelectValue placeholder="Optional" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {clusters.map((c: Cluster) => (
-                            <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-
                 <FormField control={handoverForm.control} name="notes" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Notes</FormLabel>
-                    <FormControl><Textarea {...field} value={field.value || ""} data-testid="input-handover-notes" /></FormControl>
+                    <FormControl><Textarea {...field} data-testid="input-handover-notes" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
 
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setShowHandoverDialog(false)}>Cancel</Button>
                   <Button type="submit" disabled={handoverMutation.isPending} data-testid="button-submit-handover">
-                    {handoverMutation.isPending ? "Recording..." : "Record Handover"}
+                    {handoverMutation.isPending ? "Submitting..." : "Record Handover"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -536,124 +1014,383 @@ export default function PacketTrackingPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-4 max-w-6xl mx-auto">
+      <OfflineBanner queueCount={offlineQueue.length} onSync={handleSync} isSyncing={isSyncing} />
+
       <div className="flex items-center gap-2 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Exam Paper Logistics</h1>
-          <p className="text-sm text-muted-foreground">Track exam packets through chain of custody</p>
-        </div>
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
-          <Button onClick={() => setShowCreateDialog(true)} data-testid="button-create-packet">
-            <Plus className="w-4 h-4 mr-1" /> Create Packet
-          </Button>
-        </div>
+        <Package className="w-6 h-6" />
+        <h1 className="text-xl font-bold flex-1">Packet Tracking</h1>
+        {!isOnline && (
+          <Badge variant="destructive" data-testid="badge-offline">
+            <WifiOff className="w-3 h-3 mr-1" /> Offline
+          </Badge>
+        )}
       </div>
 
-      <DashboardStats stats={stats} />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList data-testid="tabs-navigation">
+          <TabsTrigger value="dashboard" data-testid="tab-dashboard">
+            <BarChart3 className="w-4 h-4 mr-1" /> Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="receive" data-testid="tab-receive">
+            <Download className="w-4 h-4 mr-1" /> Receive
+          </TabsTrigger>
+          <TabsTrigger value="dispatch" data-testid="tab-dispatch">
+            <Upload className="w-4 h-4 mr-1" /> Dispatch
+          </TabsTrigger>
+          <TabsTrigger value="packets" data-testid="tab-packets">
+            <Package className="w-4 h-4 mr-1" /> Packets
+          </TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <CardTitle className="text-lg flex-1">Packets</CardTitle>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+        <TabsContent value="dashboard" className="space-y-4 mt-4">
+          {stats ? <DashboardStats stats={stats} /> : <Skeleton className="h-24 w-full" />}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="flex gap-3 flex-wrap">
+              <Button onClick={() => setActiveTab("receive")} data-testid="button-go-receive">
+                <Download className="w-4 h-4 mr-1" /> Receive Packet
+              </Button>
+              <Button onClick={() => setActiveTab("dispatch")} data-testid="button-go-dispatch">
+                <Upload className="w-4 h-4 mr-1" /> Dispatch Packet
+              </Button>
+              <Button variant="outline" onClick={() => setActiveTab("packets")} data-testid="button-go-packets">
+                <Package className="w-4 h-4 mr-1" /> View All Packets
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="receive" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2"><Download className="w-4 h-4" /> Receive Packet</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
                 <Input
-                  placeholder="Search barcode..."
-                  className="pl-8 w-48"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  data-testid="input-search-barcode"
+                  placeholder="Scan or enter barcode..."
+                  value={receiveBarcode}
+                  onChange={(e) => setReceiveBarcode(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleReceiveLookup(); }}
+                  className="text-lg"
+                  data-testid="input-receive-barcode"
                 />
+                <Button onClick={handleReceiveLookup} disabled={receiveLookupLoading || !receiveBarcode.trim()} data-testid="button-receive-lookup">
+                  {receiveLookupLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                </Button>
               </div>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-36" data-testid="select-filter-status"><SelectValue placeholder="Status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  {Object.entries(statusConfig).map(([key, val]) => (
-                    <SelectItem key={key} value={key}>{val.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterGrade} onValueChange={setFilterGrade}>
-                <SelectTrigger className="w-28" data-testid="select-filter-grade"><SelectValue placeholder="Grade" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Grades</SelectItem>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((g) => (
-                    <SelectItem key={g} value={g.toString()}>Grade {g}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+              {receivePacket && (
+                <div className="space-y-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div><span className="text-muted-foreground block">Barcode</span><span className="font-medium" data-testid="text-receive-barcode">{receivePacket.barcode}</span></div>
+                        <div><span className="text-muted-foreground block">Subject</span><span>{getSubjectLabel(receivePacket.subjectId)}</span></div>
+                        <div><span className="text-muted-foreground block">Grade</span><span>{receivePacket.grade}</span></div>
+                        <div><span className="text-muted-foreground block">Status</span><StatusBadge status={receivePacket.status} /></div>
+                        <div><span className="text-muted-foreground block">Current Location</span><span>{locationLabels[receivePacket.currentLocationType]}</span></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium">Sender</label>
+                        <Select value={receiveSenderId?.toString() || ""} onValueChange={(v) => setReceiveSenderId(v ? parseInt(v) : null)}>
+                          <SelectTrigger data-testid="select-receive-sender"><SelectValue placeholder="Select sender" /></SelectTrigger>
+                          <SelectContent>
+                            {staffProfiles.map((s: StaffProfile) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>{s.firstName} {s.lastName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Receiver</label>
+                        <Select value={receiveReceiverId?.toString() || ""} onValueChange={(v) => setReceiveReceiverId(v ? parseInt(v) : null)}>
+                          <SelectTrigger data-testid="select-receive-receiver"><SelectValue placeholder="Select receiver" /></SelectTrigger>
+                          <SelectContent>
+                            {staffProfiles.map((s: StaffProfile) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>{s.firstName} {s.lastName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium">Your Location Type</label>
+                        <Select value={receiveLocationType} onValueChange={(v) => { setReceiveLocationType(v); setReceiveRegionId(null); setReceiveClusterId(null); setReceiveCenterId(null); }}>
+                          <SelectTrigger data-testid="select-receive-location-type"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hq">HQ</SelectItem>
+                            <SelectItem value="region">Region</SelectItem>
+                            <SelectItem value="cluster">Cluster</SelectItem>
+                            <SelectItem value="center">Center</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <LocationDropdowns
+                        locationType={receiveLocationType}
+                        regionId={receiveRegionId}
+                        clusterId={receiveClusterId}
+                        centerId={receiveCenterId}
+                        onRegionChange={setReceiveRegionId}
+                        onClusterChange={setReceiveClusterId}
+                        onCenterChange={setReceiveCenterId}
+                        regions={regions}
+                        clusters={clusters}
+                        centers={centers}
+                        prefix="receive"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Notes</label>
+                    <Textarea value={receiveNotes} onChange={(e) => setReceiveNotes(e.target.value)} placeholder="Optional notes..." data-testid="input-receive-notes" />
+                  </div>
+
+                  {gps && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <MapPin className="w-3 h-3" />
+                      <span data-testid="text-receive-gps">GPS: {gps.lat.toFixed(6)}, {gps.lng.toFixed(6)}</span>
+                    </div>
+                  )}
+
+                  <Button className="w-full" onClick={handleReceiveSubmit} disabled={!receiveLocationValid} data-testid="button-receive-submit">
+                    <Download className="w-4 h-4 mr-1" /> Confirm Receive
+                  </Button>
+                  {!receiveLocationValid && receiveLocationType !== "hq" && (
+                    <p className="text-xs text-destructive">Please select all required location fields above</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="dispatch" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2"><Upload className="w-4 h-4" /> Dispatch Packet</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Scan or enter barcode..."
+                  value={dispatchBarcode}
+                  onChange={(e) => setDispatchBarcode(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleDispatchLookup(); }}
+                  className="text-lg"
+                  data-testid="input-dispatch-barcode"
+                />
+                <Button onClick={handleDispatchLookup} disabled={dispatchLookupLoading || !dispatchBarcode.trim()} data-testid="button-dispatch-lookup">
+                  {dispatchLookupLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                </Button>
+              </div>
+
+              {dispatchPacket && (
+                <div className="space-y-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div><span className="text-muted-foreground block">Barcode</span><span className="font-medium" data-testid="text-dispatch-barcode">{dispatchPacket.barcode}</span></div>
+                        <div><span className="text-muted-foreground block">Subject</span><span>{getSubjectLabel(dispatchPacket.subjectId)}</span></div>
+                        <div><span className="text-muted-foreground block">Grade</span><span>{dispatchPacket.grade}</span></div>
+                        <div><span className="text-muted-foreground block">Status</span><StatusBadge status={dispatchPacket.status} /></div>
+                        <div><span className="text-muted-foreground block">Current Location</span><span>{locationLabels[dispatchPacket.currentLocationType]}</span></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium">Sender</label>
+                        <Select value={dispatchSenderId?.toString() || ""} onValueChange={(v) => setDispatchSenderId(v ? parseInt(v) : null)}>
+                          <SelectTrigger data-testid="select-dispatch-sender"><SelectValue placeholder="Select sender" /></SelectTrigger>
+                          <SelectContent>
+                            {staffProfiles.map((s: StaffProfile) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>{s.firstName} {s.lastName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Receiver</label>
+                        <Select value={dispatchReceiverId?.toString() || ""} onValueChange={(v) => setDispatchReceiverId(v ? parseInt(v) : null)}>
+                          <SelectTrigger data-testid="select-dispatch-receiver"><SelectValue placeholder="Select receiver" /></SelectTrigger>
+                          <SelectContent>
+                            {staffProfiles.map((s: StaffProfile) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>{s.firstName} {s.lastName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium">Destination Type</label>
+                        <Select value={dispatchLocationType} onValueChange={(v) => { setDispatchLocationType(v); setDispatchRegionId(null); setDispatchClusterId(null); setDispatchCenterId(null); }}>
+                          <SelectTrigger data-testid="select-dispatch-location-type"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hq">HQ</SelectItem>
+                            <SelectItem value="region">Region</SelectItem>
+                            <SelectItem value="cluster">Cluster</SelectItem>
+                            <SelectItem value="center">Center</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <LocationDropdowns
+                        locationType={dispatchLocationType}
+                        regionId={dispatchRegionId}
+                        clusterId={dispatchClusterId}
+                        centerId={dispatchCenterId}
+                        onRegionChange={setDispatchRegionId}
+                        onClusterChange={setDispatchClusterId}
+                        onCenterChange={setDispatchCenterId}
+                        regions={regions}
+                        clusters={clusters}
+                        centers={centers}
+                        prefix="dispatch"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Notes</label>
+                    <Textarea value={dispatchNotes} onChange={(e) => setDispatchNotes(e.target.value)} placeholder="Optional notes..." data-testid="input-dispatch-notes" />
+                  </div>
+
+                  {gps && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <MapPin className="w-3 h-3" />
+                      <span data-testid="text-dispatch-gps">GPS: {gps.lat.toFixed(6)}, {gps.lng.toFixed(6)}</span>
+                    </div>
+                  )}
+
+                  <Button className="w-full" onClick={handleDispatchSubmit} disabled={!dispatchLocationValid} data-testid="button-dispatch-submit">
+                    <Upload className="w-4 h-4 mr-1" /> Confirm Dispatch
+                  </Button>
+                  {!dispatchLocationValid && dispatchLocationType !== "hq" && (
+                    <p className="text-xs text-destructive">Please select all required location fields above</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="packets" className="space-y-4 mt-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by barcode..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-packets"
+              />
             </div>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[150px]" data-testid="select-filter-status"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {Object.entries(statusConfig).map(([key, val]) => (
+                  <SelectItem key={key} value={key}>{val.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterExamYear} onValueChange={setFilterExamYear}>
+              <SelectTrigger className="w-[120px]" data-testid="select-filter-year"><SelectValue placeholder="Year" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Years</SelectItem>
+                {examYears.map((y: ExamYear) => (
+                  <SelectItem key={y.id} value={y.id.toString()}>{y.year}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterGrade} onValueChange={setFilterGrade}>
+              <SelectTrigger className="w-[120px]" data-testid="select-filter-grade"><SelectValue placeholder="Grade" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Grades</SelectItem>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((g) => (
+                  <SelectItem key={g} value={g.toString()}>Grade {g}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => setShowCreateDialog(true)} data-testid="button-create-packet">
+              <Plus className="w-4 h-4 mr-1" /> Create Packet
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
+
           {packetsLoading ? (
-            <div className="p-4 space-y-3">
+            <div className="space-y-2">
               {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
           ) : filteredPackets.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">
-              <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
-              <p>No packets found</p>
-              <p className="text-xs">Create your first exam packet to get started</p>
-            </div>
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p>No packets found</p>
+              </CardContent>
+            </Card>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Barcode</TableHead>
-                    <TableHead>Year</TableHead>
-                    <TableHead>Grade</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Destination</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Papers</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredPackets.map((p: ExamPacket) => (
-                    <TableRow key={p.id} data-testid={`row-packet-${p.id}`}>
-                      <TableCell className="font-mono text-xs">{p.barcode}</TableCell>
-                      <TableCell>{getExamYearLabel(p.examYearId)}</TableCell>
-                      <TableCell>{p.grade}</TableCell>
-                      <TableCell>{getSubjectLabel(p.subjectId)}</TableCell>
-                      <TableCell className="text-xs">{getCenterLabel(p.destinationCenterId)}</TableCell>
-                      <TableCell><StatusBadge status={p.status} /></TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          <MapPin className="w-3 h-3 mr-1" />
-                          {locationLabels[p.currentLocationType]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{p.paperCount}</TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => { setSelectedPacket(p); setShowDetailView(true); }}
-                          data-testid={`button-view-packet-${p.id}`}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Barcode</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Grade</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPackets.map((p: ExamPacket) => (
+                      <TableRow key={p.id} data-testid={`packet-row-${p.id}`}>
+                        <TableCell className="font-mono text-sm">{p.barcode}</TableCell>
+                        <TableCell>{getSubjectLabel(p.subjectId)}</TableCell>
+                        <TableCell>{p.grade}</TableCell>
+                        <TableCell><StatusBadge status={p.status} /></TableCell>
+                        <TableCell>{locationLabels[p.currentLocationType]}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => { setSelectedPacket(p); setShowDetailView(true); }}
+                            data-testid={`button-view-${p.id}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Create Exam Packet</DialogTitle>
-            <DialogDescription>Register a new exam paper packet for tracking</DialogDescription>
+            <DialogDescription>Register a new exam packet for tracking</DialogDescription>
           </DialogHeader>
           <Form {...createForm}>
             <form onSubmit={createForm.handleSubmit((data) => createMutation.mutate(data))} className="space-y-4">
@@ -661,11 +1398,11 @@ export default function PacketTrackingPage() {
                 <FormField control={createForm.control} name="examYearId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Exam Year</FormLabel>
-                    <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value?.toString() || ""}>
-                      <FormControl><SelectTrigger data-testid="select-exam-year"><SelectValue placeholder="Select year" /></SelectTrigger></FormControl>
+                    <Select onValueChange={field.onChange} value={field.value?.toString() || ""}>
+                      <FormControl><SelectTrigger data-testid="select-create-exam-year"><SelectValue placeholder="Select year" /></SelectTrigger></FormControl>
                       <SelectContent>
                         {examYears.map((y: ExamYear) => (
-                          <SelectItem key={y.id} value={y.id.toString()}>{y.year}</SelectItem>
+                          <SelectItem key={y.id} value={y.id.toString()}>{y.year} - {y.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -673,14 +1410,14 @@ export default function PacketTrackingPage() {
                   </FormItem>
                 )} />
 
-                <FormField control={createForm.control} name="grade" render={({ field }) => (
+                <FormField control={createForm.control} name="subjectId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Grade</FormLabel>
-                    <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value?.toString()}>
-                      <FormControl><SelectTrigger data-testid="select-grade"><SelectValue /></SelectTrigger></FormControl>
+                    <FormLabel>Subject</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value?.toString() || ""}>
+                      <FormControl><SelectTrigger data-testid="select-create-subject"><SelectValue placeholder="Select subject" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((g) => (
-                          <SelectItem key={g} value={g.toString()}>Grade {g}</SelectItem>
+                        {subjects.map((s: Subject) => (
+                          <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -689,45 +1426,15 @@ export default function PacketTrackingPage() {
                 )} />
               </div>
 
-              <FormField control={createForm.control} name="subjectId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Subject</FormLabel>
-                  <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value?.toString() || ""}>
-                    <FormControl><SelectTrigger data-testid="select-subject"><SelectValue placeholder="Select subject" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {subjects.map((s: Subject) => (
-                        <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-
-              <FormField control={createForm.control} name="destinationCenterId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Destination Center</FormLabel>
-                  <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value?.toString() || ""}>
-                    <FormControl><SelectTrigger data-testid="select-center"><SelectValue placeholder="Select center" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {centers.map((c: ExamCenter) => (
-                        <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-
               <div className="grid grid-cols-2 gap-3">
-                <FormField control={createForm.control} name="destinationRegionId" render={({ field }) => (
+                <FormField control={createForm.control} name="grade" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Region</FormLabel>
-                    <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : null)} value={field.value?.toString() || ""}>
-                      <FormControl><SelectTrigger data-testid="select-region"><SelectValue placeholder="Optional" /></SelectTrigger></FormControl>
+                    <FormLabel>Grade</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value?.toString() || ""}>
+                      <FormControl><SelectTrigger data-testid="select-create-grade"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {regions.map((r: Region) => (
-                          <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((g) => (
+                          <SelectItem key={g} value={g.toString()}>Grade {g}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -735,13 +1442,13 @@ export default function PacketTrackingPage() {
                   </FormItem>
                 )} />
 
-                <FormField control={createForm.control} name="destinationClusterId" render={({ field }) => (
+                <FormField control={createForm.control} name="destinationCenterId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cluster</FormLabel>
-                    <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : null)} value={field.value?.toString() || ""}>
-                      <FormControl><SelectTrigger data-testid="select-cluster"><SelectValue placeholder="Optional" /></SelectTrigger></FormControl>
+                    <FormLabel>Destination Center</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value?.toString() || ""}>
+                      <FormControl><SelectTrigger data-testid="select-create-center"><SelectValue placeholder="Select center" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {clusters.map((c: Cluster) => (
+                        {centers.map((c: ExamCenter) => (
                           <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -755,7 +1462,7 @@ export default function PacketTrackingPage() {
                 <FormField control={createForm.control} name="paperCount" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Paper Count</FormLabel>
-                    <FormControl><Input type="number" {...field} data-testid="input-paper-count" /></FormControl>
+                    <FormControl><Input type="number" {...field} data-testid="input-create-paper-count" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -763,7 +1470,7 @@ export default function PacketTrackingPage() {
                 <FormField control={createForm.control} name="securitySealNumber" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Security Seal #</FormLabel>
-                    <FormControl><Input {...field} value={field.value || ""} data-testid="input-seal-number" /></FormControl>
+                    <FormControl><Input {...field} data-testid="input-create-seal" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -772,14 +1479,13 @@ export default function PacketTrackingPage() {
               <FormField control={createForm.control} name="notes" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
-                  <FormControl><Textarea {...field} value={field.value || ""} data-testid="input-packet-notes" /></FormControl>
+                  <FormControl><Textarea {...field} data-testid="input-create-notes" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-                <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit-packet">
+                <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit-create">
                   {createMutation.isPending ? "Creating..." : "Create Packet"}
                 </Button>
               </DialogFooter>
