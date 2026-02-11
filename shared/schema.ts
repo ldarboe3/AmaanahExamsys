@@ -1369,6 +1369,97 @@ export const insertImpactStatSchema = createInsertSchema(impactStats).pick({
   isActive: true,
 });
 
+// ============================================================
+// AIITS - Amaanah Institutional Identity & Trust System
+// ============================================================
+
+export const staffStatusEnum = pgEnum('staff_status', ['created', 'printed', 'issued', 'activated', 'suspended', 'revoked']);
+
+export const staffRoleEnum = pgEnum('staff_role', [
+  'hq_director',
+  'hq_staff',
+  'regional_coordinator',
+  'regional_staff',
+  'cluster_officer',
+  'examiner',
+  'invigilator',
+  'supervisor',
+  'monitor',
+  'temporary_staff'
+]);
+
+export const staffProfiles = pgTable("staff_profiles", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  staffIdNumber: varchar("staff_id_number", { length: 20 }).notNull().unique(),
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName: varchar("last_name", { length: 100 }).notNull(),
+  middleName: varchar("middle_name", { length: 100 }),
+  fullNameArabic: varchar("full_name_arabic", { length: 255 }),
+  photoUrl: varchar("photo_url", { length: 500 }),
+  role: staffRoleEnum("role").notNull(),
+  secondaryRoles: text("secondary_roles").array().default([]),
+  regionId: integer("region_id").references(() => regions.id),
+  clusterId: integer("cluster_id").references(() => clusters.id),
+  centerId: integer("center_id").references(() => examCenters.id),
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  status: staffStatusEnum("status").default('created').notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  cardPrintedAt: timestamp("card_printed_at"),
+  cardIssuedAt: timestamp("card_issued_at"),
+  activatedAt: timestamp("activated_at"),
+  suspendedAt: timestamp("suspended_at"),
+  revokedAt: timestamp("revoked_at"),
+  suspendReason: text("suspend_reason"),
+  revokeReason: text("revoke_reason"),
+  confirmationCode: varchar("confirmation_code", { length: 10 }),
+  issueDate: timestamp("issue_date").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const staffIdEventTypeEnum = pgEnum('staff_id_event_type', [
+  'created', 'updated', 'photo_uploaded', 'card_generated', 'card_printed',
+  'card_issued', 'activated', 'suspended', 'reactivated', 'revoked',
+  'role_changed', 'assignment_changed'
+]);
+
+export const staffIdEvents = pgTable("staff_id_events", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  staffProfileId: integer("staff_profile_id").notNull().references(() => staffProfiles.id),
+  eventType: staffIdEventTypeEnum("event_type").notNull(),
+  actorId: varchar("actor_id").references(() => users.id),
+  details: text("details"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStaffProfileSchema = createInsertSchema(staffProfiles).pick({
+  firstName: true,
+  lastName: true,
+  middleName: true,
+  fullNameArabic: true,
+  photoUrl: true,
+  role: true,
+  secondaryRoles: true,
+  regionId: true,
+  clusterId: true,
+  centerId: true,
+  phone: true,
+  email: true,
+  status: true,
+  userId: true,
+});
+
+export const insertStaffIdEventSchema = createInsertSchema(staffIdEvents).pick({
+  staffProfileId: true,
+  eventType: true,
+  actorId: true,
+  details: true,
+  metadata: true,
+});
+
 // Approved Gambian Surnames table for name validation and normalization
 export const approvedSurnameOriginEnum = pgEnum('surname_origin', ['approved_list', 'transliterated', 'fuzzy_match', 'manual']);
 
@@ -1470,3 +1561,9 @@ export type InsertImpactStat = z.infer<typeof insertImpactStatSchema>;
 export type ImpactStat = typeof impactStats.$inferSelect;
 export type InsertApprovedSurname = z.infer<typeof insertApprovedSurnameSchema>;
 export type ApprovedSurname = typeof approvedSurnames.$inferSelect;
+
+// AIITS Types
+export type InsertStaffProfile = z.infer<typeof insertStaffProfileSchema>;
+export type StaffProfile = typeof staffProfiles.$inferSelect;
+export type InsertStaffIdEvent = z.infer<typeof insertStaffIdEventSchema>;
+export type StaffIdEvent = typeof staffIdEvents.$inferSelect;

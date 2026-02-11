@@ -61,6 +61,8 @@ import WebsiteManagement from "@/pages/website-management";
 import Documentation from "@/pages/documentation";
 import VerifyTranscript from "@/pages/verify-transcript";
 import VerifyCertificate from "@/pages/verify-certificate";
+import StaffIdentity from "@/pages/staff-identity";
+import VerifyStaff from "@/pages/verify-staff";
 
 function LoadingScreen() {
   return (
@@ -95,6 +97,9 @@ function AuthenticatedRoutes() {
       <Route path="/certificates" component={Certificates} />
       <Route path="/transcripts" component={Transcripts} />
       <Route path="/examiners" component={Examiners} />
+      <Route path="/staff-identity">
+        {() => <ProtectedRoute component={StaffIdentity} allowedRoles={["super_admin", "examination_admin"]} />}
+      </Route>
       <Route path="/users">
         {() => <ProtectedRoute component={UsersPage} allowedRoles={["super_admin"]} />}
       </Route>
@@ -125,6 +130,8 @@ function PublicRoutes() {
       <Route path="/verify" component={Verify} />
       <Route path="/verify/transcript/:token" component={VerifyTranscript} />
       <Route path="/verify/:token" component={VerifyCertificate} />
+      <Route path="/verify-staff/:staffId" component={VerifyStaff} />
+      <Route path="/verify-staff" component={VerifyStaff} />
       <Route path="/about" component={About} />
       <Route path="/about/organisation-structure" component={OrganisationStructure} />
       <Route path="/about/senior-executives" component={SeniorExecutives} />

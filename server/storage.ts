@@ -9,6 +9,7 @@ import {
   newsletterSubscribers, impactStats,
   paperMovements, scriptMovements, centerAssignments, centerActivityLogs,
   schoolExamRegistrations,
+  staffProfiles, staffIdEvents,
   type User, type UpsertUser, type Region, type InsertRegion,
   type Cluster, type InsertCluster, type ExamYear, type InsertExamYear,
   type ExamCenter, type InsertExamCenter, type School, type InsertSchool,
@@ -31,6 +32,8 @@ import {
   type CenterAssignment, type InsertCenterAssignment,
   type CenterActivityLog, type InsertCenterActivityLog,
   type SchoolExamRegistration, type InsertSchoolExamRegistration,
+  type StaffProfile, type InsertStaffProfile,
+  type StaffIdEvent, type InsertStaffIdEvent,
 } from "@shared/schema";
 import { randomBytes } from "crypto";
 import bcrypt from "bcrypt";
@@ -401,6 +404,16 @@ export interface IStorage {
   createCenterActivityLog(log: InsertCenterActivityLog): Promise<CenterActivityLog>;
   getCenterActivityLogs(centerId: number, examYearId?: number): Promise<CenterActivityLog[]>;
   getCenterActivityLogsByType(centerId: number, activityType: string): Promise<CenterActivityLog[]>;
+
+  // ===== AIITS - Staff Identity =====
+  createStaffProfile(profile: InsertStaffProfile & { staffIdNumber: string; confirmationCode: string; createdBy: string }): Promise<StaffProfile>;
+  getStaffProfile(id: number): Promise<StaffProfile | undefined>;
+  getStaffProfileByStaffId(staffIdNumber: string): Promise<StaffProfile | undefined>;
+  getAllStaffProfiles(): Promise<StaffProfile[]>;
+  updateStaffProfile(id: number, profile: Partial<InsertStaffProfile & { staffIdNumber?: string; confirmationCode?: string; cardPrintedAt?: Date; cardIssuedAt?: Date; activatedAt?: Date; suspendedAt?: Date; revokedAt?: Date; suspendReason?: string; revokeReason?: string }>): Promise<StaffProfile | undefined>;
+  deleteStaffProfile(id: number): Promise<boolean>;
+  createStaffIdEvent(event: InsertStaffIdEvent): Promise<StaffIdEvent>;
+  getStaffIdEvents(staffProfileId: number): Promise<StaffIdEvent[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2353,6 +2366,51 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(centerActivityLogs)
       .where(and(eq(centerActivityLogs.centerId, centerId), eq(centerActivityLogs.activityType, activityType)))
       .orderBy(desc(centerActivityLogs.createdAt));
+  }
+
+  // ===== AIITS - Staff Identity =====
+  async createStaffProfile(profile: InsertStaffProfile & { staffIdNumber: string; confirmationCode: string; createdBy: string }): Promise<StaffProfile> {
+    const [created] = await db.insert(staffProfiles).values(profile).returning();
+    return created;
+  }
+
+  async getStaffProfile(id: number): Promise<StaffProfile | undefined> {
+    const [profile] = await db.select().from(staffProfiles).where(eq(staffProfiles.id, id));
+    return profile;
+  }
+
+  async getStaffProfileByStaffId(staffIdNumber: string): Promise<StaffProfile | undefined> {
+    const [profile] = await db.select().from(staffProfiles).where(eq(staffProfiles.staffIdNumber, staffIdNumber));
+    return profile;
+  }
+
+  async getAllStaffProfiles(): Promise<StaffProfile[]> {
+    return db.select().from(staffProfiles).orderBy(desc(staffProfiles.createdAt));
+  }
+
+  async updateStaffProfile(id: number, profile: Partial<InsertStaffProfile & { staffIdNumber?: string; confirmationCode?: string; cardPrintedAt?: Date; cardIssuedAt?: Date; activatedAt?: Date; suspendedAt?: Date; revokedAt?: Date; suspendReason?: string; revokeReason?: string }>): Promise<StaffProfile | undefined> {
+    const [updated] = await db.update(staffProfiles)
+      .set({ ...profile, updatedAt: new Date() })
+      .where(eq(staffProfiles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteStaffProfile(id: number): Promise<boolean> {
+    await db.delete(staffIdEvents).where(eq(staffIdEvents.staffProfileId, id));
+    await db.delete(staffProfiles).where(eq(staffProfiles.id, id));
+    return true;
+  }
+
+  async createStaffIdEvent(event: InsertStaffIdEvent): Promise<StaffIdEvent> {
+    const [created] = await db.insert(staffIdEvents).values(event).returning();
+    return created;
+  }
+
+  async getStaffIdEvents(staffProfileId: number): Promise<StaffIdEvent[]> {
+    return db.select().from(staffIdEvents)
+      .where(eq(staffIdEvents.staffProfileId, staffProfileId))
+      .orderBy(desc(staffIdEvents.createdAt));
   }
 }
 

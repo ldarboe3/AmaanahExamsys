@@ -1,6 +1,8 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import fs from "fs";
+import path from "path";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments, studentResults } from "@shared/schema";
@@ -80,6 +82,29 @@ const bankSlipUpload = multer({
       cb(null, true);
     } else {
       cb(new Error('Invalid file type. Only PDF, JPG, and PNG files are allowed.'));
+    }
+  },
+});
+
+const staffPhotoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const ext = file.originalname.split('.').pop();
+      cb(null, `staff-${Date.now()}-${randomBytes(4).toString('hex')}.${ext}`);
+    }
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req: any, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPG and PNG photos are allowed.'));
     }
   },
 });
@@ -14167,6 +14192,370 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         errors: errors.length > 0 ? errors.slice(0, 10) : undefined
       });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============ AIITS - Staff Identity Management API ============
+
+  app.get("/api/staff-profiles", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const profiles = await storage.getAllStaffProfiles();
+      const allRegions = await storage.getAllRegions();
+      const allClusters = await storage.getAllClusters();
+      const allCenters = await storage.getAllExamCenters();
+      
+      const enriched = profiles.map(p => ({
+        ...p,
+        regionName: allRegions.find(r => r.id === p.regionId)?.name || null,
+        clusterName: allClusters.find(c => c.id === p.clusterId)?.name || null,
+        centerName: allCenters.find(c => c.id === p.centerId)?.name || null,
+      }));
+      res.json(enriched);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/staff-profiles/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const profile = await storage.getStaffProfile(parseInt(req.params.id));
+      if (!profile) return res.status(404).json({ message: "Staff profile not found" });
+      
+      const events = await storage.getStaffIdEvents(profile.id);
+      const region = profile.regionId ? await storage.getRegion(profile.regionId) : null;
+      const cluster = profile.clusterId ? await storage.getCluster(profile.clusterId) : null;
+      
+      res.json({ 
+        ...profile, 
+        regionName: region?.name || null,
+        clusterName: cluster?.name || null,
+        events 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/staff-profiles", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const { firstName, lastName, middleName, fullNameArabic, role, secondaryRoles, regionId, clusterId, centerId, phone, email, photoUrl } = req.body;
+      
+      if (!firstName || !lastName || !role) {
+        return res.status(400).json({ message: "First name, last name, and role are required" });
+      }
+
+      const allProfiles = await storage.getAllStaffProfiles();
+      const nextNum = allProfiles.length + 1;
+      const staffIdNumber = `AMS-${String(nextNum).padStart(5, '0')}`;
+      
+      const confirmationCode = Math.random().toString(36).substring(2, 8).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+      
+      const profile = await storage.createStaffProfile({
+        firstName, lastName, middleName: middleName || null, fullNameArabic: fullNameArabic || null,
+        role, secondaryRoles: secondaryRoles || [], 
+        regionId: regionId ? parseInt(regionId) : null, 
+        clusterId: clusterId ? parseInt(clusterId) : null, 
+        centerId: centerId ? parseInt(centerId) : null,
+        phone: phone || null, email: email || null, 
+        photoUrl: photoUrl || null,
+        status: 'created',
+        userId: null,
+        staffIdNumber,
+        confirmationCode: confirmationCode.substring(0, 10),
+        createdBy: user.id,
+      });
+
+      await storage.createStaffIdEvent({
+        staffProfileId: profile.id,
+        eventType: 'created',
+        actorId: user.id,
+        details: `Staff profile created for ${firstName} ${lastName}`,
+        metadata: { role },
+      });
+
+      await storage.createAuditLog({
+        action: 'staff_profile_created',
+        entityType: 'staff_profile',
+        entityId: profile.id.toString(),
+        userId: user.id,
+        newData: { details: `Created staff profile: ${firstName} ${lastName} (${staffIdNumber})` },
+      });
+
+      res.status(201).json(profile);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/staff-profiles/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const existing = await storage.getStaffProfile(id);
+      if (!existing) return res.status(404).json({ message: "Staff profile not found" });
+
+      const { firstName, lastName, middleName, fullNameArabic, role, secondaryRoles, regionId, clusterId, centerId, phone, email, photoUrl } = req.body;
+      
+      const updateData: any = {};
+      if (firstName !== undefined) updateData.firstName = firstName;
+      if (lastName !== undefined) updateData.lastName = lastName;
+      if (middleName !== undefined) updateData.middleName = middleName;
+      if (fullNameArabic !== undefined) updateData.fullNameArabic = fullNameArabic;
+      if (role !== undefined) updateData.role = role;
+      if (secondaryRoles !== undefined) updateData.secondaryRoles = secondaryRoles;
+      if (regionId !== undefined) updateData.regionId = regionId ? parseInt(regionId) : null;
+      if (clusterId !== undefined) updateData.clusterId = clusterId ? parseInt(clusterId) : null;
+      if (centerId !== undefined) updateData.centerId = centerId ? parseInt(centerId) : null;
+      if (phone !== undefined) updateData.phone = phone;
+      if (email !== undefined) updateData.email = email;
+      if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
+
+      const updated = await storage.updateStaffProfile(id, updateData);
+
+      await storage.createStaffIdEvent({
+        staffProfileId: id,
+        eventType: 'updated',
+        actorId: user.id,
+        details: `Staff profile updated`,
+        metadata: updateData,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/staff-profiles/:id/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const { status, reason } = req.body;
+      const existing = await storage.getStaffProfile(id);
+      if (!existing) return res.status(404).json({ message: "Staff profile not found" });
+
+      const validTransitions: Record<string, string[]> = {
+        'created': ['printed'],
+        'printed': ['issued'],
+        'issued': ['activated'],
+        'activated': ['suspended', 'revoked'],
+        'suspended': ['activated', 'revoked'],
+      };
+
+      const allowed = validTransitions[existing.status] || [];
+      if (!allowed.includes(status)) {
+        return res.status(400).json({ message: `Cannot transition from '${existing.status}' to '${status}'` });
+      }
+
+      const updateData: any = { status };
+      let eventType: string = status;
+
+      if (status === 'printed') { updateData.cardPrintedAt = new Date(); eventType = 'card_printed'; }
+      if (status === 'issued') { updateData.cardIssuedAt = new Date(); eventType = 'card_issued'; }
+      if (status === 'activated') { 
+        updateData.activatedAt = new Date(); 
+        eventType = existing.status === 'suspended' ? 'reactivated' : 'activated'; 
+      }
+      if (status === 'suspended') { updateData.suspendedAt = new Date(); updateData.suspendReason = reason || null; }
+      if (status === 'revoked') { updateData.revokedAt = new Date(); updateData.revokeReason = reason || null; }
+
+      const updated = await storage.updateStaffProfile(id, updateData);
+
+      await storage.createStaffIdEvent({
+        staffProfileId: id,
+        eventType: eventType as any,
+        actorId: user.id,
+        details: `Status changed from '${existing.status}' to '${status}'${reason ? `: ${reason}` : ''}`,
+        metadata: { previousStatus: existing.status, newStatus: status, reason },
+      });
+
+      await storage.createAuditLog({
+        action: `staff_status_${status}`,
+        entityType: 'staff_profile',
+        entityId: id.toString(),
+        userId: user.id,
+        newData: { details: `Staff ${existing.staffIdNumber} status changed to ${status}` },
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/staff-profiles/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super admin can delete staff profiles" });
+      }
+      const id = parseInt(req.params.id);
+      const existing = await storage.getStaffProfile(id);
+      if (!existing) return res.status(404).json({ message: "Staff profile not found" });
+
+      await storage.deleteStaffProfile(id);
+
+      await storage.createAuditLog({
+        action: 'staff_profile_deleted',
+        entityType: 'staff_profile',
+        entityId: id.toString(),
+        userId: user.id,
+        newData: { details: `Deleted staff profile: ${existing.firstName} ${existing.lastName} (${existing.staffIdNumber})` },
+      });
+
+      res.json({ message: "Staff profile deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/staff-profiles/:id/events", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const events = await storage.getStaffIdEvents(parseInt(req.params.id));
+      res.json(events);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/staff-profiles/:id/photo", isAuthenticated, staffPhotoUpload.single('photo'), async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const id = parseInt(req.params.id);
+      const existing = await storage.getStaffProfile(id);
+      if (!existing) return res.status(404).json({ message: "Staff profile not found" });
+
+      if (!req.file) return res.status(400).json({ message: "No photo uploaded" });
+
+      const photoUrl = `/uploads/${req.file.filename}`;
+      const updated = await storage.updateStaffProfile(id, { photoUrl });
+
+      await storage.createStaffIdEvent({
+        staffProfileId: id,
+        eventType: 'photo_uploaded',
+        actorId: user.id,
+        details: `Photo uploaded`,
+        metadata: { photoUrl },
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/public/staff-verify/:staffIdNumber", async (req, res) => {
+    try {
+      const profile = await storage.getStaffProfileByStaffId(req.params.staffIdNumber);
+      if (!profile) {
+        return res.status(404).json({ message: "Staff ID not found", verified: false });
+      }
+
+      res.json({
+        verified: true,
+        staffIdNumber: profile.staffIdNumber,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        middleName: profile.middleName,
+        photoUrl: profile.photoUrl,
+        role: profile.role,
+        status: profile.status,
+        issueDate: profile.issueDate,
+        isActive: profile.status === 'activated',
+        isSuspended: profile.status === 'suspended',
+        isRevoked: profile.status === 'revoked',
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============ AIITS - Staff ID Card Generation ============
+  app.get("/api/staff-profiles/:id/id-card", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const profile = await storage.getStaffProfile(parseInt(req.params.id));
+      if (!profile) return res.status(404).json({ message: "Staff profile not found" });
+
+      const regions = await storage.getRegions();
+      const clusters = await storage.getClusters();
+      const region = regions.find((r: any) => r.id === profile.regionId);
+      const cluster = clusters.find((c: any) => c.id === profile.clusterId);
+
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers.host || 'localhost:5000';
+      const verifyUrl = `${protocol}://${host}/verify-staff/${profile.staffIdNumber}`;
+
+      const { generateStaffIdCard } = await import('./staffIdCardService');
+      const pdfBuffer = await generateStaffIdCard({
+        staffIdNumber: profile.staffIdNumber,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        middleName: profile.middleName,
+        fullNameArabic: profile.fullNameArabic,
+        role: profile.role,
+        regionName: region?.name,
+        clusterName: cluster?.name,
+        photoUrl: profile.photoUrl,
+        confirmationCode: profile.confirmationCode,
+        issueDate: profile.issueDate,
+        verifyUrl,
+      });
+
+      await storage.createStaffIdEvent({
+        staffProfileId: profile.id,
+        eventType: 'card_generated',
+        actorId: user.id,
+        details: `ID card generated for ${profile.staffIdNumber}`,
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="staff-id-${profile.staffIdNumber}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("Error generating staff ID card:", error);
       res.status(500).json({ message: error.message });
     }
   });
