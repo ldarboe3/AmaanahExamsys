@@ -28,11 +28,24 @@ import {
 import {
   Search, MoreVertical, Eye, Edit, Plus, UserCheck, Trash2,
   Shield, ShieldAlert, ShieldOff, ShieldCheck, CreditCard,
-  Upload, Clock, CheckCircle, XCircle, AlertTriangle, IdCard, Download,
+  Upload, Clock, CheckCircle, XCircle, AlertTriangle, IdCard, Download, Printer, Building2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { StaffProfile, Region, Cluster } from "@shared/schema";
+
+const departmentOptions = [
+  "Administration",
+  "Examinations",
+  "Logistics",
+  "Finance",
+  "Human Resources",
+  "IT & Systems",
+  "Quality Assurance",
+  "Regional Operations",
+  "Training & Development",
+  "Communications",
+] as const;
 
 const staffProfileSchema = z.object({
   firstName: z.string().min(2, "First name is required"),
@@ -43,6 +56,7 @@ const staffProfileSchema = z.object({
     "hq_director", "hq_staff", "regional_coordinator", "regional_staff",
     "cluster_officer", "examiner", "invigilator", "supervisor", "monitor", "temporary_staff",
   ]),
+  department: z.string().optional(),
   regionId: z.coerce.number().optional().nullable(),
   clusterId: z.coerce.number().optional().nullable(),
   phone: z.string().optional(),
@@ -95,9 +109,12 @@ export default function StaffIdentityPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffProfile | null>(null);
   const [viewingStaff, setViewingStaff] = useState<StaffProfile | null>(null);
+  const [bulkPrintDept, setBulkPrintDept] = useState<string>("");
+  const [bulkPrinting, setBulkPrinting] = useState(false);
   const [statusChangeStaff, setStatusChangeStaff] = useState<{ staff: StaffProfile; newStatus: string } | null>(null);
   const [statusReason, setStatusReason] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -133,7 +150,7 @@ export default function StaffIdentityPage() {
     resolver: zodResolver(staffProfileSchema),
     defaultValues: {
       firstName: "", lastName: "", middleName: "", fullNameArabic: "",
-      role: "examiner", regionId: null, clusterId: null, phone: "", email: "",
+      role: "examiner", department: "", regionId: null, clusterId: null, phone: "", email: "",
     },
   });
 
@@ -221,7 +238,7 @@ export default function StaffIdentityPage() {
   const openCreateDialog = () => {
     form.reset({
       firstName: "", lastName: "", middleName: "", fullNameArabic: "",
-      role: "examiner", regionId: null, clusterId: null, phone: "", email: "",
+      role: "examiner", department: "", regionId: null, clusterId: null, phone: "", email: "",
     });
     setPhotoFile(null);
     setShowCreateDialog(true);
@@ -234,6 +251,7 @@ export default function StaffIdentityPage() {
       middleName: staff.middleName || "",
       fullNameArabic: staff.fullNameArabic || "",
       role: staff.role as StaffFormData["role"],
+      department: staff.department || "",
       regionId: staff.regionId,
       clusterId: staff.clusterId,
       phone: staff.phone || "",
@@ -266,11 +284,32 @@ export default function StaffIdentityPage() {
     ? clusters.filter((c) => c.regionId === form.watch("regionId"))
     : clusters;
 
+  const filteredByDepartment = departmentFilter === "all"
+    ? staffProfiles
+    : staffProfiles.filter((s) => s.department === departmentFilter);
+
   const statusCounts = {
     total: staffProfiles.length,
     activated: staffProfiles.filter((s) => s.status === "activated").length,
     suspended: staffProfiles.filter((s) => s.status === "suspended").length,
     created: staffProfiles.filter((s) => s.status === "created").length,
+  };
+
+  const handleBulkPrint = async () => {
+    if (!bulkPrintDept) {
+      toast({ title: "Select a department", description: "Please choose a department to print ID cards for", variant: "destructive" });
+      return;
+    }
+    setBulkPrinting(true);
+    try {
+      const params = new URLSearchParams({ department: bulkPrintDept });
+      window.open(`/api/staff-profiles/bulk-id-cards?${params.toString()}`, '_blank');
+      toast({ title: "Bulk print started", description: `Generating ID cards for ${bulkPrintDept} department` });
+    } catch {
+      toast({ title: "Error", description: "Failed to generate bulk ID cards", variant: "destructive" });
+    } finally {
+      setBulkPrinting(false);
+    }
   };
 
   return (
@@ -367,6 +406,41 @@ export default function StaffIdentityPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <SelectTrigger className="w-[180px]" data-testid="select-department-filter">
+                <SelectValue placeholder="Department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departmentOptions.map((dept) => (
+                  <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-muted/50 rounded-md">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Bulk Print ID Cards:</span>
+            <Select value={bulkPrintDept} onValueChange={setBulkPrintDept}>
+              <SelectTrigger className="w-[200px]" data-testid="select-bulk-dept">
+                <SelectValue placeholder="Select department" />
+              </SelectTrigger>
+              <SelectContent>
+                {departmentOptions.map((dept) => (
+                  <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              onClick={handleBulkPrint}
+              disabled={bulkPrinting || !bulkPrintDept}
+              data-testid="button-bulk-print"
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              {bulkPrinting ? "Generating..." : "Print All"}
+            </Button>
           </div>
 
           {isLoading ? (
@@ -385,6 +459,7 @@ export default function StaffIdentityPage() {
                     <TableHead>Staff</TableHead>
                     <TableHead>Staff ID</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Department</TableHead>
                     <TableHead>Region</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Contact</TableHead>
@@ -392,7 +467,7 @@ export default function StaffIdentityPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {staffProfiles.map((staff) => {
+                  {filteredByDepartment.map((staff) => {
                     const sConfig = statusConfig[staff.status] || statusConfig.created;
                     const StatusIcon = sConfig.icon;
                     const regionName = regions.find((r) => r.id === staff.regionId)?.name;
@@ -419,6 +494,9 @@ export default function StaffIdentityPage() {
                           </code>
                         </TableCell>
                         <TableCell>{roleLabels[staff.role] || staff.role}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">{staff.department || "—"}</div>
+                        </TableCell>
                         <TableCell>
                           <div className="text-sm">
                             {regionName || "—"}
@@ -570,24 +648,45 @@ export default function StaffIdentityPage() {
                 )} />
               </div>
 
-              <FormField control={form.control} name="role" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Role</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-role">
-                        <SelectValue placeholder="Select role" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {Object.entries(roleLabels).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="role" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-role">
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.entries(roleLabels).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="department" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Department</FormLabel>
+                    <Select value={field.value || "none"} onValueChange={(v) => field.onChange(v === "none" ? "" : v)}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-department">
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {departmentOptions.map((dept) => (
+                          <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="regionId" render={({ field }) => (
@@ -732,15 +831,29 @@ export default function StaffIdentityPage() {
                   )}
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     <code className="text-sm bg-muted px-2 py-0.5 rounded">{viewingStaff.staffIdNumber}</code>
+                    {viewingStaff.employeeId && (
+                      <code className="text-sm bg-muted px-2 py-0.5 rounded">EID: {viewingStaff.employeeId}</code>
+                    )}
                     <Badge variant="secondary" className={statusConfig[viewingStaff.status]?.color}>
                       {statusConfig[viewingStaff.status]?.label || viewingStaff.status}
                     </Badge>
                     <Badge variant="outline">{roleLabels[viewingStaff.role] || viewingStaff.role}</Badge>
+                    {viewingStaff.department && (
+                      <Badge variant="outline">{viewingStaff.department}</Badge>
+                    )}
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Department:</span>{" "}
+                  {viewingStaff.department || "—"}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Employee ID:</span>{" "}
+                  {viewingStaff.employeeId || "—"}
+                </div>
                 <div>
                   <span className="text-muted-foreground">Region:</span>{" "}
                   {regions.find((r) => r.id === viewingStaff.regionId)?.name || "—"}

@@ -51,9 +51,11 @@ The system is built on a robust architecture featuring a React-based frontend, a
     - **Safe Filenames**: Sanitized school names with special character handling for HTTP compatibility
   - **Result Publication Notifications**: When results are published, automatic email and in-dashboard notifications are sent to all schools with registered students for that examination. Schools without registered students are excluded from notifications.
 - **AIITS (Staff Identity & Trust System)**:
-  - **Staff Profile Management**: Create, edit, search, filter staff profiles with photo upload. Staff ID numbers auto-generated (AMS-00001 format) with confirmation codes.
+  - **Staff Profile Management**: Create, edit, search, filter staff profiles with photo upload. Staff ID numbers auto-generated (AMS-00001 format) with confirmation codes. Includes 8-digit Employee ID (auto-generated, unique) and Department field.
   - **ID Card Lifecycle**: Status transitions: Created → Printed → Issued → Activated → Suspended/Revoked. Full audit trail via staff_id_events table.
-  - **Staff ID Card PDF**: pdfkit-based ID card generation with logo, photo, name (English/Arabic), role, region/cluster, QR code, and confirmation code.
+  - **Staff ID Card PDF**: Portrait-oriented CR-80 format (54mm × 85.6mm) designed for MagiCard Enduro 3e printer. Two-sided card with green wave design. Front: circular photo, name (English/Arabic), role, department, Employee ID, phone, email, Code128 barcode. Back: logo, terms & conditions, signature area, issue/expiry dates, QR code, Code128 barcode. Barcodes generated via bwip-js using employeeId as data.
+  - **Bulk ID Card Printing**: API endpoint `/api/staff-profiles/bulk-id-cards` generates multi-page PDF with front+back pages for all staff filtered by department or role. Frontend UI with department selector and bulk print button.
+  - **Department Management**: 10 predefined departments (Administration, Examinations, Logistics, Finance, HR, IT & Systems, QA, Regional Operations, Training & Development, Communications). Department filter in staff table and form.
   - **Public Staff Verification**: Public page at /verify-staff/:staffId for QR-based or manual staff identity verification.
   - **Access Control**: HQ-only access (super_admin, examination_admin) for staff profile management.
   - **Key Files**: server/staffIdCardService.ts, client/src/pages/staff-identity.tsx, client/src/pages/verify-staff.tsx
