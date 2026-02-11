@@ -1577,6 +1577,90 @@ export const insertApprovedSurnameSchema = createInsertSchema(approvedSurnames).
   isActive: true,
 });
 
+// Exam Scheduling & Time Enforcement
+export const examSessionStatusEnum = pgEnum('exam_session_status', [
+  'scheduled', 'started_on_time', 'started_late', 'in_progress', 'ended_on_time', 'ended_late', 'completed', 'cancelled'
+]);
+
+export const lateReasonCodeEnum = pgEnum('late_reason_code', [
+  'transport_delay', 'weather', 'security_incident', 'materials_late', 'staff_absence',
+  'technical_issue', 'venue_issue', 'student_delay', 'communication_gap', 'other'
+]);
+
+export const examSchedules = pgTable("exam_schedules", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
+  subjectId: integer("subject_id").notNull().references(() => subjects.id),
+  grade: integer("grade").notNull(),
+  examDate: date("exam_date").notNull(),
+  scheduledStartTime: varchar("scheduled_start_time", { length: 10 }).notNull(),
+  durationMinutes: integer("duration_minutes").notNull(),
+  scheduledEndTime: varchar("scheduled_end_time", { length: 10 }).notNull(),
+  isPublished: boolean("is_published").default(false),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const examSessionLogs = pgTable("exam_session_logs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  scheduleId: integer("schedule_id").notNull().references(() => examSchedules.id),
+  centerId: integer("center_id").notNull().references(() => examCenters.id),
+  examinerId: varchar("examiner_id").references(() => users.id),
+  status: examSessionStatusEnum("status").default('scheduled'),
+  actualStartTime: timestamp("actual_start_time"),
+  actualEndTime: timestamp("actual_end_time"),
+  startedLate: boolean("started_late").default(false),
+  lateStartMinutes: integer("late_start_minutes").default(0),
+  lateStartReasonCode: lateReasonCodeEnum("late_start_reason_code"),
+  lateStartReasonDetails: text("late_start_reason_details"),
+  endedLate: boolean("ended_late").default(false),
+  lateEndMinutes: integer("late_end_minutes").default(0),
+  lateEndReasonDetails: text("late_end_reason_details"),
+  candidateCount: integer("candidate_count"),
+  gpsLatitude: varchar("gps_latitude", { length: 20 }),
+  gpsLongitude: varchar("gps_longitude", { length: 20 }),
+  deviceInfo: text("device_info"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertExamScheduleSchema = createInsertSchema(examSchedules).pick({
+  examYearId: true,
+  subjectId: true,
+  grade: true,
+  examDate: true,
+  scheduledStartTime: true,
+  durationMinutes: true,
+  scheduledEndTime: true,
+  isPublished: true,
+  notes: true,
+  createdBy: true,
+});
+
+export const insertExamSessionLogSchema = createInsertSchema(examSessionLogs).pick({
+  scheduleId: true,
+  centerId: true,
+  examinerId: true,
+  status: true,
+  actualStartTime: true,
+  actualEndTime: true,
+  startedLate: true,
+  lateStartMinutes: true,
+  lateStartReasonCode: true,
+  lateStartReasonDetails: true,
+  endedLate: true,
+  lateEndMinutes: true,
+  lateEndReasonDetails: true,
+  candidateCount: true,
+  gpsLatitude: true,
+  gpsLongitude: true,
+  deviceInfo: true,
+  notes: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1668,3 +1752,9 @@ export type InsertExamPacket = z.infer<typeof insertExamPacketSchema>;
 export type ExamPacket = typeof examPackets.$inferSelect;
 export type InsertHandoverLog = z.infer<typeof insertHandoverLogSchema>;
 export type HandoverLog = typeof handoverLogs.$inferSelect;
+
+// Exam Scheduling & Time Enforcement Types
+export type InsertExamSchedule = z.infer<typeof insertExamScheduleSchema>;
+export type ExamSchedule = typeof examSchedules.$inferSelect;
+export type InsertExamSessionLog = z.infer<typeof insertExamSessionLogSchema>;
+export type ExamSessionLog = typeof examSessionLogs.$inferSelect;
