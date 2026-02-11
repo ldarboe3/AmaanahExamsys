@@ -54,10 +54,16 @@ const adminMenuDefs: MenuItemDef[] = [
   { key: "certificates", url: "/certificates", icon: Award },
   { key: "transcripts", url: "/transcripts", icon: BookOpen },
   { key: "examiners", url: "/examiners", icon: UserCheck },
+  { key: "analytics", url: "/analytics", icon: BarChart3 },
+];
+
+const staffManagementDefs: MenuItemDef[] = [
   { key: "staffIdentity", url: "/staff-identity", icon: Shield },
+];
+
+const examLogisticsDefs: MenuItemDef[] = [
   { key: "packetTracking", url: "/packet-tracking", icon: Package },
   { key: "examScheduling", url: "/exam-scheduling", icon: Timer },
-  { key: "analytics", url: "/analytics", icon: BarChart3 },
 ];
 
 const schoolAdminMenuDefs: MenuItemDef[] = [
@@ -152,6 +158,54 @@ export function AppSidebar({ side = "left" }: AppSidebarProps) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>{t.nav.examLogistics}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {examLogisticsDefs.map((item) => (
+                  <SidebarMenuItem key={item.key}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location === item.url}
+                      data-testid={`nav-${item.key}`}
+                    >
+                      <Link href={item.url}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{getNavLabel(item.key)}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>{t.nav.staffManagement}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {staffManagementDefs.map((item) => (
+                  <SidebarMenuItem key={item.key}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location === item.url}
+                      data-testid={`nav-${item.key}`}
+                    >
+                      <Link href={item.url}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{getNavLabel(item.key)}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {isAdmin && (
           <SidebarGroup>

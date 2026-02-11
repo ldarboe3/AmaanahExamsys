@@ -8,6 +8,8 @@ export const translations = {
     },
     nav: {
       mainMenu: 'Amaanah Examination Management',
+      staffManagement: 'Staff Management',
+      examLogistics: 'Exam Logistics',
       management: 'Management',
       dashboard: 'Dashboard',
       examYears: 'Exam Years',
@@ -633,6 +635,8 @@ export const translations = {
     },
     nav: {
       mainMenu: 'إدارة امتحانات الأمانة',
+      staffManagement: 'إدارة الموظفين',
+      examLogistics: 'لوجستيات الامتحانات',
       management: 'الإدارة',
       dashboard: 'لوحة التحكم',
       examYears: 'السنوات الدراسية',
