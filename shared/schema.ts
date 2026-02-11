@@ -1391,6 +1391,8 @@ export const staffRoleEnum = pgEnum('staff_role', [
 export const staffProfiles = pgTable("staff_profiles", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   staffIdNumber: varchar("staff_id_number", { length: 20 }).notNull().unique(),
+  employeeId: varchar("employee_id", { length: 8 }).unique(),
+  department: varchar("department", { length: 100 }),
   firstName: varchar("first_name", { length: 100 }).notNull(),
   lastName: varchar("last_name", { length: 100 }).notNull(),
   middleName: varchar("middle_name", { length: 100 }),
@@ -1442,6 +1444,7 @@ export const insertStaffProfileSchema = createInsertSchema(staffProfiles).pick({
   fullNameArabic: true,
   photoUrl: true,
   role: true,
+  department: true,
   secondaryRoles: true,
   regionId: true,
   clusterId: true,
