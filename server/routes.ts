@@ -14222,6 +14222,85 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  app.get("/api/staff-profiles/bulk-id-cards", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const department = req.query.department as string | undefined;
+      const role = req.query.role as string | undefined;
+
+      if (!department && !role) {
+        return res.status(400).json({ message: "Please specify a department or role filter for bulk printing" });
+      }
+
+      let allProfiles = await storage.getAllStaffProfiles();
+
+      if (department) {
+        allProfiles = allProfiles.filter(p => p.department === department);
+      }
+      if (role) {
+        allProfiles = allProfiles.filter(p => p.role === role);
+      }
+
+      if (allProfiles.length === 0) {
+        return res.status(404).json({ message: "No staff profiles found matching the filter" });
+      }
+
+      const regions = await storage.getRegions();
+      const clusters = await storage.getClusters();
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers.host || 'localhost:5000';
+
+      const staffCardData = allProfiles.map(profile => {
+        const region = regions.find((r: any) => r.id === profile.regionId);
+        const cluster = clusters.find((c: any) => c.id === profile.clusterId);
+        return {
+          staffIdNumber: profile.staffIdNumber,
+          employeeId: profile.employeeId,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          middleName: profile.middleName,
+          fullNameArabic: profile.fullNameArabic,
+          role: profile.role,
+          department: profile.department,
+          regionName: region?.name,
+          clusterName: cluster?.name,
+          photoUrl: profile.photoUrl,
+          phone: profile.phone,
+          email: profile.email,
+          confirmationCode: profile.confirmationCode,
+          issueDate: profile.issueDate,
+          verifyUrl: `${protocol}://${host}/verify-staff/${profile.staffIdNumber}`,
+        };
+      });
+
+      const { generateBulkStaffIdCards } = await import('./staffIdCardService');
+      const pdfBuffer = await generateBulkStaffIdCards(staffCardData);
+
+      for (const profile of allProfiles) {
+        await storage.createStaffIdEvent({
+          staffProfileId: profile.id,
+          eventType: 'card_generated',
+          actorId: user.id,
+          details: `ID card generated via bulk print (${department ? `dept: ${department}` : ''}${role ? `role: ${role}` : ''})`,
+        });
+      }
+
+      const filterLabel = department || role || 'all';
+      const safeLabel = filterLabel.replace(/[^a-zA-Z0-9_-]/g, '_');
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="bulk-staff-ids-${safeLabel}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("Error generating bulk staff ID cards:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/staff-profiles/:id", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
@@ -14255,7 +14334,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return res.status(403).json({ message: "Access denied" });
       }
       
-      const { firstName, lastName, middleName, fullNameArabic, role, secondaryRoles, regionId, clusterId, centerId, phone, email, photoUrl } = req.body;
+      const { firstName, lastName, middleName, fullNameArabic, role, department, secondaryRoles, regionId, clusterId, centerId, phone, email, photoUrl } = req.body;
       
       if (!firstName || !lastName || !role) {
         return res.status(400).json({ message: "First name, last name, and role are required" });
@@ -14266,10 +14345,20 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const staffIdNumber = `AMS-${String(nextNum).padStart(5, '0')}`;
       
       const confirmationCode = Math.random().toString(36).substring(2, 8).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+      const generateEmployeeId = async (): Promise<string> => {
+        for (let i = 0; i < 100; i++) {
+          const eid = String(Math.floor(10000000 + Math.random() * 90000000));
+          const existing = allProfiles.find(p => p.employeeId === eid);
+          if (!existing) return eid;
+        }
+        return String(Math.floor(10000000 + Math.random() * 90000000));
+      };
+      const employeeId = await generateEmployeeId();
       
       const profile = await storage.createStaffProfile({
         firstName, lastName, middleName: middleName || null, fullNameArabic: fullNameArabic || null,
-        role, secondaryRoles: secondaryRoles || [], 
+        role, department: department || null, secondaryRoles: secondaryRoles || [], 
         regionId: regionId ? parseInt(regionId) : null, 
         clusterId: clusterId ? parseInt(clusterId) : null, 
         centerId: centerId ? parseInt(centerId) : null,
@@ -14278,6 +14367,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         status: 'created',
         userId: null,
         staffIdNumber,
+        employeeId,
         confirmationCode: confirmationCode.substring(0, 10),
         createdBy: user.id,
       });
@@ -14316,7 +14406,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const existing = await storage.getStaffProfile(id);
       if (!existing) return res.status(404).json({ message: "Staff profile not found" });
 
-      const { firstName, lastName, middleName, fullNameArabic, role, secondaryRoles, regionId, clusterId, centerId, phone, email, photoUrl } = req.body;
+      const { firstName, lastName, middleName, fullNameArabic, role, department, secondaryRoles, regionId, clusterId, centerId, phone, email, photoUrl } = req.body;
       
       const updateData: any = {};
       if (firstName !== undefined) updateData.firstName = firstName;
@@ -14324,6 +14414,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       if (middleName !== undefined) updateData.middleName = middleName;
       if (fullNameArabic !== undefined) updateData.fullNameArabic = fullNameArabic;
       if (role !== undefined) updateData.role = role;
+      if (department !== undefined) updateData.department = department || null;
       if (secondaryRoles !== undefined) updateData.secondaryRoles = secondaryRoles;
       if (regionId !== undefined) updateData.regionId = regionId ? parseInt(regionId) : null;
       if (clusterId !== undefined) updateData.clusterId = clusterId ? parseInt(clusterId) : null;
@@ -14531,14 +14622,18 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const { generateStaffIdCard } = await import('./staffIdCardService');
       const pdfBuffer = await generateStaffIdCard({
         staffIdNumber: profile.staffIdNumber,
+        employeeId: profile.employeeId,
         firstName: profile.firstName,
         lastName: profile.lastName,
         middleName: profile.middleName,
         fullNameArabic: profile.fullNameArabic,
         role: profile.role,
+        department: profile.department,
         regionName: region?.name,
         clusterName: cluster?.name,
         photoUrl: profile.photoUrl,
+        phone: profile.phone,
+        email: profile.email,
         confirmationCode: profile.confirmationCode,
         issueDate: profile.issueDate,
         verifyUrl,
@@ -14559,6 +14654,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       res.status(500).json({ message: error.message });
     }
   });
+
 
   // ===== Exam Paper Logistics & Tracking Routes =====
 

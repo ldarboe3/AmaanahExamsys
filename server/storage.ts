@@ -412,7 +412,7 @@ export interface IStorage {
   getCenterActivityLogsByType(centerId: number, activityType: string): Promise<CenterActivityLog[]>;
 
   // ===== AIITS - Staff Identity =====
-  createStaffProfile(profile: InsertStaffProfile & { staffIdNumber: string; confirmationCode: string; createdBy: string }): Promise<StaffProfile>;
+  createStaffProfile(profile: InsertStaffProfile & { staffIdNumber: string; employeeId: string; confirmationCode: string; createdBy: string }): Promise<StaffProfile>;
   getStaffProfile(id: number): Promise<StaffProfile | undefined>;
   getStaffProfileByStaffId(staffIdNumber: string): Promise<StaffProfile | undefined>;
   getAllStaffProfiles(): Promise<StaffProfile[]>;
@@ -2398,7 +2398,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ===== AIITS - Staff Identity =====
-  async createStaffProfile(profile: InsertStaffProfile & { staffIdNumber: string; confirmationCode: string; createdBy: string }): Promise<StaffProfile> {
+  async createStaffProfile(profile: InsertStaffProfile & { staffIdNumber: string; employeeId: string; confirmationCode: string; createdBy: string }): Promise<StaffProfile> {
     const [created] = await db.insert(staffProfiles).values(profile).returning();
     return created;
   }
