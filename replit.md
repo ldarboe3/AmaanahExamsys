@@ -64,8 +64,11 @@ The system is built on a robust architecture featuring a React-based frontend, a
   - **Chain of Custody**: Full tracking HQ → Region → Cluster → Center (forward) and reverse (return) with handover logging.
   - **Status Lifecycle**: 17-state progression with enforced transition rules preventing invalid status changes.
   - **Handover Logging**: Records sender/receiver staff, GPS coordinates, timestamps, direction, and notes for each custody transfer.
-  - **Direction Validation**: Enforces forward/return direction consistency with location hierarchy.
-  - **Offline Sync**: Mobile-ready API with clientEventId-based idempotency and bulk sync endpoint.
+  - **Direction Validation**: Enforces forward/return direction consistency with location hierarchy. Same-level transfers default to forward direction.
+  - **Dedicated Receive/Dispatch Workflows**: Tab-based UI with separate Receive (incoming) and Dispatch (outgoing) flows. Each includes barcode scan/lookup, packet info display, sender/receiver staff selection, location dropdowns with validation, GPS capture, and offline timestamps.
+  - **Location Validation**: Client-side validation ensures required location IDs (region, cluster, center) are selected before submission based on location type. Submit buttons disabled until valid.
+  - **Logistics Chain Visualization**: Horizontal stepper showing HQ → Region → Cluster → Center with current position highlighted, forward/return indicators per stage.
+  - **Offline Event Queue**: localStorage-based queue for offline handover capture with clientEventId-based idempotency. Sync banner shows pending count with manual sync trigger. Partial failure handling: batch sync attempted first, falls back to individual event submission, only successful events removed from queue.
   - **Dashboard Stats**: Real-time overview of packet counts by status and location type.
   - **Access Control**: super_admin, examination_admin, logistics_admin roles for packet management.
   - **Key Files**: client/src/pages/packet-tracking.tsx, shared/schema.ts (examPackets, handoverLogs), server/routes.ts (exam-packets section)
