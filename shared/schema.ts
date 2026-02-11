@@ -1460,6 +1460,101 @@ export const insertStaffIdEventSchema = createInsertSchema(staffIdEvents).pick({
   metadata: true,
 });
 
+// ============ Exam Paper Logistics & Tracking ============
+
+export const packetStatusEnum = pgEnum('packet_status', [
+  'created', 'packed', 'dispatched_to_region', 'at_region', 
+  'dispatched_to_cluster', 'at_cluster', 'dispatched_to_center', 'at_center',
+  'opened', 'administered',
+  'collected', 'returned_to_cluster', 'returned_to_region', 'returned_to_hq',
+  'completed', 'missing', 'damaged'
+]);
+
+export const locationTypeEnum = pgEnum('location_type', ['hq', 'region', 'cluster', 'center']);
+
+export const handoverDirectionEnum = pgEnum('handover_direction', ['forward', 'return']);
+
+export const examPackets = pgTable("exam_packets", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  barcode: varchar("barcode", { length: 50 }).notNull().unique(),
+  examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
+  subjectId: integer("subject_id").notNull().references(() => subjects.id),
+  grade: integer("grade").notNull(),
+  destinationCenterId: integer("destination_center_id").notNull().references(() => examCenters.id),
+  destinationRegionId: integer("destination_region_id").references(() => regions.id),
+  destinationClusterId: integer("destination_cluster_id").references(() => clusters.id),
+  paperCount: integer("paper_count").notNull().default(0),
+  status: packetStatusEnum("status").default('created').notNull(),
+  currentLocationType: locationTypeEnum("current_location_type").default('hq').notNull(),
+  currentRegionId: integer("current_region_id").references(() => regions.id),
+  currentClusterId: integer("current_cluster_id").references(() => clusters.id),
+  currentCenterId: integer("current_center_id").references(() => examCenters.id),
+  securitySealNumber: varchar("security_seal_number", { length: 100 }),
+  lastHandoverId: integer("last_handover_id"),
+  lastHandoverAt: timestamp("last_handover_at"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const handoverLogs = pgTable("handover_logs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  clientEventId: varchar("client_event_id", { length: 100 }).unique(),
+  packetId: integer("packet_id").notNull().references(() => examPackets.id),
+  senderStaffId: integer("sender_staff_id").references(() => staffProfiles.id),
+  receiverStaffId: integer("receiver_staff_id").references(() => staffProfiles.id),
+  direction: handoverDirectionEnum("direction").notNull(),
+  fromLocationType: locationTypeEnum("from_location_type").notNull(),
+  toLocationType: locationTypeEnum("to_location_type").notNull(),
+  fromRegionId: integer("from_region_id").references(() => regions.id),
+  fromClusterId: integer("from_cluster_id").references(() => clusters.id),
+  fromCenterId: integer("from_center_id").references(() => examCenters.id),
+  toRegionId: integer("to_region_id").references(() => regions.id),
+  toClusterId: integer("to_cluster_id").references(() => clusters.id),
+  toCenterId: integer("to_center_id").references(() => examCenters.id),
+  statusAtHandover: packetStatusEnum("status_at_handover").notNull(),
+  handoverTime: timestamp("handover_time").notNull().defaultNow(),
+  gpsLatitude: decimal("gps_latitude", { precision: 10, scale: 7 }),
+  gpsLongitude: decimal("gps_longitude", { precision: 10, scale: 7 }),
+  notes: text("notes"),
+  isSynced: boolean("is_synced").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertExamPacketSchema = createInsertSchema(examPackets).pick({
+  examYearId: true,
+  subjectId: true,
+  grade: true,
+  destinationCenterId: true,
+  destinationRegionId: true,
+  destinationClusterId: true,
+  paperCount: true,
+  securitySealNumber: true,
+  notes: true,
+});
+
+export const insertHandoverLogSchema = createInsertSchema(handoverLogs).pick({
+  clientEventId: true,
+  packetId: true,
+  senderStaffId: true,
+  receiverStaffId: true,
+  direction: true,
+  fromLocationType: true,
+  toLocationType: true,
+  fromRegionId: true,
+  fromClusterId: true,
+  fromCenterId: true,
+  toRegionId: true,
+  toClusterId: true,
+  toCenterId: true,
+  statusAtHandover: true,
+  handoverTime: true,
+  gpsLatitude: true,
+  gpsLongitude: true,
+  notes: true,
+});
+
 // Approved Gambian Surnames table for name validation and normalization
 export const approvedSurnameOriginEnum = pgEnum('surname_origin', ['approved_list', 'transliterated', 'fuzzy_match', 'manual']);
 
@@ -1567,3 +1662,9 @@ export type InsertStaffProfile = z.infer<typeof insertStaffProfileSchema>;
 export type StaffProfile = typeof staffProfiles.$inferSelect;
 export type InsertStaffIdEvent = z.infer<typeof insertStaffIdEventSchema>;
 export type StaffIdEvent = typeof staffIdEvents.$inferSelect;
+
+// Exam Paper Logistics Types
+export type InsertExamPacket = z.infer<typeof insertExamPacketSchema>;
+export type ExamPacket = typeof examPackets.$inferSelect;
+export type InsertHandoverLog = z.infer<typeof insertHandoverLogSchema>;
+export type HandoverLog = typeof handoverLogs.$inferSelect;
