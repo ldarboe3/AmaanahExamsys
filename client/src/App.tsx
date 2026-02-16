@@ -39,6 +39,7 @@ import Profile from "@/pages/profile";
 import SchoolProfile from "@/pages/school-profile";
 import SchoolResults from "@/pages/school-results";
 import ExamDay from "@/pages/exam-day";
+import ExamExecution from "@/pages/exam-execution";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -109,6 +110,9 @@ function AuthenticatedRoutes() {
       <Route path="/exam-scheduling" component={ExamScheduling} />
       <Route path="/exam-day">
         {() => <ProtectedRoute component={ExamDay} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "examiner"]} />}
+      </Route>
+      <Route path="/exam-execution">
+        {() => <ProtectedRoute component={ExamExecution} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "examiner"]} />}
       </Route>
       <Route path="/users">
         {() => <ProtectedRoute component={UsersPage} allowedRoles={["super_admin"]} />}

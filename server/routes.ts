@@ -15427,6 +15427,60 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ===== Exam Execution Routes =====
+
+  app.get("/api/exam-execution/my-context", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const allowedRoles = ["super_admin", "examination_admin", "logistics_admin", "examiner"];
+      if (!allowedRoles.includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      let centerId: number | null = null;
+      if (user.role === "examiner") {
+        const examinerRecord = await storage.getExaminerByUserId(user.id);
+        if (examinerRecord) {
+          const assignments = await storage.getExaminerAssignments(examinerRecord.id);
+          if (assignments.length > 0) {
+            centerId = assignments[0].centerId;
+          }
+        }
+      } else if (req.query.centerId) {
+        centerId = parseInt(req.query.centerId as string);
+      }
+
+      if (!centerId) {
+        return res.json({ center: null, schedules: [], sessions: [], subjects: [] });
+      }
+
+      const center = await storage.getExamCenter(centerId);
+      const today = new Date().toISOString().split("T")[0];
+      const schedules = await storage.getSchedulesForCenterAndDate(centerId, today);
+      const sessions = await storage.getExamSessionLogs({ centerId });
+      const subjects = await storage.getAllSubjects();
+
+      const todaySessions = sessions.filter(s => {
+        if (!s.createdAt) return false;
+        return new Date(s.createdAt).toISOString().split("T")[0] === today;
+      });
+
+      res.json({
+        center,
+        schedules: schedules.map(sch => ({
+          ...sch,
+          subject: subjects.find(sub => sub.id === sch.subjectId),
+        })),
+        sessions: todaySessions,
+        subjects,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ===== Exam Day Workflow Routes =====
 
   app.get("/api/exam-day/packet-lookup", isAuthenticated, async (req, res) => {

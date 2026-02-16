@@ -1,7 +1,7 @@
 # Amaanah Examination Management System
 
 ## Overview
-Amaanah Examination Management System is a comprehensive platform designed to manage countrywide Arabic & Islamic education examinations. Its core purpose is to streamline school registration, student enrollment, invoice generation, result processing, and the creation of bilingual PDF certificates and transcripts. The system aims to provide a robust, multi-role environment for efficient management of the entire examination lifecycle from registration to result dissemination, with a focus on ease of use, scalability, and security.
+The Amaanah Examination Management System is a comprehensive platform designed to manage countrywide Arabic & Islamic education examinations. Its primary purpose is to streamline school registration, student enrollment, invoice generation, result processing, and the creation of bilingual PDF certificates and transcripts. The system aims to provide a robust, multi-role environment for efficient management of the entire examination lifecycle from registration to result dissemination, focusing on ease of use, scalability, and security for nationwide application.
 
 ## User Preferences
 - Modern, clean, and attractive design with teal/emerald color scheme
@@ -13,107 +13,47 @@ Amaanah Examination Management System is a comprehensive platform designed to ma
 The system is built on a robust architecture featuring a React-based frontend, an Express.js and TypeScript backend, and a PostgreSQL database.
 
 ### UI/UX Decisions
-- **Modern Design System**: Fresh teal/emerald color palette with gradient accents, soft shadows, and rounded corners.
-- **Typography**: Inter font family for clean, modern text rendering; Amiri/Noto Naskh fonts for PDF generation.
-- **Animations**: Subtle fade-in, hover elevation, and smooth transitions.
-- **Card Designs**: Modern cards with gradient top borders, hover lift effects, and shadow depth.
-- **Hero Sections**: Full-viewport heroes with gradient overlays and animated text.
-- Supports both dark and light modes with automatic theme detection.
-- Full bilingual support (English/Arabic) with RTL rendering for Arabic.
+- **Modern Design System**: Features a fresh teal/emerald color palette, gradient accents, soft shadows, rounded corners, and the Inter font family. Amiri/Noto Naskh fonts are used for PDF generation.
+- **Animations**: Incorporates subtle fade-in, hover elevation, and smooth transitions.
+- **Theming**: Supports both dark and light modes with automatic theme detection.
+- **Bilingual Support**: Full English/Arabic bilingual support with RTL rendering for Arabic.
 
 ### Technical Implementations
-- **Frontend**: Developed with React and TypeScript, leveraging `shadcn/ui` for reusable components.
+- **Frontend**: Developed with React and TypeScript, utilizing `shadcn/ui` for components.
 - **Backend**: Built with Express.js and TypeScript, handling API endpoints, authentication, and business logic.
 - **Database**: PostgreSQL, managed with Drizzle ORM.
-- **PDF Generation**: Uses pdfkit (native Node.js) for Grade 6 certificates and transcripts, with Arabic text rendering via arabic-reshaper + bidi-js for proper bidirectional text handling. Shared utility in `server/arabicTextHelper.ts` centralizes Arabic text processing. Primary certificates and invoices use Puppeteer with browser pooling as fallback. QR code verification included in all certificates.
-- **Authentication**: Password-based authentication with bcrypt hashing and session management, supporting six distinct user roles: `super_admin`, `examination_admin`, `logistics_admin`, `school_admin`, `examiner`, and `candidate`.
+- **PDF Generation**: Uses `pdfkit` for Grade 6 certificates and transcripts, with advanced Arabic text rendering. Puppeteer is used as a fallback for other certificates and invoices. All certificates include QR code verification.
+- **Authentication**: Password-based authentication with bcrypt hashing and session management, supporting six distinct user roles.
 - **Email Services**: Integrated with SendGrid for reliable email delivery.
 - **File Handling**: Multer-based file uploads with object storage integration.
-- **Notification System**: Role-based in-app notifications.
-- **Website CMS**: Integrated content management system for public-facing content.
+- **Notification System**: Provides role-based in-app notifications.
 
 ### Feature Specifications
-- **School Management**: Profile management, school badge upload, invitation system for school administrators. Features authoritative Regions & Clusters validation during upload and a specific school admin credential generation process. Imported schools (via bulk JSON/CSV upload) are automatically granted complete access with `registrationFeePaid: true`, bypassing payment restrictions and providing immediate dashboard access without requiring payment of the registration fee.
-- **Student Management**: CSV import, index number generation, and a 3-tier registration navigation workflow. Includes a multi-stage student submission workflow with payment confirmation.
-  - **Surname Normalization**: Automatic validation and normalization of surnames against an approved Gambian surname list (80+ surnames with alternate spellings). Matching uses: exact lookup → diacritic normalization → fuzzy matching (Levenshtein ≤1) → transliteration for common variants (Diallo→Jallow, Cissé→Ceesay, etc.). Normalized surnames are stored at data entry and used on all official PDFs.
-- **Financial Management**: Three-tier fee structure, auto-invoice generation (including a mandatory registration fee for new schools), bank slip upload, payment confirmation, and professional PDF invoice downloads.
-- **Results & Certificates**:
-  - **Three-Tier Results Navigation**: Interactive boards for examination years and grades, leading to editable marks tables with filtering.
-  - **Editable Marks Entry**: Interactive tables with real-time auto-calculation of total marks and percentages (Admin only).
-  - **Comprehensive Results CSV Upload**: Template download, Arabic text cleaning, authoritative school/student matching, and mark validation with detailed error reporting.
-  - **Unified Certificate/Transcript Workflow**: Eligibility-based student selection, filtering, bulk generation, preview, and print functionalities. Includes gender-specific templates and QR verification.
-  - **Online Result Checker**: Public checker for candidates to search results and generate/download transcripts.
-  - **School Results Dashboard**: Read-only results view with no edit/upload capabilities. Shows student results in table format with global examination ranking (across all participating schools). Schools can download PDF reports with official Amaanah logo and address. PDF features:
-    - **Global Ranking**: Rankings calculated across all schools for the same exam year and grade (not per-school)
-    - **Arabic Final Result**: Result column displays Arabic text only (نجح for Pass, رسب for Fail)
-    - **Enhanced Readability**: Increased font sizes (12px table body, 11px headers) for better board-level review
-    - **Multi-Page Layout**: Approximately 20 student rows per page, with automatic pagination across multiple pages
-    - **Safe Filenames**: Sanitized school names with special character handling for HTTP compatibility
-  - **Result Publication Notifications**: When results are published, automatic email and in-dashboard notifications are sent to all schools with registered students for that examination. Schools without registered students are excluded from notifications.
-- **AIITS (Staff Identity & Trust System)**:
-  - **Staff Profile Management**: Create, edit, search, filter staff profiles with photo upload. Staff ID numbers auto-generated (AMS-00001 format) with confirmation codes. Includes 8-digit Employee ID (auto-generated, unique) and Department field.
-  - **ID Card Lifecycle**: Status transitions: Created → Printed → Issued → Activated → Suspended/Revoked. Full audit trail via staff_id_events table.
-  - **Staff ID Card PDF**: Portrait-oriented CR-80 format (54mm × 85.6mm) designed for MagiCard Enduro 3e printer. Two-sided card with green wave design. Front: circular photo, name (English/Arabic), role, department, Employee ID, phone, email, Code128 barcode. Back: logo, terms & conditions, signature area, issue/expiry dates, QR code, Code128 barcode. Barcodes generated via bwip-js using employeeId as data.
-  - **Bulk ID Card Printing**: API endpoint `/api/staff-profiles/bulk-id-cards` generates multi-page PDF with front+back pages for all staff filtered by department or role. Frontend UI with department selector and bulk print button.
-  - **Department Management**: 10 predefined departments (Administration, Examinations, Logistics, Finance, HR, IT & Systems, QA, Regional Operations, Training & Development, Communications). Department filter in staff table and form.
-  - **Public Staff Verification**: Public page at /verify-staff/:staffId for QR-based or manual staff identity verification.
-  - **Access Control**: HQ-only access (super_admin, examination_admin) for staff profile management.
-  - **Key Files**: server/staffIdCardService.ts, client/src/pages/staff-identity.tsx, client/src/pages/verify-staff.tsx
-- **Exam Paper Logistics & Tracking**:
-  - **Packet Management**: Create and track exam paper packets with unique barcodes (PKT-{year}-G{grade}-{subject}-C{center}-{sequence}).
-  - **Chain of Custody**: Full tracking HQ → Region → Cluster → Center (forward) and reverse (return) with handover logging.
-  - **Status Lifecycle**: 17-state progression with enforced transition rules preventing invalid status changes.
-  - **Handover Logging**: Records sender/receiver staff, GPS coordinates, timestamps, direction, and notes for each custody transfer.
-  - **Direction Validation**: Enforces forward/return direction consistency with location hierarchy. Same-level transfers default to forward direction.
-  - **Dedicated Receive/Dispatch Workflows**: Tab-based UI with separate Receive (incoming) and Dispatch (outgoing) flows. Each includes barcode scan/lookup, packet info display, sender/receiver staff selection, location dropdowns with validation, GPS capture, and offline timestamps.
-  - **Location Validation**: Client-side validation ensures required location IDs (region, cluster, center) are selected before submission based on location type. Submit buttons disabled until valid.
-  - **Logistics Chain Visualization**: Horizontal stepper showing HQ → Region → Cluster → Center with current position highlighted, forward/return indicators per stage.
-  - **Offline Event Queue**: localStorage-based queue for offline handover capture with clientEventId-based idempotency. Sync banner shows pending count with manual sync trigger. Partial failure handling: batch sync attempted first, falls back to individual event submission, only successful events removed from queue.
-  - **Dashboard Stats**: Real-time overview of packet counts by status and location type.
-  - **Access Control**: super_admin, examination_admin, logistics_admin roles for packet management.
-  - **Key Files**: client/src/pages/packet-tracking.tsx, shared/schema.ts (examPackets, handoverLogs), server/routes.ts (exam-packets section)
-- **Exam Scheduling & Time Enforcement**:
-  - **Schedule Creation**: HQ creates exam schedules (date, start time, duration, subject, grade) with publish workflow.
-  - **Pre-sync API**: Published schedules available via `/api/exam-schedules/sync` for mobile app consumption.
-  - **Start/End Recording**: Examiner devices record actual start/end times via API with automatic late detection (>5 min threshold).
-  - **Late Start Tracking**: 10 reason codes (transport_delay, weather, security_incident, etc.) with detailed notes.
-  - **Late End Tracking**: Automatic delay calculation with reason logging.
-  - **HQ Monitoring Dashboard**: Real-time view of on-time/late starts, late ends, in-progress sessions, and per-center status.
-  - **Access Control**: HQ roles (super_admin, examination_admin) for schedule management; all roles for session recording.
-  - **Key Files**: client/src/pages/exam-scheduling.tsx, server/routes.ts (exam-schedules section), shared/schema.ts (examSchedules, examSessionLogs)
-- **Exam Day Workflow (Phase 4)**:
-  - **Packet Verification via Barcode**: Scan/enter packet barcode, lookup against database, validate against assigned exam center and today's schedule.
-  - **Mismatch Detection**: Automatic warnings for center assignment mismatches, missing schedules, subject/grade discrepancies. Center-grade filtering ensures only relevant schedules are compared.
-  - **Live Video Evidence Capture**: 10-second live camera recording using MediaRecorder API (no gallery upload). Auto-stop after 10 seconds with progress indicator.
-  - **IndexedDB Offline Storage**: Video blobs stored in IndexedDB for offline capability. Sync banner shows pending count with manual sync trigger.
-  - **Object Storage Sync**: Videos uploaded to object storage via signed URLs. Partial failure handling preserves unsynchronized items.
-  - **System Flags**: Admin dashboard showing missing video evidence, early recordings (before scheduled time), and packet mismatches.
-  - **GPS & Device Logging**: Automatic GPS coordinate capture and device info logging for each verification.
-  - **Access Control**: Examiner + HQ admin roles (super_admin, examination_admin, logistics_admin) for exam day workflow. Examiners see only their own verifications.
-  - **Key Files**: client/src/pages/exam-day.tsx, server/routes.ts (exam-day section), shared/schema.ts (examPacketVerifications), server/storage.ts
-- **Administrative Tools**: Comprehensive audit logging, advanced CSV export functionalities, and role-based access control.
-- **Exam Management**: Examiner, subject, timetable, and exam center management.
-- **Website Management**: Public-facing website content management system.
-- **Past Exam Year Management**: Intelligent visibility and read-only mode for completed exam years.
+- **School Management**: Includes profile management, badge upload, invitation systems, authoritative region/cluster validation, and credential generation for school administrators. Supports bulk JSON/CSV import for schools, automatically granting access.
+- **Student Management**: Features CSV import, index number generation, a 3-tier registration workflow, and multi-stage submission with payment confirmation. Includes automatic surname normalization against an approved list of Gambian surnames for accuracy on official documents.
+- **Financial Management**: Manages a three-tier fee structure, auto-generates invoices, handles bank slip uploads, and confirms payments, offering professional PDF invoice downloads.
+- **Results & Certificates**: Offers a three-tier results navigation, editable marks entry (admin-only), comprehensive results CSV upload with validation, and a unified certificate/transcript workflow with bulk generation and QR verification. Provides an online result checker for candidates and a read-only School Results Dashboard with global ranking and PDF report downloads. Automated email and in-dashboard notifications are sent to relevant schools upon result publication.
+- **AIITS (Staff Identity & Trust System)**: Manages staff profiles, auto-generates staff IDs, handles ID card lifecycle (Created to Revoked), and supports bulk ID card printing in a CR-80 format with barcodes and QR codes. Includes a public verification page for staff identities.
+- **Exam Paper Logistics & Tracking**: Enables creation and tracking of exam paper packets with unique barcodes, implementing a chain of custody system (HQ → Region → Cluster → Center and reverse) with 17-state progression and enforced transition rules. Features handover logging with GPS coordinates, dedicated receive/dispatch workflows with location validation, and an offline event queue for data capture during connectivity loss. Provides dashboard statistics on packet counts.
+- **Exam Scheduling & Time Enforcement**: Allows HQ to create and publish exam schedules. Facilitates recording of actual exam start/end times by examiners, with automatic detection and logging of late starts and ends, including reason codes. A HQ monitoring dashboard provides real-time oversight.
+- **Exam Day Workflow (Phase 4)**: Supports packet verification via barcode scanning, mismatch detection, live video evidence capture (10-second recordings stored offline and synced to object storage), and automatic GPS/device logging for each verification. An admin dashboard flags missing evidence or mismatches.
+- **Exam Execution & Time Enforcement (Phase 5)**: Implements an HQ-controlled start time gate for exams. Examiners can record actual start/end times, with automatic late start/end detection and mandatory reason logging. Features an offline-capable countdown timer with audible alerts and session resumption capabilities.
+- **Administrative Tools**: Includes comprehensive audit logging, advanced CSV export, and role-based access control.
+- **Exam Management**: Covers examiner, subject, timetable, and exam center management.
+- **Website Management**: Provides a CMS for public-facing website content.
+- **Past Exam Year Management**: Offers intelligent visibility and read-only access for completed exam years.
 
 ### System Design Choices
-- **Modularity**: Separation of concerns for API routes, database access, authentication, and UI components.
-- **Scalability**: Designed for countrywide examinations with a multi-tenant architecture.
-- **Security**: Token-based workflows, bcrypt for password hashing, and role-based access control.
+- **Modularity**: Emphasizes separation of concerns across API routes, database access, authentication, and UI components.
+- **Scalability**: Designed to support countrywide examinations through a multi-tenant architecture.
+- **Security**: Utilizes token-based workflows, bcrypt for password hashing, and robust role-based access control.
 
 ## External Dependencies
-- **Database**: PostgreSQL (hosted on Neon)
+- **Database**: PostgreSQL
 - **ORM**: Drizzle ORM
-- **Email Service**: SendGrid (via Replit Connector)
-- **PDF Generation**: pdfkit (primary for Grade 6), Puppeteer (fallback for primary certificates)
-- **Arabic Text Processing**: arabic-reshaper + bidi-js
+- **Email Service**: SendGrid
+- **PDF Generation**: pdfkit, Puppeteer
+- **Arabic Text Processing**: arabic-reshaper, bidi-js
 - **UI Framework**: shadcn/ui
 - **Frontend Development**: React, TypeScript, Vite
 - **Backend Framework**: Express.js, TypeScript
-
-## Deployment Status
-- **TypeScript Compilation**: 0 errors (production-ready)
-- **Build Configuration**: build.mjs uses esbuild for server bundling and Vite for client
-- **Server Configuration**: Configured for DigitalOcean App Platform with PORT environment variable and 0.0.0.0 host binding
-- **ES5 Compatibility**: Map/Set iterations use Array.from() for compatibility
-- **Recent Fixes**: Function declarations converted to arrow functions, type mismatches resolved, non-existent property references removed
