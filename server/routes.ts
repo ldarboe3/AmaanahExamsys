@@ -10903,30 +10903,6 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  app.post("/api/audit-logs/sync", isAuthenticated, async (req, res) => {
-    try {
-      const { userId, userRole, action, entityType, entityId, data, clientTimestamp, deviceId, gpsLatitude, gpsLongitude } = req.body;
-      await storage.createAuditLog({
-        userId: userId || req.session.userId,
-        action,
-        entityType,
-        entityId: entityId ? String(entityId) : null,
-        newData: data || null,
-        ipAddress: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || null,
-        userAgent: req.headers["user-agent"] || null,
-        userRole: userRole || null,
-        deviceId: deviceId || null,
-        gpsLatitude: gpsLatitude || null,
-        gpsLongitude: gpsLongitude || null,
-        clientTimestamp: clientTimestamp ? new Date(clientTimestamp) : null,
-        actionSource: "offline_sync",
-      });
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
   // ============ Notifications API ============
   app.get("/api/notifications", isAuthenticated, async (req, res) => {
     try {

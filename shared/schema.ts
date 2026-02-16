@@ -11,7 +11,6 @@ import {
   decimal,
   date,
   pgEnum,
-  doublePrecision,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -603,12 +602,6 @@ export const auditLogs = pgTable("audit_logs", {
   newData: jsonb("new_data"),
   ipAddress: varchar("ip_address", { length: 50 }),
   userAgent: varchar("user_agent", { length: 500 }),
-  userRole: varchar("user_role", { length: 50 }),
-  deviceId: varchar("device_id", { length: 100 }),
-  gpsLatitude: doublePrecision("gps_latitude"),
-  gpsLongitude: doublePrecision("gps_longitude"),
-  clientTimestamp: timestamp("client_timestamp"),
-  actionSource: varchar("action_source", { length: 20 }).default("server"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1109,12 +1102,6 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).pick({
   newData: true,
   ipAddress: true,
   userAgent: true,
-  userRole: true,
-  deviceId: true,
-  gpsLatitude: true,
-  gpsLongitude: true,
-  clientTimestamp: true,
-  actionSource: true,
 });
 
 export const insertSchoolExamRegistrationSchema = createInsertSchema(schoolExamRegistrations).pick({

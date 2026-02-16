@@ -9,16 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SyncStatusBar } from "@/components/sync-status-bar";
-import {
-  useOnlineStatus,
-  useGeoLocation,
-  useAutoSync,
-  appendAuditEvent,
-  saveSessionState,
-  loadSessionState,
-  clearSessionState,
-} from "@/lib/offline";
 import {
   Search,
   ScanBarcode,
@@ -38,7 +28,6 @@ import {
   Eye,
   WifiOff,
   Flag,
-  RotateCcw,
 } from "lucide-react";
 
 const DB_NAME = "examDayVideos";
@@ -98,14 +87,36 @@ const deleteVideoFromDB = async (id: string) => {
   });
 };
 
-const CAMERA_SESSION_KEY = "examday_camera_session";
+function useOnlineStatus() {
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
+  return isOnline;
+}
+
+function useGeoLocation() {
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => setCoords(null)
+      );
+    }
+  }, []);
+  return coords;
+}
 
 export default function ExamDayPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isOnline = useOnlineStatus();
   const gps = useGeoLocation();
-  const { isSyncing: autoSyncing, triggerSync } = useAutoSync();
 
   const [activeTab, setActiveTab] = useState("scan");
   const [barcode, setBarcode] = useState("");
@@ -131,15 +142,6 @@ export default function ExamDayPage() {
 
   useEffect(() => {
     getAllVideos().then(setVideoQueue).catch(() => {});
-    loadSessionState<{ verificationId: number; packetBarcode: string }>(CAMERA_SESSION_KEY)
-      .then((session) => {
-        if (session?.verificationId) {
-          setVerificationId(session.verificationId);
-          setBarcode(session.packetBarcode || "");
-          toast({ title: "Session restored", description: "Previous verification session recovered. Please recapture video evidence." });
-        }
-      })
-      .catch(() => {});
   }, []);
 
   const { data: verifications = [] } = useQuery({
@@ -185,30 +187,10 @@ export default function ExamDayPage() {
       setVerificationId(verification.id);
       queryClient.invalidateQueries({ queryKey: ["/api/exam-day/verifications"] });
       toast({ title: "Packet verified", description: "Verification recorded. Now capture envelope opening video." });
-
-      appendAuditEvent({
-        userId: user?.id || "",
-        userRole: user?.role || "",
-        action: "packet_verification",
-        entityType: "exam_day_verification",
-        entityId: String(verification.id),
-        data: { packetId: lookupResult.packet.id, isMatch: lookupResult.mismatchReasons.length === 0 },
-        clientTimestamp: new Date().toISOString(),
-        gpsLatitude: gps?.lat ?? null,
-        gpsLongitude: gps?.lng ?? null,
-      }).catch(() => {});
-
-      saveSessionState(CAMERA_SESSION_KEY, {
-        verificationId: verification.id,
-        packetBarcode: barcode,
-        startedAt: new Date().toISOString(),
-      }).catch(() => {});
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
-
-  const cameraRetryCountRef = useRef(0);
 
   const startCamera = useCallback(async () => {
     try {
@@ -223,16 +205,9 @@ export default function ExamDayPage() {
         videoRef.current.play();
       }
       setCameraActive(true);
-      cameraRetryCountRef.current = 0;
     } catch (err: any) {
-      cameraRetryCountRef.current++;
-      if (cameraRetryCountRef.current < 3) {
-        setTimeout(() => startCamera(), 1500);
-        setCameraError(`Camera access failed. Retrying... (attempt ${cameraRetryCountRef.current}/3)`);
-      } else {
-        setCameraError("Camera access denied. Please allow camera permissions and try again.");
-        toast({ title: "Camera error", description: err.message, variant: "destructive" });
-      }
+      setCameraError("Camera access denied. Please allow camera permissions.");
+      toast({ title: "Camera error", description: err.message, variant: "destructive" });
     }
   }, [toast]);
 
@@ -314,20 +289,6 @@ export default function ExamDayPage() {
     setVideoBlob(null);
     stopCamera();
 
-    appendAuditEvent({
-      userId: user?.id || "",
-      userRole: user?.role || "",
-      action: "video_evidence_saved",
-      entityType: "exam_day_video",
-      entityId: item.id,
-      data: { verificationId, recordedBeforeScheduled, durationSec: recordingTime },
-      clientTimestamp: now,
-      gpsLatitude: gps?.lat ?? null,
-      gpsLongitude: gps?.lng ?? null,
-    }).catch(() => {});
-
-    clearSessionState(CAMERA_SESSION_KEY).catch(() => {});
-
     if (recordedBeforeScheduled) {
       toast({ title: "Early recording flagged", description: "Video was recorded before the scheduled exam time", variant: "destructive" });
     } else {
@@ -338,7 +299,7 @@ export default function ExamDayPage() {
     setVerificationId(null);
     setBarcode("");
     setNotes("");
-  }, [videoBlob, verificationId, lookupResult, recordingTime, stopCamera, toast, user, gps]);
+  }, [videoBlob, verificationId, lookupResult, recordingTime, stopCamera, toast]);
 
   const syncVideo = useCallback(async (item: VideoQueueItem) => {
     try {
@@ -400,9 +361,19 @@ export default function ExamDayPage() {
           <h1 className="text-xl font-bold" data-testid="text-page-title">Exam Day Workflow</h1>
           <p className="text-sm text-muted-foreground">Verify packets and capture envelope opening evidence</p>
         </div>
+        <div className="flex items-center gap-2">
+          {!isOnline && (
+            <Badge variant="destructive" data-testid="badge-offline">
+              <WifiOff className="w-3 h-3 mr-1" /> Offline
+            </Badge>
+          )}
+          {pendingVideos.length > 0 && (
+            <Badge variant="secondary" data-testid="badge-pending-count">
+              {pendingVideos.length} pending
+            </Badge>
+          )}
+        </div>
       </div>
-
-      <SyncStatusBar isSyncing={isSyncing || autoSyncing} onSync={handleSyncAll} />
 
       {pendingVideos.length > 0 && (
         <Card className="border-amber-200 dark:border-amber-800">
