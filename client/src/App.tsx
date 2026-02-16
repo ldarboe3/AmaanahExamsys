@@ -67,6 +67,7 @@ import StaffIdentity from "@/pages/staff-identity";
 import VerifyStaff from "@/pages/verify-staff";
 import PacketTracking from "@/pages/packet-tracking";
 import ExamScheduling from "@/pages/exam-scheduling";
+import StudentAttendance from "@/pages/student-attendance";
 
 function LoadingScreen() {
   return (
@@ -113,6 +114,9 @@ function AuthenticatedRoutes() {
       </Route>
       <Route path="/exam-execution">
         {() => <ProtectedRoute component={ExamExecution} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "examiner"]} />}
+      </Route>
+      <Route path="/student-attendance">
+        {() => <ProtectedRoute component={StudentAttendance} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "examiner"]} />}
       </Route>
       <Route path="/users">
         {() => <ProtectedRoute component={UsersPage} allowedRoles={["super_admin"]} />}

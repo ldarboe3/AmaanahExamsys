@@ -36,6 +36,7 @@ import {
   Timer,
   ScanBarcode,
   Play,
+  UserCheck2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -68,6 +69,7 @@ const examLogisticsDefs: MenuItemDef[] = [
   { key: "examScheduling", url: "/exam-scheduling", icon: Timer },
   { key: "examDay", url: "/exam-day", icon: ScanBarcode },
   { key: "examExecution", url: "/exam-execution", icon: Play },
+  { key: "studentAttendance", url: "/student-attendance", icon: UserCheck2 },
 ];
 
 const schoolAdminMenuDefs: MenuItemDef[] = [

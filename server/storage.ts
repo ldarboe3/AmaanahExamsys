@@ -249,6 +249,8 @@ export interface IStorage {
   getAttendanceByStudent(studentId: number): Promise<AttendanceRecord[]>;
   getAttendanceByCenter(centerId: number, subjectId: number): Promise<AttendanceRecord[]>;
   updateAttendanceRecord(id: number, record: Partial<InsertAttendanceRecord>): Promise<AttendanceRecord | undefined>;
+  getAttendanceByCenterAndExamYear(centerId: number, examYearId: number): Promise<AttendanceRecord[]>;
+  findAttendanceByOfflineId(offlineId: string): Promise<AttendanceRecord | undefined>;
 
   // Malpractice Reports
   createMalpracticeReport(report: InsertMalpracticeReport): Promise<MalpracticeReport>;
@@ -1475,6 +1477,17 @@ export class DatabaseStorage implements IStorage {
   async updateAttendanceRecord(id: number, record: Partial<InsertAttendanceRecord>): Promise<AttendanceRecord | undefined> {
     const [updated] = await db.update(attendanceRecords).set(record).where(eq(attendanceRecords.id, id)).returning();
     return updated;
+  }
+
+  async getAttendanceByCenterAndExamYear(centerId: number, examYearId: number): Promise<AttendanceRecord[]> {
+    return db.select().from(attendanceRecords).where(
+      and(eq(attendanceRecords.centerId, centerId), eq(attendanceRecords.examYearId, examYearId))
+    );
+  }
+
+  async findAttendanceByOfflineId(offlineId: string): Promise<AttendanceRecord | undefined> {
+    const [record] = await db.select().from(attendanceRecords).where(eq(attendanceRecords.offlineId, offlineId)).limit(1);
+    return record;
   }
 
   // Malpractice Reports

@@ -15678,6 +15678,177 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ===== Student Attendance Scanning Routes =====
+
+  app.get("/api/attendance-scan/context", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const allowedRoles = ["super_admin", "examination_admin", "logistics_admin", "examiner"];
+      if (!allowedRoles.includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      let centerId: number | null = null;
+      if (user.role === "examiner") {
+        const examinerRecord = await storage.getExaminerByUserId(user.id);
+        if (examinerRecord) {
+          const assignments = await storage.getExaminerAssignments(examinerRecord.id);
+          if (assignments.length > 0) {
+            centerId = assignments[0].centerId;
+          }
+        }
+      } else if (req.query.centerId) {
+        centerId = parseInt(req.query.centerId as string);
+      }
+
+      if (!centerId) {
+        return res.json({ center: null, schedules: [], subjects: [], students: [], existingScans: [] });
+      }
+
+      const center = await storage.getExamCenter(centerId);
+      const today = new Date().toISOString().split("T")[0];
+      const schedules = await storage.getSchedulesForCenterAndDate(centerId, today);
+      const subjects = await storage.getAllSubjects();
+
+      const activeExamYear = await storage.getActiveExamYear();
+      let students: any[] = [];
+      let existingScans: any[] = [];
+      if (activeExamYear) {
+        const allStudents = await storage.getStudentsByExamYear(activeExamYear.id);
+        const centerAssignments = await storage.getCenterAssignmentsByCenter(centerId, activeExamYear.id);
+        const assignedSchoolIds = centerAssignments.map((a: any) => a.schoolId);
+        students = allStudents.filter(s => assignedSchoolIds.includes(s.schoolId) && s.indexNumber);
+        existingScans = await storage.getAttendanceByCenterAndExamYear(centerId, activeExamYear.id);
+      }
+
+      res.json({
+        center,
+        schedules: schedules.map(sch => ({
+          ...sch,
+          subject: subjects.find(sub => sub.id === sch.subjectId),
+        })),
+        subjects,
+        students: students.map(s => ({
+          id: s.id,
+          indexNumber: s.indexNumber,
+          firstName: s.firstName,
+          lastName: s.lastName,
+          grade: s.grade,
+          schoolId: s.schoolId,
+        })),
+        existingScans: existingScans.map(sc => ({
+          id: sc.id,
+          studentId: sc.studentId,
+          subjectId: sc.subjectId,
+          offlineId: sc.offlineId,
+          scannedBarcode: sc.scannedBarcode,
+          checkInTime: sc.checkInTime,
+        })),
+        examYearId: activeExamYear?.id,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/attendance-scan/sync", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const allowedRoles = ["super_admin", "examination_admin", "logistics_admin", "examiner"];
+      if (!allowedRoles.includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      let allowedCenterId: number | null = null;
+      if (user.role === "examiner") {
+        const examinerRecord = await storage.getExaminerByUserId(user.id);
+        if (examinerRecord) {
+          const assignments = await storage.getExaminerAssignments(examinerRecord.id);
+          if (assignments.length > 0) {
+            allowedCenterId = assignments[0].centerId;
+          }
+        }
+        if (!allowedCenterId) {
+          return res.status(403).json({ message: "Not assigned to any exam center" });
+        }
+      }
+
+      const { records } = req.body;
+      if (!Array.isArray(records) || records.length === 0) {
+        return res.status(400).json({ message: "Records array required" });
+      }
+
+      const results: { offlineId: string; status: "created" | "duplicate" | "error"; id?: number; error?: string }[] = [];
+
+      for (const rec of records) {
+        try {
+          if (allowedCenterId && rec.centerId !== allowedCenterId) {
+            results.push({ offlineId: rec.offlineId, status: "error", error: "Center mismatch with assignment" });
+            continue;
+          }
+
+          if (rec.offlineId) {
+            const existing = await storage.findAttendanceByOfflineId(rec.offlineId);
+            if (existing) {
+              results.push({ offlineId: rec.offlineId, status: "duplicate", id: existing.id });
+              continue;
+            }
+          }
+
+          const created = await storage.createAttendanceRecord({
+            studentId: rec.studentId,
+            examYearId: rec.examYearId,
+            subjectId: rec.subjectId,
+            centerId: rec.centerId,
+            isPresent: true,
+            checkInTime: rec.checkInTime ? new Date(rec.checkInTime) : new Date(),
+            recordedBy: user.id,
+            scannedBarcode: rec.scannedBarcode,
+            offlineId: rec.offlineId,
+            deviceInfo: rec.deviceInfo,
+            gpsLatitude: rec.gpsLatitude?.toString(),
+            gpsLongitude: rec.gpsLongitude?.toString(),
+          });
+          results.push({ offlineId: rec.offlineId, status: "created", id: created.id });
+        } catch (err: any) {
+          results.push({ offlineId: rec.offlineId, status: "error", error: err.message });
+        }
+      }
+
+      res.json({ results });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/attendance-scan/records", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const allowedRoles = ["super_admin", "examination_admin", "logistics_admin", "examiner"];
+      if (!allowedRoles.includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const centerId = parseInt(req.query.centerId as string);
+      const subjectId = parseInt(req.query.subjectId as string);
+
+      if (!centerId || !subjectId) {
+        return res.status(400).json({ message: "centerId and subjectId required" });
+      }
+
+      const records = await storage.getAttendanceByCenter(centerId, subjectId);
+      res.json(records);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }
 
