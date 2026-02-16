@@ -442,6 +442,11 @@ export const attendanceRecords = pgTable("attendance_records", {
   checkInTime: timestamp("check_in_time"),
   notes: text("notes"),
   recordedBy: varchar("recorded_by").references(() => users.id),
+  scannedBarcode: varchar("scanned_barcode", { length: 50 }),
+  offlineId: varchar("offline_id", { length: 100 }),
+  deviceInfo: text("device_info"),
+  gpsLatitude: decimal("gps_latitude", { precision: 10, scale: 7 }),
+  gpsLongitude: decimal("gps_longitude", { precision: 10, scale: 7 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1064,6 +1069,11 @@ export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords
   checkInTime: true,
   notes: true,
   recordedBy: true,
+  scannedBarcode: true,
+  offlineId: true,
+  deviceInfo: true,
+  gpsLatitude: true,
+  gpsLongitude: true,
 });
 
 export const insertMalpracticeReportSchema = createInsertSchema(malpracticeReports).pick({
