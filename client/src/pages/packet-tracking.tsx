@@ -32,6 +32,15 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { SyncStatusBar } from "@/components/sync-status-bar";
+import {
+  useOnlineStatus,
+  useGeoLocation,
+  useAutoSync,
+  appendAuditEvent,
+  getDeviceId,
+} from "@/lib/offline";
+import { useAuth } from "@/hooks/useAuth";
 import type { ExamPacket, ExamYear, Subject, ExamCenter, Region, Cluster, StaffProfile } from "@shared/schema";
 
 const packetFormSchema = z.object({
@@ -273,38 +282,6 @@ function LogisticsChainVisualization({ packet, handoverLogs }: { packet: ExamPac
   );
 }
 
-function useGeoLocation() {
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => setCoords(null)
-      );
-    }
-  }, []);
-
-  return coords;
-}
-
-function useOnlineStatus() {
-  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
-
-  return isOnline;
-}
-
 function LocationDropdowns({
   locationType,
   regionId,
@@ -407,6 +384,8 @@ function OfflineBanner({ queueCount, onSync, isSyncing }: { queueCount: number; 
 
 export default function PacketTrackingPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { isSyncing: autoSyncing, triggerSync: autoTriggerSync } = useAutoSync();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedPacket, setSelectedPacket] = useState<ExamPacket | null>(null);
@@ -642,6 +621,18 @@ export default function PacketTrackingPage() {
   };
 
   const submitHandover = async (payload: OfflineHandoverEvent) => {
+    appendAuditEvent({
+      userId: user?.id || "",
+      userRole: user?.role || "",
+      action: `packet_${payload.direction}`,
+      entityType: "exam_packet_handover",
+      entityId: String(payload.packetId),
+      data: { direction: payload.direction, fromLocType: payload.fromLocationType, toLocType: payload.toLocationType, status: payload.statusAtHandover },
+      clientTimestamp: payload.clientTimestamp,
+      gpsLatitude: payload.gpsLatitude,
+      gpsLongitude: payload.gpsLongitude,
+    }).catch(() => {});
+
     if (!isOnline) {
       const queue = getOfflineQueue();
       queue.push(payload);

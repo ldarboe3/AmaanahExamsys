@@ -8,6 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SyncStatusBar } from "@/components/sync-status-bar";
+import {
+  useOnlineStatus,
+  useGeoLocation,
+  useAutoSync,
+  appendAuditEvent,
+  registerSyncHandler,
+  getDeviceId,
+} from "@/lib/offline";
 import {
   ScanBarcode,
   CheckCircle2,
@@ -107,18 +116,6 @@ const updateScanStatus = async (id: string, status: ScanRecord["syncStatus"]) =>
   });
 };
 
-function useOnlineStatus() {
-  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
-  useEffect(() => {
-    const on = () => setIsOnline(true);
-    const off = () => setIsOnline(false);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
-    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
-  }, []);
-  return isOnline;
-}
-
 function getDeviceInfo(): string {
   return `${navigator.userAgent.substring(0, 100)}`;
 }
@@ -129,6 +126,8 @@ export default function StudentAttendance() {
   const { user } = useAuth();
   const { toast } = useToast();
   const isOnline = useOnlineStatus();
+  const gpsCoords = useGeoLocation();
+  const { isSyncing, triggerSync } = useAutoSync();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
@@ -138,8 +137,6 @@ export default function StudentAttendance() {
   const [feedbackStudentName, setFeedbackStudentName] = useState("");
   const [localScans, setLocalScans] = useState<ScanRecord[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const ctx = useQuery<{
@@ -153,15 +150,6 @@ export default function StudentAttendance() {
     queryKey: ["/api/attendance-scan/context"],
     refetchInterval: 120000,
   });
-
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setGpsCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => {}
-      );
-    }
-  }, []);
 
   useEffect(() => {
     getAllScans().then((scans) => {
@@ -245,8 +233,20 @@ export default function StudentAttendance() {
     setLocalScans(prev => [newScan, ...prev]);
     setPendingCount(prev => prev + 1);
 
+    appendAuditEvent({
+      userId: user?.id || "",
+      userRole: user?.role || "",
+      action: "attendance_scan",
+      entityType: "attendance",
+      entityId: scanId,
+      data: { studentId: student.id, indexNumber: trimmed, subjectId: selectedSubjectId, centerId: ctx.data.center.id },
+      clientTimestamp: newScan.checkInTime,
+      gpsLatitude: gpsCoords?.lat ?? null,
+      gpsLongitude: gpsCoords?.lng ?? null,
+    }).catch(() => {});
+
     showFeedback("success", `${student.firstName} ${student.lastName}`, student.indexNumber);
-  }, [ctx.data, selectedSubjectId, isAlreadyScanned, gpsCoords, showFeedback]);
+  }, [ctx.data, selectedSubjectId, isAlreadyScanned, gpsCoords, showFeedback, user]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -312,7 +312,7 @@ export default function StudentAttendance() {
     if (!isOnline || pendingCount === 0) return;
     const timer = setTimeout(() => {
       syncScans();
-    }, 5000);
+    }, 3000);
     return () => clearTimeout(timer);
   }, [isOnline, pendingCount, syncScans]);
 
@@ -341,29 +341,14 @@ export default function StudentAttendance() {
 
   return (
     <div className="flex flex-col h-full max-w-2xl mx-auto p-4 gap-4">
+      <SyncStatusBar isSyncing={isSyncing} onSync={syncScans} />
+
       {pendingCount > 0 && (
         <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800" data-testid="banner-pending-sync">
-          {isOnline ? (
-            <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
-              <Upload className="w-4 h-4" />
-              <span>{pendingCount} scan{pendingCount !== 1 ? "s" : ""} pending sync</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
-              <WifiOff className="w-4 h-4" />
-              <span>{pendingCount} scan{pendingCount !== 1 ? "s" : ""} saved offline</span>
-            </div>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!isOnline || isSyncing}
-            onClick={syncScans}
-            data-testid="button-sync-scans"
-          >
-            <RefreshCw className={`w-3 h-3 mr-1 ${isSyncing ? "animate-spin" : ""}`} />
-            Sync
-          </Button>
+          <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
+            <Upload className="w-4 h-4" />
+            <span>{pendingCount} scan{pendingCount !== 1 ? "s" : ""} {isOnline ? "pending sync" : "saved offline"}</span>
+          </div>
         </div>
       )}
 
@@ -373,10 +358,6 @@ export default function StudentAttendance() {
             <MapPin className="w-4 h-4 text-muted-foreground" />
             {ctx.data.center.name}
           </CardTitle>
-          <Badge variant={isOnline ? "default" : "secondary"}>
-            {isOnline ? <Wifi className="w-3 h-3 mr-1" /> : <WifiOff className="w-3 h-3 mr-1" />}
-            {isOnline ? "Online" : "Offline"}
-          </Badge>
         </CardHeader>
       </Card>
 
