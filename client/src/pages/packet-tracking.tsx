@@ -28,7 +28,7 @@ import {
   Search, Plus, Package, MapPin, ArrowRight, ArrowLeft,
   Clock, CheckCircle, AlertTriangle, Truck, Building2,
   Eye, BarChart3, RefreshCw, Send, ArrowDownRight, ArrowUpRight,
-  Download, Upload, WifiOff, Wifi,
+  Download, Upload, WifiOff, Wifi, Lock, RotateCcw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -59,6 +59,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   at_center: { label: "At Center", variant: "default", icon: Building2 },
   opened: { label: "Opened", variant: "outline", icon: Package },
   administered: { label: "Administered", variant: "outline", icon: CheckCircle },
+  sealed: { label: "Sealed", variant: "default", icon: Lock },
   collected: { label: "Collected", variant: "default", icon: ArrowUpRight },
   returned_to_cluster: { label: "Ret. Cluster", variant: "default", icon: ArrowLeft },
   returned_to_region: { label: "Ret. Region", variant: "default", icon: ArrowLeft },
@@ -437,6 +438,23 @@ export default function PacketTrackingPage() {
   const [dispatchNotes, setDispatchNotes] = useState("");
   const [dispatchLookupLoading, setDispatchLookupLoading] = useState(false);
 
+  const [sealBarcode, setSealBarcode] = useState("");
+  const [sealPacket, setSealPacket] = useState<ExamPacket | null>(null);
+  const [sealNumber, setSealNumber] = useState("");
+  const [sealStaffId, setSealStaffId] = useState<number | null>(null);
+  const [sealLookupLoading, setSealLookupLoading] = useState(false);
+  const [sealSubmitting, setSealSubmitting] = useState(false);
+
+  const [returnBarcode, setReturnBarcode] = useState("");
+  const [returnPacket, setReturnPacket] = useState<ExamPacket | null>(null);
+  const [returnLocationType, setReturnLocationType] = useState("cluster");
+  const [returnRegionId, setReturnRegionId] = useState<number | null>(null);
+  const [returnClusterId, setReturnClusterId] = useState<number | null>(null);
+  const [returnSenderId, setReturnSenderId] = useState<number | null>(null);
+  const [returnReceiverId, setReturnReceiverId] = useState<number | null>(null);
+  const [returnNotes, setReturnNotes] = useState("");
+  const [returnLookupLoading, setReturnLookupLoading] = useState(false);
+
   const [offlineQueue, setOfflineQueue] = useState<OfflineHandoverEvent[]>(getOfflineQueue());
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -694,6 +712,124 @@ export default function PacketTrackingPage() {
       setDispatchRegionId(null);
       setDispatchClusterId(null);
       setDispatchCenterId(null);
+    }
+  };
+
+  const handleSealLookup = async () => {
+    setSealLookupLoading(true);
+    const pkt = await lookupBarcode(sealBarcode);
+    setSealPacket(pkt);
+    setSealLookupLoading(false);
+  };
+
+  const handleSealSubmit = async () => {
+    if (!sealPacket || !sealNumber.trim()) return;
+    setSealSubmitting(true);
+    try {
+      await apiRequest("POST", `/api/exam-packets/${sealPacket.id}/seal`, {
+        returnSealNumber: sealNumber.trim(),
+        sealedByStaffId: sealStaffId,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets/dashboard/stats"] });
+      toast({ title: "Packet sealed", description: `Packet ${sealPacket.barcode} sealed with #${sealNumber}` });
+      setSealPacket(null);
+      setSealBarcode("");
+      setSealNumber("");
+      setSealStaffId(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSealSubmitting(false);
+    }
+  };
+
+  const handleReturnLookup = async () => {
+    setReturnLookupLoading(true);
+    const pkt = await lookupBarcode(returnBarcode);
+    if (pkt) {
+      const returnableStatuses = ["sealed", "collected", "returned_to_cluster", "returned_to_region"];
+      if (!returnableStatuses.includes(pkt.status)) {
+        toast({ title: "Cannot dispatch", description: `Packet is in '${statusConfig[pkt.status]?.label || pkt.status}' status. Must be sealed first.`, variant: "destructive" });
+        setReturnPacket(null);
+      } else {
+        setReturnPacket(pkt);
+        const nextDest = getNextReturnDestination(pkt.currentLocationType, pkt.status);
+        setReturnLocationType(nextDest);
+      }
+    } else {
+      setReturnPacket(null);
+    }
+    setReturnLookupLoading(false);
+  };
+
+  const getNextReturnDestination = (currentLoc: string, status: string): string => {
+    if (status === "sealed" && currentLoc === "center") return "cluster";
+    if (currentLoc === "center") return "cluster";
+    if (currentLoc === "cluster") return "region";
+    if (currentLoc === "region") return "hq";
+    return "hq";
+  };
+
+  const getReturnStatus = (currentStatus: string, toLocationType: string): string => {
+    if (currentStatus === "sealed") return "collected";
+    if (toLocationType === "cluster") return "returned_to_cluster";
+    if (toLocationType === "region") return "returned_to_region";
+    if (toLocationType === "hq") return "returned_to_hq";
+    return "collected";
+  };
+
+  const getReturnStepLabel = (currentStatus: string, currentLoc: string): string => {
+    if (currentStatus === "sealed") return "Collect from Center";
+    if (currentLoc === "center" || currentLoc === "cluster") return `Dispatch to ${locationLabels[getNextReturnDestination(currentLoc, currentStatus)] || "next"}`;
+    if (currentLoc === "region") return "Dispatch to HQ";
+    return "Dispatch";
+  };
+
+  const returnLocationValid = isLocationSelectionValid(returnLocationType, returnRegionId, returnClusterId, null);
+
+  const handleReturnSubmit = async () => {
+    if (!returnPacket) return;
+    if (returnLocationType !== "hq" && !returnLocationValid) {
+      toast({ title: "Missing location", description: "Please select all required location fields", variant: "destructive" });
+      return;
+    }
+
+    const direction: "forward" | "return" = "return";
+    const statusAtHandover = getReturnStatus(returnPacket.status, returnLocationType);
+    const now = new Date().toISOString();
+
+    const payload: OfflineHandoverEvent = {
+      packetId: returnPacket.id,
+      clientEventId: crypto.randomUUID(),
+      clientTimestamp: now,
+      handoverTime: now,
+      senderStaffId: returnSenderId,
+      receiverStaffId: returnReceiverId,
+      direction,
+      fromLocationType: returnPacket.currentLocationType,
+      toLocationType: returnLocationType,
+      fromRegionId: returnPacket.currentRegionId ?? null,
+      fromClusterId: returnPacket.currentClusterId ?? null,
+      fromCenterId: returnPacket.currentCenterId ?? null,
+      toRegionId: returnRegionId,
+      toClusterId: returnClusterId,
+      toCenterId: null,
+      statusAtHandover,
+      notes: returnNotes,
+      gpsLatitude: gps?.lat ?? null,
+      gpsLongitude: gps?.lng ?? null,
+    };
+
+    const ok = await submitHandover(payload);
+    if (ok) {
+      setReturnPacket(null);
+      setReturnBarcode("");
+      setReturnNotes("");
+      setReturnSenderId(null);
+      setReturnReceiverId(null);
+      setReturnRegionId(null);
+      setReturnClusterId(null);
     }
   };
 
@@ -1038,6 +1174,9 @@ export default function PacketTrackingPage() {
           <TabsTrigger value="dispatch" data-testid="tab-dispatch">
             <Upload className="w-4 h-4 mr-1" /> Dispatch
           </TabsTrigger>
+          <TabsTrigger value="post-exam" data-testid="tab-post-exam">
+            <RotateCcw className="w-4 h-4 mr-1" /> Post-Exam Return
+          </TabsTrigger>
           <TabsTrigger value="packets" data-testid="tab-packets">
             <Package className="w-4 h-4 mr-1" /> Packets
           </TabsTrigger>
@@ -1055,6 +1194,9 @@ export default function PacketTrackingPage() {
               </Button>
               <Button onClick={() => setActiveTab("dispatch")} data-testid="button-go-dispatch">
                 <Upload className="w-4 h-4 mr-1" /> Dispatch Packet
+              </Button>
+              <Button onClick={() => setActiveTab("post-exam")} data-testid="button-go-post-exam">
+                <RotateCcw className="w-4 h-4 mr-1" /> Post-Exam Return
               </Button>
               <Button variant="outline" onClick={() => setActiveTab("packets")} data-testid="button-go-packets">
                 <Package className="w-4 h-4 mr-1" /> View All Packets
@@ -1281,6 +1423,220 @@ export default function PacketTrackingPage() {
                     <Upload className="w-4 h-4 mr-1" /> Confirm Dispatch
                   </Button>
                   {!dispatchLocationValid && dispatchLocationType !== "hq" && (
+                    <p className="text-xs text-destructive">Please select all required location fields above</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="post-exam" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2"><Lock className="w-4 h-4" /> Step 1: Seal Packet</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs text-muted-foreground">After exam administration, scan the packet barcode and enter the return seal number to seal it before dispatch.</p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Scan or enter barcode..."
+                  value={sealBarcode}
+                  onChange={(e) => setSealBarcode(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSealLookup(); }}
+                  className="text-lg"
+                  data-testid="input-seal-barcode"
+                />
+                <Button onClick={handleSealLookup} disabled={sealLookupLoading || !sealBarcode.trim()} data-testid="button-seal-lookup">
+                  {sealLookupLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                </Button>
+              </div>
+
+              {sealPacket && (
+                <div className="space-y-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div><span className="text-muted-foreground block">Barcode</span><span className="font-medium" data-testid="text-seal-barcode">{sealPacket.barcode}</span></div>
+                        <div><span className="text-muted-foreground block">Subject</span><span>{getSubjectLabel(sealPacket.subjectId)}</span></div>
+                        <div><span className="text-muted-foreground block">Grade</span><span>{sealPacket.grade}</span></div>
+                        <div><span className="text-muted-foreground block">Status</span><StatusBadge status={sealPacket.status} /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {sealPacket.status !== "administered" ? (
+                    <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md p-3 text-sm text-amber-800 dark:text-amber-200" data-testid="text-seal-warning">
+                      <AlertTriangle className="w-4 h-4 inline mr-1" />
+                      Packet must be in "Administered" status to seal. Current status: {statusConfig[sealPacket.status]?.label || sealPacket.status}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium">Return Seal Number *</label>
+                        <Input
+                          value={sealNumber}
+                          onChange={(e) => setSealNumber(e.target.value)}
+                          placeholder="Enter seal number..."
+                          data-testid="input-seal-number"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Sealed By</label>
+                        <Select value={sealStaffId?.toString() || ""} onValueChange={(v) => setSealStaffId(v ? parseInt(v) : null)}>
+                          <SelectTrigger data-testid="select-seal-staff"><SelectValue placeholder="Select staff member" /></SelectTrigger>
+                          <SelectContent>
+                            {staffProfiles.map((s: StaffProfile) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>{s.firstName} {s.lastName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        className="w-full"
+                        onClick={handleSealSubmit}
+                        disabled={sealSubmitting || !sealNumber.trim()}
+                        data-testid="button-seal-submit"
+                      >
+                        <Lock className="w-4 h-4 mr-1" /> {sealSubmitting ? "Sealing..." : "Confirm Seal"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2"><RotateCcw className="w-4 h-4" /> Step 2: Return Dispatch</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs text-muted-foreground">Dispatch sealed packets back up the chain: Center to Cluster, Cluster to Region, Region to HQ. Each step records sender, receiver, and time.</p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Scan sealed packet barcode..."
+                  value={returnBarcode}
+                  onChange={(e) => setReturnBarcode(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleReturnLookup(); }}
+                  className="text-lg"
+                  data-testid="input-return-barcode"
+                />
+                <Button onClick={handleReturnLookup} disabled={returnLookupLoading || !returnBarcode.trim()} data-testid="button-return-lookup">
+                  {returnLookupLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                </Button>
+              </div>
+
+              {returnPacket && (
+                <div className="space-y-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                        <div><span className="text-muted-foreground block">Barcode</span><span className="font-medium" data-testid="text-return-barcode">{returnPacket.barcode}</span></div>
+                        <div><span className="text-muted-foreground block">Subject</span><span>{getSubjectLabel(returnPacket.subjectId)}</span></div>
+                        <div><span className="text-muted-foreground block">Grade</span><span>{returnPacket.grade}</span></div>
+                        <div><span className="text-muted-foreground block">Status</span><StatusBadge status={returnPacket.status} /></div>
+                        <div><span className="text-muted-foreground block">Current Location</span><span>{locationLabels[returnPacket.currentLocationType]}</span></div>
+                      </div>
+                      {(returnPacket as any).returnSealNumber && (
+                        <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                          <Lock className="w-3 h-3" /> Return Seal: {(returnPacket as any).returnSealNumber}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium">Sender (Dispatching)</label>
+                        <Select value={returnSenderId?.toString() || ""} onValueChange={(v) => setReturnSenderId(v ? parseInt(v) : null)}>
+                          <SelectTrigger data-testid="select-return-sender"><SelectValue placeholder="Select sender" /></SelectTrigger>
+                          <SelectContent>
+                            {staffProfiles.map((s: StaffProfile) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>{s.firstName} {s.lastName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Receiver (Collecting)</label>
+                        <Select value={returnReceiverId?.toString() || ""} onValueChange={(v) => setReturnReceiverId(v ? parseInt(v) : null)}>
+                          <SelectTrigger data-testid="select-return-receiver"><SelectValue placeholder="Select receiver" /></SelectTrigger>
+                          <SelectContent>
+                            {staffProfiles.map((s: StaffProfile) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>{s.firstName} {s.lastName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium">Destination (Next Step)</label>
+                        <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                          <ArrowLeft className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium" data-testid="text-return-destination">{locationLabels[returnLocationType] || returnLocationType}</span>
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            {returnPacket?.status === "sealed" ? "(Collecting)" : "(Return dispatch)"}
+                          </span>
+                        </div>
+                      </div>
+                      {returnLocationType !== "hq" && (
+                        <div className="space-y-3">
+                          {(returnLocationType === "region" || returnLocationType === "cluster") && (
+                            <div>
+                              <label className="text-sm font-medium">Region</label>
+                              <Select value={returnRegionId?.toString() || ""} onValueChange={(v) => { setReturnRegionId(v ? parseInt(v) : null); setReturnClusterId(null); }}>
+                                <SelectTrigger data-testid="select-return-region"><SelectValue placeholder="Select region" /></SelectTrigger>
+                                <SelectContent>
+                                  {regions.map((r: Region) => (
+                                    <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                          {returnLocationType === "cluster" && (
+                            <div>
+                              <label className="text-sm font-medium">Cluster</label>
+                              <Select value={returnClusterId?.toString() || ""} onValueChange={(v) => setReturnClusterId(v ? parseInt(v) : null)}>
+                                <SelectTrigger data-testid="select-return-cluster"><SelectValue placeholder="Select cluster" /></SelectTrigger>
+                                <SelectContent>
+                                  {(returnRegionId ? clusters.filter((c: Cluster) => c.regionId === returnRegionId) : clusters).map((c: Cluster) => (
+                                    <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Notes</label>
+                    <Textarea value={returnNotes} onChange={(e) => setReturnNotes(e.target.value)} placeholder="Optional notes..." data-testid="input-return-notes" />
+                  </div>
+
+                  {gps && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <MapPin className="w-3 h-3" />
+                      <span data-testid="text-return-gps">GPS: {gps.lat.toFixed(6)}, {gps.lng.toFixed(6)}</span>
+                    </div>
+                  )}
+
+                  <Button
+                    className="w-full"
+                    onClick={handleReturnSubmit}
+                    disabled={returnLocationType !== "hq" && !returnLocationValid}
+                    data-testid="button-return-submit"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-1" /> {getReturnStepLabel(returnPacket.status, returnPacket.currentLocationType)}
+                  </Button>
+                  {returnLocationType !== "hq" && !returnLocationValid && (
                     <p className="text-xs text-destructive">Please select all required location fields above</p>
                   )}
                 </div>

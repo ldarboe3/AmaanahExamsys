@@ -1478,7 +1478,7 @@ export const insertStaffIdEventSchema = createInsertSchema(staffIdEvents).pick({
 export const packetStatusEnum = pgEnum('packet_status', [
   'created', 'packed', 'dispatched_to_region', 'at_region', 
   'dispatched_to_cluster', 'at_cluster', 'dispatched_to_center', 'at_center',
-  'opened', 'administered',
+  'opened', 'administered', 'sealed',
   'collected', 'returned_to_cluster', 'returned_to_region', 'returned_to_hq',
   'completed', 'missing', 'damaged'
 ]);
@@ -1503,6 +1503,9 @@ export const examPackets = pgTable("exam_packets", {
   currentClusterId: integer("current_cluster_id").references(() => clusters.id),
   currentCenterId: integer("current_center_id").references(() => examCenters.id),
   securitySealNumber: varchar("security_seal_number", { length: 100 }),
+  sealedAt: timestamp("sealed_at"),
+  sealedByStaffId: integer("sealed_by_staff_id").references(() => staffProfiles.id),
+  returnSealNumber: varchar("return_seal_number", { length: 100 }),
   lastHandoverId: integer("last_handover_id"),
   lastHandoverAt: timestamp("last_handover_at"),
   notes: text("notes"),

@@ -14671,9 +14671,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     dispatched_to_center: ['at_center', 'missing', 'damaged'],
     at_center: ['opened', 'missing', 'damaged'],
     opened: ['administered', 'missing', 'damaged'],
-    administered: ['collected', 'missing', 'damaged'],
-    collected: ['returned_to_cluster', 'returned_to_region', 'returned_to_hq', 'missing', 'damaged'],
-    returned_to_cluster: ['returned_to_region', 'returned_to_hq', 'missing', 'damaged'],
+    administered: ['sealed', 'missing', 'damaged'],
+    sealed: ['collected', 'missing', 'damaged'],
+    collected: ['returned_to_cluster', 'missing', 'damaged'],
+    returned_to_cluster: ['returned_to_region', 'missing', 'damaged'],
     returned_to_region: ['returned_to_hq', 'missing', 'damaged'],
     returned_to_hq: ['completed'],
     completed: [],
@@ -14972,6 +14973,50 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         entityType: "exam_packet",
         entityId: packet.id.toString(),
         newData: { details: `Updated packet ${packet.barcode} status from ${packet.status} to ${parsed.data.status}` },
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-packets/:id/seal", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "logistics_admin", "examiner"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const sealSchema = z.object({
+        returnSealNumber: z.string().min(1, "Seal number required"),
+        sealedByStaffId: z.coerce.number().optional().nullable(),
+      });
+      const parsed = sealSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const packet = await storage.getExamPacket(parseInt(req.params.id));
+      if (!packet) return res.status(404).json({ message: "Packet not found" });
+
+      if (packet.status !== "administered") {
+        return res.status(400).json({ message: `Cannot seal packet in '${packet.status}' status. Packet must be 'administered' first.` });
+      }
+
+      const updated = await storage.updateExamPacket(packet.id, {
+        status: "sealed" as any,
+        returnSealNumber: parsed.data.returnSealNumber,
+        sealedAt: new Date(),
+        sealedByStaffId: parsed.data.sealedByStaffId || null,
+      });
+
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "update",
+        entityType: "exam_packet",
+        entityId: packet.id.toString(),
+        newData: { details: `Sealed packet ${packet.barcode} with return seal #${parsed.data.returnSealNumber}` },
       });
 
       res.json(updated);
