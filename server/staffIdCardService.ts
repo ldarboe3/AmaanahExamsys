@@ -70,16 +70,19 @@ function getLogoPath(): string {
 }
 
 async function generateBarcodePng(text: string, opts?: { width?: number; height?: number }): Promise<Buffer> {
-  const png = await bwipjs.toBuffer({
+  const barcodeOpts: any = {
     bcid: 'code128',
     text: text,
     scale: 3,
     height: opts?.height || 8,
-    width: opts?.width || undefined,
     includetext: false,
     backgroundcolor: 'FFFFFF',
     barcolor: '000000',
-  });
+  };
+  if (opts?.width) {
+    barcodeOpts.width = opts.width;
+  }
+  const png = await bwipjs.toBuffer(barcodeOpts);
   return png;
 }
 
