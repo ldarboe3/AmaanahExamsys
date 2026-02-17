@@ -74,12 +74,17 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   revoked: { label: "Revoked", color: "bg-destructive/10 text-destructive", icon: ShieldOff },
 };
 
+const mobileRoleLabels: Record<string, string> = {
+  examiner: "Examiner",
+  cluster_officer: "Cluster Operations Officer",
+};
+
 const roleLabels: Record<string, string> = {
   hq_director: "HQ Director",
   hq_staff: "HQ Staff",
   regional_coordinator: "Regional Coordinator",
   regional_staff: "Regional Staff",
-  cluster_officer: "Cluster Officer",
+  cluster_officer: "Cluster Operations Officer",
   examiner: "Examiner",
   invigilator: "Invigilator",
   supervisor: "Supervisor",
@@ -382,7 +387,7 @@ export default function StaffIdentityPage() {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
+              <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -396,7 +401,7 @@ export default function StaffIdentityPage() {
               </SelectContent>
             </Select>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[180px]" data-testid="select-role-filter">
+              <SelectTrigger className="w-[140px]" data-testid="select-role-filter">
                 <SelectValue placeholder="Role" />
               </SelectTrigger>
               <SelectContent>
@@ -407,7 +412,7 @@ export default function StaffIdentityPage() {
               </SelectContent>
             </Select>
             <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="w-[180px]" data-testid="select-department-filter">
+              <SelectTrigger className="w-[160px]" data-testid="select-department-filter">
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
               <SelectContent>
@@ -452,18 +457,16 @@ export default function StaffIdentityPage() {
               <p className="text-sm">Create a new staff profile to get started</p>
             </div>
           ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
+            <div className="rounded-md border overflow-hidden">
+              <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Staff</TableHead>
-                    <TableHead>Staff ID</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Region</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                    <TableHead className="w-[30%]">Staff</TableHead>
+                    <TableHead className="w-[18%]">Role / Dept</TableHead>
+                    <TableHead className="w-[14%]">Region</TableHead>
+                    <TableHead className="w-[12%]">Status</TableHead>
+                    <TableHead className="w-[20%]">Contact</TableHead>
+                    <TableHead className="w-[6%]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -476,31 +479,26 @@ export default function StaffIdentityPage() {
                       <TableRow key={staff.id} data-testid={`row-staff-${staff.id}`}>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <Avatar className="h-9 w-9">
+                            <Avatar className="h-9 w-9 shrink-0">
                               <AvatarImage src={staff.photoUrl || undefined} alt={staff.firstName} />
                               <AvatarFallback>{staff.firstName[0]}{staff.lastName[0]}</AvatarFallback>
                             </Avatar>
-                            <div>
-                              <div className="font-medium">{staff.firstName} {staff.middleName ? `${staff.middleName} ` : ""}{staff.lastName}</div>
-                              {staff.fullNameArabic && (
-                                <div className="text-xs text-muted-foreground" dir="rtl">{staff.fullNameArabic}</div>
-                              )}
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">{staff.firstName} {staff.middleName ? `${staff.middleName} ` : ""}{staff.lastName}</div>
+                              <code className="text-xs bg-muted px-1.5 py-0.5 rounded" data-testid={`text-staff-id-${staff.id}`}>
+                                {staff.staffIdNumber}
+                              </code>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <code className="text-sm bg-muted px-2 py-0.5 rounded" data-testid={`text-staff-id-${staff.id}`}>
-                            {staff.staffIdNumber}
-                          </code>
-                        </TableCell>
-                        <TableCell>{roleLabels[staff.role] || staff.role}</TableCell>
-                        <TableCell>
-                          <div className="text-sm">{staff.department || "—"}</div>
+                          <div className="text-sm font-medium">{roleLabels[staff.role] || staff.role}</div>
+                          <div className="text-xs text-muted-foreground">{staff.department || "—"}</div>
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
                             {regionName || "—"}
-                            {clusterName && <span className="text-muted-foreground"> / {clusterName}</span>}
+                            {clusterName && <div className="text-xs text-muted-foreground">{clusterName}</div>}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -512,7 +510,7 @@ export default function StaffIdentityPage() {
                         <TableCell>
                           <div className="text-sm">
                             {staff.phone && <div>{staff.phone}</div>}
-                            {staff.email && <div className="text-muted-foreground text-xs">{staff.email}</div>}
+                            {staff.email && <div className="text-muted-foreground text-xs truncate max-w-[180px]">{staff.email}</div>}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -659,7 +657,7 @@ export default function StaffIdentityPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {Object.entries(roleLabels).map(([value, label]) => (
+                        {Object.entries(mobileRoleLabels).map(([value, label]) => (
                           <SelectItem key={value} value={value}>{label}</SelectItem>
                         ))}
                       </SelectContent>

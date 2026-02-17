@@ -14579,6 +14579,26 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return res.status(404).json({ message: "Staff ID not found", verified: false });
       }
 
+      let regionName: string | null = null;
+      let clusterName: string | null = null;
+      let centerName: string | null = null;
+
+      if (profile.regionId) {
+        const regions = await storage.getAllRegions();
+        const region = regions.find((r: any) => r.id === profile.regionId);
+        regionName = region ? region.name : null;
+      }
+      if (profile.clusterId) {
+        const clusters = await storage.getAllClusters();
+        const cluster = clusters.find((c: any) => c.id === profile.clusterId);
+        clusterName = cluster ? cluster.name : null;
+      }
+      if (profile.centerId) {
+        const centers = await storage.getAllExamCenters();
+        const center = centers.find((c: any) => c.id === profile.centerId);
+        centerName = center ? center.name : null;
+      }
+
       res.json({
         verified: true,
         staffIdNumber: profile.staffIdNumber,
@@ -14587,6 +14607,14 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         middleName: profile.middleName,
         photoUrl: profile.photoUrl,
         role: profile.role,
+        phone: profile.phone,
+        email: profile.email,
+        regionId: profile.regionId,
+        regionName,
+        clusterId: profile.clusterId,
+        clusterName,
+        centerId: profile.centerId,
+        centerName,
         status: profile.status,
         issueDate: profile.issueDate,
         isActive: profile.status === 'activated',
