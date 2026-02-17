@@ -1018,11 +1018,50 @@ export default function Students() {
     });
   };
 
+  const handlePrintSingleCard = async (studentId: number) => {
+    try {
+      setPrintingCards(true);
+      const params = new URLSearchParams();
+      params.append('studentId', studentId.toString());
+
+      const response = await fetch(`/api/students/exam-cards/pdf?${params.toString()}`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to generate exam card');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `exam-card.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: isRTL ? "تم التحميل" : "Downloaded",
+        description: isRTL ? "تم تحميل بطاقة الامتحان بنجاح" : "Exam card downloaded successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل تحميل بطاقة الامتحان" : "Failed to download exam card"),
+        variant: "destructive",
+      });
+    } finally {
+      setPrintingCards(false);
+    }
+  };
+
   const handlePrintCards = async () => {
     try {
       setPrintingCards(true);
       
-      // Build query params based on current filters
       const params = new URLSearchParams();
       if (selectedExamYear) params.append('examYearId', selectedExamYear.toString());
       if (selectedGrade) params.append('grade', selectedGrade.toString());
@@ -2310,7 +2349,11 @@ export default function Students() {
                                 <Eye className="w-4 h-4 me-2" />
                                 {t.common.viewDetails}
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handlePrintSingleCard(student.id)}
+                                disabled={student.status !== 'approved' || !student.indexNumber}
+                                data-testid={`button-print-card-${student.id}`}
+                              >
                                 <Printer className="w-4 h-4 me-2" />
                                 {isRTL ? "طباعة البطاقة" : "Print Card"}
                               </DropdownMenuItem>
@@ -2521,9 +2564,14 @@ export default function Students() {
               <Edit className="w-4 h-4 me-2" />
               {isRTL ? "تعديل" : "Edit"}
             </Button>
-            <Button variant="outline">
+            <Button
+              variant="outline"
+              onClick={() => selectedStudent && handlePrintSingleCard(selectedStudent.id)}
+              disabled={!selectedStudent || selectedStudent.status !== 'approved' || !selectedStudent.indexNumber || printingCards}
+              data-testid="button-print-card-dialog"
+            >
               <Printer className="w-4 h-4 me-2" />
-              {isRTL ? "طباعة البطاقة" : "Print Card"}
+              {printingCards ? (isRTL ? "جاري الطباعة..." : "Printing...") : (isRTL ? "طباعة البطاقة" : "Print Card")}
             </Button>
           </DialogFooter>
         </DialogContent>
