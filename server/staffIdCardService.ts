@@ -36,6 +36,7 @@ interface StaffCardData {
   regionName?: string | null;
   clusterName?: string | null;
   photoUrl?: string | null;
+  photoBuffer?: Buffer | null;
   phone?: string | null;
   email?: string | null;
   confirmationCode?: string | null;
@@ -49,7 +50,7 @@ const roleLabels: Record<string, string> = {
   hq_staff: "HQ Staff",
   regional_coordinator: "Regional Coordinator",
   regional_staff: "Regional Staff",
-  cluster_officer: "Cluster Officer",
+  cluster_officer: "Cluster Operations Officer",
   examiner: "Examiner",
   invigilator: "Invigilator",
   supervisor: "Supervisor",
@@ -179,20 +180,15 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
 
   doc.save();
   doc.circle(photoCenterX, photoCenterY, photoSize / 2).clip();
-  if (data.photoUrl) {
+  if (data.photoBuffer) {
     try {
-      const photoPath = path.resolve(process.cwd(), data.photoUrl.replace(/^\//, ''));
-      if (fs.existsSync(photoPath)) {
-        doc.image(photoPath, photoCenterX - photoSize / 2, photoCenterY - photoSize / 2, {
-          width: photoSize,
-          height: photoSize,
-          fit: [photoSize, photoSize],
-          align: 'center',
-          valign: 'center',
-        });
-      } else {
-        doc.rect(photoCenterX - photoSize / 2, photoCenterY - photoSize / 2, photoSize, photoSize).fill('#E8E8E8');
-      }
+      doc.image(data.photoBuffer, photoCenterX - photoSize / 2, photoCenterY - photoSize / 2, {
+        width: photoSize,
+        height: photoSize,
+        fit: [photoSize, photoSize],
+        align: 'center',
+        valign: 'center',
+      });
     } catch {
       doc.rect(photoCenterX - photoSize / 2, photoCenterY - photoSize / 2, photoSize, photoSize).fill('#E8E8E8');
     }
@@ -201,7 +197,7 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
   }
   doc.restore();
 
-  const fullName = [data.firstName, data.middleName, data.lastName].filter(Boolean).join(' ');
+  const fullName = [data.firstName, data.lastName].filter(Boolean).join(' ');
   const nameY = photoCenterY + photoSize / 2 + 8;
 
   doc.font(hasAmiri ? 'Amiri-Bold' : 'Helvetica-Bold')
@@ -239,12 +235,20 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
   if (data.department) {
     drawInfoLine('Dept', data.department);
   }
-  if (data.phone) {
-    drawInfoLine('Phone', data.phone);
+
+  let workplace = 'Headquarters';
+  const hqRoles = ['hq_director', 'hq_staff'];
+  const regionalRoles = ['regional_coordinator', 'regional_staff'];
+  if (hqRoles.includes(data.role)) {
+    workplace = 'Headquarters';
+  } else if (regionalRoles.includes(data.role)) {
+    workplace = data.regionName ? `Regional Office — ${data.regionName}` : 'Regional Office';
+  } else if (data.clusterName) {
+    workplace = data.clusterName;
+  } else if (data.regionName) {
+    workplace = `Regional Office — ${data.regionName}`;
   }
-  if (data.email) {
-    drawInfoLine('Email', data.email);
-  }
+  drawInfoLine('Base', workplace);
 
   drawGreenWaveFooter(doc, W, H);
 
@@ -390,9 +394,30 @@ function drawBackPage(doc: typeof PDFDocument.prototype, data: StaffCardData, ha
     .text('Scan QR or barcode to verify', 8, H * 0.88 + 12, { width: W - 16, align: 'center' });
 }
 
+async function loadPhotoBuffer(photoUrl: string | null | undefined): Promise<Buffer | null> {
+  if (!photoUrl) return null;
+  try {
+    const localPath = path.resolve(process.cwd(), photoUrl.replace(/^\//, ''));
+    if (fs.existsSync(localPath)) {
+      return fs.readFileSync(localPath);
+    }
+    const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+    const response = await fetch(`${baseUrl}${photoUrl}`);
+    if (response.ok) {
+      const arrayBuf = await response.arrayBuffer();
+      return Buffer.from(arrayBuf);
+    }
+  } catch {}
+  return null;
+}
+
 export async function generateStaffIdCard(data: StaffCardData): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     try {
+      if (!data.photoBuffer && data.photoUrl) {
+        data.photoBuffer = await loadPhotoBuffer(data.photoUrl);
+      }
+
       const doc = new PDFDocument({
         size: [W, H],
         margin: 0,
@@ -456,6 +481,10 @@ export async function generateBulkStaffIdCards(staffList: StaffCardData[]): Prom
 
       for (let i = 0; i < staffList.length; i++) {
         const data = staffList[i];
+
+        if (!data.photoBuffer && data.photoUrl) {
+          data.photoBuffer = await loadPhotoBuffer(data.photoUrl);
+        }
 
         if (i > 0) {
           doc.addPage({ size: [W, H], margin: 0 });

@@ -194,6 +194,18 @@ async function ensureApprovedStudentsHaveIndexNumbers(examYearId?: number): Prom
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  // Serve uploaded staff photos
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  app.get('/uploads/:filename', (req, res) => {
+    const filePath = path.join(uploadsDir, req.params.filename);
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      res.status(404).json({ message: 'File not found' });
+    }
+  });
+
   // Session setup
   app.use(
     session({
