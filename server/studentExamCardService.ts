@@ -67,13 +67,13 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
   doc.save();
   doc.roundedRect(0, 0, W, H, 6).clip();
 
-  doc.rect(0, 0, W, H * 0.38).fill(GREEN_DARK);
+  doc.rect(0, 0, W, H * 0.35).fill(GREEN_DARK);
 
-  doc.rect(0, H * 0.38, W, H * 0.62).fill(WHITE);
+  doc.rect(0, H * 0.35, W, H * 0.65).fill(WHITE);
 
   doc.save();
-  doc.rect(0, H * 0.34, W, H * 0.08);
-  const grad1 = doc.linearGradient(0, H * 0.34, 0, H * 0.42);
+  doc.rect(0, H * 0.31, W, H * 0.08);
+  const grad1 = doc.linearGradient(0, H * 0.31, 0, H * 0.39);
   grad1.stop(0, GREEN_DARK);
   grad1.stop(1, WHITE);
   doc.fill(grad1);
@@ -81,16 +81,16 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
 
   doc.lineWidth(0.5)
     .strokeColor(GREEN_MID)
-    .moveTo(8, H * 0.34)
-    .lineTo(W - 8, H * 0.34)
+    .moveTo(8, H * 0.31)
+    .lineTo(W - 8, H * 0.31)
     .stroke();
 
   const logo = getLogoBuffer();
   if (logo) {
     try {
-      const logoSize = 30;
+      const logoSize = 28;
       const logoX = (W - logoSize) / 2;
-      const logoY = 8;
+      const logoY = 6;
       doc.save();
       doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 2).fill(WHITE);
       doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2).clip();
@@ -103,47 +103,47 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
   const regularFont = hasAmiri ? 'Amiri' : 'Helvetica';
 
   doc.font(titleFont)
-    .fontSize(6)
+    .fontSize(8)
     .fillColor(WHITE)
-    .text('AMAANAH', 0, 42, { width: W, align: 'center' });
+    .text('AMAANAH', 0, 37, { width: W, align: 'center' });
 
   doc.font(regularFont)
-    .fontSize(4.5)
+    .fontSize(5.5)
     .fillColor('#B0E0C8')
-    .text('Islamic Education Trust', 0, 50, { width: W, align: 'center' });
+    .text('Islamic Education Trust', 0, 47, { width: W, align: 'center' });
 
   doc.save();
-  const pillW = W * 0.7;
-  const pillH = 14;
+  const pillW = W * 0.75;
+  const pillH = 15;
   const pillX = (W - pillW) / 2;
-  const pillY = 58;
+  const pillY = 56;
   doc.roundedRect(pillX, pillY, pillW, pillH, 3).fill(GREEN_LIGHT);
   doc.font(titleFont)
-    .fontSize(5.5)
+    .fontSize(7)
     .fillColor(WHITE)
-    .text('EXAMINATION CARD', 0, pillY + 3.5, { width: W, align: 'center' });
+    .text('EXAMINATION CARD', 0, pillY + 3, { width: W, align: 'center' });
   doc.restore();
 
   doc.font(titleFont)
-    .fontSize(4.5)
+    .fontSize(5.5)
     .fillColor('#C0E8D0')
-    .text(data.examYearName, 0, 76, { width: W, align: 'center' });
+    .text(data.examYearName, 0, 74, { width: W, align: 'center' });
 
-  const infoStartY = H * 0.40;
+  const infoStartY = H * 0.37;
   const labelX = 10;
   const valueX = 10;
-  const lineHeight = 14;
+  const lineHeight = 15;
   let currentY = infoStartY;
 
-  const drawField = (label: string, value: string, isBold: boolean = false) => {
+  const drawField = (label: string, value: string) => {
     doc.font(regularFont)
-      .fontSize(4.5)
+      .fontSize(5.5)
       .fillColor(LIGHT_GRAY)
       .text(label, labelX, currentY, { width: W - 20 });
-    doc.font(isBold ? titleFont : regularFont)
-      .fontSize(isBold ? 6.5 : 5.5)
+    doc.font(titleFont)
+      .fontSize(7)
       .fillColor(DARK)
-      .text(value, valueX, currentY + 5.5, { width: W - 20 });
+      .text(value, valueX, currentY + 7, { width: W - 20 });
     currentY += lineHeight;
   };
 
@@ -152,21 +152,21 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
 
   doc.save();
   const idxPillW = W - 20;
-  const idxPillH = 18;
+  const idxPillH = 24;
   const idxPillX = 10;
-  const idxPillY = currentY - 1;
-  doc.roundedRect(idxPillX, idxPillY, idxPillW, idxPillH, 3)
+  const idxPillY = currentY;
+  doc.roundedRect(idxPillX, idxPillY, idxPillW, idxPillH, 4)
     .fillAndStroke('#F0FAF4', GREEN_MID);
   doc.font(regularFont)
-    .fontSize(4)
+    .fontSize(5)
     .fillColor(GRAY)
-    .text('INDEX NUMBER', idxPillX + 5, idxPillY + 2);
+    .text('INDEX NUMBER', idxPillX + 8, idxPillY + 3);
   doc.font(titleFont)
-    .fontSize(10)
+    .fontSize(13)
     .fillColor(GREEN_DARK)
-    .text(data.indexNumber, idxPillX + 5, idxPillY + 7.5);
+    .text(data.indexNumber, idxPillX + 8, idxPillY + 10);
   doc.restore();
-  currentY += 22;
+  currentY += idxPillH + 4;
 
   const gradeStr = data.grade === 6 ? 'Grade 6' : data.grade === 9 ? 'Grade 9' : `Grade ${data.grade}`;
   drawField('CLASS / GRADE', gradeStr);
@@ -201,19 +201,19 @@ function drawBackPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri: 
   const regularFont = hasAmiri ? 'Amiri' : 'Helvetica';
 
   doc.font(titleFont)
-    .fontSize(5.5)
+    .fontSize(7)
     .fillColor(WHITE)
     .text('AMAANAH', 0, 10, { width: W, align: 'center' });
 
   doc.font(regularFont)
-    .fontSize(4)
+    .fontSize(5)
     .fillColor('#B0E0C8')
-    .text('Examination Card', 0, 18, { width: W, align: 'center' });
+    .text('Examination Card', 0, 19, { width: W, align: 'center' });
 
   doc.lineWidth(0.3)
     .strokeColor(GREEN_LIGHT)
-    .moveTo(15, 26)
-    .lineTo(W - 15, 26)
+    .moveTo(15, 28)
+    .lineTo(W - 15, 28)
     .stroke();
 
   if (qrBuffer) {
@@ -228,7 +228,7 @@ function drawBackPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri: 
       doc.restore();
 
       doc.font(regularFont)
-        .fontSize(3.5)
+        .fontSize(4.5)
         .fillColor('#B0E0C8')
         .text('Scan to verify', 0, qrY + qrSize + 6, { width: W, align: 'center' });
     } catch {}
@@ -236,14 +236,14 @@ function drawBackPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri: 
 
   const rulesY = H * 0.55;
   doc.font(titleFont)
-    .fontSize(4.5)
+    .fontSize(6)
     .fillColor(WHITE)
     .text('INSTRUCTIONS', 0, rulesY, { width: W, align: 'center' });
 
   doc.lineWidth(0.3)
     .strokeColor(GREEN_LIGHT)
-    .moveTo(30, rulesY + 8)
-    .lineTo(W - 30, rulesY + 8)
+    .moveTo(30, rulesY + 9)
+    .lineTo(W - 30, rulesY + 9)
     .stroke();
 
   const rules = [
@@ -253,13 +253,13 @@ function drawBackPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri: 
     'Valid for current exam year only',
   ];
 
-  let ruleY = rulesY + 14;
+  let ruleY = rulesY + 15;
   rules.forEach((rule) => {
     doc.font(regularFont)
-      .fontSize(4)
+      .fontSize(5)
       .fillColor('#C0E8D0')
-      .text(`• ${rule}`, 12, ruleY, { width: W - 24 });
-    ruleY += 9;
+      .text(`•  ${rule}`, 12, ruleY, { width: W - 24 });
+    ruleY += 10;
   });
 
   if (barcodeBuffer) {
@@ -275,7 +275,7 @@ function drawBackPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri: 
       doc.restore();
 
       doc.font(regularFont)
-        .fontSize(3.5)
+        .fontSize(4.5)
         .fillColor('#90C8A8')
         .text(data.indexNumber, 0, bcY + bcH + 3, { width: W, align: 'center' });
     } catch {}

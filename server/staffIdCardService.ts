@@ -201,30 +201,30 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
   const nameY = photoCenterY + photoSize / 2 + 8;
 
   doc.font(hasAmiri ? 'Amiri-Bold' : 'Helvetica-Bold')
-    .fontSize(9)
+    .fontSize(10)
     .fillColor(DARK)
     .text(fullName, 8, nameY, { width: W - 16, align: 'center' });
 
   const roleLabel = roleLabels[data.role] || data.role;
   doc.font(hasAmiri ? 'Amiri' : 'Helvetica')
-    .fontSize(6.5)
+    .fontSize(7.5)
     .fillColor(GREEN_DARK)
-    .text(roleLabel, 8, nameY + 13, { width: W - 16, align: 'center' });
+    .text(roleLabel, 8, nameY + 14, { width: W - 16, align: 'center' });
 
-  let infoY = nameY + 28;
+  let infoY = nameY + 30;
   const labelX = 12;
-  const valueX = 52;
-  const infoWidth = W - valueX - 10;
-  const lineH = 11;
+  const valueX = 50;
+  const infoWidth = W - valueX - 8;
+  const lineH = 13;
 
   const drawInfoLine = (label: string, value: string) => {
     doc.font(hasAmiri ? 'Amiri-Bold' : 'Helvetica-Bold')
-      .fontSize(5.5)
+      .fontSize(7)
       .fillColor(DARK)
-      .text(label, labelX, infoY, { width: 38 });
+      .text(label, labelX, infoY, { width: 36 });
 
     doc.font(hasAmiri ? 'Amiri' : 'Helvetica')
-      .fontSize(5.5)
+      .fontSize(7)
       .fillColor(DARK)
       .text(`:  ${value}`, valueX, infoY, { width: infoWidth });
 
