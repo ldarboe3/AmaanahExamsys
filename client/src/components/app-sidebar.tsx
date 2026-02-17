@@ -34,9 +34,6 @@ import {
   Shield,
   Package,
   Timer,
-  ScanBarcode,
-  Play,
-  UserCheck2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -67,9 +64,6 @@ const staffManagementDefs: MenuItemDef[] = [
 const examLogisticsDefs: MenuItemDef[] = [
   { key: "packetTracking", url: "/packet-tracking", icon: Package },
   { key: "examScheduling", url: "/exam-scheduling", icon: Timer },
-  { key: "examDay", url: "/exam-day", icon: ScanBarcode },
-  { key: "examExecution", url: "/exam-execution", icon: Play },
-  { key: "studentAttendance", url: "/student-attendance", icon: UserCheck2 },
 ];
 
 const schoolAdminMenuDefs: MenuItemDef[] = [
