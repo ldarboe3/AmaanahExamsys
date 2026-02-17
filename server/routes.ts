@@ -14250,8 +14250,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return res.status(404).json({ message: "No staff profiles found matching the filter" });
       }
 
-      const regions = await storage.getRegions();
-      const clusters = await storage.getClusters();
+      const regions = await storage.getAllRegions();
+      const clusters = await storage.getAllClusters();
       const protocol = req.headers['x-forwarded-proto'] || 'https';
       const host = req.headers.host || 'localhost:5000';
 
@@ -14610,8 +14610,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const profile = await storage.getStaffProfile(parseInt(req.params.id));
       if (!profile) return res.status(404).json({ message: "Staff profile not found" });
 
-      const regions = await storage.getRegions();
-      const clusters = await storage.getClusters();
+      const regions = await storage.getAllRegions();
+      const clusters = await storage.getAllClusters();
       const region = regions.find((r: any) => r.id === profile.regionId);
       const cluster = clusters.find((c: any) => c.id === profile.clusterId);
 
