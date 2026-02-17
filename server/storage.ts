@@ -426,6 +426,7 @@ export interface IStorage {
   createStaffProfile(profile: InsertStaffProfile & { staffIdNumber: string; employeeId: string; confirmationCode: string; createdBy: string }): Promise<StaffProfile>;
   getStaffProfile(id: number): Promise<StaffProfile | undefined>;
   getStaffProfileByStaffId(staffIdNumber: string): Promise<StaffProfile | undefined>;
+  getStaffProfileByEmployeeId(employeeId: string): Promise<StaffProfile | undefined>;
   getAllStaffProfiles(): Promise<StaffProfile[]>;
   updateStaffProfile(id: number, profile: Partial<InsertStaffProfile & { staffIdNumber?: string; confirmationCode?: string; cardPrintedAt?: Date; cardIssuedAt?: Date; activatedAt?: Date; suspendedAt?: Date; revokedAt?: Date; suspendReason?: string; revokeReason?: string }>): Promise<StaffProfile | undefined>;
   deleteStaffProfile(id: number): Promise<boolean>;
@@ -2464,6 +2465,11 @@ export class DatabaseStorage implements IStorage {
 
   async getStaffProfileByStaffId(staffIdNumber: string): Promise<StaffProfile | undefined> {
     const [profile] = await db.select().from(staffProfiles).where(eq(staffProfiles.staffIdNumber, staffIdNumber));
+    return profile;
+  }
+
+  async getStaffProfileByEmployeeId(employeeId: string): Promise<StaffProfile | undefined> {
+    const [profile] = await db.select().from(staffProfiles).where(eq(staffProfiles.employeeId, employeeId));
     return profile;
   }
 
