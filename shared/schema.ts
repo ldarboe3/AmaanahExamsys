@@ -202,16 +202,45 @@ export const students = pgTable("students", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Exam Card Status
+export const examCardStatusEnum = pgEnum('exam_card_status', [
+  'generated', 'printed', 'distributed'
+]);
+
 // Exam Cards for candidate activation
 export const examCards = pgTable("exam_cards", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   studentId: integer("student_id").notNull().references(() => students.id),
   cardNumber: varchar("card_number", { length: 20 }).notNull().unique(),
+  confirmationCode: varchar("confirmation_code", { length: 10 }),
+  barcodeValue: varchar("barcode_value", { length: 50 }),
   activationToken: varchar("activation_token", { length: 100 }).unique(),
   isActivated: boolean("is_activated").default(false),
   activatedAt: timestamp("activated_at"),
   activatedByUserId: varchar("activated_by_user_id").references(() => users.id),
+  cardStatus: examCardStatusEnum("card_status").default('generated'),
   printedAt: timestamp("printed_at"),
+  distributedAt: timestamp("distributed_at"),
+  distributedByStaffId: integer("distributed_by_staff_id").references(() => staffProfiles.id),
+  distributedByUserId: varchar("distributed_by_user_id").references(() => users.id),
+  batchId: integer("batch_id"),
+  schoolId: integer("school_id").references(() => schools.id),
+  examYearId: integer("exam_year_id").references(() => examYears.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Exam Card Batches
+export const examCardBatches = pgTable("exam_card_batches", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  batchNumber: varchar("batch_number", { length: 50 }).notNull().unique(),
+  schoolId: integer("school_id").references(() => schools.id),
+  examYearId: integer("exam_year_id").references(() => examYears.id),
+  grade: integer("grade"),
+  totalCards: integer("total_cards").notNull().default(0),
+  printedCards: integer("printed_cards").default(0),
+  distributedCards: integer("distributed_cards").default(0),
+  status: examCardStatusEnum("batch_status").default('generated'),
+  generatedBy: varchar("generated_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -939,11 +968,32 @@ export const insertStudentSchema = createInsertSchema(students).pick({
 export const insertExamCardSchema = createInsertSchema(examCards).pick({
   studentId: true,
   cardNumber: true,
+  confirmationCode: true,
+  barcodeValue: true,
   activationToken: true,
   isActivated: true,
   activatedAt: true,
   activatedByUserId: true,
+  cardStatus: true,
   printedAt: true,
+  distributedAt: true,
+  distributedByStaffId: true,
+  distributedByUserId: true,
+  batchId: true,
+  schoolId: true,
+  examYearId: true,
+});
+
+export const insertExamCardBatchSchema = createInsertSchema(examCardBatches).pick({
+  batchNumber: true,
+  schoolId: true,
+  examYearId: true,
+  grade: true,
+  totalCards: true,
+  printedCards: true,
+  distributedCards: true,
+  status: true,
+  generatedBy: true,
 });
 
 export const insertSystemSettingSchema = createInsertSchema(systemSettings).pick({
@@ -1727,6 +1777,145 @@ export const insertExamPacketVerificationSchema = createInsertSchema(examPacketV
   notes: true,
 });
 
+// ============ Investigation & Integrity Flags ============
+
+export const flagSeverityEnum = pgEnum('flag_severity', ['critical', 'high', 'medium', 'low']);
+
+export const flagTypeEnum = pgEnum('flag_type', [
+  'malpractice', 'missing_evidence', 'time_violation', 'attendance_anomaly',
+  'packet_mismatch', 'seal_breach', 'unauthorized_access', 'data_inconsistency',
+  'late_submission', 'missing_materials', 'other'
+]);
+
+export const flagStatusEnum = pgEnum('flag_status', [
+  'open', 'under_investigation', 'resolved', 'dismissed', 'escalated'
+]);
+
+export const integrityFlags = pgTable("integrity_flags", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  examYearId: integer("exam_year_id").references(() => examYears.id),
+  centerId: integer("center_id").references(() => examCenters.id),
+  subjectId: integer("subject_id").references(() => subjects.id),
+  studentId: integer("student_id").references(() => students.id),
+  scheduleId: integer("schedule_id").references(() => examSchedules.id),
+  flagType: flagTypeEnum("flag_type").notNull(),
+  severity: flagSeverityEnum("severity").notNull(),
+  status: flagStatusEnum("status").default('open').notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  evidenceUrls: text("evidence_urls").array().default([]),
+  autoDetected: boolean("auto_detected").default(false),
+  reportedBy: varchar("reported_by").references(() => users.id),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by").references(() => users.id),
+  resolutionNotes: text("resolution_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const integrityFlagEvents = pgTable("integrity_flag_events", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  flagId: integer("flag_id").notNull().references(() => integrityFlags.id),
+  eventType: varchar("event_type", { length: 50 }).notNull(),
+  previousStatus: flagStatusEnum("previous_status"),
+  newStatus: flagStatusEnum("new_status"),
+  notes: text("notes"),
+  actorId: varchar("actor_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertIntegrityFlagSchema = createInsertSchema(integrityFlags).pick({
+  examYearId: true,
+  centerId: true,
+  subjectId: true,
+  studentId: true,
+  scheduleId: true,
+  flagType: true,
+  severity: true,
+  status: true,
+  title: true,
+  description: true,
+  evidenceUrls: true,
+  autoDetected: true,
+  reportedBy: true,
+  assignedTo: true,
+});
+
+export const insertIntegrityFlagEventSchema = createInsertSchema(integrityFlagEvents).pick({
+  flagId: true,
+  eventType: true,
+  previousStatus: true,
+  newStatus: true,
+  notes: true,
+  actorId: true,
+});
+
+// ============ Sync Monitoring ============
+
+export const syncSessionStatusEnum = pgEnum('sync_session_status', [
+  'active', 'completed', 'failed', 'timed_out'
+]);
+
+export const deviceSyncSessions = pgTable("device_sync_sessions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  deviceId: varchar("device_id", { length: 100 }).notNull(),
+  deviceName: varchar("device_name", { length: 255 }),
+  deviceInfo: text("device_info"),
+  userId: varchar("user_id").references(() => users.id),
+  centerId: integer("center_id").references(() => examCenters.id),
+  status: syncSessionStatusEnum("status").default('active').notNull(),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  recordsUploaded: integer("records_uploaded").default(0),
+  recordsFailed: integer("records_failed").default(0),
+  recordsConflicted: integer("records_conflicted").default(0),
+  totalRecords: integer("total_records").default(0),
+  dataTypes: text("data_types").array().default([]),
+  isLateSync: boolean("is_late_sync").default(false),
+  expectedSyncBy: timestamp("expected_sync_by"),
+  lastActivityAt: timestamp("last_activity_at"),
+  errorSummary: text("error_summary"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const syncErrorLogs = pgTable("sync_error_logs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: integer("session_id").notNull().references(() => deviceSyncSessions.id),
+  errorType: varchar("error_type", { length: 100 }).notNull(),
+  errorMessage: text("error_message").notNull(),
+  recordType: varchar("record_type", { length: 100 }),
+  recordId: varchar("record_id", { length: 100 }),
+  stackTrace: text("stack_trace"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDeviceSyncSessionSchema = createInsertSchema(deviceSyncSessions).pick({
+  deviceId: true,
+  deviceName: true,
+  deviceInfo: true,
+  userId: true,
+  centerId: true,
+  status: true,
+  recordsUploaded: true,
+  recordsFailed: true,
+  recordsConflicted: true,
+  totalRecords: true,
+  dataTypes: true,
+  isLateSync: true,
+  expectedSyncBy: true,
+  errorSummary: true,
+});
+
+export const insertSyncErrorLogSchema = createInsertSchema(syncErrorLogs).pick({
+  sessionId: true,
+  errorType: true,
+  errorMessage: true,
+  recordType: true,
+  recordId: true,
+  stackTrace: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1828,3 +2017,19 @@ export type ExamSessionLog = typeof examSessionLogs.$inferSelect;
 // Exam Day Verification Types
 export type InsertExamPacketVerification = z.infer<typeof insertExamPacketVerificationSchema>;
 export type ExamPacketVerification = typeof examPacketVerifications.$inferSelect;
+
+// Exam Card Batch Types
+export type InsertExamCardBatch = z.infer<typeof insertExamCardBatchSchema>;
+export type ExamCardBatch = typeof examCardBatches.$inferSelect;
+
+// Integrity Flag Types
+export type InsertIntegrityFlag = z.infer<typeof insertIntegrityFlagSchema>;
+export type IntegrityFlag = typeof integrityFlags.$inferSelect;
+export type InsertIntegrityFlagEvent = z.infer<typeof insertIntegrityFlagEventSchema>;
+export type IntegrityFlagEvent = typeof integrityFlagEvents.$inferSelect;
+
+// Sync Monitoring Types
+export type InsertDeviceSyncSession = z.infer<typeof insertDeviceSyncSessionSchema>;
+export type DeviceSyncSession = typeof deviceSyncSessions.$inferSelect;
+export type InsertSyncErrorLog = z.infer<typeof insertSyncErrorLogSchema>;
+export type SyncErrorLog = typeof syncErrorLogs.$inferSelect;

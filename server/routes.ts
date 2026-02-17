@@ -5,8 +5,8 @@ import fs from "fs";
 import path from "path";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments, studentResults } from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments, studentResults, examCards } from "@shared/schema";
+import { eq, and, sql, desc } from "drizzle-orm";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
 import {
@@ -15889,6 +15889,452 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
 
       const records = await storage.getAttendanceByCenter(centerId, subjectId);
       res.json(records);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============ Exam Card Management ============
+
+  app.get("/api/exam-cards", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      const schoolId = req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      const allCards = await storage.getAllStudents();
+      let cards;
+      if (schoolId) {
+        cards = await storage.getExamCardsBySchool(schoolId, examYearId);
+      } else {
+        const conditions: any = {};
+        cards = await db.select().from(examCards).orderBy(desc(examCards.createdAt));
+        if (examYearId) {
+          cards = cards.filter((c: any) => c.examYearId === examYearId);
+        }
+      }
+      res.json(cards);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/exam-cards/generate", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const { studentId, schoolId, examYearId, grade } = req.body;
+
+      let studentsToGenerate: any[] = [];
+      if (studentId) {
+        const student = await storage.getStudent(studentId);
+        if (student && student.status === 'approved' && student.indexNumber) {
+          studentsToGenerate = [student];
+        }
+      } else if (schoolId) {
+        const allStudents = await storage.getAllStudents();
+        studentsToGenerate = allStudents.filter(s =>
+          s.schoolId === schoolId &&
+          s.status === 'approved' &&
+          s.indexNumber &&
+          (!examYearId || s.examYearId === examYearId) &&
+          (!grade || s.grade === grade)
+        );
+      }
+
+      if (studentsToGenerate.length === 0) {
+        return res.status(400).json({ message: "No eligible students found" });
+      }
+
+      const batchNumber = `BATCH-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      const batch = await storage.createExamCardBatch({
+        batchNumber,
+        schoolId: schoolId || studentsToGenerate[0].schoolId,
+        examYearId: examYearId || studentsToGenerate[0].examYearId,
+        grade,
+        totalCards: studentsToGenerate.length,
+        generatedBy: user.id,
+      });
+
+      const generatedCards = [];
+      for (const student of studentsToGenerate) {
+        const existingCards = await db.select().from(examCards).where(eq(examCards.studentId, student.id));
+        if (existingCards.length > 0) continue;
+
+        const confirmationCode = Math.random().toString().substr(2, 10).padEnd(10, '0');
+        const barcodeValue = `EC${student.indexNumber}${confirmationCode.substr(0, 4)}`;
+        const cardNumber = `CARD-${student.indexNumber}`;
+
+        const card = await db.insert(examCards).values({
+          studentId: student.id,
+          cardNumber,
+          confirmationCode,
+          barcodeValue,
+          cardStatus: 'generated',
+          batchId: batch.id,
+          schoolId: student.schoolId,
+          examYearId: student.examYearId,
+        }).returning();
+
+        generatedCards.push(card[0]);
+      }
+
+      await storage.updateExamCardBatch(batch.id, { totalCards: generatedCards.length });
+      res.json({ batch, cards: generatedCards, count: generatedCards.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/exam-cards/mark-printed", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const { cardIds, batchId } = req.body;
+      let ids = cardIds || [];
+      if (batchId && ids.length === 0) {
+        const batchCards = await storage.getExamCardsByBatch(batchId);
+        ids = batchCards.map((c: any) => c.id);
+      }
+
+      await storage.bulkUpdateExamCards(ids, { cardStatus: 'printed', printedAt: new Date() });
+      if (batchId) {
+        await storage.updateExamCardBatch(batchId, { status: 'printed', printedCards: ids.length });
+      }
+
+      res.json({ message: "Cards marked as printed", count: ids.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/exam-cards/mark-distributed", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const { cardIds, batchId, staffId } = req.body;
+      let ids = cardIds || [];
+      if (batchId && ids.length === 0) {
+        const batchCards = await storage.getExamCardsByBatch(batchId);
+        ids = batchCards.map((c: any) => c.id);
+      }
+
+      await storage.bulkUpdateExamCards(ids, {
+        cardStatus: 'distributed',
+        distributedAt: new Date(),
+        distributedByUserId: user.id,
+        distributedByStaffId: staffId || null,
+      });
+
+      if (batchId) {
+        await storage.updateExamCardBatch(batchId, { status: 'distributed', distributedCards: ids.length });
+      }
+
+      res.json({ message: "Cards marked as distributed", count: ids.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-cards/batches", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const schoolId = req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      const batches = await storage.getAllExamCardBatches({ schoolId, examYearId });
+      res.json(batches);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-cards/distribution-stats", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+
+      const allSchools = await storage.getAllSchools();
+      const allCards = await db.select().from(examCards).orderBy(desc(examCards.createdAt));
+
+      const filteredCards = examYearId ? allCards.filter((c: any) => c.examYearId === examYearId) : allCards;
+
+      const stats = allSchools.map(school => {
+        const schoolCards = filteredCards.filter((c: any) => c.schoolId === school.id);
+        return {
+          schoolId: school.id,
+          schoolName: school.name,
+          totalCards: schoolCards.length,
+          generated: schoolCards.filter((c: any) => c.cardStatus === 'generated').length,
+          printed: schoolCards.filter((c: any) => c.cardStatus === 'printed').length,
+          distributed: schoolCards.filter((c: any) => c.cardStatus === 'distributed').length,
+        };
+      }).filter(s => s.totalCards > 0);
+
+      const totals = {
+        totalCards: filteredCards.length,
+        generated: filteredCards.filter((c: any) => c.cardStatus === 'generated').length,
+        printed: filteredCards.filter((c: any) => c.cardStatus === 'printed').length,
+        distributed: filteredCards.filter((c: any) => c.cardStatus === 'distributed').length,
+      };
+
+      res.json({ totals, bySchool: stats });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============ Investigation Reports ============
+
+  app.get("/api/integrity-flags", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const filters = {
+        examYearId: req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined,
+        centerId: req.query.centerId ? parseInt(req.query.centerId as string) : undefined,
+        severity: req.query.severity as string | undefined,
+        flagType: req.query.flagType as string | undefined,
+        status: req.query.status as string | undefined,
+      };
+
+      const flags = await storage.getAllIntegrityFlags(filters);
+      res.json(flags);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/integrity-flags/stats", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      const allFlags = await storage.getAllIntegrityFlags({ examYearId });
+
+      const bySeverity = {
+        critical: allFlags.filter(f => f.severity === 'critical').length,
+        high: allFlags.filter(f => f.severity === 'high').length,
+        medium: allFlags.filter(f => f.severity === 'medium').length,
+        low: allFlags.filter(f => f.severity === 'low').length,
+      };
+
+      const byStatus = {
+        open: allFlags.filter(f => f.status === 'open').length,
+        under_investigation: allFlags.filter(f => f.status === 'under_investigation').length,
+        resolved: allFlags.filter(f => f.status === 'resolved').length,
+        dismissed: allFlags.filter(f => f.status === 'dismissed').length,
+        escalated: allFlags.filter(f => f.status === 'escalated').length,
+      };
+
+      const byType: Record<string, number> = {};
+      allFlags.forEach(f => {
+        byType[f.flagType] = (byType[f.flagType] || 0) + 1;
+      });
+
+      res.json({ total: allFlags.length, bySeverity, byStatus, byType });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/integrity-flags/:id", isAuthenticated, async (req, res) => {
+    try {
+      const flag = await storage.getIntegrityFlag(parseInt(req.params.id));
+      if (!flag) return res.status(404).json({ message: "Flag not found" });
+      const events = await storage.getIntegrityFlagEvents(flag.id);
+      res.json({ ...flag, events });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/integrity-flags", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const flag = await storage.createIntegrityFlag({
+        ...req.body,
+        reportedBy: user.id,
+      });
+
+      await storage.createIntegrityFlagEvent({
+        flagId: flag.id,
+        eventType: 'created',
+        newStatus: 'open',
+        notes: 'Flag created',
+        actorId: user.id,
+      });
+
+      res.json(flag);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/integrity-flags/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const flagId = parseInt(req.params.id);
+      const existing = await storage.getIntegrityFlag(flagId);
+      if (!existing) return res.status(404).json({ message: "Flag not found" });
+
+      const updateData: any = { ...req.body };
+      if (req.body.status === 'resolved') {
+        updateData.resolvedAt = new Date();
+        updateData.resolvedBy = user.id;
+      }
+
+      const updated = await storage.updateIntegrityFlag(flagId, updateData);
+
+      if (req.body.status && req.body.status !== existing.status) {
+        await storage.createIntegrityFlagEvent({
+          flagId,
+          eventType: 'status_changed',
+          previousStatus: existing.status as any,
+          newStatus: req.body.status,
+          notes: req.body.resolutionNotes || `Status changed to ${req.body.status}`,
+          actorId: user.id,
+        });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============ Sync Monitoring ============
+
+  app.get("/api/sync-sessions", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const filters = {
+        status: req.query.status as string | undefined,
+        deviceId: req.query.deviceId as string | undefined,
+        centerId: req.query.centerId ? parseInt(req.query.centerId as string) : undefined,
+      };
+
+      const sessions = await storage.getAllDeviceSyncSessions(filters);
+      res.json(sessions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/sync-sessions/stats", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const sessions = await storage.getAllDeviceSyncSessions();
+      const active = sessions.filter(s => s.status === 'active').length;
+      const completed = sessions.filter(s => s.status === 'completed').length;
+      const failed = sessions.filter(s => s.status === 'failed').length;
+      const timedOut = sessions.filter(s => s.status === 'timed_out').length;
+      const lateSyncs = sessions.filter(s => s.isLateSync).length;
+
+      const totalUploaded = sessions.reduce((sum, s) => sum + (s.recordsUploaded || 0), 0);
+      const totalFailed = sessions.reduce((sum, s) => sum + (s.recordsFailed || 0), 0);
+      const totalConflicted = sessions.reduce((sum, s) => sum + (s.recordsConflicted || 0), 0);
+
+      const uniqueDevices = new Set(sessions.map(s => s.deviceId)).size;
+
+      res.json({
+        total: sessions.length,
+        active,
+        completed,
+        failed,
+        timedOut,
+        lateSyncs,
+        totalUploaded,
+        totalFailed,
+        totalConflicted,
+        uniqueDevices,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/sync-sessions/:id", isAuthenticated, async (req, res) => {
+    try {
+      const session = await storage.getDeviceSyncSession(parseInt(req.params.id));
+      if (!session) return res.status(404).json({ message: "Session not found" });
+      const errors = await storage.getSyncErrorLogs(session.id);
+      res.json({ ...session, errors });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/sync-sessions", isAuthenticated, async (req, res) => {
+    try {
+      const session = await storage.createDeviceSyncSession(req.body);
+      res.json(session);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/sync-sessions/:id", isAuthenticated, async (req, res) => {
+    try {
+      const updated = await storage.updateDeviceSyncSession(parseInt(req.params.id), req.body);
+      if (!updated) return res.status(404).json({ message: "Session not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/sync-sessions/:id/errors", isAuthenticated, async (req, res) => {
+    try {
+      const error = await storage.createSyncErrorLog({
+        ...req.body,
+        sessionId: parseInt(req.params.id),
+      });
+      res.json(error);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/sync-sessions/:id/errors", isAuthenticated, async (req, res) => {
+    try {
+      const errors = await storage.getSyncErrorLogs(parseInt(req.params.id));
+      res.json(errors);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

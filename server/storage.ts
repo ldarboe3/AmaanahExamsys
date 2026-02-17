@@ -10,6 +10,8 @@ import {
   paperMovements, scriptMovements, centerAssignments, centerActivityLogs,
   schoolExamRegistrations,
   staffProfiles, staffIdEvents,
+  examCardBatches, integrityFlags, integrityFlagEvents,
+  deviceSyncSessions, syncErrorLogs,
   type User, type UpsertUser, type Region, type InsertRegion,
   type Cluster, type InsertCluster, type ExamYear, type InsertExamYear,
   type ExamCenter, type InsertExamCenter, type School, type InsertSchool,
@@ -34,6 +36,11 @@ import {
   type SchoolExamRegistration, type InsertSchoolExamRegistration,
   type StaffProfile, type InsertStaffProfile,
   type StaffIdEvent, type InsertStaffIdEvent,
+  type ExamCardBatch, type InsertExamCardBatch,
+  type IntegrityFlag, type InsertIntegrityFlag,
+  type IntegrityFlagEvent, type InsertIntegrityFlagEvent,
+  type DeviceSyncSession, type InsertDeviceSyncSession,
+  type SyncErrorLog, type InsertSyncErrorLog,
   examPackets, handoverLogs,
   type ExamPacket, type InsertExamPacket,
   type HandoverLog, type InsertHandoverLog,
@@ -453,6 +460,32 @@ export interface IStorage {
   getExamPacketVerifications(filters?: { centerId?: number; examinerId?: string; packetId?: number }): Promise<ExamPacketVerification[]>;
   updateExamPacketVerification(id: number, data: Partial<ExamPacketVerification>): Promise<ExamPacketVerification | undefined>;
   getSchedulesForCenterAndDate(centerId: number, examDate: string): Promise<ExamSchedule[]>;
+
+  // ===== Exam Card Batches =====
+  createExamCardBatch(batch: InsertExamCardBatch): Promise<ExamCardBatch>;
+  getExamCardBatch(id: number): Promise<ExamCardBatch | undefined>;
+  getAllExamCardBatches(filters?: { schoolId?: number; examYearId?: number }): Promise<ExamCardBatch[]>;
+  updateExamCardBatch(id: number, data: Partial<ExamCardBatch>): Promise<ExamCardBatch | undefined>;
+  getExamCardsByBatch(batchId: number): Promise<ExamCard[]>;
+  getExamCardsBySchool(schoolId: number, examYearId?: number): Promise<ExamCard[]>;
+  updateExamCard(id: number, data: Partial<ExamCard>): Promise<ExamCard | undefined>;
+  bulkUpdateExamCards(ids: number[], data: Partial<ExamCard>): Promise<void>;
+
+  // ===== Integrity Flags =====
+  createIntegrityFlag(flag: InsertIntegrityFlag): Promise<IntegrityFlag>;
+  getIntegrityFlag(id: number): Promise<IntegrityFlag | undefined>;
+  getAllIntegrityFlags(filters?: { examYearId?: number; centerId?: number; severity?: string; flagType?: string; status?: string }): Promise<IntegrityFlag[]>;
+  updateIntegrityFlag(id: number, data: Partial<IntegrityFlag>): Promise<IntegrityFlag | undefined>;
+  createIntegrityFlagEvent(event: InsertIntegrityFlagEvent): Promise<IntegrityFlagEvent>;
+  getIntegrityFlagEvents(flagId: number): Promise<IntegrityFlagEvent[]>;
+
+  // ===== Sync Monitoring =====
+  createDeviceSyncSession(session: InsertDeviceSyncSession): Promise<DeviceSyncSession>;
+  getDeviceSyncSession(id: number): Promise<DeviceSyncSession | undefined>;
+  getAllDeviceSyncSessions(filters?: { status?: string; deviceId?: string; centerId?: number }): Promise<DeviceSyncSession[]>;
+  updateDeviceSyncSession(id: number, data: Partial<DeviceSyncSession>): Promise<DeviceSyncSession | undefined>;
+  createSyncErrorLog(log: InsertSyncErrorLog): Promise<SyncErrorLog>;
+  getSyncErrorLogs(sessionId: number): Promise<SyncErrorLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2657,6 +2690,133 @@ export class DatabaseStorage implements IStorage {
     }
 
     return allSchedules;
+  }
+
+  // ===== Exam Card Batches =====
+  async createExamCardBatch(batch: InsertExamCardBatch): Promise<ExamCardBatch> {
+    const [created] = await db.insert(examCardBatches).values(batch).returning();
+    return created;
+  }
+
+  async getExamCardBatch(id: number): Promise<ExamCardBatch | undefined> {
+    const [batch] = await db.select().from(examCardBatches).where(eq(examCardBatches.id, id));
+    return batch;
+  }
+
+  async getAllExamCardBatches(filters?: { schoolId?: number; examYearId?: number }): Promise<ExamCardBatch[]> {
+    const conditions = [];
+    if (filters?.schoolId) conditions.push(eq(examCardBatches.schoolId, filters.schoolId));
+    if (filters?.examYearId) conditions.push(eq(examCardBatches.examYearId, filters.examYearId));
+    return db.select().from(examCardBatches)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(examCardBatches.createdAt));
+  }
+
+  async updateExamCardBatch(id: number, data: Partial<ExamCardBatch>): Promise<ExamCardBatch | undefined> {
+    const [updated] = await db.update(examCardBatches).set(data).where(eq(examCardBatches.id, id)).returning();
+    return updated;
+  }
+
+  async getExamCardsByBatch(batchId: number): Promise<ExamCard[]> {
+    return db.select().from(examCards).where(eq(examCards.batchId, batchId));
+  }
+
+  async getExamCardsBySchool(schoolId: number, examYearId?: number): Promise<ExamCard[]> {
+    const conditions = [eq(examCards.schoolId, schoolId)];
+    if (examYearId) conditions.push(eq(examCards.examYearId, examYearId));
+    return db.select().from(examCards).where(and(...conditions));
+  }
+
+  async updateExamCard(id: number, data: Partial<ExamCard>): Promise<ExamCard | undefined> {
+    const [updated] = await db.update(examCards).set(data).where(eq(examCards.id, id)).returning();
+    return updated;
+  }
+
+  async bulkUpdateExamCards(ids: number[], data: Partial<ExamCard>): Promise<void> {
+    if (ids.length === 0) return;
+    await db.update(examCards).set(data).where(inArray(examCards.id, ids));
+  }
+
+  // ===== Integrity Flags =====
+  async createIntegrityFlag(flag: InsertIntegrityFlag): Promise<IntegrityFlag> {
+    const [created] = await db.insert(integrityFlags).values(flag).returning();
+    return created;
+  }
+
+  async getIntegrityFlag(id: number): Promise<IntegrityFlag | undefined> {
+    const [flag] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, id));
+    return flag;
+  }
+
+  async getAllIntegrityFlags(filters?: { examYearId?: number; centerId?: number; severity?: string; flagType?: string; status?: string }): Promise<IntegrityFlag[]> {
+    const conditions = [];
+    if (filters?.examYearId) conditions.push(eq(integrityFlags.examYearId, filters.examYearId));
+    if (filters?.centerId) conditions.push(eq(integrityFlags.centerId, filters.centerId));
+    if (filters?.severity) conditions.push(eq(integrityFlags.severity, filters.severity as any));
+    if (filters?.flagType) conditions.push(eq(integrityFlags.flagType, filters.flagType as any));
+    if (filters?.status) conditions.push(eq(integrityFlags.status, filters.status as any));
+    return db.select().from(integrityFlags)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(integrityFlags.createdAt));
+  }
+
+  async updateIntegrityFlag(id: number, data: Partial<IntegrityFlag>): Promise<IntegrityFlag | undefined> {
+    const [updated] = await db.update(integrityFlags)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(integrityFlags.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createIntegrityFlagEvent(event: InsertIntegrityFlagEvent): Promise<IntegrityFlagEvent> {
+    const [created] = await db.insert(integrityFlagEvents).values(event).returning();
+    return created;
+  }
+
+  async getIntegrityFlagEvents(flagId: number): Promise<IntegrityFlagEvent[]> {
+    return db.select().from(integrityFlagEvents)
+      .where(eq(integrityFlagEvents.flagId, flagId))
+      .orderBy(desc(integrityFlagEvents.createdAt));
+  }
+
+  // ===== Sync Monitoring =====
+  async createDeviceSyncSession(session: InsertDeviceSyncSession): Promise<DeviceSyncSession> {
+    const [created] = await db.insert(deviceSyncSessions).values(session).returning();
+    return created;
+  }
+
+  async getDeviceSyncSession(id: number): Promise<DeviceSyncSession | undefined> {
+    const [session] = await db.select().from(deviceSyncSessions).where(eq(deviceSyncSessions.id, id));
+    return session;
+  }
+
+  async getAllDeviceSyncSessions(filters?: { status?: string; deviceId?: string; centerId?: number }): Promise<DeviceSyncSession[]> {
+    const conditions = [];
+    if (filters?.status) conditions.push(eq(deviceSyncSessions.status, filters.status as any));
+    if (filters?.deviceId) conditions.push(eq(deviceSyncSessions.deviceId, filters.deviceId));
+    if (filters?.centerId) conditions.push(eq(deviceSyncSessions.centerId, filters.centerId));
+    return db.select().from(deviceSyncSessions)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(deviceSyncSessions.startedAt));
+  }
+
+  async updateDeviceSyncSession(id: number, data: Partial<DeviceSyncSession>): Promise<DeviceSyncSession | undefined> {
+    const [updated] = await db.update(deviceSyncSessions)
+      .set(data)
+      .where(eq(deviceSyncSessions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createSyncErrorLog(log: InsertSyncErrorLog): Promise<SyncErrorLog> {
+    const [created] = await db.insert(syncErrorLogs).values(log).returning();
+    return created;
+  }
+
+  async getSyncErrorLogs(sessionId: number): Promise<SyncErrorLog[]> {
+    return db.select().from(syncErrorLogs)
+      .where(eq(syncErrorLogs.sessionId, sessionId))
+      .orderBy(desc(syncErrorLogs.createdAt));
   }
 }
 
