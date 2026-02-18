@@ -1,8 +1,9 @@
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, Home } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 interface ProtectedRouteProps {
   component: React.ComponentType<any>;
@@ -11,6 +12,13 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ component: Component, allowedRoles }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      setLocation("/login");
+    }
+  }, [isLoading, user, setLocation]);
 
   if (isLoading) {
     return (
@@ -22,15 +30,19 @@ export function ProtectedRoute({ component: Component, allowedRoles }: Protected
     );
   }
 
-  if (!user || !user.role || !allowedRoles.includes(user.role)) {
+  if (!user) {
+    return null;
+  }
+
+  if (!user.role || !allowedRoles.includes(user.role)) {
     return (
       <div className="space-y-6">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto" data-testid="icon-access-denied">
             <AlertCircle className="w-8 h-8 text-destructive" />
           </div>
-          <h1 className="text-4xl font-semibold text-foreground">403</h1>
-          <h2 className="text-2xl font-semibold text-foreground">Access Denied</h2>
+          <h1 className="text-4xl font-semibold text-foreground" data-testid="text-error-code">403</h1>
+          <h2 className="text-2xl font-semibold text-foreground" data-testid="text-access-denied">Access Denied</h2>
           <p className="text-muted-foreground max-w-md mx-auto">
             You don't have permission to access this page. This area is restricted to administrators only.
           </p>
@@ -38,7 +50,7 @@ export function ProtectedRoute({ component: Component, allowedRoles }: Protected
 
         <div className="flex items-center justify-center gap-4">
           <Link href="/">
-            <Button>
+            <Button data-testid="button-back-dashboard">
               <Home className="w-4 h-4 mr-2" />
               Back to Dashboard
             </Button>

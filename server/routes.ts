@@ -220,7 +220,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         sameSite: "lax",
       },
     })
@@ -296,7 +296,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const userName = req.headers["x-replit-user-name"] as string;
     const userProfileImage = req.headers["x-replit-user-profile-image"] as string;
 
-    // Check if we have Replit auth headers
     if (userId) {
       const user = await storage.upsertUser({
         id: userId,
@@ -306,7 +305,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       });
 
       req.session.userId = user.id;
-      return res.json(user);
+      return req.session.save((err) => {
+        if (err) {
+          console.error('Failed to save session:', err);
+          return res.status(500).json({ message: "Login failed - session error" });
+        }
+        res.json(user);
+      });
     }
 
     // Dev mode fallback - create a test user if no Replit headers
@@ -365,15 +370,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       req.session.userId = user.id;
       
-      // Set longer session duration if "Remember Me" is checked (30 days vs 24 hours)
       if (rememberMe) {
         req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+      } else {
+        req.session.cookie.maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days default
       }
       
-      // Update last login
       await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
 
-      // Log login action
       try {
         await storage.createAuditLog({
           userId: user.id,
@@ -386,10 +390,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         console.error('Failed to create audit log for login:', auditError);
       }
 
-      res.json({ 
-        ...user, 
-        passwordHash: undefined,
-        mustChangePassword: user.mustChangePassword 
+      req.session.save((err) => {
+        if (err) {
+          console.error('Failed to save session:', err);
+          return res.status(500).json({ message: "Login failed - session error" });
+        }
+        res.json({ 
+          ...user, 
+          passwordHash: undefined,
+          mustChangePassword: user.mustChangePassword 
+        });
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
