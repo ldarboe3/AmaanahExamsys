@@ -83,6 +83,7 @@ import {
   CheckCircle2,
   Info,
   Key,
+  KeyRound,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -398,6 +399,26 @@ export default function Schools() {
       toast({
         title: t.common.error,
         description: error.message || (isRTL ? "فشل في إرسال بيانات الدخول" : "Failed to send credentials"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendPasswordResetMutation = useMutation({
+    mutationFn: async (schoolId: number) => {
+      return apiRequest("POST", `/api/schools/${schoolId}/send-password-reset`);
+    },
+    onSuccess: async (res) => {
+      const data = await res.json();
+      toast({
+        title: t.common.success,
+        description: data.message || (isRTL ? "تم إرسال بريد إعادة تعيين كلمة المرور بنجاح" : "Password reset email sent successfully"),
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل في إرسال بريد إعادة تعيين كلمة المرور" : "Failed to send password reset email"),
         variant: "destructive",
       });
     },
@@ -975,6 +996,14 @@ export default function Schools() {
                                 >
                                   <Key className="w-4 h-4 me-2" />
                                   {isRTL ? "إرسال بيانات الدخول" : "Send Credentials"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => sendPasswordResetMutation.mutate(school.id)}
+                                  disabled={sendPasswordResetMutation.isPending}
+                                  data-testid={`button-send-password-reset-${school.id}`}
+                                >
+                                  <KeyRound className="w-4 h-4 me-2" />
+                                  {isRTL ? "إرسال إعادة تعيين كلمة المرور" : "Send Password Reset"}
                                 </DropdownMenuItem>
                               </>
                             )}
@@ -1637,10 +1666,25 @@ export default function Schools() {
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-wrap gap-2">
             <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
               {t.common.close}
             </Button>
+            {selectedSchool && selectedSchool.adminUserId && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  sendPasswordResetMutation.mutate(selectedSchool.id);
+                }}
+                disabled={sendPasswordResetMutation.isPending}
+                data-testid="button-send-password-reset-details"
+              >
+                <KeyRound className="w-4 h-4 me-2" />
+                {sendPasswordResetMutation.isPending
+                  ? (isRTL ? "جاري الإرسال..." : "Sending...")
+                  : (isRTL ? "إرسال إعادة تعيين كلمة المرور" : "Send Password Reset")}
+              </Button>
+            )}
             {selectedSchool && (selectedSchool.status === 'pending' || selectedSchool.status === 'verified') && (
               <>
                 <Button

@@ -2557,6 +2557,61 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.post("/api/schools/:id/send-password-reset", isAuthenticated, async (req, res) => {
+    try {
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser || !['super_admin', 'examination_admin'].includes(currentUser.role || '')) {
+        return res.status(403).json({ message: "Only admins can send password reset emails" });
+      }
+
+      const school = await storage.getSchool(parseInt(req.params.id));
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+
+      if (!school.adminUserId) {
+        return res.status(400).json({ message: "This school does not have an admin account yet. Please create one first." });
+      }
+
+      const resetToken = generateVerificationToken();
+      const resetExpiry = getVerificationExpiry();
+
+      await db.update(schools)
+        .set({
+          passwordResetToken: resetToken,
+          passwordResetExpiry: resetExpiry,
+          updatedAt: new Date()
+        })
+        .where(eq(schools.id, school.id));
+
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const emailSent = await sendPasswordResetEmail(
+        school.email,
+        school.name,
+        school.registrarName,
+        resetToken,
+        baseUrl
+      );
+
+      if (!emailSent) {
+        return res.status(500).json({ message: "Failed to send password reset email. Please try again later." });
+      }
+
+      await storage.createAuditLog({
+        userId: currentUser.id,
+        action: 'admin_password_reset',
+        entityType: 'school',
+        entityId: school.id.toString(),
+        newData: { schoolName: school.name, triggeredBy: currentUser.username },
+      });
+
+      res.json({ message: "Password reset email sent successfully to " + school.email });
+    } catch (error: any) {
+      console.error('Admin send password reset error:', error);
+      res.status(500).json({ message: error.message || "Failed to send password reset email" });
+    }
+  });
+
   app.post("/api/schools/:id/assign-center", isAuthenticated, async (req, res) => {
     try {
       const { centerId } = req.body;
