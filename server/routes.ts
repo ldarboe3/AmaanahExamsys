@@ -9937,7 +9937,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             firstNameEn: null,
             lastNameEn: null,
             middleNameEn: null,
-            nationality: student.nationality || 'غامبي',
+            nationality: student.nationality || (student.gender === 'female' ? 'غامبية' : 'غامبي'),
             nationalityEn: null,
             gender: student.gender as 'male' | 'female',
             indexNumber: student.indexNumber,
@@ -9946,6 +9946,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             id: school.id,
             name: school.name,
             nameEn: null,
+            address: school.address || null,
           },
           {
             id: targetExamYear.id,
@@ -10215,6 +10216,209 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.setHeader('Content-Disposition', `attachment; filename="${transcript.transcriptNumber.replace('/', '-')}.pdf"`);
       fs.createReadStream(pdfPath).pipe(res);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/transcripts/delete-all", isAuthenticated, async (req, res) => {
+    try {
+      const sessionData = req.session as any;
+      if (!sessionData.role || !['super_admin', 'admin'].includes(sessionData.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const fs = await import('fs');
+      const allTranscripts = await storage.getAllTranscripts();
+      let deletedFiles = 0;
+      let deletedRecords = 0;
+
+      for (const transcript of allTranscripts) {
+        if (transcript.pdfUrl) {
+          const pdfPath = transcript.pdfUrl.startsWith('/')
+            ? transcript.pdfUrl
+            : path.join(process.cwd(), transcript.pdfUrl);
+          try {
+            if (fs.existsSync(pdfPath)) {
+              fs.unlinkSync(pdfPath);
+              deletedFiles++;
+            }
+          } catch (e) {}
+        }
+      }
+
+      deletedRecords = await storage.deleteAllTranscripts();
+
+      await storage.createAuditLog({
+        userId: sessionData.userId!,
+        action: 'delete_all_transcripts',
+        entityType: 'transcript',
+        entityId: '0',
+        newData: { deletedRecords, deletedFiles },
+        ipAddress: req.ip || 'unknown',
+      });
+
+      res.json({ deletedRecords, deletedFiles });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/import-fiqh-marks", isAuthenticated, async (req, res) => {
+    try {
+      const sessionData = req.session as any;
+      if (!sessionData.role || !['super_admin', 'admin'].includes(sessionData.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const XLSX = require('xlsx');
+      const filePath = path.join(process.cwd(), 'attached_assets/Student_capacity_FINAL_sorted_utf8_fixed_1771843600963.xlsx');
+      const fs = await import('fs');
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Excel file not found" });
+      }
+
+      const wb = XLSX.readFile(filePath);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+      const FIQH_SUBJECT_ID = 54;
+      const EXAM_YEAR_ID = 10;
+
+      const normalizeArabic = (text: string): string => {
+        if (!text) return '';
+        return text.toString()
+          .replace(/ـ/g, '')
+          .replace(/\s+/g, ' ')
+          .replace(/[أإآ]/g, 'ا')
+          .replace(/ة/g, 'ه')
+          .replace(/ى/g, 'ي')
+          .trim();
+      };
+
+      const allStudents = await db.select({
+        id: students.id,
+        firstName: students.firstName,
+        middleName: students.middleName,
+        lastName: students.lastName,
+        schoolId: students.schoolId,
+      }).from(students)
+        .where(and(
+          eq(students.grade, 6),
+          eq(students.examYearId, EXAM_YEAR_ID)
+        ));
+
+      const allSchools = await db.select({
+        id: schools.id,
+        name: schools.name,
+      }).from(schools);
+
+      const schoolNameToId = new Map<string, number>();
+      for (const s of allSchools) {
+        schoolNameToId.set(normalizeArabic(s.name), s.id);
+      }
+
+      const existingFiqhResults = await db.select({
+        studentId: studentResults.studentId,
+      }).from(studentResults)
+        .where(and(
+          eq(studentResults.subjectId, FIQH_SUBJECT_ID),
+          eq(studentResults.examYearId, EXAM_YEAR_ID)
+        ));
+      const studentsWithFiqh = new Set(existingFiqhResults.map(r => r.studentId));
+
+      const studentsBySchool = new Map<number, typeof allStudents>();
+      for (const s of allStudents) {
+        const arr = studentsBySchool.get(s.schoolId) || [];
+        arr.push(s);
+        studentsBySchool.set(s.schoolId, arr);
+      }
+
+      let inserted = 0;
+      let skipped = 0;
+      let notMatched = 0;
+      const unmatchedRows: string[] = [];
+
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        const excelSchoolName = row[0]?.toString() || '';
+        const excelStudentName = row[2]?.toString() || '';
+        const fiqhScore = row[8];
+
+        if (fiqhScore === undefined || fiqhScore === null || fiqhScore === '') continue;
+
+        const normalizedSchool = normalizeArabic(excelSchoolName);
+        const schoolId = schoolNameToId.get(normalizedSchool);
+
+        if (!schoolId) {
+          notMatched++;
+          if (unmatchedRows.length < 20) {
+            unmatchedRows.push(`Row ${i+1}: School '${excelSchoolName}' not found`);
+          }
+          continue;
+        }
+
+        const schoolStudents = studentsBySchool.get(schoolId) || [];
+        const normalizedExcelName = normalizeArabic(excelStudentName);
+
+        const matchedStudent = schoolStudents.find(s => {
+          const fullName = normalizeArabic([s.firstName, s.middleName, s.lastName].filter(Boolean).join(' '));
+          return fullName === normalizedExcelName;
+        });
+
+        if (!matchedStudent) {
+          notMatched++;
+          if (unmatchedRows.length < 20) {
+            unmatchedRows.push(`Row ${i+1}: Student '${excelStudentName}' in '${excelSchoolName}' not found`);
+          }
+          continue;
+        }
+
+        if (studentsWithFiqh.has(matchedStudent.id)) {
+          skipped++;
+          continue;
+        }
+
+        const score = parseFloat(fiqhScore.toString());
+        if (isNaN(score)) continue;
+
+        let grade = 'F';
+        if (score >= 85) grade = 'A+';
+        else if (score >= 80) grade = 'A';
+        else if (score >= 75) grade = 'B';
+        else if (score >= 65) grade = 'C';
+        else if (score >= 50) grade = 'D';
+
+        await db.insert(studentResults).values({
+          studentId: matchedStudent.id,
+          subjectId: FIQH_SUBJECT_ID,
+          examYearId: EXAM_YEAR_ID,
+          totalScore: score.toFixed(2),
+          grade: grade,
+          status: 'published',
+        });
+
+        studentsWithFiqh.add(matchedStudent.id);
+        inserted++;
+      }
+
+      await storage.createAuditLog({
+        userId: req.session.userId!,
+        action: 'import_fiqh_marks',
+        entityType: 'student_results',
+        entityId: String(FIQH_SUBJECT_ID),
+        newData: { inserted, skipped, notMatched },
+        ipAddress: req.ip || 'unknown',
+      });
+
+      res.json({
+        inserted,
+        skipped,
+        notMatched,
+        totalExcelRows: data.length - 1,
+        unmatchedSamples: unmatchedRows,
+      });
+    } catch (error: any) {
+      console.error('[Fiqh Import Error]', error);
       res.status(500).json({ message: error.message });
     }
   });

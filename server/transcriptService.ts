@@ -221,6 +221,32 @@ export function translateNationality(arabicNationality: string): string {
   return NATIONALITY_MAP[cleaned] || NATIONALITY_MAP[arabicNationality.toLowerCase()] || arabicNationality;
 }
 
+const NATIONALITY_GENDER_MAP: Record<string, { male: string; female: string }> = {
+  'غامبي': { male: 'غامبي', female: 'غامبية' },
+  'غامبية': { male: 'غامبي', female: 'غامبية' },
+  'نيجيري': { male: 'نيجيري', female: 'نيجيرية' },
+  'نيجيرية': { male: 'نيجيري', female: 'نيجيرية' },
+  'سنغالي': { male: 'سنغالي', female: 'سنغالية' },
+  'سنغالية': { male: 'سنغالي', female: 'سنغالية' },
+  'مالي': { male: 'مالي', female: 'مالية' },
+  'مالية': { male: 'مالي', female: 'مالية' },
+  'غيني': { male: 'غيني', female: 'غينية' },
+  'غينية': { male: 'غيني', female: 'غينية' },
+  'سيراليوني': { male: 'سيراليوني', female: 'سيراليونية' },
+  'سيراليونية': { male: 'سيراليوني', female: 'سيراليونية' },
+  'موريتاني': { male: 'موريتاني', female: 'موريتانية' },
+  'موريتانية': { male: 'موريتاني', female: 'موريتانية' },
+};
+
+export function getGenderSensitiveNationality(nationality: string, gender: 'male' | 'female'): string {
+  const cleaned = cleanArabicText(nationality).trim();
+  const mapping = NATIONALITY_GENDER_MAP[cleaned] || NATIONALITY_GENDER_MAP[nationality.trim()];
+  if (mapping) {
+    return gender === 'female' ? mapping.female : mapping.male;
+  }
+  return nationality;
+}
+
 export interface TranscriptStudentData {
   id: number;
   firstName: string;
@@ -239,6 +265,7 @@ export interface TranscriptSchoolData {
   id: number;
   name: string;
   nameEn?: string | null;
+  address?: string | null;
 }
 
 export interface TranscriptExamYearData {
@@ -331,8 +358,9 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
   const { student, school, examYear, subjectMarks, totalMarks, percentage, finalGrade } = data;
   
   const fullNameAr = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
-  const nationalityAr = student.nationality || 'غامبي';
-  const schoolNameAr = school.name;
+  const defaultNationality = student.gender === 'female' ? 'غامبية' : 'غامبي';
+  const nationalityAr = student.nationality ? getGenderSensitiveNationality(student.nationality, student.gender) : defaultNationality;
+  const schoolNameAr = school.address ? `${school.name} - ${school.address}` : school.name;
   const transcriptNumber = data.transcriptNumber || '';
   
   // Build subject rows - RTL table with columns: م | المادة | الدرجات الكبرى | الدرجات الصغرى | الدرجة المحققة

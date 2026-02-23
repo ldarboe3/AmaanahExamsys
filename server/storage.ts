@@ -250,6 +250,8 @@ export interface IStorage {
   updateTranscript(id: number, transcript: Partial<InsertTranscript>): Promise<Transcript | undefined>;
   incrementTranscriptPrintCount(id: number): Promise<Transcript | undefined>;
   deleteTranscript(id: number): Promise<boolean>;
+  getAllTranscripts(): Promise<Transcript[]>;
+  deleteAllTranscripts(): Promise<number>;
 
   // Attendance Records
   createAttendanceRecord(record: InsertAttendanceRecord): Promise<AttendanceRecord>;
@@ -1492,6 +1494,18 @@ export class DatabaseStorage implements IStorage {
   async deleteTranscript(id: number): Promise<boolean> {
     await db.delete(transcripts).where(eq(transcripts.id, id));
     return true;
+  }
+
+  async getAllTranscripts(): Promise<Transcript[]> {
+    return await db.select().from(transcripts);
+  }
+
+  async deleteAllTranscripts(): Promise<number> {
+    const all = await db.select({ id: transcripts.id }).from(transcripts);
+    if (all.length > 0) {
+      await db.delete(transcripts);
+    }
+    return all.length;
   }
 
   // Attendance Records

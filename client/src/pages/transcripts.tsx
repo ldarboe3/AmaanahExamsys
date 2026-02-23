@@ -46,6 +46,7 @@ import {
   Users,
   AlertCircle,
   Award,
+  Trash2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -125,12 +126,13 @@ export default function Transcripts() {
   const [selectedSchool, setSelectedSchool] = useState<string>("all");
   const [selectedExamYear, setSelectedExamYear] = useState<string>("");
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageSize, setPageSize] = useState<number>(50);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [previewStudent, setPreviewStudent] = useState<EligibleStudent | null>(null);
   const [previewTranscript, setPreviewTranscript] = useState<Transcript | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: examYears } = useQuery<ExamYear[]>({
     queryKey: ["/api/exam-years"],
@@ -171,7 +173,6 @@ export default function Transcripts() {
     return true;
   });
 
-  // Fetch eligible Grade 6 students with published results (unpaginated for print/generate all)
   const { data: eligibleStudents, isLoading: studentsLoading } = useQuery<EligibleStudent[]>({
     queryKey: ["/api/transcripts/eligible-g6-students", selectedExamYear],
     queryFn: async () => {
@@ -185,8 +186,6 @@ export default function Transcripts() {
     enabled: !!selectedExamYear,
   });
 
-  // Get all students for print/generate all (ensures we get all, not just current page)
-  // This uses the filtered list based on region/cluster/school selection
   const allStudentsForBulkOps = useMemo(() => {
     return (eligibleStudents || []).filter(s => {
       const school = schools.find((sch: SchoolType) => sch.id === s.schoolId);
@@ -198,7 +197,6 @@ export default function Transcripts() {
     });
   }, [eligibleStudents, schools, selectedRegion, selectedCluster, selectedSchool]);
 
-  // Calculate filter counts based on all eligible students
   const filterCounts = useMemo(() => {
     const regionCounts: Record<number, number> = {};
     const clusterCounts: Record<number, number> = {};
@@ -209,15 +207,12 @@ export default function Transcripts() {
     studentsToCount.forEach((student: EligibleStudent) => {
       const school = schools.find((s: SchoolType) => s.id === student.schoolId);
       if (school) {
-        // Region counts
         if (school.regionId) {
           regionCounts[school.regionId] = (regionCounts[school.regionId] || 0) + 1;
         }
-        // Cluster counts
         if (school.clusterId) {
           clusterCounts[school.clusterId] = (clusterCounts[school.clusterId] || 0) + 1;
         }
-        // School counts
         schoolCounts[student.schoolId] = (schoolCounts[student.schoolId] || 0) + 1;
       }
     });
@@ -225,13 +220,11 @@ export default function Transcripts() {
     return { regionCounts, clusterCounts, schoolCounts, total: studentsToCount.length };
   }, [eligibleStudents, schools]);
 
-  // Check if student has a transcript
   const getStudentTranscript = (studentId: number): Transcript | undefined => {
     const examYearId = selectedExamYear ? parseInt(selectedExamYear) : activeExamYear?.id;
     return allTranscripts?.find(t => t.studentId === studentId && t.examYearId === examYearId);
   };
 
-  // Filter students by region, cluster, and school
   const filteredStudents = eligibleStudents?.filter(s => {
     const school = schools.find((sch: SchoolType) => sch.id === s.schoolId);
     if (!school) return false;
@@ -244,7 +237,6 @@ export default function Transcripts() {
     hasTranscript: !!getStudentTranscript(s.id)
   })) || [];
 
-  // Pagination
   const totalStudents = filteredStudents.length;
   const totalPages = Math.ceil(totalStudents / pageSize);
   const paginatedStudents = filteredStudents.slice(
@@ -252,14 +244,12 @@ export default function Transcripts() {
     currentPage * pageSize
   );
 
-  // Summary stats
   const summary = {
     total: totalStudents,
     withTranscript: filteredStudents.filter(s => s.hasTranscript).length,
     eligible: filteredStudents.filter(s => !s.hasTranscript).length,
   };
 
-  // Generate transcripts mutation
   const generateTranscriptMutation = useMutation({
     mutationFn: async (studentIds: number[]) => {
       const response = await apiRequest("POST", "/api/transcripts/generate-g6-arabic", { 
@@ -271,8 +261,6 @@ export default function Transcripts() {
     onSuccess: (data) => {
       const generated = data.generated || 0;
       const errors = data.errors || [];
-      
-      console.error('Transcript generation response:', { data, errors });
       
       if (errors.length > 0) {
         const errorMessages = errors.map((err: any) => `${err.studentName || err.studentId}: ${err.error}`).join('\n');
@@ -297,7 +285,6 @@ export default function Transcripts() {
       setSelectedStudents([]);
     },
     onError: (error: Error) => {
-      console.error('Transcript generation error:', error);
       toast({
         title: isRTL ? "خطأ في الإنشاء" : "Generation Error",
         description: error.message,
@@ -306,15 +293,78 @@ export default function Transcripts() {
     },
   });
 
+  const deleteAllTranscriptsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", "/api/transcripts/delete-all");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: isRTL ? "تم حذف كشوف الدرجات" : "Transcripts Deleted",
+        description: isRTL 
+          ? `تم حذف ${data.deletedRecords} كشف درجات و ${data.deletedFiles} ملف`
+          : `Deleted ${data.deletedRecords} transcript records and ${data.deletedFiles} files`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/transcripts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transcripts/eligible-g6-students"] });
+      setSelectedStudents([]);
+      setShowDeleteConfirm(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: isRTL ? "خطأ في الحذف" : "Delete Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const importFiqhMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/admin/import-fiqh-marks");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: isRTL ? "تم استيراد درجات الفقه" : "Fiqh Marks Imported",
+        description: isRTL 
+          ? `تم إدخال ${data.inserted} درجة، تخطي ${data.skipped}، غير متطابق ${data.notMatched}`
+          : `Inserted ${data.inserted}, skipped ${data.skipped}, unmatched ${data.notMatched}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/transcripts/eligible-g6-students"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: isRTL ? "خطأ في الاستيراد" : "Import Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      // Select all students without transcripts on current page
-      const eligibleIds = paginatedStudents
+      const allFilteredEligibleIds = filteredStudents
         .filter(s => !s.hasTranscript)
         .map(s => s.id);
-      setSelectedStudents(eligibleIds);
+      setSelectedStudents(allFilteredEligibleIds);
     } else {
       setSelectedStudents([]);
+    }
+  };
+
+  const handleSelectPageAll = (checked: boolean) => {
+    if (checked) {
+      const pageEligibleIds = paginatedStudents
+        .filter(s => !s.hasTranscript)
+        .map(s => s.id);
+      setSelectedStudents(prev => {
+        const newSet = new Set([...prev, ...pageEligibleIds]);
+        return Array.from(newSet);
+      });
+    } else {
+      const pageIds = new Set(paginatedStudents.map(s => s.id));
+      setSelectedStudents(prev => prev.filter(id => !pageIds.has(id)));
     }
   };
 
@@ -386,7 +436,6 @@ export default function Transcripts() {
       return;
     }
     
-    // Open all PDFs in new tabs for printing
     transcriptsWithPdf.forEach((t, index) => {
       setTimeout(() => {
         window.open(`/api/transcripts/${t!.id}/download`, '_blank');
@@ -401,10 +450,54 @@ export default function Transcripts() {
     });
   };
 
+  const handlePrintSelected = () => {
+    const selectedTranscripts = selectedStudents
+      .map(id => {
+        const student = filteredStudents.find(s => s.id === id);
+        if (student?.hasTranscript) {
+          return getStudentTranscript(id);
+        }
+        return undefined;
+      })
+      .filter(t => t !== undefined);
+
+    if (selectedTranscripts.length === 0) {
+      toast({
+        title: isRTL ? "لا توجد كشوف للطباعة" : "No Transcripts to Print",
+        description: isRTL 
+          ? "الطلاب المحددون ليس لديهم كشوف درجات بعد. قم بإنشائها أولاً." 
+          : "Selected students don't have transcripts yet. Generate them first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    selectedTranscripts.forEach((t, index) => {
+      setTimeout(() => {
+        window.open(`/api/transcripts/${t!.id}/download`, '_blank');
+      }, index * 500);
+    });
+
+    toast({
+      title: isRTL ? "جاري الطباعة" : "Printing Selected",
+      description: isRTL 
+        ? `جاري فتح ${selectedTranscripts.length} كشف درجات للطباعة.`
+        : `Opening ${selectedTranscripts.length} transcripts for printing.`,
+    });
+  };
+
+  const allPageEligibleSelected = paginatedStudents.filter(s => !s.hasTranscript).length > 0 &&
+    paginatedStudents.filter(s => !s.hasTranscript).every(s => selectedStudents.includes(s.id));
+
+  const selectedWithTranscripts = selectedStudents.filter(id => {
+    const student = filteredStudents.find(s => s.id === id);
+    return student?.hasTranscript;
+  }).length;
+
   return (
     <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       {generateTranscriptMutation.isPending && (
-        <GeneratingOverlay isRTL={isRTL} count={selectedStudents.length} />
+        <GeneratingOverlay isRTL={isRTL} count={selectedStudents.length || summary.eligible} />
       )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -419,6 +512,28 @@ export default function Transcripts() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => importFiqhMutation.mutate()}
+            disabled={importFiqhMutation.isPending}
+            data-testid="button-import-fiqh"
+          >
+            {importFiqhMutation.isPending ? (
+              <Loader2 className="w-4 h-4 me-2 animate-spin" />
+            ) : (
+              <FileText className="w-4 h-4 me-2" />
+            )}
+            {isRTL ? "استيراد درجات الفقه" : "Import Fiqh Marks"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={deleteAllTranscriptsMutation.isPending || !allTranscripts || allTranscripts.length === 0}
+            data-testid="button-delete-all-transcripts"
+          >
+            <Trash2 className="w-4 h-4 me-2" />
+            {isRTL ? "حذف الكل" : "Delete All"}
+          </Button>
           <Button
             variant="outline"
             onClick={handlePrintAll}
@@ -618,21 +733,46 @@ export default function Transcripts() {
               </CardDescription>
             </div>
             {selectedStudents.length > 0 && (
-              <Button
-                onClick={handleGenerateSelected}
-                disabled={generateTranscriptMutation.isPending}
-                size="sm"
-                data-testid="button-generate-selected"
-              >
-                {generateTranscriptMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
-                ) : (
-                  <FileText className="w-4 h-4 me-2" />
-                )}
-                {isRTL 
-                  ? `إنشاء المحدد (${selectedStudents.length})` 
-                  : `Generate Selected (${selectedStudents.length})`}
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="secondary">
+                  {isRTL ? `تم تحديد ${selectedStudents.length}` : `${selectedStudents.length} selected`}
+                </Badge>
+                <Button
+                  variant="outline"
+                  onClick={handlePrintSelected}
+                  disabled={selectedWithTranscripts === 0}
+                  size="sm"
+                  data-testid="button-print-selected"
+                >
+                  <Printer className="w-4 h-4 me-2" />
+                  {isRTL 
+                    ? `طباعة المحدد (${selectedWithTranscripts})` 
+                    : `Print Selected (${selectedWithTranscripts})`}
+                </Button>
+                <Button
+                  onClick={handleGenerateSelected}
+                  disabled={generateTranscriptMutation.isPending}
+                  size="sm"
+                  data-testid="button-generate-selected"
+                >
+                  {generateTranscriptMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                  ) : (
+                    <FileText className="w-4 h-4 me-2" />
+                  )}
+                  {isRTL 
+                    ? `إنشاء المحدد (${selectedStudents.length})` 
+                    : `Generate Selected (${selectedStudents.length})`}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedStudents([])}
+                  data-testid="button-clear-selection"
+                >
+                  {isRTL ? "إلغاء التحديد" : "Clear"}
+                </Button>
+              </div>
             )}
           </div>
         </CardHeader>
@@ -650,10 +790,24 @@ export default function Transcripts() {
           ) : paginatedStudents.length > 0 ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="text-sm text-muted-foreground">
-                  {isRTL 
-                    ? `عرض ${paginatedStudents.length} من ${totalStudents} (الصفحة ${currentPage})`
-                    : `Showing ${paginatedStudents.length} of ${totalStudents} (Page ${currentPage})`}
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="text-sm text-muted-foreground">
+                    {isRTL 
+                      ? `عرض ${paginatedStudents.length} من ${totalStudents} (الصفحة ${currentPage})`
+                      : `Showing ${paginatedStudents.length} of ${totalStudents} (Page ${currentPage})`}
+                  </div>
+                  {filteredStudents.filter(s => !s.hasTranscript).length > 0 && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleSelectAll(selectedStudents.length < filteredStudents.filter(s => !s.hasTranscript).length)}
+                      data-testid="button-select-all-filtered"
+                    >
+                      {selectedStudents.length >= filteredStudents.filter(s => !s.hasTranscript).length
+                        ? (isRTL ? "إلغاء تحديد الكل" : "Deselect All")
+                        : (isRTL ? `تحديد الكل (${filteredStudents.filter(s => !s.hasTranscript).length})` : `Select All (${filteredStudents.filter(s => !s.hasTranscript).length})`)}
+                    </Button>
+                  )}
                 </div>
                 <Select value={pageSize.toString()} onValueChange={(val) => {
                   setPageSize(parseInt(val));
@@ -663,9 +817,10 @@ export default function Transcripts() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="10">{isRTL ? "10 صفات" : "10 Items"}</SelectItem>
-                    <SelectItem value="50">{isRTL ? "50 صفات" : "50 Items"}</SelectItem>
-                    <SelectItem value="100">{isRTL ? "100 صفات" : "100 Items"}</SelectItem>
+                    <SelectItem value="10">{isRTL ? "10 صفوف" : "10 Items"}</SelectItem>
+                    <SelectItem value="50">{isRTL ? "50 صفوف" : "50 Items"}</SelectItem>
+                    <SelectItem value="100">{isRTL ? "100 صفوف" : "100 Items"}</SelectItem>
+                    <SelectItem value="500">{isRTL ? "500 صفوف" : "500 Items"}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -676,9 +831,8 @@ export default function Transcripts() {
                     <TableRow>
                       <TableHead className="w-12">
                         <Checkbox
-                          checked={paginatedStudents.filter(s => !s.hasTranscript).length > 0 && 
-                            paginatedStudents.filter(s => !s.hasTranscript).every(s => selectedStudents.includes(s.id))}
-                          onCheckedChange={handleSelectAll}
+                          checked={allPageEligibleSelected}
+                          onCheckedChange={handleSelectPageAll}
                           data-testid="checkbox-select-all"
                         />
                       </TableHead>
@@ -699,7 +853,6 @@ export default function Transcripts() {
                             <Checkbox
                               checked={selectedStudents.includes(student.id)}
                               onCheckedChange={(checked) => handleSelectStudent(student.id, !!checked)}
-                              disabled={student.hasTranscript}
                               data-testid={`checkbox-student-${student.id}`}
                             />
                           </TableCell>
@@ -910,6 +1063,41 @@ export default function Transcripts() {
                 {isRTL ? "تنزيل PDF" : "Download PDF"}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              {isRTL ? "تأكيد حذف جميع كشوف الدرجات" : "Confirm Delete All Transcripts"}
+            </DialogTitle>
+            <DialogDescription>
+              {isRTL 
+                ? "سيتم حذف جميع كشوف الدرجات المُنشأة وملفات PDF المرتبطة بها. هذا الإجراء لا يمكن التراجع عنه. هل أنت متأكد؟" 
+                : "This will delete all generated transcripts and their associated PDF files. This action cannot be undone. Are you sure?"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+              {t.common.cancel}
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => deleteAllTranscriptsMutation.mutate()}
+              disabled={deleteAllTranscriptsMutation.isPending}
+              data-testid="button-confirm-delete-all"
+            >
+              {deleteAllTranscriptsMutation.isPending ? (
+                <Loader2 className="w-4 h-4 me-2 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 me-2" />
+              )}
+              {isRTL ? "نعم، احذف الكل" : "Yes, Delete All"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
