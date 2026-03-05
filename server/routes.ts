@@ -6574,9 +6574,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       // Get all pending students for this school/exam year
+      // Also include students with null/undefined examYearId (uploaded without specifying year) — assign to this invoice's year
       const allStudents = await storage.getStudentsBySchool(invoice.schoolId);
-      const pendingStudents = allStudents.filter(s => 
-        s.examYearId === invoice.examYearId && 
+
+      // First, assign unlinked students to this exam year so they get approved correctly
+      if (invoice.examYearId) {
+        for (const s of allStudents.filter(s => !s.examYearId && s.status === 'pending')) {
+          await storage.updateStudent(s.id, { examYearId: invoice.examYearId });
+        }
+      }
+
+      // Re-fetch after potential updates
+      const refreshedStudents = await storage.getStudentsBySchool(invoice.schoolId);
+      const pendingStudents = refreshedStudents.filter(s => 
+        (s.examYearId === invoice.examYearId || (!s.examYearId && !invoice.examYearId)) && 
         s.status === 'pending'
       );
       
@@ -6797,9 +6808,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       // Get all pending students for this school and exam year
+      // Also handle students with no examYearId (assign them to this invoice's year)
       const allStudents = await storage.getStudentsBySchool(invoice.schoolId);
-      const pendingStudents = allStudents.filter(s => 
-        s.examYearId === invoice.examYearId && 
+      if (invoice.examYearId) {
+        for (const s of allStudents.filter(s => !s.examYearId && s.status === 'pending')) {
+          await storage.updateStudent(s.id, { examYearId: invoice.examYearId });
+        }
+      }
+      const refreshedStudents = await storage.getStudentsBySchool(invoice.schoolId);
+      const pendingStudents = refreshedStudents.filter(s => 
+        (s.examYearId === invoice.examYearId || (!s.examYearId && !invoice.examYearId)) && 
         s.status === 'pending'
       );
       
