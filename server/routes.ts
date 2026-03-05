@@ -1328,20 +1328,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       // Auto-create admin user if school doesn't have one yet
       let adminUserId = school.adminUserId;
+      const shortUsername = `sch${school.id}`;
       if (!adminUserId) {
-        const baseUsername = school.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '_')
-          .substring(0, 20);
-        let username = `school_${baseUsername}`;
-        let counter = 1;
-        while (await storage.getUserByUsername(username)) {
-          username = `school_${baseUsername}_${counter++}`;
-        }
         const defaultPassword = 'Admin@123';
         const hashedPassword = await bcrypt.hash(defaultPassword, 10);
         const newAdminUser = await storage.upsertUser({
-          username,
+          username: shortUsername,
           passwordHash: hashedPassword,
           role: 'school_admin',
           firstName: school.registrarName?.split(' ')[0] || 'Admin',
@@ -1361,11 +1353,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       let mustChangePassword = true;
       let hasCredentials = false;
       
-      const user = await storage.getUser(adminUserId);
-      if (user && user.username) {
-        username = user.username;
-        mustChangePassword = user.mustChangePassword ?? true;
-        hasCredentials = true;
+      let user = await storage.getUser(adminUserId);
+      if (user) {
+        // Auto-migrate old long usernames to short format
+        if (user.username && user.username.startsWith('school_') && user.username.length > 12) {
+          let newUsername = shortUsername;
+          let counter = 1;
+          while (await storage.getUserByUsername(newUsername) && (await storage.getUserByUsername(newUsername))?.id !== user.id) {
+            newUsername = `sch${school.id}_${counter++}`;
+          }
+          await db.update(users).set({ username: newUsername, updatedAt: new Date() }).where(eq(users.id, user.id));
+          user = { ...user, username: newUsername };
+        }
+        if (user.username) {
+          username = user.username;
+          mustChangePassword = user.mustChangePassword ?? true;
+          hasCredentials = true;
+        }
       }
       
       // Return credentials info
@@ -2552,18 +2556,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Auto-create admin user if school doesn't have one yet
       let adminUserId = school.adminUserId;
       if (!adminUserId) {
-        const baseUsername = school.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '_')
-          .substring(0, 20);
-        let uname = `school_${baseUsername}`;
-        let counter = 1;
-        while (await storage.getUserByUsername(uname)) {
-          uname = `school_${baseUsername}_${counter++}`;
-        }
         const hashedPw = await bcrypt.hash('Admin@123', 10);
         const newUser = await storage.upsertUser({
-          username: uname,
+          username: `sch${school.id}`,
           passwordHash: hashedPw,
           role: 'school_admin',
           firstName: school.registrarName?.split(' ')[0] || 'Admin',
@@ -2578,7 +2573,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         adminUserId = newUser.id;
       }
 
-      const adminUser = await storage.getUser(adminUserId);
+      let adminUser = await storage.getUser(adminUserId);
+      // Auto-migrate old long usernames to short format
+      if (adminUser && adminUser.username && adminUser.username.startsWith('school_') && adminUser.username.length > 12) {
+        let newUsername = `sch${school.id}`;
+        let counter = 1;
+        while (await storage.getUserByUsername(newUsername) && (await storage.getUserByUsername(newUsername))?.id !== adminUser.id) {
+          newUsername = `sch${school.id}_${counter++}`;
+        }
+        await db.update(users).set({ username: newUsername, updatedAt: new Date() }).where(eq(users.id, adminUser.id));
+        adminUser = { ...adminUser, username: newUsername };
+      }
       if (!adminUser) {
         return res.status(404).json({ message: "School admin user not found" });
       }
@@ -2622,19 +2627,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Auto-create admin user if school has email but no linked account yet
       let adminUserId = school.adminUserId;
       if (!adminUserId && school.email) {
-        const baseUsername = school.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '_')
-          .substring(0, 20);
-        let username = `school_${baseUsername}`;
-        // Ensure uniqueness
-        let counter = 1;
-        while (await storage.getUserByUsername(username)) {
-          username = `school_${baseUsername}_${counter++}`;
-        }
         const defaultPasswordHash = await bcrypt.hash('Admin@123', 10);
         const newAdminUser = await storage.upsertUser({
-          username,
+          username: `sch${school.id}`,
           passwordHash: defaultPasswordHash,
           role: 'school_admin',
           firstName: school.registrarName?.split(' ')[0] || 'Admin',
@@ -2648,6 +2643,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           .set({ adminUserId: newAdminUser.id, updatedAt: new Date() })
           .where(eq(schools.id, school.id));
         adminUserId = newAdminUser.id;
+      }
+
+      // Auto-migrate existing old long usernames to short format
+      if (adminUserId) {
+        const existingUser = await storage.getUser(adminUserId);
+        if (existingUser && existingUser.username && existingUser.username.startsWith('school_') && existingUser.username.length > 12) {
+          let newUsername = `sch${school.id}`;
+          let counter = 1;
+          while (await storage.getUserByUsername(newUsername) && (await storage.getUserByUsername(newUsername))?.id !== existingUser.id) {
+            newUsername = `sch${school.id}_${counter++}`;
+          }
+          await db.update(users).set({ username: newUsername, updatedAt: new Date() }).where(eq(users.id, existingUser.id));
+        }
       }
 
       if (!adminUserId) {
