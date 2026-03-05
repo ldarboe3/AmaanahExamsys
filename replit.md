@@ -27,6 +27,7 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Email Services**: Integrated with SendGrid for reliable email delivery.
 - **File Handling**: Multer-based file uploads with object storage integration.
 - **Notification System**: Provides role-based in-app notifications.
+- **Offline/PWA Support**: Service Worker (`client/public/sw.js`) caches app shell and API GET responses. Mutations (POST/PUT/DELETE) while offline are queued to IndexedDB (`client/src/lib/offlineQueue.ts`) and auto-synced on reconnect. Global `OfflineSyncBanner` shows offline status and pending queue count. Toast notifications confirm when items are saved offline. Service Worker is only registered in production (`import.meta.env.PROD`). Certificate/transcript PDF generation still requires server connectivity.
 
 ### Feature Specifications
 - **School Management**: Includes profile management, badge upload, invitation systems, authoritative region/cluster validation, and credential generation for school administrators. Supports bulk JSON/CSV import for schools, automatically granting access.

@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { enqueueOfflineMutation } from "./offlineQueue";
 
 function handleUnauthorized() {
   queryClient.setQueryData(["/api/auth/user"], null);
@@ -22,16 +23,36 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  options?: { offlineLabel?: string; skipOfflineQueue?: boolean }
 ): Promise<Response> {
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  const queueOffline = async () => {
+    const id = await enqueueOfflineMutation(method, url, data, options?.offlineLabel);
+    return new Response(JSON.stringify({ __offline: true, __queueId: id, id: id * -1 }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', 'X-Offline-Queued': 'true' },
+    });
+  };
 
-  await throwIfResNotOk(res);
-  return res;
+  if (!navigator.onLine && !options?.skipOfflineQueue && method !== 'GET') {
+    return queueOffline();
+  }
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
+
+    await throwIfResNotOk(res);
+    return res;
+  } catch (err) {
+    if (!navigator.onLine && !options?.skipOfflineQueue && method !== 'GET') {
+      return queueOffline();
+    }
+    throw err;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -52,7 +73,13 @@ export const getQueryFn: <T>(options: {
       handleUnauthorized();
     }
 
-    await throwIfResNotOk(res);
+    if (!res.ok) {
+      if (res.headers.get('X-Offline') === 'true') {
+        try { return await res.json(); } catch { return null; }
+      }
+      await throwIfResNotOk(res);
+    }
+
     return await res.json();
   };
 

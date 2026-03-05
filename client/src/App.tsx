@@ -42,6 +42,9 @@ import ExamDay from "@/pages/exam-day";
 import ExamExecution from "@/pages/exam-execution";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OfflineSyncBanner } from "@/components/OfflineSyncBanner";
+import { useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 import Home from "@/pages/home";
 import About from "@/pages/about";
@@ -194,6 +197,7 @@ function AuthenticatedLayout() {
               <UserProfileDropdown />
             </div>
           </header>
+          <OfflineSyncBanner />
           <main className="flex-1 overflow-auto">
             <div className="container mx-auto p-6">
               <AuthenticatedRoutes />
@@ -208,6 +212,25 @@ function AuthenticatedLayout() {
       </div>
     </SidebarProvider>
   );
+}
+
+function OfflineToastListener() {
+  const { toast } = useToast();
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      toast({
+        title: "Saved offline",
+        description: detail?.label
+          ? `"${detail.label}" queued — will sync when you're back online.`
+          : "Change queued — will sync automatically when you're back online.",
+        duration: 4000,
+      });
+    };
+    window.addEventListener('amaanah:offline-queued', handler);
+    return () => window.removeEventListener('amaanah:offline-queued', handler);
+  }, [toast]);
+  return null;
 }
 
 function AppContent() {
@@ -231,6 +254,7 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <AppContent />
+            <OfflineToastListener />
             <Toaster />
           </TooltipProvider>
         </QueryClientProvider>
