@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import { generateExamScheduleWithAI } from "./aiScheduler";
 import fs from "fs";
 import path from "path";
 import { storage } from "./storage";
@@ -7059,6 +7060,96 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       await storage.deleteTimetableEntry(parseInt(req.params.id));
       res.json({ message: "Deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // AI-powered timetable generation
+  app.post("/api/timetable/ai-generate", isAuthenticated, async (req, res) => {
+    try {
+      const { examYearId, grade } = req.body;
+      if (!examYearId) {
+        return res.status(400).json({ message: "examYearId is required" });
+      }
+
+      const examYear = await storage.getExamYear(parseInt(examYearId));
+      if (!examYear) {
+        return res.status(404).json({ message: "Exam year not found" });
+      }
+
+      const allSubjects = await storage.getAllSubjects();
+      const grades = grade ? [parseInt(grade)] : (examYear.grades || [6]);
+      const relevantSubjects = allSubjects.filter(
+        s => s.isActive && grades.includes(s.grade)
+      );
+
+      if (relevantSubjects.length === 0) {
+        return res.status(400).json({ message: "No active subjects found for the specified grade(s)" });
+      }
+
+      const startDate = examYear.examStartDate
+        ? new Date(examYear.examStartDate).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0];
+      const endDate = examYear.examEndDate
+        ? new Date(examYear.examEndDate).toISOString().split("T")[0]
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+      const schedule = await generateExamScheduleWithAI({
+        examYearId: parseInt(examYearId),
+        examYearName: examYear.name,
+        startDate,
+        endDate,
+        grades,
+        subjects: relevantSubjects.map(s => ({
+          id: s.id,
+          name: s.name,
+          arabicName: s.arabicName,
+          code: s.code,
+          grade: s.grade,
+        })),
+      });
+
+      res.json({ schedule, examYear, subjects: relevantSubjects });
+    } catch (error: any) {
+      console.error("AI schedule generation error:", error);
+      if (error.message?.includes("API key") || error.message?.includes("baseURL") || error.message?.includes("ECONNREFUSED")) {
+        return res.status(503).json({ message: "AI service not configured. Please enable the OpenAI integration first." });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Save AI-generated timetable entries (bulk)
+  app.post("/api/timetable/ai-save", isAuthenticated, async (req, res) => {
+    try {
+      const { examYearId, entries, replaceExisting } = req.body;
+      if (!examYearId || !entries || !Array.isArray(entries)) {
+        return res.status(400).json({ message: "examYearId and entries array are required" });
+      }
+
+      if (replaceExisting) {
+        const existing = await storage.getTimetableByExamYear(parseInt(examYearId));
+        for (const entry of existing) {
+          await storage.deleteTimetableEntry(entry.id);
+        }
+      }
+
+      const created = [];
+      for (const entry of entries) {
+        const newEntry = await storage.createTimetableEntry({
+          examYearId: parseInt(examYearId),
+          subjectId: entry.subjectId,
+          examDate: entry.examDate,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          grade: entry.grade,
+          venue: entry.venue || null,
+        });
+        created.push(newEntry);
+      }
+
+      res.json({ created: created.length, entries: created });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -280,6 +280,17 @@ export default function Students() {
     enabled: isSchoolAdmin && !!schoolProfile?.id,
   });
 
+  // Fetch exam timetable for school admins (uses active exam year)
+  const { data: schoolTimetable = [] } = useQuery<any[]>({
+    queryKey: ["/api/timetable", { schoolAdmin: true }],
+    queryFn: async () => {
+      const res = await fetch("/api/timetable", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isSchoolAdmin,
+  });
+
   // Bulk upload mutation
   const bulkUploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -1446,6 +1457,74 @@ export default function Students() {
                   ))}
                 </div>
               )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Exam Timetable - For School Admins */}
+      {isSchoolAdmin && schoolTimetable.length > 0 && (
+        <Card data-testid="card-school-timetable">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" />
+              <CardTitle className="text-base">
+                {isRTL ? "جدول الامتحانات" : "Exam Timetable"}
+              </CardTitle>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {isRTL ? "مواعيد جميع المواد الدراسية للسنة الدراسية الحالية" : "Schedule for all subjects in the current exam year"}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50 border-b">
+                    <th className="text-left p-3 font-medium">{isRTL ? "التاريخ" : "Date"}</th>
+                    <th className="text-left p-3 font-medium">{isRTL ? "المادة" : "Subject"}</th>
+                    <th className="text-left p-3 font-medium">{isRTL ? "الصف" : "Grade"}</th>
+                    <th className="text-left p-3 font-medium">{isRTL ? "الوقت" : "Time"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schoolTimetable
+                    .sort((a: any, b: any) => a.examDate.localeCompare(b.examDate))
+                    .map((entry: any) => (
+                      <tr key={entry.id} className="border-b last:border-0" data-testid={`timetable-row-${entry.id}`}>
+                        <td className="p-3">
+                          <div className="font-medium">
+                            {new Date(entry.examDate + "T00:00:00").toLocaleDateString(isRTL ? "ar-SA" : "en-US", {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(entry.examDate + "T00:00:00").toLocaleDateString(isRTL ? "ar-SA" : "en-US", { year: "numeric" })}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="font-medium">{entry.subject?.name || `Subject ${entry.subjectId}`}</div>
+                          {entry.subject?.arabicName && (
+                            <div className="text-xs text-muted-foreground" dir="rtl">{entry.subject.arabicName}</div>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <Badge variant="secondary" className="text-xs">
+                            {isRTL ? `الصف ${entry.grade}` : `Grade ${entry.grade}`}
+                          </Badge>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>{entry.startTime} – {entry.endTime}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>

@@ -17,7 +17,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Calendar, Clock, Plus, CheckCircle2, AlertTriangle,
   Timer, Eye, Send, XCircle, PlayCircle, StopCircle,
-  Activity, BarChart3, MapPin
+  Activity, BarChart3, MapPin, Sparkles, Loader2, Save,
+  RefreshCw, CheckCheck
 } from "lucide-react";
 import type { ExamSchedule, ExamYear, Subject } from "@shared/schema";
 
@@ -56,6 +57,9 @@ export default function ExamScheduling() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showRecordStartDialog, setShowRecordStartDialog] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<ExamSchedule | null>(null);
+  const [showAIDialog, setShowAIDialog] = useState(false);
+  const [aiSchedule, setAiSchedule] = useState<any[]>([]);
+  const [aiReplaceExisting, setAiReplaceExisting] = useState(false);
 
   const isHQ = user?.role === "super_admin" || user?.role === "examination_admin";
 
@@ -128,6 +132,40 @@ export default function ExamScheduling() {
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
+  const aiGenerateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/timetable/ai-generate", {
+        examYearId: Number(selectedExamYearId),
+        grade: selectedGrade && selectedGrade !== "all" ? Number(selectedGrade) : undefined,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setAiSchedule(data.schedule || []);
+      toast({ title: `AI generated ${(data.schedule || []).length} schedule entries` });
+    },
+    onError: (err: any) => toast({ title: "AI Generation Failed", description: err.message, variant: "destructive" }),
+  });
+
+  const aiSaveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/timetable/ai-save", {
+        examYearId: Number(selectedExamYearId),
+        entries: aiSchedule,
+        replaceExisting: aiReplaceExisting,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-schedules"] });
+      setShowAIDialog(false);
+      setAiSchedule([]);
+      toast({ title: `Saved ${data.created} timetable entries successfully` });
+    },
+    onError: (err: any) => toast({ title: "Save Failed", description: err.message, variant: "destructive" }),
+  });
+
   const getSubjectName = (id: number) => subjects.find(s => s.id === id)?.name || `Subject ${id}`;
 
   const uniqueGrades = Array.from(new Set(
@@ -147,6 +185,17 @@ export default function ExamScheduling() {
             Manage exam schedules, record sessions, and monitor timing compliance
           </p>
         </div>
+        {isHQ && (
+          <Button
+            onClick={() => setShowAIDialog(true)}
+            disabled={!selectedExamYearId}
+            data-testid="button-ai-auto-schedule"
+            className="gap-2"
+          >
+            <Sparkles className="w-4 h-4" />
+            AI Auto-Schedule
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -424,6 +473,126 @@ export default function ExamScheduling() {
               isPending={recordStartMutation.isPending}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Auto-Schedule Dialog */}
+      <Dialog open={showAIDialog} onOpenChange={(open) => { setShowAIDialog(open); if (!open) setAiSchedule([]); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              AI Auto-Schedule Generator
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Info */}
+            <div className="rounded-md bg-primary/5 border border-primary/20 p-4 text-sm">
+              <p className="font-medium mb-1">How it works:</p>
+              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                <li>AI analyzes all active subjects for the selected exam year and grade</li>
+                <li>Generates a conflict-free schedule spread across the exam period</li>
+                <li>Prioritizes core subjects (Quran, Arabic) in the first week</li>
+                <li>Respects weekends and spacing between exams</li>
+                <li>Uses standard morning (09:00–11:00) and afternoon (14:00–16:00) slots</li>
+              </ul>
+            </div>
+
+            {/* Selected exam year info */}
+            {selectedExamYearId && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="w-4 h-4" />
+                <span>
+                  Generating for: <strong>{examYears.find(ey => ey.id === Number(selectedExamYearId))?.name}</strong>
+                  {selectedGrade && selectedGrade !== "all" && <> — Grade {selectedGrade}</>}
+                </span>
+              </div>
+            )}
+
+            {/* Generate button */}
+            {aiSchedule.length === 0 ? (
+              <Button
+                onClick={() => aiGenerateMutation.mutate()}
+                disabled={aiGenerateMutation.isPending || !selectedExamYearId}
+                className="w-full gap-2"
+                data-testid="button-ai-generate"
+              >
+                {aiGenerateMutation.isPending ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Generating with AI...</>
+                ) : (
+                  <><Sparkles className="w-4 h-4" /> Generate Schedule</>
+                )}
+              </Button>
+            ) : (
+              <div className="space-y-4">
+                {/* Preview table */}
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-foreground">
+                    <CheckCheck className="w-4 h-4 inline me-1 text-chart-2" />
+                    {aiSchedule.length} entries generated
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => aiGenerateMutation.mutate()} disabled={aiGenerateMutation.isPending} className="gap-1">
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Regenerate
+                  </Button>
+                </div>
+
+                <div className="rounded-md border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/50 border-b">
+                        <th className="text-left p-3 font-medium">Date</th>
+                        <th className="text-left p-3 font-medium">Subject</th>
+                        <th className="text-left p-3 font-medium">Grade</th>
+                        <th className="text-left p-3 font-medium">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aiSchedule
+                        .sort((a, b) => a.examDate.localeCompare(b.examDate))
+                        .map((entry, idx) => (
+                          <tr key={idx} className="border-b last:border-0 hover:bg-muted/30">
+                            <td className="p-3 text-muted-foreground">
+                              {new Date(entry.examDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                            </td>
+                            <td className="p-3 font-medium">{entry.subjectName}</td>
+                            <td className="p-3">Grade {entry.grade}</td>
+                            <td className="p-3 text-muted-foreground">{entry.startTime} – {entry.endTime}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Replace option */}
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={aiReplaceExisting}
+                    onChange={e => setAiReplaceExisting(e.target.checked)}
+                    className="rounded"
+                    data-testid="checkbox-replace-existing"
+                  />
+                  <span>Replace all existing timetable entries for this exam year</span>
+                </label>
+
+                {/* Save button */}
+                <Button
+                  onClick={() => aiSaveMutation.mutate()}
+                  disabled={aiSaveMutation.isPending}
+                  className="w-full gap-2"
+                  data-testid="button-ai-save"
+                >
+                  {aiSaveMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                  ) : (
+                    <><Save className="w-4 h-4" /> Save Timetable ({aiSchedule.length} entries)</>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
