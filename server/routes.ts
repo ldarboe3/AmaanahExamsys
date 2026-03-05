@@ -6584,12 +6584,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
 
-      // Re-fetch after potential updates
+      // Re-fetch after potential updates; approve ALL pending students for this school
       const refreshedStudents = await storage.getStudentsBySchool(invoice.schoolId);
-      const pendingStudents = refreshedStudents.filter(s => 
-        (s.examYearId === invoice.examYearId || (!s.examYearId && !invoice.examYearId)) && 
-        s.status === 'pending'
-      );
+      const pendingStudents = refreshedStudents.filter(s => s.status === 'pending');
+
+      console.log(`[confirm-payment] School ${invoice.schoolId}, invoice ${invoice.id}, examYearId=${invoice.examYearId}, pending students found: ${pendingStudents.length}`);
       
       // Auto-approve students and generate index numbers
       let approvedCount = 0;
@@ -6807,8 +6806,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "Payment must be confirmed before approving students" });
       }
       
-      // Get all pending students for this school and exam year
-      // Also handle students with no examYearId (assign them to this invoice's year)
+      // Get all pending students for this school.
+      // Payment has been confirmed so approve ALL pending students for this school,
+      // regardless of examYearId. Also assign examYearId to any unlinked students.
       const allStudents = await storage.getStudentsBySchool(invoice.schoolId);
       if (invoice.examYearId) {
         for (const s of allStudents.filter(s => !s.examYearId && s.status === 'pending')) {
@@ -6816,10 +6816,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
       const refreshedStudents = await storage.getStudentsBySchool(invoice.schoolId);
-      const pendingStudents = refreshedStudents.filter(s => 
-        (s.examYearId === invoice.examYearId || (!s.examYearId && !invoice.examYearId)) && 
-        s.status === 'pending'
-      );
+      const pendingStudents = refreshedStudents.filter(s => s.status === 'pending');
+
+      console.log(`[bulk-approve] School ${invoice.schoolId}, invoice ${invoice.id}, examYearId=${invoice.examYearId}, pending students found: ${pendingStudents.length}`);
+      refreshedStudents.forEach(s => console.log(`  student ${s.id}: status=${s.status}, examYearId=${s.examYearId}`));
       
       if (pendingStudents.length === 0) {
         return res.json({
