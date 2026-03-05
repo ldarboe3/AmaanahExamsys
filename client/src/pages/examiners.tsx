@@ -99,9 +99,10 @@ export default function Examiners() {
 
   const filteredExaminers = examiners?.filter((examiner) => {
     const fullName = `${examiner.firstName} ${examiner.lastName}`.toLowerCase();
+    const email = examiner.email || '';
     const matchesSearch =
       fullName.includes(searchQuery.toLowerCase()) ||
-      examiner.email.toLowerCase().includes(searchQuery.toLowerCase());
+      email.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
 
