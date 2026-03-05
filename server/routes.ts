@@ -14286,6 +14286,34 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         newData: { details: `Created staff profile: ${firstName} ${lastName} (${staffIdNumber})` },
       });
 
+      // Auto-sync: if role is examiner, create or update examiner record
+      if (role === 'examiner' && email) {
+        try {
+          const existingExaminer = await storage.getExaminerByEmail(email);
+          if (!existingExaminer) {
+            await storage.createExaminer({
+              firstName,
+              lastName,
+              email,
+              phone: phone || null,
+              regionId: regionId ? parseInt(regionId) : null,
+              status: 'active' as any,
+              qualification: department || null,
+              specialization: null,
+            });
+          } else {
+            await storage.updateExaminer(existingExaminer.id, {
+              firstName,
+              lastName,
+              phone: phone || null,
+              regionId: regionId ? parseInt(regionId) : null,
+            });
+          }
+        } catch (syncErr) {
+          console.error('Auto-sync to examiners failed:', syncErr);
+        }
+      }
+
       res.status(201).json(profile);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -14330,6 +14358,34 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         details: `Staff profile updated`,
         metadata: updateData,
       });
+
+      // Auto-sync: if updated profile is examiner role, sync to examiners table
+      const updatedRole = updateData.role || existing.role;
+      const updatedEmail = updateData.email !== undefined ? updateData.email : existing.email;
+      if (updatedRole === 'examiner' && updatedEmail) {
+        try {
+          const existingExaminer = await storage.getExaminerByEmail(updatedEmail);
+          const syncData = {
+            firstName: updateData.firstName || existing.firstName,
+            lastName: updateData.lastName || existing.lastName,
+            phone: updateData.phone !== undefined ? (updateData.phone || null) : existing.phone,
+            regionId: updateData.regionId !== undefined ? updateData.regionId : existing.regionId,
+          };
+          if (!existingExaminer) {
+            await storage.createExaminer({
+              ...syncData,
+              email: updatedEmail,
+              status: 'active' as any,
+              qualification: updateData.department || existing.department || null,
+              specialization: null,
+            });
+          } else {
+            await storage.updateExaminer(existingExaminer.id, syncData);
+          }
+        } catch (syncErr) {
+          console.error('Auto-sync to examiners failed on update:', syncErr);
+        }
+      }
 
       res.json(updated);
     } catch (error: any) {
@@ -14435,6 +14491,54 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       }
       const events = await storage.getStaffIdEvents(parseInt(req.params.id));
       res.json(events);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Sync all existing examiner-role staff profiles to the examiners table
+  app.post("/api/staff-profiles/sync-examiners", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const allProfiles = await storage.getAllStaffProfiles();
+      const examinerProfiles = allProfiles.filter(p => p.role === 'examiner' && p.email);
+
+      let created = 0, updated = 0, skipped = 0;
+      for (const profile of examinerProfiles) {
+        try {
+          const existing = await storage.getExaminerByEmail(profile.email!);
+          if (!existing) {
+            await storage.createExaminer({
+              firstName: profile.firstName,
+              lastName: profile.lastName,
+              email: profile.email!,
+              phone: profile.phone || null,
+              regionId: profile.regionId || null,
+              status: 'active' as any,
+              qualification: profile.department || null,
+              specialization: null,
+            });
+            created++;
+          } else {
+            await storage.updateExaminer(existing.id, {
+              firstName: profile.firstName,
+              lastName: profile.lastName,
+              phone: profile.phone || null,
+              regionId: profile.regionId || null,
+            });
+            updated++;
+          }
+        } catch {
+          skipped++;
+        }
+      }
+
+      res.json({ message: `Sync complete: ${created} created, ${updated} updated, ${skipped} skipped`, created, updated, skipped });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
