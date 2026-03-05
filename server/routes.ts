@@ -1398,8 +1398,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (existingSchool) {
         return res.status(400).json({ message: "School with this email already exists" });
       }
-      
-      // Generate verification token with 2-hour expiry
+
+      // Detect if this is an admin-created school (authenticated session exists)
+      const isAdminCreated = !!req.session?.userId;
+
+      if (isAdminCreated) {
+        // Admin-created schools: auto-approve, mark registration fee as paid (offline payment)
+        const school = await storage.createSchool({
+          ...parsed.data,
+          status: 'approved',
+          isEmailVerified: true,
+          registrationFeePaid: true,
+        } as any);
+        return res.status(201).json(school);
+      }
+
+      // Website self-registration: requires email verification and registration fee payment
       const verificationToken = generateVerificationToken();
       const verificationExpiry = getVerificationExpiry();
       
@@ -1412,6 +1426,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         verificationExpiry,
         status: 'pending',
         isEmailVerified: false,
+        registrationFeePaid: false,
       } as any);
       
       // Send verification email in the school's preferred language
@@ -2473,6 +2488,35 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       
       res.json(school);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Mark school registration fee as paid offline (admin only)
+  app.post("/api/schools/:id/mark-registration-paid", isAuthenticated, async (req, res) => {
+    try {
+      const schoolId = parseInt(req.params.id);
+      const school = await storage.getSchool(schoolId);
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      if (school.registrationFeePaid) {
+        return res.json({ message: "Registration fee already marked as paid", school });
+      }
+      const updated = await storage.updateSchool(schoolId, { registrationFeePaid: true } as any);
+      try {
+        await storage.createAuditLog({
+          userId: req.session.userId!,
+          action: 'registration_fee_marked_paid',
+          entityType: 'school',
+          entityId: schoolId.toString(),
+          newData: { schoolName: school.name, markedBy: req.session.userId, method: 'offline' },
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log:', auditError);
+      }
+      res.json({ message: "Registration fee marked as paid (offline)", school: updated });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -5932,8 +5976,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             message: "Please pay the registration fee to unlock all features"
           });
         }
-        // If no registration invoice exists but fee isn't paid, still indicate this is a registration requirement
-        // This handles legacy schools that might not have a registration invoice yet
+        // No invoice exists but fee not paid — indicate registration payment is required
+        return res.json({
+          invoice: null,
+          items: [],
+          examYear: null,
+          isRegistrationFee: true,
+          registrationNotPaid: true,
+          message: "School registration fee has not been paid"
+        });
       }
       
       // Priority 2: Show examination invoice for active exam year

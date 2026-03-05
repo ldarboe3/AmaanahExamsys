@@ -84,6 +84,7 @@ import {
   Info,
   Key,
   KeyRound,
+  CreditCard,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -446,6 +447,26 @@ export default function Schools() {
       toast({
         title: t.common.error,
         description: error.message || (isRTL ? "فشل في إعادة تعيين كلمة المرور" : "Failed to reset password"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const markRegistrationPaidMutation = useMutation({
+    mutationFn: async (schoolId: number) => {
+      return apiRequest("POST", `/api/schools/${schoolId}/mark-registration-paid`);
+    },
+    onSuccess: () => {
+      invalidateSchoolQueries();
+      toast({
+        title: isRTL ? "تم تأكيد الدفع" : "Payment Confirmed",
+        description: isRTL ? "تم تسجيل رسوم التسجيل كمدفوعة (دفع يدوي)" : "Registration fee marked as paid (offline payment)",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل في تحديث حالة الدفع" : "Failed to update payment status"),
         variant: "destructive",
       });
     },
@@ -1038,6 +1059,17 @@ export default function Schools() {
                               >
                                 <Mail className="w-4 h-4 me-2" />
                                 {isRTL ? "إرسال بريد التحقق" : "Send Verification Email"}
+                              </DropdownMenuItem>
+                            )}
+                            {!school.registrationFeePaid && (
+                              <DropdownMenuItem
+                                onClick={() => markRegistrationPaidMutation.mutate(school.id)}
+                                disabled={markRegistrationPaidMutation.isPending}
+                                className="text-chart-3"
+                                data-testid={`button-mark-reg-paid-${school.id}`}
+                              >
+                                <CreditCard className="w-4 h-4 me-2" />
+                                {isRTL ? "تأكيد رسوم التسجيل (دفع يدوي)" : "Mark Registration Fee Paid"}
                               </DropdownMenuItem>
                             )}
                             {school.status === 'pending' || school.status === 'verified' ? (

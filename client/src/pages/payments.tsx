@@ -428,6 +428,7 @@ export default function Payments() {
     const items = schoolInvoiceData?.items || [];
     const StatusIcon = statusIcons[invoice?.status || 'pending'];
     const isRegistrationFee = (schoolInvoiceData as any)?.isRegistrationFee === true;
+    const registrationNotPaid = (schoolInvoiceData as any)?.registrationNotPaid === true;
 
     return (
       <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
@@ -438,8 +439,8 @@ export default function Payments() {
           </p>
         </div>
 
-        {/* Registration Fee Required Banner */}
-        {isRegistrationFee && invoice?.status !== 'paid' && (
+        {/* Registration Fee Required Banner (only when there IS an invoice to show) */}
+        {isRegistrationFee && !registrationNotPaid && invoice?.status !== 'paid' && (
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4" data-testid="banner-registration-fee">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-6 h-6 text-amber-500 mt-0.5 flex-shrink-0" />
@@ -461,6 +462,28 @@ export default function Payments() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
+        ) : registrationNotPaid ? (
+          /* School registered via website and has not paid registration fee yet */
+          <Card data-testid="card-registration-fee-pending">
+            <CardContent className="p-8 text-center">
+              <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-8 h-8 text-amber-500" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">
+                {isRTL ? "رسوم تسجيل المدرسة غير مدفوعة" : "Registration Fee Not Yet Paid"}
+              </h3>
+              <p className="text-muted-foreground mb-2 max-w-md mx-auto">
+                {isRTL
+                  ? "لم يتم دفع رسوم تسجيل مدرستك بعد. تواصل مع إدارة أمانة لإتمام الدفع أو الحصول على فاتورة."
+                  : "Your school's registration fee has not been paid yet. Please contact Amaanah administration to complete the payment or receive your invoice."}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {isRTL
+                  ? "بمجرد تأكيد الدفع، ستتمكن من الوصول إلى جميع ميزات النظام."
+                  : "Once payment is confirmed by admin, you will have full access to all system features."}
+              </p>
+            </CardContent>
+          </Card>
         ) : !invoice ? (
           <Card>
             <CardContent className="p-8 text-center">
