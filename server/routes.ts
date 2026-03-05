@@ -14036,9 +14036,18 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return res.status(400).json({ message: "indexNumber is required" });
       }
 
+      const currentUser = await storage.getUser(req.session.userId!);
       const student = await storage.getStudentByIndexNumber(indexNumber);
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
+      }
+
+      // School admins can only look up their own school's students
+      if (currentUser?.role === 'school_admin') {
+        const schoolId = await getSchoolIdForUser(currentUser);
+        if (schoolId && student.schoolId !== schoolId) {
+          return res.status(403).json({ message: "This student does not belong to your school" });
+        }
       }
 
       const school = await storage.getSchool(student.schoolId);
@@ -14056,6 +14065,66 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
           schoolName: school?.name,
         }
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get attendance records for a school's students at a center
+  app.get("/api/attendance/school-records", isAuthenticated, async (req, res) => {
+    try {
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser) return res.status(401).json({ message: "Not authenticated" });
+
+      const centerId = req.query.centerId ? parseInt(req.query.centerId as string) : undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+
+      let schoolId: number | null = null;
+      if (currentUser.role === 'school_admin') {
+        schoolId = await getSchoolIdForUser(currentUser);
+        if (!schoolId) return res.status(403).json({ message: "No school associated with this account" });
+      } else if (req.query.schoolId) {
+        schoolId = parseInt(req.query.schoolId as string);
+      }
+
+      if (!schoolId) return res.status(400).json({ message: "schoolId is required" });
+
+      // Get all students for this school (filtered by exam year if provided)
+      const allStudents = await storage.getStudentsBySchool(schoolId);
+      const students = examYearId
+        ? allStudents.filter(s => s.examYearId === examYearId)
+        : allStudents;
+
+      // For each student, get their attendance records
+      const studentIds = students.map(s => s.id);
+      const allRecords: any[] = [];
+      for (const studentId of studentIds) {
+        const records = await storage.getAttendanceByStudent(studentId);
+        const filtered = centerId ? records.filter((r: any) => r.centerId === centerId) : records;
+        allRecords.push(...filtered);
+      }
+
+      // Build enriched response: student info + attendance status
+      const attendanceMap = new Map<number, any[]>();
+      allRecords.forEach(r => {
+        if (!attendanceMap.has(r.studentId)) attendanceMap.set(r.studentId, []);
+        attendanceMap.get(r.studentId)!.push(r);
+      });
+
+      const enriched = students.map(student => ({
+        student: {
+          id: student.id,
+          firstName: student.firstName,
+          middleName: student.middleName,
+          lastName: student.lastName,
+          indexNumber: student.indexNumber,
+          grade: student.grade,
+          gender: student.gender,
+        },
+        attendance: attendanceMap.get(student.id) || [],
+      }));
+
+      res.json(enriched);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

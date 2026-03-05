@@ -281,36 +281,49 @@ function TimetableTab({ timetable }: { timetable: CenterDashboardData["timetable
   );
 }
 
-function AttendanceTab({ centerId, examYearId }: { centerId: number; examYearId?: number }) {
+function AttendanceTab({ centerId, examYearId, schoolId }: { centerId: number; examYearId?: number; schoolId?: number | null }) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [lookupResult, setLookupResult] = useState<any>(null);
   const [isLooking, setIsLooking] = useState(false);
+  const isSchoolView = !!schoolId;
+
+  // For school admin: fetch their students' attendance records
+  const { data: schoolAttendance, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useQuery<Array<{
+    student: { id: number; firstName: string; middleName?: string; lastName: string; indexNumber?: string; grade: number; gender: string };
+    attendance: Array<{ id: number; status: string; attendanceTime: string; subjectId?: number }>;
+  }>>({
+    queryKey: ["/api/attendance/school-records", { schoolId, centerId, examYearId }],
+    enabled: isSchoolView,
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (schoolId) params.set("schoolId", String(schoolId));
+      if (centerId) params.set("centerId", String(centerId));
+      if (examYearId) params.set("examYearId", String(examYearId));
+      const res = await fetch(`/api/attendance/school-records?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch attendance");
+      return res.json();
+    },
+  });
 
   const handleLookup = async () => {
     if (!searchQuery.trim()) return;
-    
     setIsLooking(true);
     try {
       const response = await fetch(`/api/attendance/lookup?indexNumber=${encodeURIComponent(searchQuery)}`);
       const data = await response.json();
-      
       if (response.ok) {
         setLookupResult(data.student);
       } else {
         setLookupResult(null);
         toast({
-          title: "Student Not Found",
+          title: response.status === 403 ? "Access Restricted" : "Student Not Found",
           description: data.message || "No student found with this index number",
           variant: "destructive",
         });
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to lookup student",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to lookup student", variant: "destructive" });
     } finally {
       setIsLooking(false);
     }
@@ -318,7 +331,6 @@ function AttendanceTab({ centerId, examYearId }: { centerId: number; examYearId?
 
   const markAttendance = async (status: "present" | "absent") => {
     if (!lookupResult || !examYearId) return;
-
     try {
       await apiRequest("POST", "/api/attendance", {
         studentId: lookupResult.id,
@@ -327,25 +339,45 @@ function AttendanceTab({ centerId, examYearId }: { centerId: number; examYearId?
         status,
         attendanceTime: new Date().toISOString(),
       });
-
-      toast({
-        title: "Attendance Marked",
-        description: `${lookupResult.firstName} ${lookupResult.lastName} marked as ${status}`,
-      });
-
+      toast({ title: "Attendance Marked", description: `${lookupResult.firstName} ${lookupResult.lastName} marked as ${status}` });
       setLookupResult(null);
       setSearchQuery("");
+      if (isSchoolView) refetchAttendance();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to mark attendance",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to mark attendance", variant: "destructive" });
     }
   };
 
+  const presentCount = schoolAttendance?.filter(r => r.attendance.some(a => a.status === "present")).length ?? 0;
+  const absentCount = schoolAttendance?.filter(r => r.attendance.some(a => a.status === "absent")).length ?? 0;
+  const unmarkedCount = schoolAttendance?.filter(r => r.attendance.length === 0).length ?? 0;
+
   return (
     <div className="space-y-4">
+      {/* School-scoped attendance summary */}
+      {isSchoolView && (
+        <div className="grid grid-cols-3 gap-3">
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-semibold text-chart-2">{presentCount}</p>
+              <p className="text-sm text-muted-foreground">Present</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-semibold text-destructive">{absentCount}</p>
+              <p className="text-sm text-muted-foreground">Absent</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-semibold text-muted-foreground">{unmarkedCount}</p>
+              <p className="text-sm text-muted-foreground">Not Marked</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -353,7 +385,9 @@ function AttendanceTab({ centerId, examYearId }: { centerId: number; examYearId?
             Student Lookup
           </CardTitle>
           <CardDescription>
-            Enter index number or scan barcode to mark attendance
+            {isSchoolView
+              ? "Enter your student's index number to mark attendance"
+              : "Enter index number or scan barcode to mark attendance"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -372,40 +406,34 @@ function AttendanceTab({ centerId, examYearId }: { centerId: number; examYearId?
             <Button onClick={handleLookup} disabled={isLooking} data-testid="button-lookup">
               {isLooking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             </Button>
-            <Button variant="outline" disabled>
-              <QrCode className="w-4 h-4 me-2" />
-              Scan
-            </Button>
+            {!isSchoolView && (
+              <Button variant="outline" disabled>
+                <QrCode className="w-4 h-4 me-2" />
+                Scan
+              </Button>
+            )}
           </div>
 
           {lookupResult && (
             <Card className="border-primary/50 bg-primary/5">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <p className="font-semibold text-lg">
                       {lookupResult.firstName} {lookupResult.middleName || ''} {lookupResult.lastName}
                     </p>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1 flex-wrap">
                       <span>Index: {lookupResult.indexNumber}</span>
                       <span>Grade: {lookupResult.grade}</span>
-                      <span>School: {lookupResult.schoolName}</span>
+                      {!isSchoolView && <span>School: {lookupResult.schoolName}</span>}
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="default" 
-                      onClick={() => markAttendance("present")}
-                      data-testid="button-mark-present"
-                    >
+                    <Button variant="default" onClick={() => markAttendance("present")} data-testid="button-mark-present">
                       <CheckCircle2 className="w-4 h-4 me-2" />
                       Present
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => markAttendance("absent")}
-                      data-testid="button-mark-absent"
-                    >
+                    <Button variant="outline" onClick={() => markAttendance("absent")} data-testid="button-mark-absent">
                       <XCircle className="w-4 h-4 me-2" />
                       Absent
                     </Button>
@@ -417,30 +445,103 @@ function AttendanceTab({ centerId, examYearId }: { centerId: number; examYearId?
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <ClipboardList className="w-4 h-4" />
-            Attendance Options
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-3 gap-4">
-            <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2">
-              <FileText className="w-6 h-6" />
-              <span>Print Attendance Sheet</span>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2">
-              <Users className="w-6 h-6" />
-              <span>Bulk Mark by Grade</span>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2">
-              <RefreshCw className="w-6 h-6" />
-              <span>Sync Attendance</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* School admin: list of their students with attendance status */}
+      {isSchoolView && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              My Students' Attendance
+            </CardTitle>
+            <CardDescription>Attendance status for all your registered students</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingAttendance ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : !schoolAttendance || schoolAttendance.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No students registered for this exam year.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Index No.</TableHead>
+                    <TableHead>Grade</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {schoolAttendance.map(({ student, attendance }) => {
+                    const latestRecord = attendance.sort(
+                      (a, b) => new Date(b.attendanceTime).getTime() - new Date(a.attendanceTime).getTime()
+                    )[0];
+                    return (
+                      <TableRow key={student.id}>
+                        <TableCell className="font-medium">
+                          {student.firstName} {student.middleName || ''} {student.lastName}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground font-mono text-sm">
+                          {student.indexNumber || '—'}
+                        </TableCell>
+                        <TableCell>{student.grade}</TableCell>
+                        <TableCell>
+                          {latestRecord ? (
+                            <Badge
+                              variant="outline"
+                              className={latestRecord.status === "present"
+                                ? "border-chart-2 text-chart-2"
+                                : "border-destructive text-destructive"}
+                            >
+                              {latestRecord.status === "present" ? (
+                                <CheckCircle2 className="w-3 h-3 me-1" />
+                              ) : (
+                                <XCircle className="w-3 h-3 me-1" />
+                              )}
+                              {latestRecord.status.charAt(0).toUpperCase() + latestRecord.status.slice(1)}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">Not Marked</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Admin-only options */}
+      {!isSchoolView && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Attendance Options
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-3 gap-4">
+              <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2">
+                <FileText className="w-6 h-6" />
+                <span>Print Attendance Sheet</span>
+              </Button>
+              <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2">
+                <Users className="w-6 h-6" />
+                <span>Bulk Mark by Grade</span>
+              </Button>
+              <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2">
+                <RefreshCw className="w-6 h-6" />
+                <span>Sync Attendance</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
@@ -1064,7 +1165,7 @@ export default function CenterDashboard() {
         </TabsContent>
 
         <TabsContent value="attendance" className="mt-4">
-          <AttendanceTab centerId={centerId} examYearId={examYear?.id} />
+          <AttendanceTab centerId={centerId} examYearId={examYear?.id} schoolId={isSchoolView ? schoolId : null} />
         </TabsContent>
 
         {!isSchoolView && (
