@@ -29,9 +29,11 @@ async function getCredentials() {
     }
   ).then(res => res.json()).then(data => data.items?.[0]);
 
-  if (!connectionSettings || (!connectionSettings.settings.api_key || !connectionSettings.settings.from_email)) {
+  if (!connectionSettings || (!connectionSettings.settings?.api_key || !connectionSettings.settings?.from_email)) {
+    console.error('SendGrid credentials fetch failed. connectionSettings:', JSON.stringify(connectionSettings));
     throw new Error('SendGrid not connected');
   }
+  console.log('SendGrid credentials fetched successfully. From email:', connectionSettings.settings.from_email);
   return { apiKey: connectionSettings.settings.api_key, email: connectionSettings.settings.from_email };
 }
 
@@ -101,6 +103,10 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     return true;
   } catch (error: any) {
     console.error('Failed to send email:', error?.message || error);
+    if (error?.response) {
+      console.error('SendGrid response status:', error.response.statusCode || error.code);
+      console.error('SendGrid response body:', JSON.stringify(error.response.body));
+    }
     return false;
   }
 }
