@@ -22,6 +22,7 @@ import ExamYears from "@/pages/exam-years";
 import Payments from "@/pages/payments";
 import Centers from "@/pages/centers";
 import CenterDashboard from "@/pages/center-dashboard";
+import SchoolCenterInfo from "@/pages/school-center-info";
 import Results from "@/pages/results";
 import Certificates from "@/pages/certificates";
 import Transcripts from "@/pages/transcripts";
@@ -98,7 +99,7 @@ function AuthenticatedRoutes() {
       <Route path="/payments" component={Payments} />
       <Route path="/centers" component={Centers} />
       <Route path="/centers/:id" component={CenterDashboard} />
-      <Route path="/center-info" component={Centers} />
+      <Route path="/center-info" component={SchoolCenterInfo} />
       <Route path="/admin-results">
         {() => <ProtectedRoute component={Results} allowedRoles={["super_admin", "examination_admin"]} />}
       </Route>

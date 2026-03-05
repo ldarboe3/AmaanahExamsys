@@ -1048,7 +1048,7 @@ export default function CenterDashboard() {
     );
   }
 
-  const { center, examYear, statistics, schools, timetable, paperMovements, scriptMovements, malpracticeReports, recentActivity, invigilators, schoolView } = data;
+  const { center, examYear, statistics, schools, timetable, paperMovements, scriptMovements, malpracticeReports, recentActivity, invigilators, schoolView, schoolId } = data;
   const isSchoolView = schoolView === true;
 
   return (
