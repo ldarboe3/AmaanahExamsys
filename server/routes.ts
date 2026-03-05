@@ -14040,7 +14040,11 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     try {
       const centerId = parseInt(req.params.id);
       const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
-      
+
+      const currentUser = await storage.getUser(req.session.userId!);
+      const isSchoolAdmin = currentUser?.role === 'school_admin';
+      const schoolAdminSchoolId = isSchoolAdmin ? await getSchoolIdForUser(currentUser) : null;
+
       const center = await storage.getExamCenter(centerId);
       if (!center) {
         return res.status(404).json({ message: "Center not found" });
@@ -14049,21 +14053,55 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const activeExamYear = examYearId ? await storage.getExamYear(examYearId) : await storage.getActiveExamYear();
       const yearId = activeExamYear?.id;
 
-      // Get all related data
+      // Get timetable — same for all roles
+      const timetable = yearId ? await storage.getTimetableByExamYear(yearId) : [];
+
+      if (isSchoolAdmin && schoolAdminSchoolId) {
+        // School admin: only show their school's data
+        const schoolStudents = await storage.getStudentsBySchool(schoolAdminSchoolId);
+        const filteredStudents = yearId ? schoolStudents.filter(s => s.examYearId === yearId) : schoolStudents;
+
+        const studentsByGrade = filteredStudents.reduce((acc: Record<number, number>, s) => {
+          acc[s.grade] = (acc[s.grade] || 0) + 1;
+          return acc;
+        }, {});
+
+        return res.json({
+          center,
+          examYear: activeExamYear,
+          schoolView: true,
+          schoolId: schoolAdminSchoolId,
+          statistics: {
+            totalSchools: 1,
+            totalStudents: filteredStudents.length,
+            studentsByGrade,
+            totalInvigilators: 0,
+            pendingPapers: 0,
+            pendingScripts: 0,
+            malpracticeCount: 0,
+          },
+          schools: [],
+          timetable,
+          paperMovements: [],
+          scriptMovements: [],
+          malpracticeReports: [],
+          recentActivity: [],
+          invigilators: [],
+        });
+      }
+
+      // Full data for admins
       const assignments = yearId ? await storage.getCenterAssignmentsByCenter(centerId, yearId) : [];
       const students = await storage.getStudentsByCenter(centerId);
-      const timetable = yearId ? await storage.getTimetableByExamYear(yearId) : [];
       const paperMovements = yearId ? await storage.getPaperMovementsByCenter(centerId, yearId) : [];
       const scriptMovements = yearId ? await storage.getScriptMovementsByCenter(centerId, yearId) : [];
       const malpracticeReports = await storage.getMalpracticeReportsByCenter(centerId);
       const activityLogs = await storage.getCenterActivityLogs(centerId, yearId);
       const invigilators = await storage.getAssignmentsByCenter(centerId);
 
-      // Get schools assigned to this center
       const schoolIds = assignments.map(a => a.schoolId);
       const schools = await Promise.all(schoolIds.map(id => storage.getSchool(id)));
 
-      // Calculate statistics
       const totalStudents = yearId ? students.filter(s => s.examYearId === yearId).length : students.length;
       const studentsByGrade = students.reduce((acc: Record<number, number>, s) => {
         if (!yearId || s.examYearId === yearId) {
@@ -14075,6 +14113,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       res.json({
         center,
         examYear: activeExamYear,
+        schoolView: false,
+        schoolId: null,
         statistics: {
           totalSchools: assignments.length,
           totalStudents,

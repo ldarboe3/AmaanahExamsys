@@ -62,6 +62,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -82,6 +83,8 @@ interface CenterDashboardData {
     contactEmail?: string;
     isActive: boolean;
   };
+  schoolView: boolean;
+  schoolId: number | null;
   examYear: {
     id: number;
     year: number;
@@ -887,6 +890,7 @@ export default function CenterDashboard() {
   const centerId = parseInt(id || "0");
   const { toast } = useToast();
   const { isRTL } = useLanguage();
+  const { user } = useAuth();
 
   const { data, isLoading, error, refetch } = useQuery<CenterDashboardData>({
     queryKey: [`/api/centers/${centerId}/dashboard`],
@@ -943,7 +947,8 @@ export default function CenterDashboard() {
     );
   }
 
-  const { center, examYear, statistics, schools, timetable, paperMovements, scriptMovements, malpracticeReports, recentActivity, invigilators } = data;
+  const { center, examYear, statistics, schools, timetable, paperMovements, scriptMovements, malpracticeReports, recentActivity, invigilators, schoolView } = data;
+  const isSchoolView = schoolView === true;
 
   return (
     <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
@@ -970,30 +975,46 @@ export default function CenterDashboard() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <StatCard label="Schools" value={statistics.totalSchools} icon={School} />
-        <StatCard label="Students" value={statistics.totalStudents} icon={Users} variant="success" />
-        <StatCard label="Examiners" value={statistics.totalInvigilators} icon={Users} />
-        <StatCard label="Pending Papers" value={statistics.pendingPapers} icon={Package} variant="warning" />
-        <StatCard label="Pending Scripts" value={statistics.pendingScripts} icon={FileText} variant="warning" />
-        <StatCard label="Malpractice" value={statistics.malpracticeCount} icon={AlertTriangle} variant="error" />
-      </div>
+      {isSchoolView ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <StatCard label="My Students" value={statistics.totalStudents} icon={Users} variant="success" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <StatCard label="Schools" value={statistics.totalSchools} icon={School} />
+          <StatCard label="Students" value={statistics.totalStudents} icon={Users} variant="success" />
+          <StatCard label="Examiners" value={statistics.totalInvigilators} icon={Users} />
+          <StatCard label="Pending Papers" value={statistics.pendingPapers} icon={Package} variant="warning" />
+          <StatCard label="Pending Scripts" value={statistics.pendingScripts} icon={FileText} variant="warning" />
+          <StatCard label="Malpractice" value={statistics.malpracticeCount} icon={AlertTriangle} variant="error" />
+        </div>
+      )}
 
       <Tabs defaultValue="overview">
-        <TabsList className="grid grid-cols-6 w-full">
-          <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
-          <TabsTrigger value="timetable" data-testid="tab-timetable">Timetable</TabsTrigger>
-          <TabsTrigger value="attendance" data-testid="tab-attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="malpractice" data-testid="tab-malpractice">Malpractice</TabsTrigger>
-          <TabsTrigger value="logistics" data-testid="tab-logistics">Logistics</TabsTrigger>
-          <TabsTrigger value="schools" data-testid="tab-schools">Schools</TabsTrigger>
-        </TabsList>
+        {isSchoolView ? (
+          <TabsList className="grid grid-cols-3 w-full">
+            <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+            <TabsTrigger value="timetable" data-testid="tab-timetable">Timetable</TabsTrigger>
+            <TabsTrigger value="attendance" data-testid="tab-attendance">Attendance</TabsTrigger>
+          </TabsList>
+        ) : (
+          <TabsList className="grid grid-cols-6 w-full">
+            <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+            <TabsTrigger value="timetable" data-testid="tab-timetable">Timetable</TabsTrigger>
+            <TabsTrigger value="attendance" data-testid="tab-attendance">Attendance</TabsTrigger>
+            <TabsTrigger value="malpractice" data-testid="tab-malpractice">Malpractice</TabsTrigger>
+            <TabsTrigger value="logistics" data-testid="tab-logistics">Logistics</TabsTrigger>
+            <TabsTrigger value="schools" data-testid="tab-schools">Schools</TabsTrigger>
+          </TabsList>
+        )}
 
         <TabsContent value="overview" className="mt-4 space-y-4">
           <div className="grid md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Students by Grade</CardTitle>
+                <CardTitle className="text-base">
+                  {isSchoolView ? "My Students by Grade" : "Students by Grade"}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {Object.keys(statistics.studentsByGrade).length === 0 ? (
@@ -1035,7 +1056,7 @@ export default function CenterDashboard() {
             </Card>
           </div>
 
-          <ActivityTab activities={recentActivity} />
+          {!isSchoolView && <ActivityTab activities={recentActivity} />}
         </TabsContent>
 
         <TabsContent value="timetable" className="mt-4">
@@ -1046,24 +1067,28 @@ export default function CenterDashboard() {
           <AttendanceTab centerId={centerId} examYearId={examYear?.id} />
         </TabsContent>
 
-        <TabsContent value="malpractice" className="mt-4">
-          <MalpracticeTab 
-            centerId={centerId} 
-            examYearId={examYear?.id} 
-            reports={malpracticeReports} 
-          />
-        </TabsContent>
+        {!isSchoolView && (
+          <>
+            <TabsContent value="malpractice" className="mt-4">
+              <MalpracticeTab 
+                centerId={centerId} 
+                examYearId={examYear?.id} 
+                reports={malpracticeReports} 
+              />
+            </TabsContent>
 
-        <TabsContent value="logistics" className="mt-4">
-          <LogisticsTab 
-            paperMovements={paperMovements} 
-            scriptMovements={scriptMovements} 
-          />
-        </TabsContent>
+            <TabsContent value="logistics" className="mt-4">
+              <LogisticsTab 
+                paperMovements={paperMovements} 
+                scriptMovements={scriptMovements} 
+              />
+            </TabsContent>
 
-        <TabsContent value="schools" className="mt-4">
-          <SchoolsTab schools={schools} />
-        </TabsContent>
+            <TabsContent value="schools" className="mt-4">
+              <SchoolsTab schools={schools} />
+            </TabsContent>
+          </>
+        )}
       </Tabs>
     </div>
   );
