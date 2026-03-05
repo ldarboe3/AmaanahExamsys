@@ -7068,18 +7068,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // AI-powered timetable generation
   app.post("/api/timetable/ai-generate", isAuthenticated, async (req, res) => {
     try {
-      const { examYearId, grade } = req.body;
+      const {
+        examYearId,
+        grade,
+        timeSlots,
+        maxPapersPerDay,
+        weekendDays,
+        mixCoreWithNonCore,
+      } = req.body;
+
       if (!examYearId) {
         return res.status(400).json({ message: "examYearId is required" });
       }
 
-      const examYear = await storage.getExamYear(parseInt(examYearId));
+      const parsedExamYearId = Number(examYearId);
+      if (isNaN(parsedExamYearId)) {
+        return res.status(400).json({ message: "Invalid examYearId" });
+      }
+
+      const examYear = await storage.getExamYear(parsedExamYearId);
       if (!examYear) {
         return res.status(404).json({ message: "Exam year not found" });
       }
 
       const allSubjects = await storage.getAllSubjects();
-      const grades = grade ? [parseInt(grade)] : (examYear.grades || [6]);
+      const parsedGrade = grade != null && grade !== "" ? Number(grade) : null;
+      const grades = parsedGrade && !isNaN(parsedGrade) ? [parsedGrade] : (examYear.grades || [6]);
       const relevantSubjects = allSubjects.filter(
         s => s.isActive && grades.includes(s.grade)
       );
@@ -7095,8 +7109,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         ? new Date(examYear.examEndDate).toISOString().split("T")[0]
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
+      // Default slots: morning and afternoon (Islamic school timing)
+      const defaultSlots = [
+        { label: "Morning", startTime: "09:00", endTime: "11:00" },
+        { label: "Afternoon", startTime: "14:00", endTime: "16:00" },
+      ];
+
       const schedule = await generateExamScheduleWithAI({
-        examYearId: parseInt(examYearId),
+        examYearId: parsedExamYearId,
         examYearName: examYear.name,
         startDate,
         endDate,
@@ -7107,7 +7127,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           arabicName: s.arabicName,
           code: s.code,
           grade: s.grade,
+          isCore: (s as any).isCore ?? false,
         })),
+        timeSlots: Array.isArray(timeSlots) && timeSlots.length > 0 ? timeSlots : defaultSlots,
+        maxPapersPerDay: Number(maxPapersPerDay) || 2,
+        weekendDays: Array.isArray(weekendDays) ? weekendDays : [4, 5], // Thu & Fri
+        mixCoreWithNonCore: mixCoreWithNonCore !== false,
       });
 
       res.json({ schedule, examYear, subjects: relevantSubjects });
@@ -7128,8 +7153,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "examYearId and entries array are required" });
       }
 
+      const parsedExamYearId = Number(examYearId);
+      if (isNaN(parsedExamYearId)) {
+        return res.status(400).json({ message: "Invalid examYearId" });
+      }
+
       if (replaceExisting) {
-        const existing = await storage.getTimetableByExamYear(parseInt(examYearId));
+        const existing = await storage.getTimetableByExamYear(parsedExamYearId);
         for (const entry of existing) {
           await storage.deleteTimetableEntry(entry.id);
         }
@@ -7137,13 +7167,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const created = [];
       for (const entry of entries) {
+        const subjectId = Number(entry.subjectId);
+        const grade = Number(entry.grade);
+        if (isNaN(subjectId) || isNaN(grade)) continue;
+
         const newEntry = await storage.createTimetableEntry({
-          examYearId: parseInt(examYearId),
-          subjectId: entry.subjectId,
+          examYearId: parsedExamYearId,
+          subjectId,
           examDate: entry.examDate,
           startTime: entry.startTime,
           endTime: entry.endTime,
-          grade: entry.grade,
+          grade,
           venue: entry.venue || null,
         });
         created.push(newEntry);

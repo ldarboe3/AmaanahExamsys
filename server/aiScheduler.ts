@@ -7,6 +7,12 @@ function getOpenAIClient() {
   });
 }
 
+export interface TimeSlotConfig {
+  label: string;
+  startTime: string;
+  endTime: string;
+}
+
 export interface ScheduleEntry {
   subjectId: number;
   subjectName: string;
@@ -15,6 +21,7 @@ export interface ScheduleEntry {
   startTime: string;
   endTime: string;
   grade: number;
+  isCore?: boolean;
   notes?: string;
 }
 
@@ -30,7 +37,13 @@ export interface GenerateScheduleParams {
     arabicName?: string | null;
     code: string;
     grade: number;
+    isCore?: boolean | null;
   }>;
+  // Scheduling configuration
+  timeSlots: TimeSlotConfig[];          // e.g. [{label:"Morning", startTime:"09:00", endTime:"11:00"}]
+  maxPapersPerDay: number;              // 1, 2, or 3
+  weekendDays: number[];                // Islamic: [4, 5] = Thursday, Friday
+  mixCoreWithNonCore: boolean;          // allow core + non-core on same day
 }
 
 export async function generateExamScheduleWithAI(
@@ -38,58 +51,77 @@ export async function generateExamScheduleWithAI(
 ): Promise<ScheduleEntry[]> {
   const openai = getOpenAIClient();
 
-  const subjectsByGrade: Record<number, typeof params.subjects> = {};
-  for (const subject of params.subjects) {
-    if (!subjectsByGrade[subject.grade]) subjectsByGrade[subject.grade] = [];
-    subjectsByGrade[subject.grade].push(subject);
-  }
+  // Build subject list WITH their IDs clearly for the AI
+  const subjectLines = params.subjects.map(s =>
+    `  ID=${s.id} | Grade ${s.grade} | ${s.name}${s.arabicName ? ` (${s.arabicName})` : ""} | Code: ${s.code} | ${s.isCore ? "CORE SUBJECT" : "Non-core subject"}`
+  ).join("\n");
 
-  const prompt = `You are an expert exam timetable scheduler for an Islamic education board in The Gambia.
+  // Build time slots description
+  const slotLines = params.timeSlots.map((slot, i) =>
+    `  Slot ${i + 1} (${slot.label}): ${slot.startTime} – ${slot.endTime}`
+  ).join("\n");
+
+  // Weekend days label
+  const weekendNames = params.weekendDays.map(d =>
+    ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d]
+  ).join(" and ");
+
+  const prompt = `You are an expert exam timetable scheduler for an Islamic Arabic education board in The Gambia.
 
 Generate a complete exam timetable for the ${params.examYearName} examination.
 
-EXAM DETAILS:
-- Exam period: ${params.startDate} to ${params.endDate}
-- Grades: ${params.grades.join(", ")}
-- Subjects to schedule:
-${params.subjects.map(s => `  • Grade ${s.grade}: ${s.name} (${s.code})`).join("\n")}
+EXAM PERIOD:
+- Start date: ${params.startDate}
+- End date: ${params.endDate}
+
+SUBJECTS TO SCHEDULE (use the exact ID numbers provided):
+${subjectLines}
+
+TIME SLOTS AVAILABLE EACH DAY:
+${slotLines}
+- Maximum papers per day across ALL grades: ${params.maxPapersPerDay} (spread slots across grades if multiple on same day)
+
+WEEKEND DAYS (no exams on these days):
+- ${weekendNames} (JavaScript day numbers: ${params.weekendDays.join(", ")})
 
 SCHEDULING RULES:
-1. Schedule ONE subject per day per grade (no two subjects of the same grade on the same day)
-2. If multiple grades have exams on the same day, they can share a day but must have different times
-3. Use these standard time slots:
-   - Morning session: 09:00 - 11:00 (120 min)
-   - Afternoon session: 14:00 - 16:00 (120 min)
-4. Skip weekends (Saturday = day 6, Sunday = day 0)
-5. Leave at least one rest day between consecutive exam days for the same grade
-6. Schedule more important/core subjects (Quran, Arabic Language) in the first week
-7. Start with easier subjects and progress to harder ones
-8. Spread subjects evenly across the available dates
-9. The schedule must fit within the exam period dates
+1. Use the EXACT subject IDs provided above - do not invent IDs
+2. Schedule ONE subject per grade per day (no two subjects for the same grade on the same day)
+3. When multiple grades have exams on the same day, assign them to different time slots
+4. Never schedule more than ${params.maxPapersPerDay} paper(s) total in one day (counting all grades)
+5. Skip weekend days (${weekendNames})
+6. Leave at least one rest day between consecutive exam days for each grade
+7. CORE SUBJECTS first: Schedule all CORE SUBJECTS in the first portion of the exam period
+${params.mixCoreWithNonCore
+  ? "8. You MAY mix core and non-core subjects on the same day to reduce student pressure"
+  : "8. Keep core subject days separate from non-core subject days where possible"}
+9. Spread subjects evenly across the available dates
+10. Every subject must be scheduled exactly once
+11. All dates must fall within the exam period
 
 Return ONLY a valid JSON array with this exact structure (no markdown, no explanation):
 [
   {
-    "subjectId": <number>,
+    "subjectId": <exact integer ID from the list above>,
     "examDate": "YYYY-MM-DD",
     "startTime": "HH:MM",
     "endTime": "HH:MM",
-    "grade": <number>
+    "grade": <integer>
   }
 ]
 
-Ensure every subject is scheduled exactly once. Return only the JSON array.`;
+IMPORTANT: Use only the subjectId values from the list above. Return only the JSON array, nothing else.`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     max_completion_tokens: 8192,
+    temperature: 0.3,
   });
 
   const content = response.choices[0]?.message?.content || "[]";
-  
   const cleanContent = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  
+
   let parsed: any[];
   try {
     parsed = JSON.parse(cleanContent);
@@ -102,18 +134,35 @@ Ensure every subject is scheduled exactly once. Return only the JSON array.`;
     }
   }
 
-  const subjectMap = new Map(params.subjects.map(s => [s.id, s]));
+  if (!Array.isArray(parsed)) {
+    throw new Error("AI returned non-array response");
+  }
 
-  return parsed.map((entry: any) => {
-    const subject = subjectMap.get(entry.subjectId);
-    return {
-      subjectId: entry.subjectId,
+  const subjectMap = new Map(params.subjects.map(s => [s.id, s]));
+  const validSubjectIds = new Set(params.subjects.map(s => s.id));
+
+  const result: ScheduleEntry[] = [];
+
+  for (const entry of parsed) {
+    const subjectId = Number(entry.subjectId);
+    const grade = Number(entry.grade);
+
+    if (isNaN(subjectId) || isNaN(grade)) continue;
+    if (!validSubjectIds.has(subjectId)) continue;
+    if (!entry.examDate || !entry.startTime || !entry.endTime) continue;
+
+    const subject = subjectMap.get(subjectId);
+    result.push({
+      subjectId,
       subjectName: subject?.name || "Unknown",
       subjectCode: subject?.code || "UNK",
       examDate: entry.examDate,
       startTime: entry.startTime,
       endTime: entry.endTime,
-      grade: entry.grade,
-    };
-  });
+      grade,
+      isCore: subject?.isCore ?? false,
+    });
+  }
+
+  return result;
 }

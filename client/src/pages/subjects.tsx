@@ -70,6 +70,7 @@ const subjectSchema = z.object({
   maxScore: z.coerce.number().min(1).default(100),
   passingScore: z.coerce.number().min(1).default(50),
   isActive: z.boolean().default(true),
+  isCore: z.boolean().default(false),
 });
 
 type SubjectFormData = z.infer<typeof subjectSchema>;
@@ -119,6 +120,7 @@ export default function Subjects() {
       maxScore: 100,
       passingScore: 50,
       isActive: true,
+      isCore: false,
     },
   });
 
@@ -231,6 +233,7 @@ export default function Subjects() {
       maxScore: subject.maxScore || 100,
       passingScore: subject.passingScore || 50,
       isActive: subject.isActive ?? true,
+      isCore: (subject as any).isCore ?? false,
     });
     setShowDialog(true);
   };
@@ -385,7 +388,16 @@ export default function Subjects() {
                         {gradeSubjects.map((subject) => (
                           <TableRow key={subject.id} data-testid={`row-subject-${subject.id}`}>
                             <TableCell className="font-mono">{subject.code}</TableCell>
-                            <TableCell className="font-medium">{subject.name}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{subject.name}</span>
+                                {(subject as any).isCore && (
+                                  <Badge variant="secondary" className="bg-primary/10 text-primary text-xs" data-testid={`badge-core-${subject.id}`}>
+                                    Core
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell dir="rtl" className="font-arabic">
                               {subject.arabicName || "-"}
                             </TableCell>
@@ -621,6 +633,27 @@ export default function Subjects() {
                         checked={field.value}
                         onCheckedChange={field.onChange}
                         data-testid="switch-is-active"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="isCore"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base font-semibold">Core Subject</FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        Core subjects (e.g. Quran, Arabic) are prioritised first in AI-generated exam schedules.
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-is-core"
                       />
                     </FormControl>
                   </FormItem>

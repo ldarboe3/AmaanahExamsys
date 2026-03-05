@@ -293,6 +293,7 @@ export const subjects = pgTable("subjects", {
   maxScore: integer("max_score").default(100),
   passingScore: integer("passing_score").default(50),
   isActive: boolean("is_active").default(true),
+  isCore: boolean("is_core").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

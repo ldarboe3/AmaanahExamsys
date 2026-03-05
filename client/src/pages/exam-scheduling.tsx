@@ -60,6 +60,13 @@ export default function ExamScheduling() {
   const [showAIDialog, setShowAIDialog] = useState(false);
   const [aiSchedule, setAiSchedule] = useState<any[]>([]);
   const [aiReplaceExisting, setAiReplaceExisting] = useState(false);
+  // AI scheduling configuration
+  const [aiPapersPerDay, setAiPapersPerDay] = useState<number>(2);
+  const [aiMixCore, setAiMixCore] = useState(true);
+  const [aiTimeSlots, setAiTimeSlots] = useState([
+    { label: "Morning", startTime: "09:00", endTime: "11:00" },
+    { label: "Afternoon", startTime: "14:00", endTime: "16:00" },
+  ]);
 
   const isHQ = user?.role === "super_admin" || user?.role === "examination_admin";
 
@@ -137,6 +144,10 @@ export default function ExamScheduling() {
       const res = await apiRequest("POST", "/api/timetable/ai-generate", {
         examYearId: Number(selectedExamYearId),
         grade: selectedGrade && selectedGrade !== "all" ? Number(selectedGrade) : undefined,
+        timeSlots: aiTimeSlots,
+        maxPapersPerDay: aiPapersPerDay,
+        weekendDays: [4, 5], // Thursday and Friday
+        mixCoreWithNonCore: aiMixCore,
       });
       return res.json();
     },
@@ -478,7 +489,7 @@ export default function ExamScheduling() {
 
       {/* AI Auto-Schedule Dialog */}
       <Dialog open={showAIDialog} onOpenChange={(open) => { setShowAIDialog(open); if (!open) setAiSchedule([]); }}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
@@ -486,20 +497,8 @@ export default function ExamScheduling() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Info */}
-            <div className="rounded-md bg-primary/5 border border-primary/20 p-4 text-sm">
-              <p className="font-medium mb-1">How it works:</p>
-              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                <li>AI analyzes all active subjects for the selected exam year and grade</li>
-                <li>Generates a conflict-free schedule spread across the exam period</li>
-                <li>Prioritizes core subjects (Quran, Arabic) in the first week</li>
-                <li>Respects weekends and spacing between exams</li>
-                <li>Uses standard morning (09:00–11:00) and afternoon (14:00–16:00) slots</li>
-              </ul>
-            </div>
-
-            {/* Selected exam year info */}
+          <div className="space-y-5">
+            {/* Exam year info */}
             {selectedExamYearId && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="w-4 h-4" />
@@ -510,31 +509,136 @@ export default function ExamScheduling() {
               </div>
             )}
 
-            {/* Generate button */}
-            {aiSchedule.length === 0 ? (
-              <Button
-                onClick={() => aiGenerateMutation.mutate()}
-                disabled={aiGenerateMutation.isPending || !selectedExamYearId}
-                className="w-full gap-2"
-                data-testid="button-ai-generate"
-              >
-                {aiGenerateMutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Generating with AI...</>
-                ) : (
-                  <><Sparkles className="w-4 h-4" /> Generate Schedule</>
-                )}
-              </Button>
-            ) : (
+            {/* Configuration section — only shown before generating */}
+            {aiSchedule.length === 0 && (
               <div className="space-y-4">
-                {/* Preview table */}
-                <div className="flex items-center justify-between">
+                {/* Papers per day */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Max Papers Per Day</label>
+                  <p className="text-xs text-muted-foreground">How many exam papers can be held on the same day across all grades (maximum 3).</p>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map(n => (
+                      <Button
+                        key={n}
+                        type="button"
+                        size="sm"
+                        variant={aiPapersPerDay === n ? "default" : "outline"}
+                        onClick={() => {
+                          setAiPapersPerDay(n);
+                          setAiTimeSlots(prev => {
+                            if (n === 1) return [prev[0] || { label: "Morning", startTime: "09:00", endTime: "11:00" }];
+                            if (n === 2) return [
+                              prev[0] || { label: "Morning", startTime: "09:00", endTime: "11:00" },
+                              prev[1] || { label: "Afternoon", startTime: "14:00", endTime: "16:00" },
+                            ];
+                            return [
+                              prev[0] || { label: "Morning", startTime: "09:00", endTime: "11:00" },
+                              prev[1] || { label: "Afternoon", startTime: "14:00", endTime: "16:00" },
+                              prev[2] || { label: "Evening", startTime: "16:30", endTime: "18:00" },
+                            ];
+                          });
+                        }}
+                        data-testid={`button-papers-${n}`}
+                      >
+                        {n} {n === 1 ? "Paper" : "Papers"}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Time slots */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Time Slots</label>
+                  <p className="text-xs text-muted-foreground">Configure the start and end time for each exam slot. Morning and afternoon only (no evening).</p>
+                  <div className="space-y-2">
+                    {aiTimeSlots.map((slot, idx) => (
+                      <div key={idx} className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm text-muted-foreground w-20 shrink-0">Slot {idx + 1}:</span>
+                        <Input
+                          type="text"
+                          value={slot.label}
+                          onChange={e => setAiTimeSlots(prev => prev.map((s, i) => i === idx ? { ...s, label: e.target.value } : s))}
+                          className="w-28"
+                          placeholder="Label"
+                          data-testid={`input-slot-label-${idx}`}
+                        />
+                        <Input
+                          type="time"
+                          value={slot.startTime}
+                          onChange={e => setAiTimeSlots(prev => prev.map((s, i) => i === idx ? { ...s, startTime: e.target.value } : s))}
+                          className="w-32"
+                          data-testid={`input-slot-start-${idx}`}
+                        />
+                        <span className="text-muted-foreground text-sm">to</span>
+                        <Input
+                          type="time"
+                          value={slot.endTime}
+                          onChange={e => setAiTimeSlots(prev => prev.map((s, i) => i === idx ? { ...s, endTime: e.target.value } : s))}
+                          className="w-32"
+                          data-testid={`input-slot-end-${idx}`}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          ({(() => {
+                            const [sh, sm] = slot.startTime.split(":").map(Number);
+                            const [eh, em] = slot.endTime.split(":").map(Number);
+                            const mins = (eh * 60 + em) - (sh * 60 + sm);
+                            return mins > 0 ? `${Math.floor(mins / 60)}h${mins % 60 > 0 ? ` ${mins % 60}m` : ""}` : "—";
+                          })()})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Core subject mixing */}
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium">Mix Core with Non-Core Subjects</p>
+                    <p className="text-xs text-muted-foreground">
+                      When on, core and non-core subjects may share the same exam day to reduce student pressure. When off, core subjects are kept on separate days.
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={aiMixCore}
+                    onChange={e => setAiMixCore(e.target.checked)}
+                    className="w-4 h-4 rounded"
+                    data-testid="checkbox-mix-core"
+                  />
+                </div>
+
+                {/* Info note */}
+                <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+                  <p><strong>Note:</strong> Weekends are set to Thursday & Friday (Islamic calendar).</p>
+                  <p>Mark subjects as "Core" in the Subjects section — core subjects (e.g. Quran, Arabic) will be scheduled first in the exam period.</p>
+                </div>
+
+                <Button
+                  onClick={() => aiGenerateMutation.mutate()}
+                  disabled={aiGenerateMutation.isPending || !selectedExamYearId}
+                  className="w-full gap-2"
+                  data-testid="button-ai-generate"
+                >
+                  {aiGenerateMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Generating with AI...</>
+                  ) : (
+                    <><Sparkles className="w-4 h-4" /> Generate Schedule</>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {/* Preview table after generation */}
+            {aiSchedule.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <p className="text-sm font-medium text-foreground">
                     <CheckCheck className="w-4 h-4 inline me-1 text-chart-2" />
                     {aiSchedule.length} entries generated
                   </p>
-                  <Button variant="outline" size="sm" onClick={() => aiGenerateMutation.mutate()} disabled={aiGenerateMutation.isPending} className="gap-1">
+                  <Button variant="outline" size="sm" onClick={() => setAiSchedule([])} className="gap-1">
                     <RefreshCw className="w-3.5 h-3.5" />
-                    Regenerate
+                    Change Settings
                   </Button>
                 </div>
 
@@ -550,14 +654,19 @@ export default function ExamScheduling() {
                     </thead>
                     <tbody>
                       {aiSchedule
-                        .sort((a, b) => a.examDate.localeCompare(b.examDate))
+                        .sort((a, b) => a.examDate.localeCompare(b.examDate) || a.startTime.localeCompare(b.startTime))
                         .map((entry, idx) => (
                           <tr key={idx} className="border-b last:border-0 hover:bg-muted/30">
                             <td className="p-3 text-muted-foreground">
                               {new Date(entry.examDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                             </td>
-                            <td className="p-3 font-medium">{entry.subjectName}</td>
-                            <td className="p-3">Grade {entry.grade}</td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium">{entry.subjectName}</span>
+                                {entry.isCore && <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">Core</Badge>}
+                              </div>
+                            </td>
+                            <td className="p-3 text-muted-foreground">Grade {entry.grade}</td>
                             <td className="p-3 text-muted-foreground">{entry.startTime} – {entry.endTime}</td>
                           </tr>
                         ))}
@@ -565,7 +674,6 @@ export default function ExamScheduling() {
                   </table>
                 </div>
 
-                {/* Replace option */}
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
                     type="checkbox"
@@ -577,19 +685,29 @@ export default function ExamScheduling() {
                   <span>Replace all existing timetable entries for this exam year</span>
                 </label>
 
-                {/* Save button */}
-                <Button
-                  onClick={() => aiSaveMutation.mutate()}
-                  disabled={aiSaveMutation.isPending}
-                  className="w-full gap-2"
-                  data-testid="button-ai-save"
-                >
-                  {aiSaveMutation.isPending ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
-                  ) : (
-                    <><Save className="w-4 h-4" /> Save Timetable ({aiSchedule.length} entries)</>
-                  )}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => aiGenerateMutation.mutate()}
+                    disabled={aiGenerateMutation.isPending}
+                    className="gap-1"
+                  >
+                    {aiGenerateMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    Regenerate
+                  </Button>
+                  <Button
+                    onClick={() => aiSaveMutation.mutate()}
+                    disabled={aiSaveMutation.isPending}
+                    className="flex-1 gap-2"
+                    data-testid="button-ai-save"
+                  >
+                    {aiSaveMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                    ) : (
+                      <><Save className="w-4 h-4" /> Save Timetable ({aiSchedule.length} entries)</>
+                    )}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
