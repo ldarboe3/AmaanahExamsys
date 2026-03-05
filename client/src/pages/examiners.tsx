@@ -94,7 +94,15 @@ export default function Examiners() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
   const { data: examiners, isLoading } = useQuery<ExaminerWithRelations[]>({
-    queryKey: ["/api/examiners", statusFilter],
+    queryKey: ["/api/examiners", { status: statusFilter }],
+    queryFn: async () => {
+      const url = statusFilter && statusFilter !== "all"
+        ? `/api/examiners?status=${statusFilter}`
+        : "/api/examiners";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch examiners");
+      return res.json();
+    },
   });
 
   const filteredExaminers = examiners?.filter((examiner) => {
