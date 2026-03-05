@@ -102,6 +102,7 @@ interface CenterDashboardData {
     schoolType: string;
     email?: string;
     phone?: string;
+    schoolBadge?: string | null;
   }>;
   timetable: Array<{
     id: number;
@@ -801,17 +802,36 @@ function SchoolsTab({ schools }: { schools: CenterDashboardData["schools"] }) {
       {schools.map(school => (
         <Card key={school.id} className="hover-elevate">
           <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-                <School className="w-5 h-5 text-primary" />
-              </div>
+            <div className="flex items-start gap-4">
+              {school.schoolBadge ? (
+                <div className="shrink-0">
+                  <img
+                    src={school.schoolBadge}
+                    alt={`${school.name} badge`}
+                    className="w-16 h-16 rounded-md object-contain border border-muted shadow-sm bg-white dark:bg-background"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = "none";
+                      const fallback = target.nextElementSibling as HTMLElement;
+                      if (fallback) fallback.style.display = "flex";
+                    }}
+                  />
+                  <div className="w-16 h-16 rounded-md bg-primary/10 items-center justify-center hidden">
+                    <School className="w-8 h-8 text-primary" />
+                  </div>
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                  <School className="w-8 h-8 text-primary" />
+                </div>
+              )}
               <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{school.name}</p>
-                <Badge variant="outline" className="mt-1">
+                <p className="font-medium leading-snug">{school.name}</p>
+                <Badge variant="outline" className="mt-1.5 text-xs">
                   {school.schoolType}
                 </Badge>
                 {school.email && (
-                  <p className="text-sm text-muted-foreground mt-2 truncate">{school.email}</p>
+                  <p className="text-xs text-muted-foreground mt-2 truncate">{school.email}</p>
                 )}
               </div>
             </div>
