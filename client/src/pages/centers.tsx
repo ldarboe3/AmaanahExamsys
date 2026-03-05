@@ -1092,13 +1092,14 @@ export default function Centers() {
           <AlertDialogHeader>
             <AlertDialogTitle>Auto-Assign Schools to Centers</AlertDialogTitle>
             <AlertDialogDescription>
-              This will automatically assign unassigned schools to examination centers based on:
+              This will automatically assign eligible schools to examination centers based on:
               <ul className="list-disc list-inside mt-2 space-y-1">
                 <li>Same cluster priority</li>
                 <li>Same region as fallback</li>
                 <li>Center capacity limits</li>
               </ul>
-              <p className="mt-2 font-medium">Schools already assigned will not be affected.</p>
+              <p className="mt-2 font-medium text-amber-600 dark:text-amber-400">Only schools with approved students and confirmed payment for the current exam year will be assigned. Schools from previous years that have not registered for the current year are excluded.</p>
+              <p className="mt-1 font-medium">Schools already assigned will not be affected.</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

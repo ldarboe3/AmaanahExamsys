@@ -13451,12 +13451,62 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Get schools eligible for center assignment in a given exam year
+  // (only schools with at least 1 approved student for that exam year)
+  app.get("/api/center-assignments/eligible-schools", isAuthenticated, async (req, res) => {
+    try {
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      if (!examYearId) {
+        return res.status(400).json({ message: "examYearId is required" });
+      }
+
+      const allStudents = await storage.getAllStudents();
+      const allSchools = await storage.getAllSchools();
+      const existingAssignments = await storage.getCenterAssignmentsByExamYear(examYearId);
+      const assignedSchoolIds = new Set(existingAssignments.map(a => a.schoolId));
+
+      const schoolsWithApprovedStudents = new Set(
+        allStudents
+          .filter(s => s.examYearId === examYearId && s.status === 'approved')
+          .map(s => s.schoolId)
+      );
+
+      const eligibleSchools = allSchools.filter(s =>
+        s.status === 'approved' &&
+        schoolsWithApprovedStudents.has(s.id)
+      ).map(s => ({
+        ...s,
+        alreadyAssigned: assignedSchoolIds.has(s.id),
+        approvedStudentCount: allStudents.filter(st => st.examYearId === examYearId && st.status === 'approved' && st.schoolId === s.id).length,
+      }));
+
+      res.json(eligibleSchools);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/center-assignments", isAuthenticated, async (req, res) => {
     try {
+      const { schoolId, examYearId, centerId } = req.body;
+
       // Check if assignment already exists
-      const existing = await storage.getCenterAssignmentBySchool(req.body.schoolId, req.body.examYearId);
+      const existing = await storage.getCenterAssignmentBySchool(schoolId, examYearId);
       if (existing) {
         return res.status(400).json({ message: "School already assigned to a center for this exam year" });
+      }
+
+      // Validate: school must have at least 1 approved student for this exam year
+      if (schoolId && examYearId) {
+        const allStudents = await storage.getAllStudents();
+        const hasApprovedStudents = allStudents.some(
+          s => s.examYearId === examYearId && s.status === 'approved' && s.schoolId === schoolId
+        );
+        if (!hasApprovedStudents) {
+          return res.status(400).json({ 
+            message: "This school has no approved students for the selected exam year. Schools must have approved students before being assigned to a center." 
+          });
+        }
       }
 
       const assignment = await storage.createCenterAssignment({
@@ -13519,8 +13569,19 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const existingAssignments = await storage.getCenterAssignmentsByExamYear(examYearId);
       const assignedSchoolIds = new Set(existingAssignments.map(a => a.schoolId));
 
+      // Only include schools that have at least one approved student for this exam year
+      // (students are only approved after payment is confirmed)
+      const allStudents = await storage.getAllStudents();
+      const schoolsWithApprovedStudents = new Set(
+        allStudents
+          .filter(s => s.examYearId === examYearId && s.status === 'approved')
+          .map(s => s.schoolId)
+      );
+
       const unassignedSchools = allSchools.filter(s => 
-        s.status === 'approved' && !assignedSchoolIds.has(s.id)
+        s.status === 'approved' &&
+        !assignedSchoolIds.has(s.id) &&
+        schoolsWithApprovedStudents.has(s.id)
       );
 
       // Track center capacities
