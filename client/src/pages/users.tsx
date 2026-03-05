@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,16 +15,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import {
   Table,
   TableBody,
@@ -57,7 +49,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Search,
-  UserPlus,
   Users,
   Shield,
   MoreHorizontal,
@@ -67,11 +58,10 @@ import {
   UserX,
   UserCheck,
   Trash2,
+  ArrowRight,
+  Info,
 } from "lucide-react";
 import { format } from "date-fns";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import type { User } from "@shared/schema";
 
 const roleLabels: Record<string, string> = {
@@ -98,18 +88,6 @@ const statusColors: Record<string, string> = {
   suspended: "bg-destructive/10 text-destructive",
 };
 
-const createUserSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  phone: z.string().optional(),
-  role: z.enum(["super_admin", "examination_admin", "logistics_admin", "school_admin", "examiner", "candidate"]),
-});
-
-type CreateUserFormData = z.infer<typeof createUserSchema>;
-
 function UsersSkeleton() {
   return (
     <div className="space-y-4">
@@ -130,48 +108,13 @@ function UsersSkeleton() {
 export default function UsersPage() {
   const { t, isRTL } = useLanguage();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
-  });
-
-  const form = useForm<CreateUserFormData>({
-    resolver: zodResolver(createUserSchema),
-    defaultValues: {
-      username: "",
-      email: "",
-      password: "",
-      firstName: "",
-      lastName: "",
-      phone: "",
-      role: "school_admin",
-    },
-  });
-
-  const createUserMutation = useMutation({
-    mutationFn: async (data: CreateUserFormData) => {
-      return apiRequest("POST", "/api/auth/register", data);
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "User created successfully",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      setIsCreateDialogOpen(false);
-      form.reset();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create user",
-        variant: "destructive",
-      });
-    },
   });
 
   const updateRoleMutation = useMutation({
@@ -241,15 +184,9 @@ export default function UsersPage() {
       user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.lastName?.toLowerCase().includes(searchQuery.toLowerCase());
-    
     const matchesRole = roleFilter === "all" || user.role === roleFilter;
-    
     return matchesSearch && matchesRole;
   });
-
-  const onSubmit = (data: CreateUserFormData) => {
-    createUserMutation.mutate(data);
-  };
 
   return (
     <div className="space-y-4">
@@ -259,154 +196,23 @@ export default function UsersPage() {
             {isRTL ? "إدارة المستخدمين" : "User Management"}
           </h1>
           <p className="text-muted-foreground mt-1">
-            {isRTL ? "إدارة وتسجيل مستخدمي النظام" : "Manage and register system users"}
+            {isRTL ? "إدارة مستخدمي النظام" : "Manage system users"}
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-user">
-              <UserPlus className="w-4 h-4 mr-2" />
-              {isRTL ? "إضافة مستخدم" : "Add User"}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{isRTL ? "إنشاء مستخدم جديد" : "Create New User"}</DialogTitle>
-              <DialogDescription>
-                {isRTL ? "أدخل تفاصيل المستخدم الجديد" : "Enter the details for the new user"}
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{isRTL ? "الاسم الأول" : "First Name"}</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-first-name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{isRTL ? "الاسم الأخير" : "Last Name"}</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-last-name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isRTL ? "اسم المستخدم" : "Username"}</FormLabel>
-                      <FormControl>
-                        <Input {...field} data-testid="input-username" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isRTL ? "البريد الإلكتروني" : "Email"}</FormLabel>
-                      <FormControl>
-                        <Input type="email" {...field} data-testid="input-email" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isRTL ? "كلمة المرور" : "Password"}</FormLabel>
-                      <FormControl>
-                        <Input type="password" {...field} data-testid="input-password" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isRTL ? "رقم الهاتف" : "Phone"}</FormLabel>
-                      <FormControl>
-                        <Input {...field} data-testid="input-phone" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isRTL ? "الدور" : "Role"}</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-role">
-                            <SelectValue placeholder={isRTL ? "اختر الدور" : "Select role"} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="super_admin">Super Admin</SelectItem>
-                          <SelectItem value="examination_admin">Examination Admin</SelectItem>
-                          <SelectItem value="logistics_admin">Logistics Admin</SelectItem>
-                          <SelectItem value="school_admin">School Admin</SelectItem>
-                          <SelectItem value="examiner">Examiner</SelectItem>
-                          <SelectItem value="candidate">Candidate</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsCreateDialogOpen(false)}
-                    data-testid="button-cancel"
-                  >
-                    {isRTL ? "إلغاء" : "Cancel"}
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createUserMutation.isPending}
-                    data-testid="button-create-user"
-                  >
-                    {createUserMutation.isPending && (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    )}
-                    {isRTL ? "إنشاء" : "Create"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setLocation("/staff-identity")} data-testid="button-go-to-staff-identity">
+          <ArrowRight className="w-4 h-4 mr-2" />
+          {isRTL ? "تسجيل من هوية الموظفين" : "Register via Staff Identity"}
+        </Button>
+      </div>
+
+      {/* Info Banner */}
+      <div className="flex items-start gap-3 p-4 rounded-md bg-primary/5 border border-primary/20">
+        <Info className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+        <p className="text-sm text-foreground">
+          {isRTL
+            ? "يتم إنشاء مستخدمي النظام (المسؤولون، موظفو اللوجستيات، إلخ) من خلال قسم هوية الموظفين. استخدم قائمة أدناه لإدارة الصلاحيات وحالة المستخدمين الحاليين."
+            : "System users (admins, logistics staff, etc.) are created through Staff Identity. Use the table below to manage roles and status of existing users."}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

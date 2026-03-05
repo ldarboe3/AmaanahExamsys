@@ -61,6 +61,10 @@ const staffProfileSchema = z.object({
   clusterId: z.coerce.number().optional().nullable(),
   phone: z.string().optional(),
   email: z.string().email("Valid email required").optional().or(z.literal("")),
+  grantSystemAccess: z.boolean().optional(),
+  systemRole: z.enum(["super_admin", "examination_admin", "logistics_admin", "examiner"]).optional(),
+  systemUsername: z.string().min(3).optional().or(z.literal("")),
+  systemPassword: z.string().min(6).optional().or(z.literal("")),
 });
 
 type StaffFormData = z.infer<typeof staffProfileSchema>;
@@ -123,6 +127,7 @@ export default function StaffIdentityPage() {
   const [statusChangeStaff, setStatusChangeStaff] = useState<{ staff: StaffProfile; newStatus: string } | null>(null);
   const [statusReason, setStatusReason] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [grantSystemAccess, setGrantSystemAccess] = useState(false);
 
   const { data: staffProfiles = [], isLoading } = useQuery<StaffProfile[]>({
     queryKey: ["/api/staff-profiles", { search: searchTerm, status: statusFilter !== "all" ? statusFilter : undefined, role: roleFilter !== "all" ? roleFilter : undefined }],
@@ -244,8 +249,10 @@ export default function StaffIdentityPage() {
     form.reset({
       firstName: "", lastName: "", middleName: "", fullNameArabic: "",
       role: "examiner", department: "", regionId: null, clusterId: null, phone: "", email: "",
+      grantSystemAccess: false, systemRole: undefined, systemUsername: "", systemPassword: "",
     });
     setPhotoFile(null);
+    setGrantSystemAccess(false);
     setShowCreateDialog(true);
   };
 
@@ -261,8 +268,10 @@ export default function StaffIdentityPage() {
       clusterId: staff.clusterId,
       phone: staff.phone || "",
       email: staff.email || "",
+      grantSystemAccess: false, systemRole: undefined, systemUsername: "", systemPassword: "",
     });
     setPhotoFile(null);
+    setGrantSystemAccess(false);
     setEditingStaff(staff);
   };
 
@@ -657,7 +666,7 @@ export default function StaffIdentityPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {Object.entries(mobileRoleLabels).map(([value, label]) => (
+                        {Object.entries(roleLabels).map(([value, label]) => (
                           <SelectItem key={value} value={value}>{label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -752,6 +761,67 @@ export default function StaffIdentityPage() {
                   </FormItem>
                 )} />
               </div>
+
+              {/* System Login Access */}
+              {!editingStaff && (
+                <div className="space-y-3 pt-2 border-t">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">System Login Access</p>
+                      <p className="text-xs text-muted-foreground">Grant this staff member a system login account</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={grantSystemAccess}
+                      onClick={() => setGrantSystemAccess((v) => !v)}
+                      data-testid="toggle-system-access"
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none ${grantSystemAccess ? "bg-primary" : "bg-muted"}`}
+                    >
+                      <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-background shadow-lg transform transition-transform ${grantSystemAccess ? "translate-x-5" : "translate-x-0"}`} />
+                    </button>
+                  </div>
+                  {grantSystemAccess && (
+                    <div className="space-y-3">
+                      <FormField control={form.control} name="systemRole" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>System Role</FormLabel>
+                          <Select value={field.value || ""} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-system-role">
+                                <SelectValue placeholder="Select system role" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="super_admin">Super Admin</SelectItem>
+                              <SelectItem value="examination_admin">Examination Admin</SelectItem>
+                              <SelectItem value="logistics_admin">Logistics Admin</SelectItem>
+                              <SelectItem value="examiner">Examiner</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField control={form.control} name="systemUsername" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Username</FormLabel>
+                            <FormControl><Input {...field} data-testid="input-system-username" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name="systemPassword" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Password</FormLabel>
+                            <FormControl><Input {...field} type="password" data-testid="input-system-password" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => { setShowCreateDialog(false); setEditingStaff(null); }}>

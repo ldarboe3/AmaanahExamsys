@@ -1,10 +1,7 @@
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,19 +18,9 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,7 +40,6 @@ import {
   MoreVertical,
   Eye,
   Edit,
-  Plus,
   UserCheck,
   Mail,
   Phone,
@@ -62,22 +48,11 @@ import {
   DollarSign,
   CheckCircle,
   Clock,
+  ArrowRight,
+  Info,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Examiner, Region } from "@shared/schema";
-
-const examinerSchema = z.object({
-  firstName: z.string().min(2, "First name is required"),
-  lastName: z.string().min(2, "Last name is required"),
-  email: z.string().email("Valid email is required"),
-  phone: z.string().optional(),
-  qualification: z.string().optional(),
-  specialization: z.string().optional(),
-  regionId: z.coerce.number().optional(),
-});
-
-type ExaminerFormData = z.infer<typeof examinerSchema>;
+import type { Examiner } from "@shared/schema";
 
 const statusColors: Record<string, string> = {
   pending: "bg-chart-5/10 text-chart-5",
@@ -112,57 +87,15 @@ function ExaminersTableSkeleton() {
 export default function Examiners() {
   const { toast } = useToast();
   const { t, isRTL } = useLanguage();
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedExaminer, setSelectedExaminer] = useState<ExaminerWithRelations | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
   const { data: examiners, isLoading } = useQuery<ExaminerWithRelations[]>({
     queryKey: ["/api/examiners", statusFilter],
   });
-
-  const { data: regions } = useQuery<Region[]>({
-    queryKey: ["/api/regions"],
-  });
-
-  const form = useForm<ExaminerFormData>({
-    resolver: zodResolver(examinerSchema),
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      qualification: "",
-      specialization: "",
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async (data: ExaminerFormData) => {
-      return apiRequest("POST", "/api/examiners", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/examiners"] });
-      setShowCreateDialog(false);
-      form.reset();
-      toast({
-        title: t.examiners.examinerAdded,
-        description: t.examiners.examinerAddedDesc,
-      });
-    },
-    onError: () => {
-      toast({
-        title: t.common.error,
-        description: t.examiners.failedToAdd,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSubmit = (data: ExaminerFormData) => {
-    createMutation.mutate(data);
-  };
 
   const filteredExaminers = examiners?.filter((examiner) => {
     const fullName = `${examiner.firstName} ${examiner.lastName}`.toLowerCase();
@@ -194,10 +127,20 @@ export default function Examiners() {
             {t.examiners.manageDescription}
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} data-testid="button-add-examiner">
-          <Plus className="w-4 h-4 me-2" />
-          {t.examiners.addExaminer}
+        <Button onClick={() => setLocation("/staff-identity")} data-testid="button-go-to-staff-identity">
+          <ArrowRight className="w-4 h-4 me-2" />
+          {isRTL ? "إضافة في هوية الموظفين" : "Register via Staff Identity"}
         </Button>
+      </div>
+
+      {/* Info Banner */}
+      <div className="flex items-start gap-3 p-4 rounded-md bg-primary/5 border border-primary/20">
+        <Info className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+        <p className="text-sm text-foreground">
+          {isRTL
+            ? "يتم تسجيل المحكّمين من خلال قسم هوية الموظفين. أي موظف بدور \"محكّم\" يظهر تلقائياً هنا."
+            : "Examiners are registered through Staff Identity. Any staff member with the Examiner role automatically appears here."}
+        </p>
       </div>
 
       {/* Stats Cards */}
@@ -390,151 +333,16 @@ export default function Examiners() {
               <UserCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">{t.examiners.noExaminersFound}</h3>
               <p className="text-muted-foreground mb-4">
-                {searchQuery ? t.examiners.tryAdjustSearch : t.examiners.addFirstExaminer}
+                {searchQuery ? t.examiners.tryAdjustSearch : (isRTL ? "أضف موظفين بدور محكّم من خلال قسم هوية الموظفين." : "Add staff with the Examiner role through Staff Identity.")}
               </p>
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="w-4 h-4 me-2" />
-                {t.examiners.addExaminer}
+              <Button onClick={() => setLocation("/staff-identity")} data-testid="button-go-to-staff-identity-empty">
+                <ArrowRight className="w-4 h-4 me-2" />
+                {isRTL ? "الذهاب إلى هوية الموظفين" : "Go to Staff Identity"}
               </Button>
             </div>
           )}
         </CardContent>
       </Card>
-
-      {/* Create Examiner Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-lg" dir={isRTL ? "rtl" : "ltr"}>
-          <DialogHeader>
-            <DialogTitle>{t.examiners.addNewExaminer}</DialogTitle>
-            <DialogDescription>
-              {t.examiners.addNewExaminerDesc}
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t.examiners.firstName}</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t.examiners.firstName} {...field} data-testid="input-first-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t.examiners.lastName}</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t.examiners.lastName} {...field} data-testid="input-last-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t.common.email}</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="examiner@example.com" {...field} data-testid="input-email" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t.examiners.phoneOptional}</FormLabel>
-                    <FormControl>
-                      <Input placeholder="+220 1234567" {...field} data-testid="input-phone" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="qualification"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t.examiners.qualification}</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t.examiners.qualification} {...field} data-testid="input-qualification" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="specialization"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t.examiners.specialization}</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t.examiners.specialization} {...field} data-testid="input-specialization" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="regionId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t.examiners.regionOptional}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value?.toString()}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-region">
-                          <SelectValue placeholder={t.centers.selectRegion} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {regions?.map((region) => (
-                          <SelectItem key={region.id} value={region.id.toString()}>
-                            {region.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
-                  {t.common.cancel}
-                </Button>
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? t.examiners.adding : t.examiners.addExaminer}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
 
       {/* Examiner Details Dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>

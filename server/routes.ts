@@ -14232,7 +14232,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return res.status(403).json({ message: "Access denied" });
       }
       
-      const { firstName, lastName, middleName, fullNameArabic, role, department, secondaryRoles, regionId, clusterId, centerId, phone, email, photoUrl } = req.body;
+      const { firstName, lastName, middleName, fullNameArabic, role, department, secondaryRoles, regionId, clusterId, centerId, phone, email, photoUrl, grantSystemAccess, systemRole, systemUsername, systemPassword } = req.body;
       
       if (!firstName || !lastName || !role) {
         return res.status(400).json({ message: "First name, last name, and role are required" });
@@ -14311,6 +14311,37 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
           }
         } catch (syncErr) {
           console.error('Auto-sync to examiners failed:', syncErr);
+        }
+      }
+
+      // Create system login account if requested
+      if (grantSystemAccess && systemRole && systemUsername && systemPassword) {
+        try {
+          const existingUser = await storage.getUserByUsername(systemUsername);
+          if (existingUser) {
+            return res.status(400).json({ message: `Username '${systemUsername}' is already taken. Please choose a different username.` });
+          }
+          const hashedPassword = await bcrypt.hash(systemPassword, 10);
+          const newUser = await storage.upsertUser({
+            username: systemUsername,
+            passwordHash: hashedPassword,
+            role: systemRole,
+            firstName,
+            lastName,
+            email: email || null,
+            phone: phone || null,
+            status: 'active',
+          });
+          await storage.updateStaffProfile(profile.id, { userId: newUser.id });
+          await storage.createAuditLog({
+            action: 'system_user_created_for_staff',
+            entityType: 'staff_profile',
+            entityId: profile.id.toString(),
+            userId: user.id,
+            newData: { details: `System login created: ${systemUsername} (${systemRole}) for staff ${firstName} ${lastName}` },
+          });
+        } catch (userErr: any) {
+          console.error('System login creation failed:', userErr);
         }
       }
 
