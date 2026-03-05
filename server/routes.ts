@@ -2569,8 +2569,38 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(404).json({ message: "School not found" });
       }
 
-      if (!school.adminUserId) {
-        return res.status(400).json({ message: "This school does not have an admin account yet. Please create one first." });
+      // Auto-create admin user if school has email but no linked account yet
+      let adminUserId = school.adminUserId;
+      if (!adminUserId && school.email) {
+        const baseUsername = school.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '_')
+          .substring(0, 20);
+        let username = `school_${baseUsername}`;
+        // Ensure uniqueness
+        let counter = 1;
+        while (await storage.getUserByUsername(username)) {
+          username = `school_${baseUsername}_${counter++}`;
+        }
+        const tempPasswordHash = await bcrypt.hash(Math.random().toString(36), 10);
+        const newAdminUser = await storage.upsertUser({
+          username,
+          passwordHash: tempPasswordHash,
+          role: 'school_admin',
+          firstName: school.registrarName?.split(' ')[0] || 'Admin',
+          lastName: school.registrarName?.split(' ').slice(1).join(' ') || school.name,
+          email: school.email,
+          status: 'active',
+        });
+        // Link the new user to the school
+        await db.update(schools)
+          .set({ adminUserId: newAdminUser.id, updatedAt: new Date() })
+          .where(eq(schools.id, school.id));
+        adminUserId = newAdminUser.id;
+      }
+
+      if (!adminUserId) {
+        return res.status(400).json({ message: "This school does not have an email address. Cannot send password reset." });
       }
 
       const resetToken = generateVerificationToken();
