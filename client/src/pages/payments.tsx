@@ -156,6 +156,8 @@ export default function Payments() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [examYearFilter, setExamYearFilter] = useState<string>("all");
+  const [regionFilter, setRegionFilter] = useState<string>("all");
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithRelations | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -169,13 +171,27 @@ export default function Payments() {
   const isSchoolAdmin = user?.role === 'school_admin';
   const canConfirmPayments = user?.role === 'super_admin' || user?.role === 'examination_admin';
 
+  // For admin users: fetch exam years for filter
+  const { data: examYears } = useQuery<any[]>({
+    queryKey: ["/api/exam-years"],
+    enabled: !isSchoolAdmin,
+  });
+
+  // For admin users: fetch regions for filter
+  const { data: regions } = useQuery<any[]>({
+    queryKey: ["/api/regions"],
+    enabled: !isSchoolAdmin,
+  });
+
   // For admin users: fetch all invoices
   const { data: invoices, isLoading } = useQuery<InvoiceWithRelations[]>({
-    queryKey: ["/api/invoices", { status: statusFilter }],
+    queryKey: ["/api/invoices", { status: statusFilter, examYearId: examYearFilter, regionId: regionFilter }],
     queryFn: async () => {
-      const url = statusFilter && statusFilter !== "all" 
-        ? `/api/invoices?status=${statusFilter}` 
-        : "/api/invoices";
+      const params = new URLSearchParams();
+      if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
+      if (examYearFilter && examYearFilter !== "all") params.set("examYearId", examYearFilter);
+      if (regionFilter && regionFilter !== "all") params.set("regionId", regionFilter);
+      const url = `/api/invoices${params.toString() ? `?${params.toString()}` : ""}`;
       const response = await fetch(url, { credentials: "include" });
       if (!response.ok) {
         const error = await response.text();
@@ -421,6 +437,9 @@ export default function Payments() {
 
   const totalRevenue = invoices?.reduce((sum, inv) => sum + parseFloat(inv.paidAmount?.toString() || '0'), 0) || 0;
   const pendingAmount = invoices?.filter(i => i.status === 'pending').reduce((sum, inv) => sum + parseFloat(inv.totalAmount?.toString() || '0'), 0) || 0;
+  const paidCount = invoices?.filter(i => i.status === 'paid').length || 0;
+  const pendingCount = invoices?.filter(i => i.status === 'pending').length || 0;
+  const processingCount = invoices?.filter(i => i.status === 'processing').length || 0;
 
   // School admin view - show their single invoice
   if (isSchoolAdmin) {
@@ -928,6 +947,7 @@ export default function Payments() {
               <div>
                 <p className="text-sm text-muted-foreground">{isRTL ? "إجمالي الإيرادات" : "Total Revenue"}</p>
                 <p className="text-2xl font-semibold">{formatCurrency(totalRevenue)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{invoices?.length || 0} {isRTL ? "فاتورة" : "invoices"}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
                 <DollarSign className="w-5 h-5 text-chart-3" />
@@ -939,39 +959,40 @@ export default function Payments() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{isRTL ? "قيد الانتظار" : "Pending"}</p>
-                <p className="text-2xl font-semibold">{formatCurrency(pendingAmount)}</p>
-              </div>
-              <div className="w-10 h-10 rounded-md bg-chart-5/10 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-chart-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">{isRTL ? "إجمالي الفواتير" : "Total Invoices"}</p>
-                <p className="text-2xl font-semibold">{invoices?.length || 0}</p>
-              </div>
-              <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-                <Receipt className="w-5 h-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
                 <p className="text-sm text-muted-foreground">{isRTL ? "مدفوع" : "Paid"}</p>
-                <p className="text-2xl font-semibold">
-                  {invoices?.filter(i => i.status === 'paid').length || 0}
-                </p>
+                <p className="text-2xl font-semibold">{paidCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">{formatCurrency(totalRevenue)}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
                 <CheckCircle className="w-5 h-5 text-chart-3" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{isRTL ? "قيد المراجعة" : "Under Review"}</p>
+                <p className="text-2xl font-semibold">{processingCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">{isRTL ? "تحتاج مراجعة" : "awaiting confirmation"}</p>
+              </div>
+              <div className="w-10 h-10 rounded-md bg-chart-4/10 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-chart-4" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{isRTL ? "قيد الانتظار" : "Pending"}</p>
+                <p className="text-2xl font-semibold">{pendingCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">{formatCurrency(pendingAmount)}</p>
+              </div>
+              <div className="w-10 h-10 rounded-md bg-chart-5/10 flex items-center justify-center">
+                <Receipt className="w-5 h-5 text-chart-5" />
               </div>
             </div>
           </CardContent>
@@ -981,8 +1002,8 @@ export default function Payments() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
+          <div className="flex flex-col md:flex-row gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className={`absolute ${isRTL ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground`} />
               <Input
                 placeholder={isRTL ? "البحث برقم الفاتورة أو المدرسة..." : "Search by invoice number or school..."}
@@ -992,6 +1013,30 @@ export default function Payments() {
                 data-testid="input-search-payments"
               />
             </div>
+            <Select value={examYearFilter} onValueChange={setExamYearFilter}>
+              <SelectTrigger className="w-[160px]" data-testid="select-exam-year-filter">
+                <SelectValue placeholder={isRTL ? "السنة الدراسية" : "Exam Year"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{isRTL ? "كل السنوات" : "All Years"}</SelectItem>
+                {(examYears || []).map((ey: any) => (
+                  <SelectItem key={ey.id} value={String(ey.id)}>
+                    {ey.name}{ey.isActive ? (isRTL ? " (نشط)" : " (Active)") : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={regionFilter} onValueChange={setRegionFilter}>
+              <SelectTrigger className="w-[150px]" data-testid="select-region-filter">
+                <SelectValue placeholder={isRTL ? "المنطقة" : "Region"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{isRTL ? "كل المناطق" : "All Regions"}</SelectItem>
+                {(regions || []).map((r: any) => (
+                  <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
                 <SelectValue placeholder={t.common.status} />
@@ -1004,6 +1049,15 @@ export default function Payments() {
                 <SelectItem value="failed">{isRTL ? "فشل" : "Failed"}</SelectItem>
               </SelectContent>
             </Select>
+            {(examYearFilter !== "all" || regionFilter !== "all" || statusFilter !== "all" || searchQuery) && (
+              <Button
+                variant="ghost"
+                onClick={() => { setExamYearFilter("all"); setRegionFilter("all"); setStatusFilter("all"); setSearchQuery(""); }}
+                data-testid="button-clear-filters"
+              >
+                {isRTL ? "مسح الفلاتر" : "Clear Filters"}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

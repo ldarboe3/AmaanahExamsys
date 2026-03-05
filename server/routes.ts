@@ -5199,13 +5199,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         // Admin users can view filtered invoices
         const status = req.query.status as string | undefined;
         const schoolIdParam = req.query.schoolId ? parseInt(req.query.schoolId as string) : undefined;
+        const examYearIdParam = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+        const regionIdParam = req.query.regionId ? parseInt(req.query.regionId as string) : undefined;
         
-        if (status) {
+        if (status && status !== 'all') {
           invoices = await storage.getInvoicesByStatus(status);
         } else if (schoolIdParam) {
           invoices = await storage.getInvoicesBySchool(schoolIdParam);
         } else {
           invoices = await storage.getAllInvoices();
+        }
+
+        // Filter by exam year
+        if (examYearIdParam) {
+          invoices = invoices.filter(inv => inv.examYearId === examYearIdParam);
+        }
+
+        // Filter by region (requires school lookup)
+        if (regionIdParam) {
+          const allSchoolsForRegion = await storage.getAllSchools();
+          const schoolsInRegion = new Set(allSchoolsForRegion.filter(s => s.regionId === regionIdParam).map(s => s.id));
+          invoices = invoices.filter(inv => inv.schoolId && schoolsInRegion.has(inv.schoolId));
         }
       }
       
@@ -5218,7 +5232,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const examYear = allExamYears.find(ey => ey.id === invoice.examYearId);
         return {
           ...invoice,
-          school: school ? { name: school.name } : null,
+          school: school ? { name: school.name, regionId: school.regionId } : null,
           examYear: examYear ? { name: examYear.name, id: examYear.id } : null,
         };
       });
@@ -5438,7 +5452,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (existingInvoice) {
         // Update existing invoice with new student counts
         const allStudents = await storage.getStudentsBySchool(schoolId);
-        const examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
+        let examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
+
+        // Fallback: if none match, use all school students
+        if (examYearStudents.length === 0 && allStudents.length > 0) {
+          for (const s of allStudents.filter(s => !s.examYearId)) {
+            await storage.updateStudent(s.id, { examYearId });
+          }
+          const refreshed = await storage.getStudentsBySchool(schoolId);
+          examYearStudents = refreshed.filter(s => s.examYearId === examYearId);
+          if (examYearStudents.length === 0) examYearStudents = refreshed;
+        }
         
         // Allow update even with no students
         if (examYearStudents.length === 0) {
@@ -5489,7 +5513,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       
       // Create new invoice
       const allStudents = await storage.getStudentsBySchool(schoolId);
-      const examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
+      let examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
+
+      // Fallback: if no students match the active exam year, try all school students (may have been
+      // uploaded without specifying exam year). Assign them to the active exam year first.
+      if (examYearStudents.length === 0 && allStudents.length > 0) {
+        // Update all unassigned students to use the active exam year
+        for (const s of allStudents.filter(s => !s.examYearId)) {
+          await storage.updateStudent(s.id, { examYearId });
+        }
+        // Re-fetch after update
+        const refreshed = await storage.getStudentsBySchool(schoolId);
+        examYearStudents = refreshed.filter(s => s.examYearId === examYearId || !s.examYearId);
+        if (examYearStudents.length === 0) examYearStudents = refreshed;
+      }
       
       // Do NOT create invoice if there are no students - examination invoice should only exist when students are uploaded
       if (examYearStudents.length === 0) {
