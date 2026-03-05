@@ -184,10 +184,16 @@ function CenterCard({
           </div>
         </div>
 
-        <div className="mt-4">
+        <div className="flex items-center justify-between mt-4">
           <Badge variant={center.isActive ? "default" : "secondary"} className="text-xs">
             {center.isActive ? t.common.active : t.common.inactive}
           </Badge>
+          <Link href={`/centers/${center.id}`}>
+            <Button size="sm" variant="outline" data-testid={`button-manage-${center.id}`}>
+              <Eye className="w-3.5 h-3.5 me-1.5" />
+              {t.centers.viewDetails}
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>
