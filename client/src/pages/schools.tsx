@@ -997,15 +997,17 @@ export default function Schools() {
                                   <Key className="w-4 h-4 me-2" />
                                   {isRTL ? "إرسال بيانات الدخول" : "Send Credentials"}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => sendPasswordResetMutation.mutate(school.id)}
-                                  disabled={sendPasswordResetMutation.isPending}
-                                  data-testid={`button-send-password-reset-${school.id}`}
-                                >
-                                  <KeyRound className="w-4 h-4 me-2" />
-                                  {isRTL ? "إرسال إعادة تعيين كلمة المرور" : "Send Password Reset"}
-                                </DropdownMenuItem>
                               </>
+                            )}
+                            {school.email && (
+                              <DropdownMenuItem
+                                onClick={() => sendPasswordResetMutation.mutate(school.id)}
+                                disabled={sendPasswordResetMutation.isPending}
+                                data-testid={`button-send-password-reset-${school.id}`}
+                              >
+                                <KeyRound className="w-4 h-4 me-2" />
+                                {isRTL ? "إرسال إعادة تعيين كلمة المرور" : "Reset Password"}
+                              </DropdownMenuItem>
                             )}
                             {school.status === 'pending' && (
                               <DropdownMenuItem
@@ -1670,7 +1672,7 @@ export default function Schools() {
             <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
               {t.common.close}
             </Button>
-            {selectedSchool && selectedSchool.adminUserId && (
+            {selectedSchool && selectedSchool.email && (
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1682,7 +1684,7 @@ export default function Schools() {
                 <KeyRound className="w-4 h-4 me-2" />
                 {sendPasswordResetMutation.isPending
                   ? (isRTL ? "جاري الإرسال..." : "Sending...")
-                  : (isRTL ? "إرسال إعادة تعيين كلمة المرور" : "Send Password Reset")}
+                  : (isRTL ? "إعادة تعيين كلمة المرور" : "Reset Password")}
               </Button>
             )}
             {selectedSchool && (selectedSchool.status === 'pending' || selectedSchool.status === 'verified') && (
