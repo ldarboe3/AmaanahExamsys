@@ -424,6 +424,33 @@ export default function Schools() {
     },
   });
 
+  const resetToDefaultMutation = useMutation({
+    mutationFn: async (schoolId: number) => {
+      return apiRequest("POST", `/api/schools/${schoolId}/reset-to-default`);
+    },
+    onSuccess: async (res) => {
+      const data = await res.json();
+      toast({
+        title: isRTL ? "تم إعادة التعيين" : "Password Reset",
+        description: data.message || (isRTL ? "تم إعادة تعيين كلمة المرور إلى Admin@123" : "Password has been reset to Admin@123"),
+      });
+      if (selectedSchoolCredentials) {
+        setSelectedSchoolCredentials(prev => prev ? {
+          ...prev,
+          defaultPassword: 'Admin@123',
+          mustChangePassword: true,
+        } : null);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل في إعادة تعيين كلمة المرور" : "Failed to reset password"),
+        variant: "destructive",
+      });
+    },
+  });
+
   const updateSchoolMutation = useMutation({
     mutationFn: async (data: AddSchoolFormData & { id: number }) => {
       const { id, ...updateData } = data;
@@ -1786,6 +1813,25 @@ export default function Schools() {
                           <span className="flex-1 bg-background px-3 py-2 rounded border text-sm text-green-600 dark:text-green-400">
                             {isRTL ? "تم تغيير كلمة المرور من قبل المستخدم" : "Password has been changed by user"}
                           </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (selectedSchoolCredentials && window.confirm(
+                                isRTL
+                                  ? "هل أنت متأكد من إعادة تعيين كلمة المرور إلى Admin@123؟"
+                                  : "Reset this school's password to Admin@123? They will need to change it on next login."
+                              )) {
+                                resetToDefaultMutation.mutate(selectedSchoolCredentials.schoolId);
+                              }
+                            }}
+                            disabled={resetToDefaultMutation.isPending}
+                            data-testid="button-reset-to-default"
+                          >
+                            {resetToDefaultMutation.isPending
+                              ? (isRTL ? "جارٍ..." : "Resetting...")
+                              : (isRTL ? "إعادة تعيين" : "Reset")}
+                          </Button>
                         </div>
                       </div>
                     )}

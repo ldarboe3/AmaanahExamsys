@@ -2701,6 +2701,53 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.post("/api/schools/:id/reset-to-default", isAuthenticated, async (req, res) => {
+    try {
+      const sessionUser = await storage.getUser(req.session.userId!);
+      if (!['super_admin', 'examination_admin'].includes(sessionUser?.role || '')) {
+        return res.status(403).json({ message: "Access denied. Admin privileges required." });
+      }
+
+      const school = await storage.getSchool(parseInt(req.params.id));
+      if (!school) return res.status(404).json({ message: "School not found" });
+
+      let adminUserId = school.adminUserId;
+      if (!adminUserId) {
+        const hashedPw = await bcrypt.hash('Admin@123', 10);
+        const newUser = await storage.upsertUser({
+          username: `sch${school.id}`,
+          passwordHash: hashedPw,
+          role: 'school_admin',
+          firstName: school.registrarName?.split(' ')[0] || 'Admin',
+          lastName: school.registrarName?.split(' ').slice(1).join(' ') || school.name,
+          email: school.email || null,
+          status: 'active',
+          mustChangePassword: true,
+        });
+        await db.update(schools).set({ adminUserId: newUser.id, updatedAt: new Date() }).where(eq(schools.id, school.id));
+        adminUserId = newUser.id;
+      }
+
+      const hashedPw = await bcrypt.hash('Admin@123', 10);
+      await db.update(users)
+        .set({ passwordHash: hashedPw, mustChangePassword: true, updatedAt: new Date() })
+        .where(eq(users.id, adminUserId));
+
+      await storage.createAuditLog({
+        userId: sessionUser!.id,
+        action: 'reset_school_password',
+        entityType: 'school',
+        entityId: school.id.toString(),
+        newData: { schoolName: school.name, resetBy: sessionUser!.username },
+      });
+
+      res.json({ message: "Password reset to Admin@123 successfully. School must change it on next login." });
+    } catch (error: any) {
+      console.error('Reset to default error:', error);
+      res.status(500).json({ message: error.message || "Failed to reset password" });
+    }
+  });
+
   app.post("/api/schools/:id/assign-center", isAuthenticated, async (req, res) => {
     try {
       const { centerId } = req.body;
