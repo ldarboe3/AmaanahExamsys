@@ -5487,6 +5487,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const totalAmount = (totalStudents * totalFeePerStudent).toFixed(2);
 
       if (existingInvoice) {
+        // Never modify an already-paid invoice — payment is final
+        if (existingInvoice.status === 'paid') {
+          console.log(`[autoGenerateSchoolInvoice] Invoice ${existingInvoice.id} is already paid — skipping update`);
+          return;
+        }
         // Update existing invoice
         await storage.updateInvoice(existingInvoice.id, {
           totalStudents,
@@ -5569,6 +5574,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const existingInvoice = existingInvoices.find(inv => inv.examYearId === examYearId);
       
       if (existingInvoice) {
+        // Never modify an already-paid invoice — payment is final
+        if (existingInvoice.status === 'paid') {
+          const items = await storage.getInvoiceItems(existingInvoice.id);
+          return res.json({ invoice: existingInvoice, items, examYear: activeExamYear, isRegistrationFee: false, message: 'Invoice already paid' });
+        }
         // Update existing invoice with new student counts
         const allStudents = await storage.getStudentsBySchool(schoolId);
         let examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
@@ -6318,6 +6328,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/invoices/:id", isAuthenticated, async (req, res) => {
     try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Not authenticated" });
+
+      const existingInvoice = await storage.getInvoice(parseInt(req.params.id));
+      if (!existingInvoice) return res.status(404).json({ message: "Invoice not found" });
+
+      // Paid invoices are locked — only super_admin can override status, and only admins can patch
+      if (existingInvoice.status === 'paid' && req.body.status && req.body.status !== 'paid') {
+        if (user.role !== 'super_admin') {
+          return res.status(403).json({ message: "Cannot change the status of a paid invoice" });
+        }
+      }
+      if (user.role !== 'super_admin' && user.role !== 'examination_admin') {
+        return res.status(403).json({ message: "Only admins can update invoices" });
+      }
+
       const invoice = await storage.updateInvoice(parseInt(req.params.id), req.body);
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
