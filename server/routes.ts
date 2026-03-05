@@ -7094,40 +7094,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.patch("/api/timetable/:id", isAuthenticated, async (req, res) => {
-    try {
-      const entry = await storage.updateTimetableEntry(parseInt(req.params.id), req.body);
-      if (!entry) {
-        return res.status(404).json({ message: "Timetable entry not found" });
-      }
-      res.json(entry);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.post("/api/timetable/:id", isAuthenticated, async (req, res) => {
-    try {
-      const entry = await storage.updateTimetableEntry(parseInt(req.params.id), req.body);
-      if (!entry) {
-        return res.status(404).json({ message: "Timetable entry not found" });
-      }
-      res.json(entry);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.delete("/api/timetable/:id", isAuthenticated, async (req, res) => {
-    try {
-      await storage.deleteTimetableEntry(parseInt(req.params.id));
-      res.json({ message: "Deleted" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // AI-powered timetable generation
+  // AI-powered timetable generation (must be before /:id parameterized routes)
   app.post("/api/timetable/ai-generate", isAuthenticated, async (req, res) => {
     try {
       const {
@@ -7251,6 +7218,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       res.json({ created: created.length, entries: created });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/timetable/:id", isAuthenticated, async (req, res) => {
+    try {
+      const entry = await storage.updateTimetableEntry(parseInt(req.params.id), req.body);
+      if (!entry) {
+        return res.status(404).json({ message: "Timetable entry not found" });
+      }
+      res.json(entry);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/timetable/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteTimetableEntry(parseInt(req.params.id));
+      res.json({ message: "Deleted" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

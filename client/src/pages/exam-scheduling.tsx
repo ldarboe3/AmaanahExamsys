@@ -72,7 +72,7 @@ export default function ExamScheduling() {
 
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
   const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
-  const { data: centers = [] } = useQuery<any[]>({ queryKey: ["/api/exam-centers"] });
+  const { data: centers = [] } = useQuery<any[]>({ queryKey: ["/api/centers"] });
 
   const scheduleFilters = new URLSearchParams();
   if (selectedExamYearId) scheduleFilters.set("examYearId", selectedExamYearId);
