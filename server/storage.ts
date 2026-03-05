@@ -617,7 +617,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveExamYear(): Promise<ExamYear | undefined> {
-    const [examYear] = await db.select().from(examYears).where(eq(examYears.isActive, true));
+    const [examYear] = await db.select().from(examYears).where(eq(examYears.isActive, true)).orderBy(desc(examYears.id));
     return examYear;
   }
 

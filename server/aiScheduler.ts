@@ -91,13 +91,9 @@ SCHEDULING RULES:
 4. Never schedule more than ${params.maxPapersPerDay} paper(s) total in one day (counting all grades)
 5. Skip weekend days (${weekendNames})
 6. Leave at least one rest day between consecutive exam days for each grade
-7. CORE SUBJECTS first: Schedule all CORE SUBJECTS in the first portion of the exam period
 ${params.mixCoreWithNonCore
-  ? "8. You MAY mix core and non-core subjects on the same day to reduce student pressure"
-  : "8. Keep core subject days separate from non-core subject days where possible"}
-9. Spread subjects evenly across the available dates
-10. Every subject must be scheduled exactly once
-11. All dates must fall within the exam period
+  ? "7. MIX subjects freely — do NOT group all core subjects first. Interleave core and non-core subjects throughout the entire exam period for a balanced schedule\n8. Spread subjects evenly across the available dates\n9. Every subject must be scheduled exactly once\n10. All dates must fall within the exam period"
+  : "7. CORE SUBJECTS first: Schedule all CORE SUBJECTS in the first portion of the exam period\n8. Keep core subject days separate from non-core subject days where possible\n9. Spread subjects evenly across the available dates\n10. Every subject must be scheduled exactly once\n11. All dates must fall within the exam period"}
 
 Return ONLY a valid JSON array with this exact structure (no markdown, no explanation):
 [

@@ -27,7 +27,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -41,7 +40,6 @@ import {
   Search,
   MoreVertical,
   Eye,
-  Edit,
   UserCheck,
   Mail,
   Phone,
@@ -335,11 +333,6 @@ export default function Examiners() {
                               <Eye className="w-4 h-4 me-2" />
                               {t.examiners.viewDetails}
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Edit className="w-4 h-4 me-2" />
-                              {t.common.edit}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
                             <DropdownMenuItem>
                               <FileCheck className="w-4 h-4 me-2" />
                               {t.examiners.viewAssignments}

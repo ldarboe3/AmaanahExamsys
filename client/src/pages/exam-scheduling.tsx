@@ -84,6 +84,16 @@ export default function ExamScheduling() {
     enabled: !!selectedExamYearId,
   });
 
+  const timetableFilters = new URLSearchParams();
+  if (selectedExamYearId) timetableFilters.set("examYearId", selectedExamYearId);
+  if (selectedGrade && selectedGrade !== "all") timetableFilters.set("grade", selectedGrade);
+
+  const { data: timetableEntries = [], isLoading: timetableLoading } = useQuery<any[]>({
+    queryKey: ["/api/timetable", selectedExamYearId, selectedGrade],
+    queryFn: () => fetch(`/api/timetable?${timetableFilters.toString()}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!selectedExamYearId,
+  });
+
   const monParams = new URLSearchParams();
   if (selectedExamYearId) monParams.set("examYearId", selectedExamYearId);
   if (monitoringDate) monParams.set("examDate", monitoringDate);
@@ -246,6 +256,9 @@ export default function ExamScheduling() {
           <TabsTrigger value="schedules" data-testid="tab-schedules">
             <Calendar className="w-4 h-4 mr-1" /> Schedules
           </TabsTrigger>
+          <TabsTrigger value="timetable" data-testid="tab-timetable">
+            <Clock className="w-4 h-4 mr-1" /> Timetable
+          </TabsTrigger>
           {isHQ && (
             <TabsTrigger value="monitoring" data-testid="tab-monitoring">
               <Activity className="w-4 h-4 mr-1" /> Monitoring Dashboard
@@ -345,6 +358,50 @@ export default function ExamScheduling() {
                               </Button>
                             )}
                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="timetable" className="space-y-4">
+          {!selectedExamYearId ? (
+            <Card><CardContent className="py-12 text-center text-muted-foreground">Select an exam year to view the timetable</CardContent></Card>
+          ) : timetableLoading ? (
+            <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}</div>
+          ) : timetableEntries.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="font-medium">No Timetable Entries</p>
+                <p className="text-sm mt-1">Use the AI Auto-Schedule button to generate a timetable.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {Array.from(new Set(timetableEntries.map((e: any) => e.examDate))).sort().map(date => (
+                <Card key={date}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-primary" />
+                      {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {timetableEntries.filter((e: any) => e.examDate === date).sort((a: any, b: any) => a.startTime.localeCompare(b.startTime)).map((entry: any) => (
+                        <div key={entry.id} className="flex flex-wrap items-center gap-3 py-2 border-t first:border-t-0">
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground w-28 shrink-0">
+                            <Clock className="w-3 h-3" />
+                            {entry.startTime} – {entry.endTime}
+                          </div>
+                          <div className="flex-1 font-medium">{entry.subject?.name || entry.subject?.arabicName || `Subject #${entry.subjectId}`}</div>
+                          <Badge variant="outline">Grade {entry.grade}</Badge>
+                          {entry.subject?.isCore && <Badge variant="secondary">Core</Badge>}
                         </div>
                       ))}
                     </div>
