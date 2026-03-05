@@ -2516,6 +2516,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       } catch (auditError) {
         console.error('Failed to create audit log:', auditError);
       }
+      // Auto-generate invoice for active exam year if students exist
+      const activeExamYear = await storage.getActiveExamYear();
+      if (activeExamYear) {
+        autoGenerateSchoolInvoice(schoolId, activeExamYear.id).catch(err =>
+          console.error('[mark-registration-paid] Invoice auto-generate failed:', err)
+        );
+      }
       res.json({ message: "Registration fee marked as paid (offline)", school: updated });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -3625,6 +3632,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       };
       
       const student = await storage.createStudent(normalizedStudentData);
+
+      // Auto-generate invoice for the school after student creation
+      if (student.schoolId && student.examYearId) {
+        autoGenerateSchoolInvoice(student.schoolId, student.examYearId).catch(err =>
+          console.error('[POST /api/students] Invoice auto-generate failed:', err)
+        );
+      }
+
       res.status(201).json({
         ...student,
         surnameNormalization: surnameResult.origin !== 'approved_list' || surnameResult.matchedFrom ? {
@@ -3792,6 +3807,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             await storage.updateSchoolExamRegistrationStage(schoolId, examYearId, 'awaiting_payment', {
               studentUploadedAt: new Date(),
             });
+
+            // Auto-generate invoice so school sees it immediately on payments page
+            autoGenerateSchoolInvoice(schoolId, examYearId).catch(err =>
+              console.error('[CSV Upload] Invoice auto-generate failed:', err)
+            );
             
             // Send confirmation email to school admin using centralized email service
             const school = await storage.getSchool(schoolId);
@@ -5306,6 +5326,75 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Internal helper: auto-generate or update an invoice for a school/examYear
+  async function autoGenerateSchoolInvoice(schoolId: number, examYearId: number): Promise<void> {
+    try {
+      const examYear = await storage.getExamYear(examYearId);
+      if (!examYear) return;
+
+      const allStudents = await storage.getStudentsBySchool(schoolId);
+      const examYearStudents = allStudents.filter(s => s.examYearId === examYearId);
+      if (examYearStudents.length === 0) return;
+
+      const registrationFee = parseFloat(examYear.feePerStudent || '100.00');
+      const certificateFee = parseFloat((examYear as any).certificateFee || '50.00');
+      const transcriptFee = parseFloat((examYear as any).transcriptFee || '25.00');
+      const totalFeePerStudent = registrationFee + certificateFee + transcriptFee;
+
+      const existingInvoices = await storage.getInvoicesBySchool(schoolId);
+      const existingInvoice = existingInvoices.find(
+        inv => inv.examYearId === examYearId && (inv as any).invoiceType !== 'registration'
+      );
+
+      const studentsByGrade: Record<number, number> = {};
+      examYearStudents.forEach(s => {
+        studentsByGrade[s.grade] = (studentsByGrade[s.grade] || 0) + 1;
+      });
+      const totalStudents = examYearStudents.length;
+      const totalAmount = (totalStudents * totalFeePerStudent).toFixed(2);
+
+      if (existingInvoice) {
+        // Update existing invoice
+        await storage.updateInvoice(existingInvoice.id, {
+          totalStudents,
+          totalAmount,
+          feePerStudent: registrationFee.toString(),
+        } as any);
+        await storage.deleteInvoiceItemsByInvoice(existingInvoice.id);
+        const invoiceItems = Object.entries(studentsByGrade).map(([grade, count]) => ({
+          invoiceId: existingInvoice.id,
+          grade: parseInt(grade),
+          studentCount: count,
+          feePerStudent: totalFeePerStudent.toString(),
+          subtotal: (count * totalFeePerStudent).toFixed(2),
+        }));
+        await storage.createInvoiceItemsBulk(invoiceItems);
+      } else {
+        // Create new invoice with pending status
+        const invoiceNumber = generateInvoiceNumber(schoolId, examYearId);
+        const invoice = await storage.createInvoice({
+          invoiceNumber,
+          schoolId,
+          examYearId,
+          totalStudents,
+          feePerStudent: registrationFee.toString(),
+          totalAmount,
+          status: 'pending' as const,
+        });
+        const invoiceItems = Object.entries(studentsByGrade).map(([grade, count]) => ({
+          invoiceId: invoice.id,
+          grade: parseInt(grade),
+          studentCount: count,
+          feePerStudent: totalFeePerStudent.toString(),
+          subtotal: (count * totalFeePerStudent).toFixed(2),
+        }));
+        await storage.createInvoiceItemsBulk(invoiceItems);
+      }
+    } catch (err) {
+      console.error('[autoGenerateSchoolInvoice] Error:', err);
+    }
+  }
+
   // Auto-generate invoice for school admin after student registration
   app.post("/api/invoices/auto-generate", isAuthenticated, async (req, res) => {
     try {
@@ -5993,10 +6082,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.json({ invoice: null, message: "No active exam year" });
       }
       
-      const invoice = invoices.find(inv => inv.examYearId === activeExamYear.id && (inv as any).invoiceType !== 'registration');
+      let invoice = invoices.find(inv => inv.examYearId === activeExamYear.id && (inv as any).invoiceType !== 'registration');
       
       if (!invoice) {
-        return res.json({ invoice: null, message: "No invoice found for current exam year" });
+        // Try auto-generating invoice if students exist but no invoice yet
+        const allStudents = await storage.getStudentsBySchool(schoolId);
+        const examYearStudents = allStudents.filter(s => s.examYearId === activeExamYear.id);
+        if (examYearStudents.length > 0) {
+          await autoGenerateSchoolInvoice(schoolId, activeExamYear.id);
+          // Re-fetch invoices after auto-generation
+          const refreshedInvoices = await storage.getInvoicesBySchool(schoolId);
+          invoice = refreshedInvoices.find(inv => inv.examYearId === activeExamYear.id && (inv as any).invoiceType !== 'registration') || null;
+        }
+        if (!invoice) {
+          return res.json({ invoice: null, message: "No invoice found for current exam year" });
+        }
       }
       
       const items = await storage.getInvoiceItems(invoice.id);

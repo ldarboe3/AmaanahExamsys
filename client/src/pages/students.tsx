@@ -1716,7 +1716,7 @@ export default function Students() {
                     variant="outline" 
                     size="sm" 
                     className="mt-3 border-amber-500 text-amber-700 hover:bg-amber-100 dark:border-amber-400 dark:text-amber-300 dark:hover:bg-amber-900/30"
-                    onClick={() => window.location.href = '/dashboard/payments'}
+                    onClick={() => window.location.href = '/payments'}
                     data-testid="button-go-to-payments"
                   >
                     {isRTL ? "انتقل إلى المدفوعات" : "Go to Payments"}
@@ -1748,7 +1748,7 @@ export default function Students() {
                     variant="outline" 
                     size="sm" 
                     className="mt-3 border-destructive text-destructive hover:bg-destructive/10"
-                    onClick={() => window.location.href = '/dashboard/payments'}
+                    onClick={() => window.location.href = '/payments'}
                     data-testid="button-go-to-payments-rejected"
                   >
                     {isRTL ? "انتقل إلى المدفوعات" : "Go to Payments"}
@@ -1851,7 +1851,7 @@ export default function Students() {
                       : "Your student list has been received. Please proceed to the Payments page to complete your payment and upload your bank slip."}
                   </p>
                   <Button 
-                    onClick={() => window.location.href = '/dashboard/payments'}
+                    onClick={() => window.location.href = '/payments'}
                     className="bg-primary"
                     data-testid="button-go-to-payments-stage2"
                   >
