@@ -15400,7 +15400,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   app.get("/api/exam-packets", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
-      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+      if (!user || !["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics"].includes(user.role || "")) {
         return res.status(403).json({ message: "Access denied" });
       }
       const filters: any = {};
@@ -15418,7 +15418,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   app.get("/api/exam-packets/dashboard/stats", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
-      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+      if (!user || !["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics"].includes(user.role || "")) {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -15446,7 +15446,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   app.get("/api/exam-packets/:id", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
-      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+      if (!user || !["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics"].includes(user.role || "")) {
         return res.status(403).json({ message: "Access denied" });
       }
       const packet = await storage.getExamPacket(parseInt(req.params.id));
@@ -15460,7 +15460,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   app.get("/api/exam-packets/barcode/:barcode", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
-      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+      if (!user || !["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics"].includes(user.role || "")) {
         return res.status(403).json({ message: "Access denied" });
       }
       const packet = await storage.getExamPacketByBarcode(req.params.barcode);
@@ -15693,7 +15693,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   app.get("/api/exam-packets/:id/handovers", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
-      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+      if (!user || !["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics"].includes(user.role || "")) {
         return res.status(403).json({ message: "Access denied" });
       }
       const logs = await storage.getHandoverLogs(parseInt(req.params.id));
@@ -15706,7 +15706,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   app.post("/api/exam-packets/:id/handover", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
-      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+      if (!user || !["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics"].includes(user.role || "")) {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -15775,7 +15775,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   app.post("/api/exam-packets/sync-handovers", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
-      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+      if (!user || !["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics"].includes(user.role || "")) {
         return res.status(403).json({ message: "Access denied" });
       }
 

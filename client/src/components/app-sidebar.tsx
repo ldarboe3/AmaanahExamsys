@@ -80,6 +80,11 @@ const schoolPendingPaymentMenuDefs: MenuItemDef[] = [
   { key: "payments", url: "/payments", icon: CreditCard },
 ];
 
+const logisticsOfficerMenuDefs: MenuItemDef[] = [
+  { key: "packetTracking", url: "/packet-tracking", icon: Package },
+  { key: "examScheduling", url: "/exam-scheduling", icon: Timer },
+];
+
 const managementDefs: MenuItemDef[] = [
   { key: "regionsAndClusters", url: "/regions", icon: Building2 },
   { key: "subjects", url: "/subjects", icon: BookOpen },
@@ -101,6 +106,7 @@ export function AppSidebar({ side = "left" }: AppSidebarProps) {
   const { t } = useLanguage();
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'examination_admin' || user?.role === 'logistics_admin';
+  const isLogisticsOfficer = user?.role === 'regional_logistics' || user?.role === 'cluster_logistics';
   const isSchoolAdmin = user?.role === 'school_admin';
   // Default to false for school admins unless explicitly true - ensures unpaid schools are restricted
   const registrationFeePaid = (user as any)?.registrationFeePaid === true;
@@ -109,6 +115,8 @@ export function AppSidebar({ side = "left" }: AppSidebarProps) {
   let menuDefs: MenuItemDef[];
   if (isAdmin) {
     menuDefs = adminMenuDefs;
+  } else if (isLogisticsOfficer) {
+    menuDefs = logisticsOfficerMenuDefs;
   } else if (isSchoolAdmin && !registrationFeePaid) {
     // School hasn't paid registration fee - only show Payments
     menuDefs = schoolPendingPaymentMenuDefs;

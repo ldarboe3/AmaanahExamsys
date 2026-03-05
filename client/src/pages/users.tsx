@@ -67,7 +67,9 @@ import type { User } from "@shared/schema";
 const roleLabels: Record<string, string> = {
   super_admin: "Super Admin",
   examination_admin: "Exam Admin",
-  logistics_admin: "Logistics Admin",
+  logistics_admin: "Logistics Admin (HQ)",
+  regional_logistics: "Regional Logistics Officer",
+  cluster_logistics: "Cluster Logistics Officer",
   school_admin: "School Admin",
   examiner: "Examiner",
   candidate: "Candidate",
@@ -77,6 +79,8 @@ const roleColors: Record<string, string> = {
   super_admin: "bg-destructive/10 text-destructive",
   examination_admin: "bg-chart-2/10 text-chart-2",
   logistics_admin: "bg-chart-4/10 text-chart-4",
+  regional_logistics: "bg-amber-500/10 text-amber-600",
+  cluster_logistics: "bg-orange-500/10 text-orange-600",
   school_admin: "bg-chart-3/10 text-chart-3",
   examiner: "bg-chart-5/10 text-chart-5",
   candidate: "bg-muted text-muted-foreground",
@@ -239,7 +243,7 @@ export default function UsersPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {users?.filter(u => ["super_admin", "examination_admin", "logistics_admin"].includes(u.role || "")).length || 0}
+              {users?.filter(u => ["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics"].includes(u.role || "")).length || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               {isRTL ? "المستخدمون ذوو صلاحيات إدارية" : "Users with admin privileges"}
@@ -291,7 +295,9 @@ export default function UsersPage() {
                 <SelectItem value="all">{isRTL ? "جميع الأدوار" : "All Roles"}</SelectItem>
                 <SelectItem value="super_admin">Super Admin</SelectItem>
                 <SelectItem value="examination_admin">Exam Admin</SelectItem>
-                <SelectItem value="logistics_admin">Logistics Admin</SelectItem>
+                <SelectItem value="logistics_admin">Logistics Admin (HQ)</SelectItem>
+                <SelectItem value="regional_logistics">Regional Logistics Officer</SelectItem>
+                <SelectItem value="cluster_logistics">Cluster Logistics Officer</SelectItem>
                 <SelectItem value="school_admin">School Admin</SelectItem>
                 <SelectItem value="examiner">Examiner</SelectItem>
                 <SelectItem value="candidate">Candidate</SelectItem>
@@ -358,7 +364,7 @@ export default function UsersPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               onClick={() => {
-                                const newRole = prompt("Enter new role (super_admin, examination_admin, logistics_admin, school_admin, examiner, candidate):");
+                                const newRole = prompt("Enter new role (super_admin, examination_admin, logistics_admin, regional_logistics, cluster_logistics, school_admin, examiner, candidate):");
                                 if (newRole && Object.keys(roleLabels).includes(newRole)) {
                                   updateRoleMutation.mutate({ userId: user.id, role: newRole });
                                 }

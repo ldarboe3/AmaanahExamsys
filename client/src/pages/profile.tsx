@@ -151,6 +151,10 @@ export default function Profile() {
         return 'secondary';
       case 'logistics_admin':
         return 'secondary';
+      case 'regional_logistics':
+        return 'secondary';
+      case 'cluster_logistics':
+        return 'secondary';
       case 'school_admin':
         return 'outline';
       default:
@@ -162,7 +166,9 @@ export default function Profile() {
     const labels: Record<string, string> = {
       super_admin: 'Super Admin',
       examination_admin: 'Examination Admin',
-      logistics_admin: 'Logistics Admin',
+      logistics_admin: 'Logistics Admin (HQ)',
+      regional_logistics: 'Regional Logistics Officer',
+      cluster_logistics: 'Cluster Logistics Officer',
       school_admin: 'School Admin',
       examiner: 'Examiner',
       candidate: 'Candidate',

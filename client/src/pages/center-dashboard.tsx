@@ -953,7 +953,7 @@ export default function CenterDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <StatCard label="Schools" value={statistics.totalSchools} icon={School} />
         <StatCard label="Students" value={statistics.totalStudents} icon={Users} variant="success" />
-        <StatCard label="Invigilators" value={statistics.totalInvigilators} icon={Users} />
+        <StatCard label="Examiners" value={statistics.totalInvigilators} icon={Users} />
         <StatCard label="Pending Papers" value={statistics.pendingPapers} icon={Package} variant="warning" />
         <StatCard label="Pending Scripts" value={statistics.pendingScripts} icon={FileText} variant="warning" />
         <StatCard label="Malpractice" value={statistics.malpracticeCount} icon={AlertTriangle} variant="error" />

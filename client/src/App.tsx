@@ -109,7 +109,7 @@ function AuthenticatedRoutes() {
         {() => <ProtectedRoute component={StaffIdentity} allowedRoles={["super_admin", "examination_admin"]} />}
       </Route>
       <Route path="/packet-tracking">
-        {() => <ProtectedRoute component={PacketTracking} allowedRoles={["super_admin", "examination_admin", "logistics_admin"]} />}
+        {() => <ProtectedRoute component={PacketTracking} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics"]} />}
       </Route>
       <Route path="/exam-scheduling" component={ExamScheduling} />
       <Route path="/exam-day">
