@@ -1131,6 +1131,68 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Monitoring dashboard aggregation for all centers
+  app.get("/api/centers/monitoring-dashboard", isAuthenticated, async (req, res) => {
+    try {
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : null;
+
+      const centers = await storage.getAllExamCenters();
+
+      const [allPackets, allSessions, allMalpractice] = await Promise.all([
+        examYearId ? storage.getExamPackets({ examYearId }) : storage.getExamPackets(),
+        storage.getExamSessionLogs(),
+        examYearId ? storage.getMalpracticeReportsByExamYear(examYearId) : Promise.resolve([]),
+      ]);
+
+      const perCenter = await Promise.all(centers.map(async (center) => {
+        const schools = await storage.getSchoolsByCenter(center.id);
+        const attendance = examYearId
+          ? await storage.getAttendanceByCenterAndExamYear(center.id, examYearId)
+          : [];
+
+        const packets = allPackets.filter((p: any) => p.destinationCenterId === center.id);
+        const malpractice = (allMalpractice as any[]).filter((m: any) => m.centerId === center.id);
+        const sessions = (allSessions as any[]).filter((s: any) => s.centerId === center.id);
+
+        // Latest session for this center
+        const latestSession = sessions.sort((a: any, b: any) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )[0] || null;
+
+        // Packet logistics breakdown
+        const packetByStatus: Record<string, number> = {};
+        packets.forEach((p: any) => {
+          packetByStatus[p.status] = (packetByStatus[p.status] || 0) + 1;
+        });
+
+        // Packet location breakdown
+        const packetByLocation: Record<string, number> = {};
+        packets.forEach((p: any) => {
+          const loc = p.currentLocationType || 'hq';
+          packetByLocation[loc] = (packetByLocation[loc] || 0) + 1;
+        });
+
+        return {
+          centerId: center.id,
+          centerName: center.name,
+          attendanceCount: attendance.length,
+          malpracticeCount: malpractice.length,
+          assignedSchoolsCount: schools.length,
+          schools: schools.map((s: any) => ({ id: s.id, name: s.name, schoolBadge: s.schoolBadge })),
+          packetByStatus,
+          packetByLocation,
+          totalPackets: packets.length,
+          latestSession,
+          sessionCount: sessions.length,
+        };
+      }));
+
+      res.json(perCenter);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/centers/:id", async (req, res) => {
     try {
       const center = await storage.getExamCenter(parseInt(req.params.id));
