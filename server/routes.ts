@@ -1272,6 +1272,62 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // School payment status overview for a given exam year (admin only)
+  app.get("/api/schools/payment-status", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin', 'data_entry'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : null;
+      const regionId = req.query.regionId ? parseInt(req.query.regionId as string) : null;
+
+      if (!examYearId) {
+        return res.status(400).json({ message: "examYearId is required" });
+      }
+
+      // Get all approved schools (optionally filtered by region)
+      let schools = (await storage.getAllSchools()).filter(s => s.status === 'approved');
+      if (regionId) {
+        schools = schools.filter(s => s.regionId === regionId);
+      }
+
+      // Get all invoices for this exam year
+      const allInvoices = await storage.getAllInvoices();
+      const examYearInvoices = allInvoices.filter(inv => inv.examYearId === examYearId);
+      const invoiceBySchool = new Map(examYearInvoices.map(inv => [inv.schoolId, inv]));
+
+      // Get student counts per school for this exam year (optimised: fetch once)
+      const studentCountBySchool = new Map<number, number>();
+      for (const school of schools) {
+        const students = await storage.getStudentsBySchool(school.id);
+        const count = students.filter(s => s.examYearId === examYearId).length;
+        studentCountBySchool.set(school.id, count);
+      }
+
+      const result = schools.map(school => {
+        const invoice = invoiceBySchool.get(school.id) || null;
+        const studentCount = studentCountBySchool.get(school.id) || 0;
+        return {
+          schoolId: school.id,
+          schoolName: school.name,
+          regionId: school.regionId,
+          studentCount,
+          invoiceStatus: invoice ? invoice.status : (studentCount > 0 ? 'not_invoiced' : 'no_students'),
+          invoiceNumber: invoice?.invoiceNumber || null,
+          invoiceId: invoice?.id || null,
+          totalAmount: invoice?.totalAmount || null,
+          paidAmount: invoice?.paidAmount || null,
+        };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/schools/:id", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);

@@ -183,6 +183,20 @@ export default function Payments() {
     enabled: !isSchoolAdmin,
   });
 
+  // School payment status for selected exam year (shows all schools including those without invoices)
+  const { data: schoolPaymentStatus, isLoading: isSchoolStatusLoading } = useQuery<any[]>({
+    queryKey: ["/api/schools/payment-status", { examYearId: examYearFilter, regionId: regionFilter }],
+    queryFn: async () => {
+      if (!examYearFilter || examYearFilter === "all") return null;
+      const params = new URLSearchParams({ examYearId: examYearFilter });
+      if (regionFilter && regionFilter !== "all") params.set("regionId", regionFilter);
+      const response = await fetch(`/api/schools/payment-status?${params.toString()}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch school payment status");
+      return response.json();
+    },
+    enabled: !isSchoolAdmin && examYearFilter !== "all",
+  });
+
   // For admin users: fetch all invoices
   const { data: invoices, isLoading } = useQuery<InvoiceWithRelations[]>({
     queryKey: ["/api/invoices", { status: statusFilter, examYearId: examYearFilter, regionId: regionFilter }],
@@ -435,7 +449,14 @@ export default function Payments() {
     }
   };
 
-  const totalRevenue = invoices?.reduce((sum, inv) => sum + parseFloat(inv.paidAmount?.toString() || '0'), 0) || 0;
+  // Use totalAmount for paid invoices (paidAmount field may be unset on legacy records)
+  const totalRevenue = invoices?.reduce((sum, inv) => {
+    if (inv.status === 'paid') {
+      const amt = parseFloat(inv.paidAmount?.toString() || '0');
+      return sum + (amt > 0 ? amt : parseFloat(inv.totalAmount?.toString() || '0'));
+    }
+    return sum + parseFloat(inv.paidAmount?.toString() || '0');
+  }, 0) || 0;
   const pendingAmount = invoices?.filter(i => i.status === 'pending').reduce((sum, inv) => sum + parseFloat(inv.totalAmount?.toString() || '0'), 0) || 0;
   const paidCount = invoices?.filter(i => i.status === 'paid').length || 0;
   const pendingCount = invoices?.filter(i => i.status === 'pending').length || 0;
@@ -1220,6 +1241,104 @@ export default function Payments() {
           )}
         </CardContent>
       </Card>
+
+      {/* School Payment Status — shown when an exam year is selected */}
+      {examYearFilter !== "all" && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div>
+              <CardTitle className="text-lg">
+                {isRTL ? "حالة مدفوعات المدارس" : "School Payment Status"}
+              </CardTitle>
+              <CardDescription>
+                {isRTL
+                  ? "قائمة شاملة بجميع المدارس المعتمدة وحالة فواتيرها"
+                  : "All approved schools and their invoice status for the selected exam year"}
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isSchoolStatusLoading ? (
+              <PaymentsTableSkeleton />
+            ) : schoolPaymentStatus && schoolPaymentStatus.length > 0 ? (
+              <>
+                {/* Summary badges */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {(() => {
+                    const paid = schoolPaymentStatus.filter(s => s.invoiceStatus === 'paid').length;
+                    const processing = schoolPaymentStatus.filter(s => s.invoiceStatus === 'processing').length;
+                    const pending = schoolPaymentStatus.filter(s => s.invoiceStatus === 'pending').length;
+                    const notInvoiced = schoolPaymentStatus.filter(s => s.invoiceStatus === 'not_invoiced').length;
+                    const noStudents = schoolPaymentStatus.filter(s => s.invoiceStatus === 'no_students').length;
+                    return (
+                      <>
+                        <Badge variant="outline" className="text-chart-3 border-chart-3/40 bg-chart-3/10">{isRTL ? `مدفوع: ${paid}` : `Paid: ${paid}`}</Badge>
+                        {processing > 0 && <Badge variant="outline" className="text-chart-4 border-chart-4/40 bg-chart-4/10">{isRTL ? `قيد المراجعة: ${processing}` : `Under Review: ${processing}`}</Badge>}
+                        {pending > 0 && <Badge variant="outline" className="text-chart-5 border-chart-5/40 bg-chart-5/10">{isRTL ? `قيد الانتظار: ${pending}` : `Pending: ${pending}`}</Badge>}
+                        {notInvoiced > 0 && <Badge variant="outline" className="text-destructive border-destructive/40 bg-destructive/10">{isRTL ? `بدون فاتورة: ${notInvoiced}` : `Not Invoiced: ${notInvoiced}`}</Badge>}
+                        {noStudents > 0 && <Badge variant="outline">{isRTL ? `بدون طلاب: ${noStudents}` : `No Students: ${noStudents}`}</Badge>}
+                      </>
+                    );
+                  })()}
+                </div>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{isRTL ? "المدرسة" : "School"}</TableHead>
+                        <TableHead>{t.common.students}</TableHead>
+                        <TableHead>{isRTL ? "رقم الفاتورة" : "Invoice #"}</TableHead>
+                        <TableHead>{isRTL ? "المبلغ" : "Amount"}</TableHead>
+                        <TableHead>{t.common.status}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {schoolPaymentStatus.map((row: any) => {
+                        const statusColors: Record<string, string> = {
+                          paid: "bg-chart-3/10 text-chart-3 border-chart-3/20",
+                          processing: "bg-chart-4/10 text-chart-4 border-chart-4/20",
+                          pending: "bg-chart-5/10 text-chart-5 border-chart-5/20",
+                          not_invoiced: "bg-destructive/10 text-destructive border-destructive/20",
+                          no_students: "bg-muted text-muted-foreground border-muted",
+                        };
+                        const statusLabel: Record<string, { en: string; ar: string }> = {
+                          paid: { en: "Paid", ar: "مدفوع" },
+                          processing: { en: "Under Review", ar: "قيد المراجعة" },
+                          pending: { en: "Pending", ar: "قيد الانتظار" },
+                          not_invoiced: { en: "Not Invoiced", ar: "بدون فاتورة" },
+                          no_students: { en: "No Students", ar: "لا طلاب" },
+                        };
+                        return (
+                          <TableRow key={row.schoolId} data-testid={`row-school-payment-${row.schoolId}`}>
+                            <TableCell className="font-medium">{row.schoolName}</TableCell>
+                            <TableCell>{row.studentCount}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">{row.invoiceNumber || "—"}</TableCell>
+                            <TableCell>{row.totalAmount ? formatCurrency(row.totalAmount) : "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={statusColors[row.invoiceStatus] || ""}>
+                                {isRTL
+                                  ? statusLabel[row.invoiceStatus]?.ar || row.invoiceStatus
+                                  : statusLabel[row.invoiceStatus]?.en || row.invoiceStatus}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <School className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground text-sm">
+                  {isRTL ? "لا توجد مدارس معتمدة لهذا العام" : "No approved schools found for this exam year"}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Invoice Details Dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
