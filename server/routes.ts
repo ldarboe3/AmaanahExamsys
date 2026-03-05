@@ -7077,23 +7077,28 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         mixCoreWithNonCore,
       } = req.body;
 
-      if (!examYearId) {
+      console.log("[AI Generate] Request body:", JSON.stringify({ examYearId, grade, maxPapersPerDay, timeSlots, weekendDays, mixCoreWithNonCore }));
+
+      if (!examYearId && examYearId !== 0) {
         return res.status(400).json({ message: "examYearId is required" });
       }
 
       const parsedExamYearId = Number(examYearId);
-      if (isNaN(parsedExamYearId)) {
-        return res.status(400).json({ message: "Invalid examYearId" });
+      if (!Number.isFinite(parsedExamYearId) || parsedExamYearId <= 0) {
+        return res.status(400).json({ message: `Invalid examYearId: ${examYearId}` });
       }
 
+      console.log("[AI Generate] Fetching exam year:", parsedExamYearId);
       const examYear = await storage.getExamYear(parsedExamYearId);
       if (!examYear) {
         return res.status(404).json({ message: "Exam year not found" });
       }
 
+      console.log("[AI Generate] Fetching subjects");
       const allSubjects = await storage.getAllSubjects();
       const parsedGrade = grade != null && grade !== "" ? Number(grade) : null;
-      const grades = parsedGrade && !isNaN(parsedGrade) ? [parsedGrade] : (examYear.grades || [6]);
+      const grades = (parsedGrade && Number.isFinite(parsedGrade)) ? [parsedGrade] : (examYear.grades?.filter(g => Number.isFinite(g)) || [6]);
+      console.log("[AI Generate] Using grades:", grades, "Total subjects:", allSubjects.length);
       const relevantSubjects = allSubjects.filter(
         s => s.isActive && grades.includes(s.grade)
       );
@@ -7189,20 +7194,69 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // Examiners API
+  // Examiners API — returns staff profiles with role='examiner', merged with legacy examiners table
   app.get("/api/examiners", async (req, res) => {
     try {
-      const status = req.query.status as string | undefined;
+      const statusFilter = req.query.status as string | undefined;
       const regionId = req.query.regionId ? parseInt(req.query.regionId as string) : undefined;
-      let examiners;
-      if (status) {
-        examiners = await storage.getExaminersByStatus(status);
+
+      // Get staff profiles with examiner role
+      const allStaffProfiles = await storage.getAllStaffProfiles();
+      const examinerProfiles = allStaffProfiles.filter(p => p.role === 'examiner');
+      const allRegions = await storage.getAllRegions();
+
+      // Map staff profiles to unified examiner display format
+      const staffAsExaminers = examinerProfiles.map(p => ({
+        id: `sp-${p.id}`, // prefix to distinguish from legacy examiner rows
+        staffProfileId: p.id,
+        staffIdNumber: p.staffIdNumber,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        email: p.email || '',
+        phone: p.phone || null,
+        qualification: p.department || null,
+        specialization: null,
+        status: p.status === 'active' || p.status === 'activated' ? 'active'
+               : p.status === 'suspended' || p.status === 'revoked' ? 'inactive'
+               : 'pending',
+        regionId: p.regionId || null,
+        region: p.regionId ? { name: allRegions.find(r => r.id === p.regionId)?.name || '' } : null,
+        totalScriptsMarked: 0,
+        totalAllowance: '0',
+        centerId: p.centerId || null,
+        isFromStaffIdentity: true,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      }));
+
+      // Also get legacy examiners for backward compatibility
+      let legacyExaminers: any[] = [];
+      if (statusFilter && statusFilter !== 'all') {
+        legacyExaminers = await storage.getExaminersByStatus(statusFilter);
       } else if (regionId) {
-        examiners = await storage.getExaminersByRegion(regionId);
+        legacyExaminers = await storage.getExaminersByRegion(regionId);
       } else {
-        examiners = await storage.getAllExaminers();
+        legacyExaminers = await storage.getAllExaminers();
       }
-      res.json(examiners);
+      const legacyMapped = legacyExaminers.map(e => ({ ...e, isFromStaffIdentity: false }));
+
+      // Merge: staff profiles first, then legacy (deduplicate by email)
+      const staffEmails = new Set(staffAsExaminers.map(e => e.email?.toLowerCase()));
+      const uniqueLegacy = legacyMapped.filter(e => !staffEmails.has(e.email?.toLowerCase()));
+
+      let combined = [...staffAsExaminers, ...uniqueLegacy];
+
+      // Apply status filter
+      if (statusFilter && statusFilter !== 'all') {
+        combined = combined.filter(e => e.status === statusFilter);
+      }
+
+      // Apply region filter
+      if (regionId && !isNaN(regionId)) {
+        combined = combined.filter(e => e.regionId === regionId);
+      }
+
+      res.json(combined);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -47,11 +47,11 @@ import {
   Phone,
   Briefcase,
   FileCheck,
-  DollarSign,
   CheckCircle,
   Clock,
   ArrowRight,
   Info,
+  IdCard,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Examiner } from "@shared/schema";
@@ -63,9 +63,14 @@ const statusColors: Record<string, string> = {
   inactive: "bg-muted text-muted-foreground",
 };
 
-interface ExaminerWithRelations extends Examiner {
+interface ExaminerWithRelations extends Omit<Examiner, 'id'> {
+  id: number | string;
   region?: { name: string };
   assignmentsCount?: number;
+  staffIdNumber?: string;
+  staffProfileId?: number;
+  isFromStaffIdentity?: boolean;
+  centerId?: number | null;
 }
 
 function ExaminersTableSkeleton() {
@@ -272,22 +277,30 @@ export default function Examiners() {
                 </TableHeader>
                 <TableBody>
                   {filteredExaminers.map((examiner) => (
-                    <TableRow key={examiner.id} data-testid={`row-examiner-${examiner.id}`}>
+                    <TableRow key={String(examiner.id)} data-testid={`row-examiner-${examiner.id}`}>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
                             <UserCheck className="w-4 h-4 text-primary" />
                           </div>
                           <div>
-                            <p className="font-medium text-foreground">
-                              {examiner.firstName} {examiner.lastName}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-foreground">
+                                {examiner.firstName} {examiner.lastName}
+                              </p>
+                              {examiner.isFromStaffIdentity && (
+                                <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">
+                                  <IdCard className="w-3 h-3" />
+                                  {examiner.staffIdNumber}
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-sm text-muted-foreground">{examiner.email}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm">{examiner.specialization || "-"}</span>
+                        <span className="text-sm">{(examiner as any).qualification || examiner.specialization || "-"}</span>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
@@ -375,47 +388,71 @@ export default function Examiners() {
                     {selectedExaminer.firstName} {selectedExaminer.lastName}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {selectedExaminer.specialization || t.examiners.noSpecialization}
+                    {(selectedExaminer as any).qualification || selectedExaminer.specialization || t.examiners.noSpecialization}
                   </p>
-                  <Badge className={`${statusColors[selectedExaminer.status || 'pending']} mt-2`}>
-                    {selectedExaminer.status === 'pending' ? t.common.pending :
-                     selectedExaminer.status === 'verified' ? t.examiners.verified :
-                     selectedExaminer.status === 'active' ? t.common.active :
-                     t.common.inactive}
-                  </Badge>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <Badge className={`${statusColors[selectedExaminer.status || 'pending']}`}>
+                      {selectedExaminer.status === 'pending' ? t.common.pending :
+                       selectedExaminer.status === 'verified' ? t.examiners.verified :
+                       selectedExaminer.status === 'active' ? t.common.active :
+                       t.common.inactive}
+                    </Badge>
+                    {selectedExaminer.isFromStaffIdentity && (
+                      <Badge variant="outline" className="gap-1 border-primary/30 text-primary">
+                        <IdCard className="w-3 h-3" />
+                        Staff ID: {selectedExaminer.staffIdNumber}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="grid gap-4">
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="w-4 h-4 text-muted-foreground" />
-                  <span>{selectedExaminer.email}</span>
-                </div>
+              <div className="grid gap-3">
+                {selectedExaminer.email && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Mail className="w-4 h-4 text-muted-foreground" />
+                    <span>{selectedExaminer.email}</span>
+                  </div>
+                )}
                 {selectedExaminer.phone && (
                   <div className="flex items-center gap-2 text-sm">
                     <Phone className="w-4 h-4 text-muted-foreground" />
                     <span>{selectedExaminer.phone}</span>
                   </div>
                 )}
-                {selectedExaminer.qualification && (
+                {((selectedExaminer as any).qualification || selectedExaminer.specialization) && (
                   <div className="flex items-center gap-2 text-sm">
                     <Briefcase className="w-4 h-4 text-muted-foreground" />
-                    <span>{selectedExaminer.qualification}</span>
+                    <span>{(selectedExaminer as any).qualification || selectedExaminer.specialization}</span>
+                  </div>
+                )}
+                {selectedExaminer.region?.name && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Info className="w-4 h-4 text-muted-foreground" />
+                    <span>{selectedExaminer.region.name}</span>
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-md">
-                  <div className="text-center">
-                    <p className="text-2xl font-semibold">{(selectedExaminer.totalScriptsMarked || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
-                    <p className="text-xs text-muted-foreground">{t.examiners.scriptsMarked}</p>
+                {!selectedExaminer.isFromStaffIdentity && (
+                  <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-md">
+                    <div className="text-center">
+                      <p className="text-2xl font-semibold">{(selectedExaminer.totalScriptsMarked || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
+                      <p className="text-xs text-muted-foreground">{t.examiners.scriptsMarked}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-semibold text-chart-3">
+                        {formatCurrency(selectedExaminer.totalAllowance)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{t.examiners.totalAllowance}</p>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-semibold text-chart-3">
-                      {formatCurrency(selectedExaminer.totalAllowance)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{t.examiners.totalAllowance}</p>
+                )}
+
+                {selectedExaminer.isFromStaffIdentity && (
+                  <div className="p-3 rounded-md bg-primary/5 border border-primary/20 text-sm text-muted-foreground">
+                    This examiner is managed through Staff Identity. Visit Staff Identity to view full profile and manage their ID card.
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
