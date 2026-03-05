@@ -1326,18 +1326,46 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(404).json({ message: "School not found" });
       }
       
+      // Auto-create admin user if school doesn't have one yet
+      let adminUserId = school.adminUserId;
+      if (!adminUserId) {
+        const baseUsername = school.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '_')
+          .substring(0, 20);
+        let username = `school_${baseUsername}`;
+        let counter = 1;
+        while (await storage.getUserByUsername(username)) {
+          username = `school_${baseUsername}_${counter++}`;
+        }
+        const defaultPassword = 'Admin@123';
+        const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+        const newAdminUser = await storage.upsertUser({
+          username,
+          passwordHash: hashedPassword,
+          role: 'school_admin',
+          firstName: school.registrarName?.split(' ')[0] || 'Admin',
+          lastName: school.registrarName?.split(' ').slice(1).join(' ') || school.name,
+          email: school.email || null,
+          status: 'active',
+          mustChangePassword: true,
+        });
+        await db.update(schools)
+          .set({ adminUserId: newAdminUser.id, updatedAt: new Date() })
+          .where(eq(schools.id, school.id));
+        adminUserId = newAdminUser.id;
+      }
+
       // Get the associated user to get the username and password status
       let username = null;
       let mustChangePassword = true;
       let hasCredentials = false;
       
-      if (school.adminUserId) {
-        const user = await storage.getUser(school.adminUserId);
-        if (user && user.username) {
-          username = user.username;
-          mustChangePassword = user.mustChangePassword ?? true;
-          hasCredentials = true;
-        }
+      const user = await storage.getUser(adminUserId);
+      if (user && user.username) {
+        username = user.username;
+        mustChangePassword = user.mustChangePassword ?? true;
+        hasCredentials = true;
       }
       
       // Return credentials info
@@ -2521,12 +2549,36 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(404).json({ message: "School not found" });
       }
       
-      // Get the school admin user
-      if (!school.adminUserId) {
-        return res.status(400).json({ message: "This school does not have an admin user yet. Please complete the verification process first." });
+      // Auto-create admin user if school doesn't have one yet
+      let adminUserId = school.adminUserId;
+      if (!adminUserId) {
+        const baseUsername = school.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '_')
+          .substring(0, 20);
+        let uname = `school_${baseUsername}`;
+        let counter = 1;
+        while (await storage.getUserByUsername(uname)) {
+          uname = `school_${baseUsername}_${counter++}`;
+        }
+        const hashedPw = await bcrypt.hash('Admin@123', 10);
+        const newUser = await storage.upsertUser({
+          username: uname,
+          passwordHash: hashedPw,
+          role: 'school_admin',
+          firstName: school.registrarName?.split(' ')[0] || 'Admin',
+          lastName: school.registrarName?.split(' ').slice(1).join(' ') || school.name,
+          email: school.email || null,
+          status: 'active',
+          mustChangePassword: true,
+        });
+        await db.update(schools)
+          .set({ adminUserId: newUser.id, updatedAt: new Date() })
+          .where(eq(schools.id, school.id));
+        adminUserId = newUser.id;
       }
-      
-      const adminUser = await storage.getUser(school.adminUserId);
+
+      const adminUser = await storage.getUser(adminUserId);
       if (!adminUser) {
         return res.status(404).json({ message: "School admin user not found" });
       }
@@ -2534,8 +2586,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Send credentials email
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       
-      // For schools created via upload, password is Admin@123
-      // For schools created via verification, we can't retrieve the password
       const temporaryPassword = adminUser.mustChangePassword ? 'Admin@123' : 'Please use your existing password or reset it';
       
       const emailSent = await sendSchoolCredentialsEmail(
@@ -2582,15 +2632,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         while (await storage.getUserByUsername(username)) {
           username = `school_${baseUsername}_${counter++}`;
         }
-        const tempPasswordHash = await bcrypt.hash(Math.random().toString(36), 10);
+        const defaultPasswordHash = await bcrypt.hash('Admin@123', 10);
         const newAdminUser = await storage.upsertUser({
           username,
-          passwordHash: tempPasswordHash,
+          passwordHash: defaultPasswordHash,
           role: 'school_admin',
           firstName: school.registrarName?.split(' ')[0] || 'Admin',
           lastName: school.registrarName?.split(' ').slice(1).join(' ') || school.name,
           email: school.email,
           status: 'active',
+          mustChangePassword: true,
         });
         // Link the new user to the school
         await db.update(schools)

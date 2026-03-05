@@ -977,38 +977,32 @@ export default function Schools() {
                               {isRTL ? "تعديل" : "Edit"}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {school.adminUserId && (
-                              <>
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    fetchSchoolCredentials(school.id, school.name);
-                                  }}
-                                  disabled={isLoadingCredentials}
-                                  data-testid={`button-view-credentials-${school.id}`}
-                                >
-                                  <Eye className="w-4 h-4 me-2" />
-                                  {isRTL ? "عرض بيانات الدخول" : "View Credentials"}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => sendCredentialsMutation.mutate(school.id)}
-                                  className="text-primary"
-                                  data-testid={`button-send-credentials-${school.id}`}
-                                >
-                                  <Key className="w-4 h-4 me-2" />
-                                  {isRTL ? "إرسال بيانات الدخول" : "Send Credentials"}
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            {school.email && (
-                              <DropdownMenuItem
-                                onClick={() => sendPasswordResetMutation.mutate(school.id)}
-                                disabled={sendPasswordResetMutation.isPending}
-                                data-testid={`button-send-password-reset-${school.id}`}
-                              >
-                                <KeyRound className="w-4 h-4 me-2" />
-                                {isRTL ? "إرسال إعادة تعيين كلمة المرور" : "Reset Password"}
-                              </DropdownMenuItem>
-                            )}
+                            <DropdownMenuItem
+                              onClick={() => {
+                                fetchSchoolCredentials(school.id, school.name);
+                              }}
+                              disabled={isLoadingCredentials}
+                              data-testid={`button-view-credentials-${school.id}`}
+                            >
+                              <Eye className="w-4 h-4 me-2" />
+                              {isRTL ? "عرض بيانات الدخول" : "View Credentials"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => sendCredentialsMutation.mutate(school.id)}
+                              className="text-primary"
+                              data-testid={`button-send-credentials-${school.id}`}
+                            >
+                              <Key className="w-4 h-4 me-2" />
+                              {isRTL ? "إرسال بيانات الدخول" : "Send Credentials"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => sendPasswordResetMutation.mutate(school.id)}
+                              disabled={sendPasswordResetMutation.isPending}
+                              data-testid={`button-send-password-reset-${school.id}`}
+                            >
+                              <KeyRound className="w-4 h-4 me-2" />
+                              {isRTL ? "إرسال إعادة تعيين كلمة المرور" : "Reset Password"}
+                            </DropdownMenuItem>
                             {school.status === 'pending' && (
                               <DropdownMenuItem
                                 onClick={() => resendVerificationMutation.mutate(school.id)}
@@ -1672,7 +1666,7 @@ export default function Schools() {
             <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
               {t.common.close}
             </Button>
-            {selectedSchool && selectedSchool.email && (
+            {selectedSchool && (
               <Button
                 variant="outline"
                 onClick={() => {
