@@ -14148,8 +14148,18 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const activeExamYear = examYearId ? await storage.getExamYear(examYearId) : await storage.getActiveExamYear();
       const yearId = activeExamYear?.id;
 
-      // Get timetable — same for all roles
-      const timetable = yearId ? await storage.getTimetableByExamYear(yearId) : [];
+      // Get timetable and enrich with subject names — same for all roles
+      const rawTimetable = yearId ? await storage.getTimetableByExamYear(yearId) : [];
+      const allSubjects = await storage.getAllSubjects();
+      const timetable = rawTimetable.map((entry: any) => {
+        const subject = allSubjects.find(s => s.id === entry.subjectId);
+        return {
+          ...entry,
+          subjectName: subject?.name || null,
+          subjectArabicName: subject?.arabicName || null,
+          venue: entry.venue || center.name,
+        };
+      });
 
       if (isSchoolAdmin && schoolAdminSchoolId) {
         // School admin: only show their school's data

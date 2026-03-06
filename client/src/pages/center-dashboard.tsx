@@ -201,6 +201,15 @@ function StatCard({ label, value, icon: Icon, variant = "default" }: {
   );
 }
 
+const DATE_COLORS = [
+  { header: "bg-primary/8 border-primary/20", row: "bg-primary/5" },
+  { header: "bg-chart-2/8 border-chart-2/20", row: "bg-chart-2/5" },
+  { header: "bg-chart-4/8 border-chart-4/20", row: "bg-chart-4/5" },
+  { header: "bg-chart-1/8 border-chart-1/20", row: "bg-chart-1/5" },
+  { header: "bg-chart-3/8 border-chart-3/20", row: "bg-chart-3/5" },
+  { header: "bg-chart-5/8 border-chart-5/20", row: "bg-chart-5/5" },
+];
+
 function TimetableTab({ timetable }: { timetable: CenterDashboardData["timetable"] }) {
   const { isRTL } = useLanguage();
   
@@ -227,56 +236,65 @@ function TimetableTab({ timetable }: { timetable: CenterDashboardData["timetable
 
   return (
     <div className="space-y-4">
-      {sortedDates.map(date => (
-        <Card key={date}>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              {new Date(date).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Grade</TableHead>
-                  <TableHead>Venue</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {groupedByDate[date].map(entry => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="font-medium">
-                      {entry.startTime} - {entry.endTime}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        {entry.subjectName}
-                        {entry.subjectArabicName && (
-                          <span className="text-muted-foreground block text-sm" dir="rtl">
-                            {entry.subjectArabicName}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">Grade {entry.grade}</Badge>
-                    </TableCell>
-                    <TableCell>{entry.venue || "-"}</TableCell>
+      {sortedDates.map((date, dateIndex) => {
+        const colors = DATE_COLORS[dateIndex % DATE_COLORS.length];
+        return (
+          <Card key={date} className={`border ${colors.header}`}>
+            <CardHeader className={`pb-3 rounded-t-md ${colors.header}`}>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                {new Date(date).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className={colors.header}>
+                    <TableHead className="ps-4">Time</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Grade</TableHead>
+                    <TableHead className="pe-4">Venue</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      ))}
+                </TableHeader>
+                <TableBody>
+                  {groupedByDate[date].map(entry => (
+                    <TableRow key={entry.id} className="border-0">
+                      <TableCell className="font-medium ps-4 py-3">
+                        {entry.startTime} - {entry.endTime}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        {entry.subjectName ? (
+                          <div>
+                            <span>{entry.subjectName}</span>
+                            {entry.subjectArabicName && (
+                              <span className="text-muted-foreground block text-sm" dir="rtl">
+                                {entry.subjectArabicName}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <Badge variant="outline">Grade {entry.grade}</Badge>
+                      </TableCell>
+                      <TableCell className="py-3 pe-4 text-muted-foreground">
+                        {entry.venue || "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
