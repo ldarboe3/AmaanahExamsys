@@ -93,7 +93,8 @@ import {
   PlayCircle,
   CircleDot,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { ExamCenter, Region, Cluster } from "@shared/schema";
@@ -773,6 +774,8 @@ function MonitoringCharts({
 export default function Centers() {
   const { toast } = useToast();
   const { t, isRTL } = useLanguage();
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [clusterFilter, setClusterFilter] = useState<string>("all");
@@ -783,7 +786,13 @@ export default function Centers() {
   const [showAutoAssignDialog, setShowAutoAssignDialog] = useState(false);
   const [selectedCenter, setSelectedCenter] = useState<CenterWithRelations | null>(null);
 
-  // Build query string for API
+  // Redirect school admins immediately to their dedicated center info page
+  useEffect(() => {
+    if (user?.role === "school_admin") {
+      navigate("/center-info");
+    }
+  }, [user?.role]);
+
   const queryParams = new URLSearchParams();
   if (regionFilter !== "all") queryParams.set("regionId", regionFilter);
   if (clusterFilter !== "all") queryParams.set("clusterId", clusterFilter);

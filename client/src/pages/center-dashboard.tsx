@@ -1156,14 +1156,18 @@ export default function CenterDashboard() {
     enabled: centerId > 0,
   });
 
+  const isSchoolAdmin = user?.role === "school_admin";
+  const backUrl = isSchoolAdmin ? "/center-info" : "/centers";
+  const backLabel = isSchoolAdmin ? "Back to Exam Center" : "Back to Centers";
+
   if (!centerId) {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground">Invalid center ID</p>
-        <Link href="/centers">
+        <Link href={backUrl}>
           <Button className="mt-4">
             <ArrowLeft className="w-4 h-4 me-2" />
-            Back to Centers
+            {backLabel}
           </Button>
         </Link>
       </div>
@@ -1195,10 +1199,10 @@ export default function CenterDashboard() {
             <RefreshCw className="w-4 h-4 me-2" />
             Retry
           </Button>
-          <Link href="/centers">
+          <Link href={backUrl}>
             <Button variant="outline">
               <ArrowLeft className="w-4 h-4 me-2" />
-              Back to Centers
+              {backLabel}
             </Button>
           </Link>
         </div>
@@ -1227,7 +1231,7 @@ export default function CenterDashboard() {
     <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/centers">
+          <Link href={backUrl}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="w-4 h-4" />
             </Button>
