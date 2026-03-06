@@ -308,7 +308,7 @@ export default function Dashboard() {
               trendValue={`+8% ${t.dashboard.thisMonth}`}
             />
             <StatCard
-              title={t.dashboard.totalRevenue}
+              title={isSchoolAdmin ? (isRTL ? "إجمالي فاتورتك" : "Your Invoice Total") : t.dashboard.totalRevenue}
               value={formatCurrency(stats?.totalRevenue || 0)}
               subtitle={`${stats?.pendingPayments || 0} ${t.dashboard.pendingPayments}`}
               icon={CreditCard}

@@ -616,13 +616,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const pendingSchoolStudents = schoolStudents.filter(s => s.status === 'pending');
         pendingStudents = pendingSchoolStudents.length;
 
-        // Get invoices for this school
+        // Get invoices for this school — filter to active exam year only for dashboard display
         const schoolInvoices = await storage.getInvoicesBySchool(schoolId);
-        // Total revenue: sum of all invoice amounts (whether paid or pending)
-        totalRevenue = schoolInvoices.reduce((sum, inv) => sum + parseFloat(inv.totalAmount || '0'), 0);
-        
-        // Pending payments: count invoices that are not paid
-        const pendingInvoices = schoolInvoices.filter(inv => inv.status !== 'paid');
+        const activeYearForInvoices = await storage.getActiveExamYear();
+        const activeYearInvoices = activeYearForInvoices
+          ? schoolInvoices.filter(inv => inv.examYearId === activeYearForInvoices.id)
+          : schoolInvoices;
+        totalRevenue = activeYearInvoices.reduce((sum, inv) => sum + parseFloat(inv.totalAmount || '0'), 0);
+
+        // Pending payments: count active year invoices that are not paid
+        const pendingInvoices = activeYearInvoices.filter(inv => inv.status !== 'paid');
         pendingPayments = pendingInvoices.length;
 
         // School only has 1 school (itself)
