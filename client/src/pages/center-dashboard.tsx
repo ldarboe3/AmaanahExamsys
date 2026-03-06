@@ -202,12 +202,12 @@ function StatCard({ label, value, icon: Icon, variant = "default" }: {
 }
 
 const DATE_COLORS = [
-  { header: "bg-primary/8 border-primary/20", row: "bg-primary/5" },
-  { header: "bg-chart-2/8 border-chart-2/20", row: "bg-chart-2/5" },
-  { header: "bg-chart-4/8 border-chart-4/20", row: "bg-chart-4/5" },
-  { header: "bg-chart-1/8 border-chart-1/20", row: "bg-chart-1/5" },
-  { header: "bg-chart-3/8 border-chart-3/20", row: "bg-chart-3/5" },
-  { header: "bg-chart-5/8 border-chart-5/20", row: "bg-chart-5/5" },
+  { card: "border-teal-200 dark:border-teal-800", header: "bg-teal-50 dark:bg-teal-950/40", tableHead: "bg-teal-100/60 dark:bg-teal-900/40" },
+  { card: "border-blue-200 dark:border-blue-800", header: "bg-blue-50 dark:bg-blue-950/40", tableHead: "bg-blue-100/60 dark:bg-blue-900/40" },
+  { card: "border-amber-200 dark:border-amber-800", header: "bg-amber-50 dark:bg-amber-950/40", tableHead: "bg-amber-100/60 dark:bg-amber-900/40" },
+  { card: "border-violet-200 dark:border-violet-800", header: "bg-violet-50 dark:bg-violet-950/40", tableHead: "bg-violet-100/60 dark:bg-violet-900/40" },
+  { card: "border-rose-200 dark:border-rose-800", header: "bg-rose-50 dark:bg-rose-950/40", tableHead: "bg-rose-100/60 dark:bg-rose-900/40" },
+  { card: "border-emerald-200 dark:border-emerald-800", header: "bg-emerald-50 dark:bg-emerald-950/40", tableHead: "bg-emerald-100/60 dark:bg-emerald-900/40" },
 ];
 
 function TimetableTab({ timetable }: { timetable: CenterDashboardData["timetable"] }) {
@@ -239,8 +239,8 @@ function TimetableTab({ timetable }: { timetable: CenterDashboardData["timetable
       {sortedDates.map((date, dateIndex) => {
         const colors = DATE_COLORS[dateIndex % DATE_COLORS.length];
         return (
-          <Card key={date} className={`border ${colors.header}`}>
-            <CardHeader className={`pb-3 rounded-t-md ${colors.header}`}>
+          <Card key={date} className={`border ${colors.card} overflow-hidden`}>
+            <CardHeader className={`pb-3 ${colors.header}`}>
               <CardTitle className="text-base flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 {new Date(date).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US', { 
@@ -254,7 +254,7 @@ function TimetableTab({ timetable }: { timetable: CenterDashboardData["timetable
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
-                  <TableRow className={colors.header}>
+                  <TableRow className={`${colors.tableHead} border-b`}>
                     <TableHead className="ps-4">Time</TableHead>
                     <TableHead>Subject</TableHead>
                     <TableHead>Grade</TableHead>
@@ -263,7 +263,7 @@ function TimetableTab({ timetable }: { timetable: CenterDashboardData["timetable
                 </TableHeader>
                 <TableBody>
                   {groupedByDate[date].map(entry => (
-                    <TableRow key={entry.id} className="border-0">
+                    <TableRow key={entry.id}>
                       <TableCell className="font-medium ps-4 py-3">
                         {entry.startTime} - {entry.endTime}
                       </TableCell>
@@ -271,7 +271,7 @@ function TimetableTab({ timetable }: { timetable: CenterDashboardData["timetable
                         {entry.subjectName ? (
                           <div>
                             <span>{entry.subjectName}</span>
-                            {entry.subjectArabicName && (
+                            {entry.subjectArabicName && entry.subjectArabicName !== entry.subjectName && (
                               <span className="text-muted-foreground block text-sm" dir="rtl">
                                 {entry.subjectArabicName}
                               </span>
