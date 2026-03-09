@@ -14133,6 +14133,210 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Attendance monitoring summary — counts per center+subject with totals
+  app.get("/api/attendance/monitoring-summary", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const allowedRoles = ["super_admin", "examination_admin", "logistics_admin", "regional_coordinator", "cluster_coordinator"];
+      if (!allowedRoles.includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : null;
+      if (!examYearId) return res.status(400).json({ message: "examYearId is required" });
+
+      const regionId = req.query.regionId ? parseInt(req.query.regionId as string) : null;
+      const clusterId = req.query.clusterId ? parseInt(req.query.clusterId as string) : null;
+      const centerId = req.query.centerId ? parseInt(req.query.centerId as string) : null;
+
+      // Attendance counts grouped by center + subject
+      const { rows: attendanceRows } = await pool.query(`
+        SELECT
+          ec.id AS center_id, ec.name AS center_name,
+          r.id AS region_id, r.name AS region_name,
+          cl.id AS cluster_id, cl.name AS cluster_name,
+          sub.id AS subject_id, sub.name AS subject_name, sub.arabic_name AS subject_arabic_name,
+          COUNT(DISTINCT ar.student_id)::int AS attended_count
+        FROM attendance_records ar
+        JOIN exam_centers ec ON ar.center_id = ec.id
+        JOIN regions r ON ec.region_id = r.id
+        JOIN clusters cl ON ec.cluster_id = cl.id
+        JOIN subjects sub ON ar.subject_id = sub.id
+        WHERE ar.exam_year_id = $1
+          AND ($2::int IS NULL OR ec.region_id = $2)
+          AND ($3::int IS NULL OR ec.cluster_id = $3)
+          AND ($4::int IS NULL OR ec.id = $4)
+        GROUP BY ec.id, ec.name, r.id, r.name, cl.id, cl.name, sub.id, sub.name, sub.arabic_name
+        ORDER BY r.name, cl.name, ec.name, sub.name
+      `, [examYearId, regionId, clusterId, centerId]);
+
+      // Total registered students per center via center_assignments
+      const { rows: registeredRows } = await pool.query(`
+        SELECT
+          ca.center_id,
+          COUNT(DISTINCT s.id)::int AS total_students
+        FROM center_assignments ca
+        JOIN students s ON s.school_id = ca.school_id AND s.exam_year_id = ca.exam_year_id
+        JOIN exam_centers ec ON ca.center_id = ec.id
+        WHERE ca.exam_year_id = $1
+          AND ($2::int IS NULL OR ec.region_id = $2)
+          AND ($3::int IS NULL OR ec.cluster_id = $3)
+          AND ($4::int IS NULL OR ca.center_id = $4)
+        GROUP BY ca.center_id
+      `, [examYearId, regionId, clusterId, centerId]);
+
+      const registeredMap = new Map(registeredRows.map((r: any) => [r.center_id, r.total_students]));
+
+      const summary = attendanceRows.map((row: any) => ({
+        ...row,
+        total_students: registeredMap.get(row.center_id) || 0,
+        attendance_rate: registeredMap.get(row.center_id)
+          ? Math.round((row.attended_count / registeredMap.get(row.center_id)!) * 100)
+          : null,
+      }));
+
+      res.json(summary);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Attendance validation flags — cross-check attendance vs marks
+  app.get("/api/attendance/validation-flags", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const allowedRoles = ["super_admin", "examination_admin", "logistics_admin", "regional_coordinator", "cluster_coordinator"];
+      if (!allowedRoles.includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : null;
+      if (!examYearId) return res.status(400).json({ message: "examYearId is required" });
+
+      const regionId = req.query.regionId ? parseInt(req.query.regionId as string) : null;
+      const clusterId = req.query.clusterId ? parseInt(req.query.clusterId as string) : null;
+      const centerId = req.query.centerId ? parseInt(req.query.centerId as string) : null;
+
+      // Flag 1: Attended but no marks recorded
+      const { rows: attendedNoMarks } = await pool.query(`
+        SELECT
+          'attended_no_marks' AS flag_type,
+          ar.student_id,
+          s.first_name || ' ' || COALESCE(s.middle_name || ' ', '') || s.last_name AS student_name,
+          s.index_number,
+          sub.id AS subject_id, sub.name AS subject_name, sub.arabic_name AS subject_arabic_name,
+          ec.id AS center_id, ec.name AS center_name,
+          r.name AS region_name, cl.name AS cluster_name,
+          ar.check_in_time::text AS attended_at,
+          NULL::numeric AS marks
+        FROM attendance_records ar
+        JOIN students s ON ar.student_id = s.id
+        JOIN subjects sub ON ar.subject_id = sub.id
+        JOIN exam_centers ec ON ar.center_id = ec.id
+        JOIN regions r ON ec.region_id = r.id
+        JOIN clusters cl ON ec.cluster_id = cl.id
+        WHERE ar.exam_year_id = $1
+          AND ($2::int IS NULL OR ec.region_id = $2)
+          AND ($3::int IS NULL OR ec.cluster_id = $3)
+          AND ($4::int IS NULL OR ec.id = $4)
+          AND NOT EXISTS (
+            SELECT 1 FROM student_results sr
+            WHERE sr.student_id = ar.student_id
+              AND sr.subject_id = ar.subject_id
+              AND sr.exam_year_id = ar.exam_year_id
+          )
+        ORDER BY r.name, cl.name, ec.name, s.last_name, sub.name
+        LIMIT 500
+      `, [examYearId, regionId, clusterId, centerId]);
+
+      // Flag 2: Has marks but no attendance record
+      const { rows: marksNoAttend } = await pool.query(`
+        SELECT
+          'marks_no_attendance' AS flag_type,
+          sr.student_id,
+          s.first_name || ' ' || COALESCE(s.middle_name || ' ', '') || s.last_name AS student_name,
+          s.index_number,
+          sub.id AS subject_id, sub.name AS subject_name, sub.arabic_name AS subject_arabic_name,
+          ec.id AS center_id, ec.name AS center_name,
+          r.name AS region_name, cl.name AS cluster_name,
+          NULL::text AS attended_at,
+          sr.total_score AS marks
+        FROM student_results sr
+        JOIN students s ON sr.student_id = s.id
+        JOIN subjects sub ON sr.subject_id = sub.id
+        LEFT JOIN schools sch ON s.school_id = sch.id
+        LEFT JOIN exam_centers ec ON sch.assigned_center_id = ec.id
+        LEFT JOIN regions r ON ec.region_id = r.id
+        LEFT JOIN clusters cl ON ec.cluster_id = cl.id
+        WHERE sr.exam_year_id = $1
+          AND sr.total_score IS NOT NULL
+          AND ($2::int IS NULL OR ec.region_id = $2)
+          AND ($3::int IS NULL OR ec.cluster_id = $3)
+          AND ($4::int IS NULL OR ec.id = $4)
+          AND NOT EXISTS (
+            SELECT 1 FROM attendance_records ar
+            WHERE ar.student_id = sr.student_id
+              AND ar.subject_id = sr.subject_id
+              AND ar.exam_year_id = sr.exam_year_id
+          )
+        ORDER BY r.name, cl.name, s.last_name, sub.name
+        LIMIT 500
+      `, [examYearId, regionId, clusterId, centerId]);
+
+      // Flag 3: Passing marks (>=50) but no attendance record
+      const { rows: passingNoAttend } = await pool.query(`
+        SELECT
+          'passing_no_attendance' AS flag_type,
+          sr.student_id,
+          s.first_name || ' ' || COALESCE(s.middle_name || ' ', '') || s.last_name AS student_name,
+          s.index_number,
+          sub.id AS subject_id, sub.name AS subject_name, sub.arabic_name AS subject_arabic_name,
+          ec.id AS center_id, ec.name AS center_name,
+          r.name AS region_name, cl.name AS cluster_name,
+          NULL::text AS attended_at,
+          sr.total_score AS marks
+        FROM student_results sr
+        JOIN students s ON sr.student_id = s.id
+        JOIN subjects sub ON sr.subject_id = sub.id
+        LEFT JOIN schools sch ON s.school_id = sch.id
+        LEFT JOIN exam_centers ec ON sch.assigned_center_id = ec.id
+        LEFT JOIN regions r ON ec.region_id = r.id
+        LEFT JOIN clusters cl ON ec.cluster_id = cl.id
+        WHERE sr.exam_year_id = $1
+          AND sr.total_score >= 50
+          AND ($2::int IS NULL OR ec.region_id = $2)
+          AND ($3::int IS NULL OR ec.cluster_id = $3)
+          AND ($4::int IS NULL OR ec.id = $4)
+          AND NOT EXISTS (
+            SELECT 1 FROM attendance_records ar
+            WHERE ar.student_id = sr.student_id
+              AND ar.subject_id = sr.subject_id
+              AND ar.exam_year_id = sr.exam_year_id
+          )
+        ORDER BY r.name, cl.name, s.last_name, sub.name
+        LIMIT 500
+      `, [examYearId, regionId, clusterId, centerId]);
+
+      res.json({
+        attendedNoMarks,
+        marksNoAttend,
+        passingNoAttend,
+        summary: {
+          attendedNoMarksCount: attendedNoMarks.length,
+          marksNoAttendCount: marksNoAttend.length,
+          passingNoAttendCount: passingNoAttend.length,
+          totalFlags: attendedNoMarks.length + marksNoAttend.length + passingNoAttend.length,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get center dashboard data
   app.get("/api/centers/:id/dashboard", isAuthenticated, async (req, res) => {
     try {
