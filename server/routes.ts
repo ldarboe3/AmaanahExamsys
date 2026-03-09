@@ -15549,6 +15549,72 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ============ Secure Card Scan Verify — validates {EID}:{token} barcode payload ============
+  app.get("/api/public/staff-card-scan/:payload", async (req, res) => {
+    try {
+      const raw = decodeURIComponent(req.params.payload);
+      const colonIdx = raw.indexOf(':');
+      if (colonIdx === -1) {
+        return res.status(400).json({ verified: false, message: "Invalid scan payload — card may be outdated. Please reprint." });
+      }
+      const eid = raw.substring(0, colonIdx);
+      const token = raw.substring(colonIdx + 1);
+
+      const profile = await storage.getStaffProfileByEmployeeId(eid);
+      if (!profile) {
+        return res.status(404).json({ verified: false, message: "Employee ID not found." });
+      }
+      if (!profile.confirmationCode || profile.confirmationCode !== token) {
+        return res.status(403).json({ verified: false, message: "Card verification failed — token mismatch. Please contact HQ." });
+      }
+
+      let regionName: string | null = null;
+      let clusterName: string | null = null;
+      let centerName: string | null = null;
+      if (profile.regionId) {
+        const regions = await storage.getAllRegions();
+        const region = regions.find((r: any) => r.id === profile.regionId);
+        regionName = region ? region.name : null;
+      }
+      if (profile.clusterId) {
+        const clusters = await storage.getAllClusters();
+        const cluster = clusters.find((c: any) => c.id === profile.clusterId);
+        clusterName = cluster ? cluster.name : null;
+      }
+      if (profile.centerId) {
+        const centers = await storage.getAllExamCenters();
+        const center = centers.find((c: any) => c.id === profile.centerId);
+        centerName = center ? center.name : null;
+      }
+
+      res.json({
+        verified: true,
+        staffIdNumber: profile.staffIdNumber,
+        employeeId: profile.employeeId,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        middleName: profile.middleName,
+        photoUrl: profile.photoUrl,
+        role: profile.role,
+        phone: profile.phone,
+        email: profile.email,
+        regionId: profile.regionId,
+        regionName,
+        clusterId: profile.clusterId,
+        clusterName,
+        centerId: profile.centerId,
+        centerName,
+        status: profile.status,
+        issueDate: profile.issueDate,
+        isActive: profile.status === 'activated',
+        isSuspended: profile.status === 'suspended',
+        isRevoked: profile.status === 'revoked',
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============ Public Mobile API — Exam Schedules Sync (no auth required) ============
   app.get("/api/public/exam-schedules", async (req, res) => {
     try {

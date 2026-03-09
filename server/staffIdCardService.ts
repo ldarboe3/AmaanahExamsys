@@ -24,9 +24,14 @@ const GRAY = '#555555';
 const LIGHT_GRAY = '#888888';
 const CREAM = '#F5F5F0';
 
+const CONTACT_PHONE = '+220 368 1104';
+const CONTACT_EMAIL = 'info@amaanah.gm';
+const CONTACT_WEBSITE = 'www.amaanah.gm';
+
 interface StaffCardData {
   staffIdNumber: string;
   employeeId?: string | null;
+  confirmationCode?: string | null;
   firstName: string;
   lastName: string;
   middleName?: string | null;
@@ -39,7 +44,6 @@ interface StaffCardData {
   photoBuffer?: Buffer | null;
   phone?: string | null;
   email?: string | null;
-  confirmationCode?: string | null;
   issueDate?: Date | string | null;
   expiryDate?: string | null;
   verifyUrl: string;
@@ -85,6 +89,14 @@ async function generateBarcodePng(text: string, opts?: { width?: number; height?
   }
   const png = await bwipjs.toBuffer(barcodeOpts);
   return png;
+}
+
+function buildBarcodePayload(data: StaffCardData): string {
+  const eid = data.employeeId || data.staffIdNumber;
+  if (data.confirmationCode) {
+    return `${eid}:${data.confirmationCode}`;
+  }
+  return eid;
 }
 
 function drawGreenWaveHeader(doc: typeof PDFDocument.prototype, w: number, h: number) {
@@ -265,7 +277,7 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
   } catch {}
 }
 
-function drawBackPage(doc: typeof PDFDocument.prototype, data: StaffCardData, hasAmiri: boolean, barcodeBuffer: Buffer, qrBuffer: Buffer | null) {
+function drawBackPage(doc: typeof PDFDocument.prototype, data: StaffCardData, hasAmiri: boolean, qrBuffer: Buffer | null) {
   doc.rect(0, 0, W, H).fill(WHITE);
 
   drawGreenWaveHeader(doc, W, H);
@@ -362,10 +374,36 @@ function drawBackPage(doc: typeof PDFDocument.prototype, data: StaffCardData, ha
     .fillColor(DARK)
     .text(`Expire Date  :  ${expiryStr}`, mx, contentY, { width: contentW });
 
-  contentY += 12;
+  contentY += 10;
 
-  const qrSize = 32;
-  const qrX = mx;
+  doc.moveTo(mx, contentY).lineTo(W - mx, contentY).lineWidth(0.3).stroke('#CCCCCC');
+  contentY += 6;
+
+  doc.font(hasAmiri ? 'Amiri-Bold' : 'Helvetica-Bold')
+    .fontSize(5.5)
+    .fillColor(GREEN_DARK)
+    .text('Contact', mx, contentY, { width: contentW });
+
+  contentY += 9;
+
+  const contactLines = [
+    CONTACT_PHONE,
+    CONTACT_EMAIL,
+    CONTACT_WEBSITE,
+  ];
+
+  contactLines.forEach(line => {
+    doc.font(hasAmiri ? 'Amiri' : 'Helvetica')
+      .fontSize(4.8)
+      .fillColor(GRAY)
+      .text(line, mx, contentY, { width: contentW });
+    contentY += 7;
+  });
+
+  contentY += 4;
+
+  const qrSize = 34;
+  const qrX = (W - qrSize) / 2;
   const qrY = contentY;
 
   if (qrBuffer) {
@@ -374,24 +412,12 @@ function drawBackPage(doc: typeof PDFDocument.prototype, data: StaffCardData, ha
     } catch {}
   }
 
-  const backBarcodeW = 55;
-  const backBarcodeH = 16;
-  const backBarcodeX = W - mx - backBarcodeW;
-  const backBarcodeY = qrY + 4;
-  try {
-    doc.image(barcodeBuffer, backBarcodeX, backBarcodeY, { width: backBarcodeW, height: backBarcodeH });
-    doc.font('Helvetica')
-      .fontSize(3.5)
-      .fillColor(GRAY)
-      .text(data.employeeId || data.staffIdNumber, backBarcodeX, backBarcodeY + backBarcodeH + 1, { width: backBarcodeW, align: 'center' });
-  } catch {}
-
   drawGreenWaveFooter(doc, W, H);
 
   doc.font(hasAmiri ? 'Amiri' : 'Helvetica')
     .fontSize(4)
     .fillColor(WHITE)
-    .text('Scan QR or barcode to verify', 8, H * 0.88 + 12, { width: W - 16, align: 'center' });
+    .text('Scan QR to verify', 8, H * 0.88 + 12, { width: W - 16, align: 'center' });
 }
 
 async function loadPhotoBuffer(photoUrl: string | null | undefined): Promise<Buffer | null> {
@@ -421,6 +447,7 @@ export async function generateStaffIdCard(data: StaffCardData): Promise<Buffer> 
       const doc = new PDFDocument({
         size: [W, H],
         margin: 0,
+        autoFirstPage: false,
       });
 
       const chunks: Buffer[] = [];
@@ -434,8 +461,8 @@ export async function generateStaffIdCard(data: StaffCardData): Promise<Buffer> 
         doc.registerFont('Amiri-Bold', FONT_BOLD);
       }
 
-      const barcodeText = data.employeeId || data.staffIdNumber;
-      const barcodeBuffer = await generateBarcodePng(barcodeText);
+      const barcodePayload = buildBarcodePayload(data);
+      const barcodeBuffer = await generateBarcodePng(barcodePayload);
 
       let qrBuffer: Buffer | null = null;
       try {
@@ -447,11 +474,11 @@ export async function generateStaffIdCard(data: StaffCardData): Promise<Buffer> 
         qrBuffer = Buffer.from(qrDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
       } catch {}
 
+      doc.addPage({ size: [W, H], margin: 0 });
       drawFrontPage(doc, data, hasAmiri, barcodeBuffer);
 
       doc.addPage({ size: [W, H], margin: 0 });
-
-      drawBackPage(doc, data, hasAmiri, barcodeBuffer, qrBuffer);
+      drawBackPage(doc, data, hasAmiri, qrBuffer);
 
       doc.end();
     } catch (err) {
@@ -466,6 +493,7 @@ export async function generateBulkStaffIdCards(staffList: StaffCardData[]): Prom
       const doc = new PDFDocument({
         size: [W, H],
         margin: 0,
+        autoFirstPage: false,
       });
 
       const chunks: Buffer[] = [];
@@ -486,12 +514,8 @@ export async function generateBulkStaffIdCards(staffList: StaffCardData[]): Prom
           data.photoBuffer = await loadPhotoBuffer(data.photoUrl);
         }
 
-        if (i > 0) {
-          doc.addPage({ size: [W, H], margin: 0 });
-        }
-
-        const barcodeText = data.employeeId || data.staffIdNumber;
-        const barcodeBuffer = await generateBarcodePng(barcodeText);
+        const barcodePayload = buildBarcodePayload(data);
+        const barcodeBuffer = await generateBarcodePng(barcodePayload);
 
         let qrBuffer: Buffer | null = null;
         try {
@@ -503,11 +527,11 @@ export async function generateBulkStaffIdCards(staffList: StaffCardData[]): Prom
           qrBuffer = Buffer.from(qrDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
         } catch {}
 
+        doc.addPage({ size: [W, H], margin: 0 });
         drawFrontPage(doc, data, hasAmiri, barcodeBuffer);
 
         doc.addPage({ size: [W, H], margin: 0 });
-
-        drawBackPage(doc, data, hasAmiri, barcodeBuffer, qrBuffer);
+        drawBackPage(doc, data, hasAmiri, qrBuffer);
       }
 
       doc.end();
