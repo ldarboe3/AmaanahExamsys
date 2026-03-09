@@ -247,7 +247,6 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
   if (data.department) {
     drawInfoLine('Dept', data.department);
   }
-  const roleLabel = roleLabels[data.role] || data.role;
   drawInfoLine('Post', roleLabel);
 
   let workplace = 'Headquarters';
