@@ -183,7 +183,7 @@ export default function StaffIdentityPage() {
       setShowCreateDialog(false);
       setPhotoFile(null);
       form.reset();
-      toast({ title: "Staff profile created", description: `Staff ID: ${newStaff.staffIdNumber}` });
+      toast({ title: "Staff profile created", description: `Employee ID: ${newStaff.employeeId || newStaff.staffIdNumber}` });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -495,7 +495,7 @@ export default function StaffIdentityPage() {
                             <div className="min-w-0">
                               <div className="font-medium truncate">{staff.firstName} {staff.middleName ? `${staff.middleName} ` : ""}{staff.lastName}</div>
                               <code className="text-xs bg-muted px-1.5 py-0.5 rounded" data-testid={`text-staff-id-${staff.id}`}>
-                                {staff.staffIdNumber}
+                                EID: {staff.employeeId || staff.staffIdNumber}
                               </code>
                             </div>
                           </div>
@@ -898,10 +898,7 @@ export default function StaffIdentityPage() {
                     <p className="text-muted-foreground" dir="rtl">{viewingStaff.fullNameArabic}</p>
                   )}
                   <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <code className="text-sm bg-muted px-2 py-0.5 rounded">{viewingStaff.staffIdNumber}</code>
-                    {viewingStaff.employeeId && (
-                      <code className="text-sm bg-muted px-2 py-0.5 rounded">EID: {viewingStaff.employeeId}</code>
-                    )}
+                    <code className="text-sm bg-muted px-2 py-0.5 rounded">EID: {viewingStaff.employeeId || viewingStaff.staffIdNumber}</code>
                     <Badge variant="secondary" className={statusConfig[viewingStaff.status]?.color}>
                       {statusConfig[viewingStaff.status]?.label || viewingStaff.status}
                     </Badge>

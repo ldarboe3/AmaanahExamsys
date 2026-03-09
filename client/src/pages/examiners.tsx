@@ -289,7 +289,7 @@ export default function Examiners() {
                               {examiner.isFromStaffIdentity && (
                                 <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">
                                   <IdCard className="w-3 h-3" />
-                                  {examiner.staffIdNumber}
+                                  EID: {examiner.employeeId || examiner.staffIdNumber}
                                 </Badge>
                               )}
                             </div>
@@ -393,7 +393,7 @@ export default function Examiners() {
                     {selectedExaminer.isFromStaffIdentity && (
                       <Badge variant="outline" className="gap-1 border-primary/30 text-primary">
                         <IdCard className="w-3 h-3" />
-                        Staff ID: {selectedExaminer.staffIdNumber}
+                        EID: {selectedExaminer.employeeId || selectedExaminer.staffIdNumber}
                       </Badge>
                     )}
                   </div>

@@ -42,7 +42,11 @@ export default function VerifyStaffPage() {
     queryKey: ["/api/staff-verify", queryId],
     queryFn: async () => {
       if (!queryId) return null;
-      const res = await fetch(`/api/public/staff-verify/${queryId}`);
+      const isEid = /^\d{6,10}$/.test(queryId.trim());
+      const url = isEid
+        ? `/api/public/staff-verify-by-eid/${queryId.trim()}`
+        : `/api/public/staff-verify/${queryId.trim()}`;
+      const res = await fetch(url);
       if (!res.ok) {
         if (res.status === 404) return { notFound: true };
         throw new Error("Verification failed");
@@ -69,7 +73,7 @@ export default function VerifyStaffPage() {
           <img src={amanahLogo} alt="AMAANAH Logo" className="w-16 h-16 mx-auto object-contain" />
           <h1 className="text-2xl font-bold" data-testid="text-verify-title">Staff Identity Verification</h1>
           <p className="text-muted-foreground text-sm">
-            Enter a Staff ID number or scan the QR code to verify staff credentials
+            Enter an Employee ID or scan the QR code to verify staff credentials
           </p>
         </div>
 
@@ -77,7 +81,7 @@ export default function VerifyStaffPage() {
           <CardContent className="pt-6">
             <div className="flex gap-2">
               <Input
-                placeholder="Enter Staff ID (e.g., AMS-00001)"
+                placeholder="Enter Employee ID (8 digits)"
                 value={searchId}
                 onChange={(e) => setSearchId(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -151,7 +155,7 @@ export default function VerifyStaffPage() {
                     {staffData.firstName} {staffData.middleName ? `${staffData.middleName} ` : ""}{staffData.lastName}
                   </h3>
                   <p className="text-sm text-muted-foreground">{roleLabels[staffData.role] || staffData.role}</p>
-                  <code className="text-xs bg-muted px-2 py-0.5 rounded mt-1 inline-block">{staffData.staffIdNumber}</code>
+                  <code className="text-xs bg-muted px-2 py-0.5 rounded mt-1 inline-block">EID: {staffData.employeeId || staffData.staffIdNumber}</code>
                 </div>
               </div>
 
