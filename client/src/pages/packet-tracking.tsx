@@ -91,6 +91,13 @@ const packetFormSchema = z.object({
 });
 type PacketFormData = z.infer<typeof packetFormSchema>;
 
+function generateSealNumber(): string {
+  const date = new Date();
+  const ymd = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+  const rand = Math.random().toString(36).toUpperCase().slice(2, 7);
+  return `SEAL-${ymd}-${rand}`;
+}
+
 function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { toast } = useToast();
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
@@ -99,7 +106,11 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
 
   const form = useForm<PacketFormData>({
     resolver: zodResolver(packetFormSchema),
-    defaultValues: { examYearId: 0, subjectId: 0, grade: 6, destinationCenterId: 0, paperCount: 0 },
+    defaultValues: {
+      examYearId: 0, subjectId: 0, grade: 6,
+      destinationCenterId: 0, paperCount: 0,
+      securitySealNumber: generateSealNumber(),
+    },
   });
 
   const mutation = useMutation({
@@ -183,7 +194,18 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
               )} />
               <FormField control={form.control} name="securitySealNumber" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Security Seal #</FormLabel>
+                  <FormLabel className="flex items-center justify-between">
+                    Security Seal #
+                    <button
+                      type="button"
+                      className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1"
+                      onClick={() => field.onChange(generateSealNumber())}
+                      data-testid="button-regenerate-seal"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      Regenerate
+                    </button>
+                  </FormLabel>
                   <FormControl><Input data-testid="input-seal-number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
