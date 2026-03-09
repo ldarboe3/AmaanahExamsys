@@ -1,0 +1,105 @@
+Prompt for Mobile App Developer:
+AmaanahExamsys Full Integration — Mobile App
+We are connecting the Amaanah mobile exam app fully to the AmaanahExamsys backend. Below are all required changes. The app should be user-friendly, professional, and consistent in design throughout. Treat every screen as production-quality — clean layouts, clear typography, proper loading/error states, no raw JSON visible to users.
+________________________________________
+1. Employee ID Format
+The Employee ID (EID) printed on every ID card is now an 8-digit numeric code (e.g. 91184642). This is what the barcode on the physical ID card encodes. Update any UI text, placeholder, or label to say "8-digit Employee ID" wherever the EID input appears. The barcode scanner should decode straight to this 8-digit number.
+________________________________________
+2. Authentication — Eliminate Manual Role Selection
+Current (broken): After scanning EID, the app asks the user to manually select their role.
+Required: Role, name, assignment, and photo must be fetched automatically from ExamSys immediately after EID scan — no manual selection.
+API call to make on EID scan:
+GET https://amaanah.gm/api/public/staff-verify-by-eid/{eid}
+Response fields to use:
+{
+  "verified": true,
+  "staffIdNumber": "AMS-00004",
+  "firstName": "Test Center",
+  "lastName": "Examiner",
+  "photoUrl": null,
+  "role": "examiner",
+  "regionId": 340,
+  "regionName": "Region Name",
+  "clusterId": 49,
+  "clusterName": "Cluster Name",
+  "centerId": 7,
+  "centerName": "Test Examination Center",
+  "status": "activated",
+  "isActive": true,
+  "isSuspended": false,
+  "isRevoked": false
+}
+Role mapping (ExamSys role → App role screen):
+ExamSys role	App Screen
+examiner	Examiner home (timer, attendance, packet open/seal)
+cluster_officer	Cluster Officer home (packet receive, dispatch to center)
+regional_coordinator	Regional Officer home (packet receive, dispatch to cluster)
+hq_staff	HQ Admin home (full monitoring, dispatch from HQ)
+If isActive is false, isSuspended is true, or isRevoked is true → block login with a clear, respectful error message (e.g. "Your account has been suspended. Please contact HQ."). Do not let suspended or revoked staff proceed.
+Store all returned fields in secure local storage after PIN creation so they are available offline.
+________________________________________
+3. Home Screen — Personalized & Professional
+After login, the home screen must display:
+•	Staff photo (from photoUrl; if null, show initials avatar in teal)
+•	Full name prominently (large, bold)
+•	Staff ID Number (AMS-XXXXX) in smaller secondary text
+•	Role label (human-readable, e.g. "Cluster Operations Officer" not "cluster_officer")
+•	Assigned area — whichever is most specific:
+o	If centerName is set → show it (e.g. "Test Examination Center")
+o	Else if clusterName is set → show it
+o	Else if regionName is set → show it
+•	Today's exam schedule summary (see section 4)
+The design should feel like a professional identity badge at the top, with a teal/emerald accent matching the ExamSys brand.
+________________________________________
+4. Exam Schedule — Sync from ExamSys
+Remove the internal schedule management database. Fetch published schedules from:
+GET https://amaanah.gm/api/public/exam-schedules
+Optional query parameters: ?grade=6
+Response is an array of schedule objects:
+[
+  {
+    "id": 1,
+    "subjectId": 12,
+    "grade": 6,
+    "examDate": "2027-03-15",
+    "scheduledStartTime": "09:00",
+    "scheduledEndTime": "11:00",
+    "durationMinutes": 120,
+    "isPublished": true,
+    "notes": "..."
+  }
+]
+•	Cache these locally in IndexedDB on app launch and refresh daily
+•	The exam timer's schedule picker should be populated from this data
+•	Show scheduledStartTime as the "HQ SET" start time (keep the "HQ SET" badge — this confirms the time is official from headquarters)
+•	Show durationMinutes to drive the countdown timer
+•	The "HQ SET" badge should remain — it is correct; it signals the schedule is locked by administration
+________________________________________
+5. Staff Profile Tab — Full Data from ExamSys
+Replace the static profile display with live data from the verify response (already fetched at login). Show:
+•	Photo (with teal initials fallback)
+•	Full name, Employee ID (8 digits — for ID card reference)
+•	Role (human-readable)
+•	Assigned area (center / cluster / region name)
+•	Status badge: Active (green), Suspended (amber), Revoked (red)
+•	Issue date
+Add a "Refresh Profile" button that re-calls the verify endpoint to get the latest status from ExamSys. This is important so a suspended user cannot continue working if their account was suspended mid-session.
+________________________________________
+6. Auto-Lock & Session Security
+Keep the existing auto-lock (3 min), lockout after 5 failed PINs (5-min lock), and PIN-based unlock. These are working correctly and should not change.
+Additionally: when the profile is refreshed (section 5) and isActive is false, immediately lock the app and show a suspension message. The user must contact HQ to continue.
+________________________________________
+7. General UI/UX Standards
+Apply these standards across all screens:
+•	Color palette: Teal/emerald primary (#0D9488), white surfaces, slate text
+•	Typography: Clear hierarchy — large bold for names/headings, medium for labels, small secondary for meta info
+•	Loading states: Show a spinner or skeleton while any API call is in progress — never show a blank screen
+•	Error states: Clear, plain-language error messages (not technical codes). Always offer a "Try again" action
+•	Offline indicator: When offline, show a subtle banner ("Working offline — data will sync when connected") rather than blocking the user
+•	Sync confirmation: When data syncs successfully, show a brief toast ("Synced to ExamSys")
+•	Role-based navigation: Only show navigation items relevant to the logged-in role. An examiner should not see regional dispatch options, and vice versa
+•	Consistent spacing and card padding: All cards and panels should have uniform 16px padding, 8px border radius, subtle shadow
+•	No raw data exposure: Never show database IDs, error stack traces, or technical field names to the user
+________________________________________
+That covers all four gaps plus the UI quality bar. The ExamSys backend has already been updated with the GET /api/public/exam-schedules endpoint and all 29 staff profiles now have their correct 8-digit Employee IDs ready for ID card printing.
+
