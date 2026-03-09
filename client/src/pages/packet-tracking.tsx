@@ -32,6 +32,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import QRCode from "qrcode";
 import type { ExamPacket, ExamYear, Subject, ExamCenter, Region, Cluster } from "@shared/schema";
+import amanahLogoUrl from "@assets/Amana_Logo_1770390631299.jpeg";
 
 // ── Status config ────────────────────────────────────────────────────────────
 
@@ -530,17 +531,31 @@ function ChainOfCustodyTab({ onViewTimeline }: { onViewTimeline: (barcode: strin
 
 // ── Print Label ───────────────────────────────────────────────────────────────
 
+async function toBase64DataUrl(url: string): Promise<string> {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 async function printPacketLabel(
   packet: ExamPacket,
   subjectName: string,
   centerName: string,
   examYearLabel: string,
 ) {
-  const qrDataUrl = await QRCode.toDataURL(packet.barcode, {
-    width: 200,
-    margin: 1,
-    color: { dark: "#000000", light: "#ffffff" },
-  });
+  const [qrDataUrl, logoDataUrl] = await Promise.all([
+    QRCode.toDataURL(packet.barcode, {
+      width: 200,
+      margin: 1,
+      color: { dark: "#000000", light: "#ffffff" },
+    }),
+    toBase64DataUrl(amanahLogoUrl).catch(() => ""),
+  ]);
 
   const statusLabel = (STATUS_CFG[packet.status]?.label ?? packet.status);
   const printDate = new Date().toLocaleString();
@@ -563,6 +578,8 @@ async function printPacketLabel(
       display: flex; align-items: center; justify-content: space-between;
       border-bottom: 1.5px solid #0d9488; padding-bottom: 4mm;
     }
+    .header-left { display: flex; align-items: center; gap: 4mm; }
+    .header-logo { width: 14mm; height: 14mm; object-fit: contain; flex-shrink: 0; }
     .org-name { font-size: 16pt; font-weight: 900; color: #0d9488; letter-spacing: 0.5px; }
     .org-sub  { font-size: 8pt; color: #555; margin-top: 1mm; }
     .title-badge {
@@ -596,9 +613,12 @@ async function printPacketLabel(
 <body>
 <div class="label">
   <div class="header">
-    <div>
-      <div class="org-name">AMAANAH</div>
-      <div class="org-sub">Examination Management System &nbsp;|&nbsp; ${examYearLabel}</div>
+    <div class="header-left">
+      ${logoDataUrl ? `<img class="header-logo" src="${logoDataUrl}" alt="Amaanah Logo" />` : ""}
+      <div>
+        <div class="org-name">AMAANAH</div>
+        <div class="org-sub">Examination Management System &nbsp;|&nbsp; ${examYearLabel}</div>
+      </div>
     </div>
     <div class="title-badge">EXAM PAPER PACKET</div>
   </div>
