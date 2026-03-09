@@ -1160,6 +1160,14 @@ export default function CenterDashboard() {
   const backUrl = isSchoolAdmin ? "/center-info" : "/centers";
   const backLabel = isSchoolAdmin ? "Back to Exam Center" : "Back to Centers";
 
+  // Must be declared before any conditional returns to comply with React hooks rules
+  const isSchoolView = data?.schoolView === true;
+  const schoolId = data?.schoolId;
+  const { data: schoolData } = useQuery<{ id: number; name: string; schoolBadge?: string | null }>({
+    queryKey: [`/api/schools/${schoolId}`],
+    enabled: isSchoolView && !!schoolId,
+  });
+
   if (!centerId) {
     return (
       <div className="text-center py-12">
@@ -1210,14 +1218,7 @@ export default function CenterDashboard() {
     );
   }
 
-  const { center, examYear, statistics, schools, timetable, paperMovements, scriptMovements, malpracticeReports, recentActivity, invigilators, schoolView, schoolId } = data;
-  const isSchoolView = schoolView === true;
-
-  // Fetch school info for school admin print headers
-  const { data: schoolData } = useQuery<{ id: number; name: string; schoolBadge?: string | null }>({
-    queryKey: [`/api/schools/${schoolId}`],
-    enabled: isSchoolView && !!schoolId,
-  });
+  const { center, examYear, statistics, schools, timetable, paperMovements, scriptMovements, malpracticeReports, recentActivity, invigilators } = data;
 
   const printInfo: PrintInfo | undefined = isSchoolView ? {
     centerName: center.name,

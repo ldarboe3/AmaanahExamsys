@@ -123,7 +123,7 @@ export default function StudentAttendance() {
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
   const { data: regions = [] } = useQuery<Region[]>({ queryKey: ["/api/regions"] });
   const { data: clusters = [] } = useQuery<Cluster[]>({ queryKey: ["/api/clusters"] });
-  const { data: centers = [] } = useQuery<ExamCenter[]>({ queryKey: ["/api/exam-centers"] });
+  const { data: centers = [] } = useQuery<ExamCenter[]>({ queryKey: ["/api/centers"] });
 
   // Set default exam year to active one
   useEffect(() => {

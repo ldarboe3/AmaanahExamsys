@@ -67,7 +67,6 @@ const examLogisticsDefs: MenuItemDef[] = [
   { key: "packetTracking", url: "/packet-tracking", icon: Package },
   { key: "examScheduling", url: "/exam-scheduling", icon: Timer },
   { key: "studentAttendance", url: "/student-attendance", icon: ScanLine },
-  { key: "mobileAttendanceScan", url: "/mobile-attendance-scan", icon: Smartphone },
 ];
 
 const examinerMenuDefs: MenuItemDef[] = [
