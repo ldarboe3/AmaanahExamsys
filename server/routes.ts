@@ -15888,6 +15888,150 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Auto-generate packets for all subjects × all centers for an exam year
+  app.post("/api/exam-packets/auto-generate", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const schema = z.object({
+        examYearId: z.coerce.number().int().positive(),
+        skipExisting: z.boolean().optional().default(true),
+        bufferPercent: z.number().min(0).max(100).optional().default(15),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Validation error" });
+      const { examYearId, skipExisting, bufferPercent } = parsed.data;
+
+      const examYear = await storage.getExamYear(examYearId);
+      if (!examYear) return res.status(400).json({ message: "Exam year not found" });
+
+      // Get all subjects relevant to this exam year
+      const allSubjects = await storage.getAllSubjects();
+      const examGrades: number[] = (examYear as any).grades ?? [];
+      // If examYear has grades filter, use it; otherwise use all subjects
+      const subjects = examGrades.length > 0
+        ? allSubjects.filter((s: any) => examGrades.includes(s.grade))
+        : allSubjects;
+
+      // Get all exam centers
+      const centers = await storage.getAllExamCenters();
+
+      // Build center → student count map
+      const centerStudentCount: Record<number, number> = {};
+      for (const center of centers) {
+        const schools = await storage.getSchoolsByCenter(center.id);
+        let count = 0;
+        for (const school of schools) {
+          const students = await storage.getStudentsBySchool(school.id);
+          count += students.length;
+        }
+        centerStudentCount[center.id] = count;
+      }
+
+      // Get existing packets to detect duplicates
+      const existingPackets = await storage.getExamPackets({ examYearId });
+
+      const created: any[] = [];
+      let skipped = 0;
+
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+      for (const subject of subjects) {
+        const subjectCode = ((subject as any).code || (subject as any).name.substring(0, 3))
+          .toUpperCase().replace(/\s/g, '').replace(/[()]/g, '');
+
+        for (const center of centers) {
+          // Skip if packet already exists for this subject + center + year
+          if (skipExisting && existingPackets.some((p: any) => p.subjectId === subject.id && p.destinationCenterId === center.id)) {
+            skipped++;
+            continue;
+          }
+
+          const studentCount = centerStudentCount[center.id] ?? 0;
+          // paper count = students + buffer%, rounded up to nearest 10, minimum 10
+          const rawCount = Math.ceil(studentCount * (1 + (bufferPercent / 100)));
+          const paperCount = Math.max(10, Math.ceil(rawCount / 10) * 10);
+
+          const sealRand = Math.random().toString(36).toUpperCase().slice(2, 7);
+          const securitySealNumber = `SEAL-${dateStr}-${sealRand}`;
+
+          let barcode: string;
+          let attempts = 0;
+          const baseSeq = (await storage.getExamPackets({ examYearId, grade: (subject as any).grade })).length;
+          do {
+            const seq = String(baseSeq + created.length + 1 + attempts).padStart(3, '0');
+            barcode = `PKT-${examYear.year}-G${(subject as any).grade}-${subjectCode}-C${center.id}-${seq}`;
+            const dup = await storage.getExamPacketByBarcode(barcode);
+            if (!dup) break;
+            attempts++;
+          } while (attempts < 100);
+
+          const packet = await storage.createExamPacket({
+            examYearId,
+            subjectId: subject.id,
+            grade: (subject as any).grade,
+            destinationCenterId: center.id,
+            destinationRegionId: (center as any).regionId ?? null,
+            destinationClusterId: (center as any).clusterId ?? null,
+            paperCount,
+            securitySealNumber,
+            notes: `Auto-generated: ${studentCount} students + ${bufferPercent}% buffer`,
+            barcode,
+            createdBy: user.id,
+          });
+          created.push(packet);
+        }
+      }
+
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "create",
+        entityType: "exam_packet",
+        entityId: "auto-generate",
+        newData: { details: `Auto-generated ${created.length} packets for exam year ${examYear.year}, skipped ${skipped} existing` },
+      });
+
+      res.status(201).json({
+        created: created.length,
+        skipped,
+        total: created.length + skipped,
+        packets: created,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete exam packet (admin only, only if status is 'created')
+  app.delete("/api/exam-packets/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const packet = await storage.getExamPacket(parseInt(req.params.id));
+      if (!packet) return res.status(404).json({ message: "Packet not found" });
+
+      const deleted = await storage.deleteExamPacket(packet.id);
+      if (!deleted) return res.status(500).json({ message: "Failed to delete packet" });
+
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "delete",
+        entityType: "exam_packet",
+        entityId: packet.id.toString(),
+        newData: { details: `Deleted exam packet ${packet.barcode}` },
+      });
+
+      res.json({ success: true, message: `Packet ${packet.barcode} deleted` });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.patch("/api/exam-packets/:id/status", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);

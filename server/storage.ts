@@ -442,6 +442,7 @@ export interface IStorage {
   getExamPacketByBarcode(barcode: string): Promise<ExamPacket | undefined>;
   getExamPackets(filters?: { examYearId?: number; grade?: number; status?: string; centerId?: number }): Promise<ExamPacket[]>;
   updateExamPacket(id: number, data: Partial<ExamPacket>): Promise<ExamPacket | undefined>;
+  deleteExamPacket(id: number): Promise<boolean>;
   createHandoverLog(log: InsertHandoverLog): Promise<HandoverLog>;
   getHandoverLogs(packetId: number): Promise<HandoverLog[]>;
   getHandoverLogByClientEventId(clientEventId: string): Promise<HandoverLog | undefined>;
@@ -2560,6 +2561,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(examPackets.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteExamPacket(id: number): Promise<boolean> {
+    const result = await db.delete(examPackets).where(eq(examPackets.id, id)).returning();
+    return result.length > 0;
   }
 
   async createHandoverLog(log: InsertHandoverLog): Promise<HandoverLog> {
