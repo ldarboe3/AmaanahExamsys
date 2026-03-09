@@ -569,45 +569,45 @@ async function printPacketLabel(
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; background: #fff; color: #111; }
-    @page { size: A5 landscape; margin: 10mm; }
+    @page { size: A4 landscape; margin: 12mm; }
     .label {
-      width: 190mm; min-height: 118mm;
-      border: 2px solid #0d9488; border-radius: 6px;
-      padding: 10mm; display: flex; flex-direction: column; gap: 6mm;
+      width: 270mm; min-height: 168mm;
+      border: 2.5px solid #0d9488; border-radius: 8px;
+      padding: 12mm; display: flex; flex-direction: column; gap: 7mm;
     }
     .header {
       display: flex; align-items: center; justify-content: space-between;
-      border-bottom: 1.5px solid #0d9488; padding-bottom: 4mm;
+      border-bottom: 2px solid #0d9488; padding-bottom: 5mm;
     }
-    .header-left { display: flex; align-items: center; gap: 4mm; }
-    .header-logo { width: 14mm; height: 14mm; object-fit: contain; flex-shrink: 0; }
-    .org-name { font-size: 16pt; font-weight: 900; color: #0d9488; letter-spacing: 0.5px; }
-    .org-sub  { font-size: 8pt; color: #555; margin-top: 1mm; }
+    .header-left { display: flex; align-items: center; gap: 5mm; }
+    .header-logo { width: 20mm; height: 20mm; object-fit: contain; flex-shrink: 0; }
+    .org-name { font-size: 26pt; font-weight: 900; color: #0d9488; letter-spacing: 0.5px; }
+    .org-sub  { font-size: 12pt; color: #555; margin-top: 1.5mm; }
     .title-badge {
       background: #0d9488; color: #fff;
-      font-size: 9pt; font-weight: 700;
-      padding: 3px 10px; border-radius: 4px;
+      font-size: 13pt; font-weight: 700;
+      padding: 5px 14px; border-radius: 5px; letter-spacing: 0.5px;
     }
-    .body { display: flex; gap: 8mm; flex: 1; }
+    .body { display: flex; gap: 10mm; flex: 1; }
     .details { flex: 1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 6mm; }
-    .field label { font-size: 7pt; text-transform: uppercase; color: #888; letter-spacing: 0.5px; }
-    .field p { font-size: 10pt; font-weight: 700; color: #111; margin-top: 1px; }
-    .field p.mono { font-family: 'Courier New', monospace; font-size: 9pt; }
-    .qr-block { display: flex; flex-direction: column; align-items: center; gap: 2mm; }
-    .qr-block img { width: 38mm; height: 38mm; border: 1px solid #e5e7eb; border-radius: 4px; }
-    .qr-label { font-size: 7pt; color: #555; text-align: center; max-width: 40mm; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm 8mm; }
+    .field label { font-size: 9pt; text-transform: uppercase; color: #888; letter-spacing: 0.6px; font-weight: 600; }
+    .field p { font-size: 15pt; font-weight: 700; color: #111; margin-top: 1.5px; }
+    .field p.mono { font-family: 'Courier New', monospace; font-size: 13pt; }
+    .qr-block { display: flex; flex-direction: column; align-items: center; gap: 3mm; }
+    .qr-block img { width: 52mm; height: 52mm; border: 1px solid #e5e7eb; border-radius: 5px; }
+    .qr-label { font-size: 9pt; color: #555; text-align: center; max-width: 56mm; line-height: 1.4; }
     .barcode-strip {
-      background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 4px;
-      padding: 3mm 4mm; text-align: center;
+      background: #f8fafc; border: 1.5px solid #e5e7eb; border-radius: 5px;
+      padding: 4mm 6mm; text-align: center;
     }
-    .barcode-strip .bc-text { font-family: 'Courier New', monospace; font-size: 13pt; font-weight: 900; letter-spacing: 2px; color: #0d9488; }
-    .barcode-strip .bc-hint { font-size: 7pt; color: #888; margin-top: 1mm; }
-    .footer { border-top: 1px solid #e5e7eb; padding-top: 3mm; display: flex; justify-content: space-between; align-items: center; }
-    .footer p { font-size: 7pt; color: #aaa; }
+    .barcode-strip .bc-text { font-family: 'Courier New', monospace; font-size: 20pt; font-weight: 900; letter-spacing: 3px; color: #0d9488; }
+    .barcode-strip .bc-hint { font-size: 10pt; color: #888; margin-top: 2mm; }
+    .footer { border-top: 1px solid #e5e7eb; padding-top: 4mm; display: flex; justify-content: space-between; align-items: center; }
+    .footer p { font-size: 9pt; color: #aaa; }
     .status-badge {
       display: inline-block; background: #d1fae5; color: #065f46;
-      font-size: 8pt; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+      font-size: 12pt; font-weight: 700; padding: 3px 12px; border-radius: 20px;
     }
   </style>
 </head>
