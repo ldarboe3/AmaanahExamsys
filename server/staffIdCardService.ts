@@ -183,9 +183,9 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
     .text('STAFF IDENTITY CARD', textX, 32, { width: W - textX - 10 });
 
   const headerH = H * 0.30;
-  const photoSize = 48;
+  const photoSize = 62;
   const photoCenterX = W / 2;
-  const photoCenterY = headerH + 2;
+  const photoCenterY = headerH + 6;
 
   doc.circle(photoCenterX, photoCenterY, photoSize / 2 + 3).fill(GREEN_MID);
   doc.circle(photoCenterX, photoCenterY, photoSize / 2 + 1).fill(WHITE);
@@ -243,10 +243,12 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
     infoY += lineH;
   };
 
-  drawInfoLine('ID', data.employeeId || data.staffIdNumber);
+  drawInfoLine('EID', data.employeeId || data.staffIdNumber);
   if (data.department) {
     drawInfoLine('Dept', data.department);
   }
+  const roleLabel = roleLabels[data.role] || data.role;
+  drawInfoLine('Post', roleLabel);
 
   let workplace = 'Headquarters';
   const hqRoles = ['hq_director', 'hq_staff'];

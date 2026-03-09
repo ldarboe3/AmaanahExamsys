@@ -28,7 +28,7 @@ import {
 import {
   Search, MoreVertical, Eye, Edit, Plus, UserCheck, Trash2,
   Shield, ShieldAlert, ShieldOff, ShieldCheck, CreditCard,
-  Upload, Clock, CheckCircle, XCircle, AlertTriangle, IdCard, Download, Printer, Building2,
+  Upload, Clock, CheckCircle, XCircle, AlertTriangle, IdCard, Download, Printer, Building2, MapPin,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -128,6 +128,7 @@ export default function StaffIdentityPage() {
   const [statusReason, setStatusReason] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [grantSystemAccess, setGrantSystemAccess] = useState(false);
+  const [workLocation, setWorkLocation] = useState<"hq" | "field">("hq");
 
   const { data: staffProfiles = [], isLoading } = useQuery<StaffProfile[]>({
     queryKey: ["/api/staff-profiles", { search: searchTerm, status: statusFilter !== "all" ? statusFilter : undefined, role: roleFilter !== "all" ? roleFilter : undefined }],
@@ -253,6 +254,7 @@ export default function StaffIdentityPage() {
     });
     setPhotoFile(null);
     setGrantSystemAccess(false);
+    setWorkLocation("hq");
     setShowCreateDialog(true);
   };
 
@@ -272,6 +274,7 @@ export default function StaffIdentityPage() {
     });
     setPhotoFile(null);
     setGrantSystemAccess(false);
+    setWorkLocation(staff.regionId ? "field" : "hq");
     setEditingStaff(staff);
   };
 
@@ -695,55 +698,93 @@ export default function StaffIdentityPage() {
                 )} />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="regionId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Region</FormLabel>
-                    <Select
-                      value={field.value?.toString() || "none"}
-                      onValueChange={(v) => {
-                        field.onChange(v === "none" ? null : parseInt(v));
-                        form.setValue("clusterId", null);
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-region">
-                          <SelectValue placeholder="Select region" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {regions.map((r) => (
-                          <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="clusterId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cluster</FormLabel>
-                    <Select
-                      value={field.value?.toString() || "none"}
-                      onValueChange={(v) => field.onChange(v === "none" ? null : parseInt(v))}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-cluster">
-                          <SelectValue placeholder="Select cluster" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {filteredRegionClusters.map((c) => (
-                          <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Work Location</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    data-testid="btn-work-location-hq"
+                    onClick={() => {
+                      setWorkLocation("hq");
+                      form.setValue("regionId", null);
+                      form.setValue("clusterId", null);
+                    }}
+                    className={`flex items-center gap-2 rounded-md border px-3 py-2.5 text-sm transition-colors ${
+                      workLocation === "hq"
+                        ? "border-primary bg-primary/10 text-primary font-medium"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                    }`}
+                  >
+                    <Building2 className="h-4 w-4 shrink-0" />
+                    <span>Headquarters (HQ)</span>
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="btn-work-location-field"
+                    onClick={() => setWorkLocation("field")}
+                    className={`flex items-center gap-2 rounded-md border px-3 py-2.5 text-sm transition-colors ${
+                      workLocation === "field"
+                        ? "border-primary bg-primary/10 text-primary font-medium"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                    }`}
+                  >
+                    <MapPin className="h-4 w-4 shrink-0" />
+                    <span>Field Operations</span>
+                  </button>
+                </div>
               </div>
+
+              {workLocation === "field" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="regionId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Region</FormLabel>
+                      <Select
+                        value={field.value?.toString() || "none"}
+                        onValueChange={(v) => {
+                          field.onChange(v === "none" ? null : parseInt(v));
+                          form.setValue("clusterId", null);
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-region">
+                            <SelectValue placeholder="Select region" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {regions.map((r) => (
+                            <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="clusterId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cluster</FormLabel>
+                      <Select
+                        value={field.value?.toString() || "none"}
+                        onValueChange={(v) => field.onChange(v === "none" ? null : parseInt(v))}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-cluster">
+                            <SelectValue placeholder="Select cluster" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {filteredRegionClusters.map((c) => (
+                            <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="phone" render={({ field }) => (
