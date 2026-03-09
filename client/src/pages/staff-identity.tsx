@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +129,8 @@ export default function StaffIdentityPage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [grantSystemAccess, setGrantSystemAccess] = useState(false);
   const [workLocation, setWorkLocation] = useState<"hq" | "field">("hq");
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   const { data: staffProfiles = [], isLoading } = useQuery<StaffProfile[]>({
     queryKey: ["/api/staff-profiles", { search: searchTerm, status: statusFilter !== "all" ? statusFilter : undefined, role: roleFilter !== "all" ? roleFilter : undefined }],
@@ -305,6 +307,10 @@ export default function StaffIdentityPage() {
     ? staffProfiles
     : staffProfiles.filter((s) => s.department === departmentFilter);
 
+  const totalStaffFiltered = filteredByDepartment.length;
+  const totalPages = Math.ceil(totalStaffFiltered / pageSize);
+  const paginatedStaff = filteredByDepartment.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+
   const statusCounts = {
     total: staffProfiles.length,
     activated: staffProfiles.filter((s) => s.status === "activated").length,
@@ -393,12 +399,12 @@ export default function StaffIdentityPage() {
               <Input
                 placeholder="Search by name, ID, email..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }}
                 className="pl-10"
                 data-testid="input-search-staff"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(0); }}>
               <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -412,7 +418,7 @@ export default function StaffIdentityPage() {
                 <SelectItem value="revoked">Revoked</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setCurrentPage(0); }}>
               <SelectTrigger className="w-[140px]" data-testid="select-role-filter">
                 <SelectValue placeholder="Role" />
               </SelectTrigger>
@@ -423,7 +429,7 @@ export default function StaffIdentityPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v); setCurrentPage(0); }}>
               <SelectTrigger className="w-[160px]" data-testid="select-department-filter">
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
@@ -482,7 +488,7 @@ export default function StaffIdentityPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredByDepartment.map((staff) => {
+                  {paginatedStaff.map((staff) => {
                     const sConfig = statusConfig[staff.status] || statusConfig.created;
                     const StatusIcon = sConfig.icon;
                     const regionName = regions.find((r) => r.id === staff.regionId)?.name;
@@ -585,6 +591,50 @@ export default function StaffIdentityPage() {
             </div>
           )}
         </CardContent>
+        {totalStaffFiltered > 0 && (
+          <CardFooter className="border-t p-4 flex items-center justify-between gap-4">
+            <div className="text-sm text-muted-foreground">
+              Showing {totalStaffFiltered > 0 ? (currentPage * pageSize + 1) : 0} to {Math.min((currentPage + 1) * pageSize, totalStaffFiltered)} of {totalStaffFiltered}
+            </div>
+            <div className="flex items-center gap-2">
+              <Select
+                value={pageSize.toString()}
+                onValueChange={(v) => { setPageSize(parseInt(v)); setCurrentPage(0); }}
+                data-testid="select-staff-page-size"
+              >
+                <SelectTrigger className="w-[100px]" data-testid="select-staff-page-size-trigger">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10 / page</SelectItem>
+                  <SelectItem value="25">25 / page</SelectItem>
+                  <SelectItem value="50">50 / page</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                disabled={currentPage === 0}
+                data-testid="button-staff-prev-page"
+              >
+                ←
+              </Button>
+              <span className="text-sm">
+                Page {currentPage + 1} of {totalPages || 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={currentPage >= totalPages - 1}
+                data-testid="button-staff-next-page"
+              >
+                →
+              </Button>
+            </div>
+          </CardFooter>
+        )}
       </Card>
 
       <Dialog open={showCreateDialog || !!editingStaff} onOpenChange={(open) => {
