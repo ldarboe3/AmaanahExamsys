@@ -95,7 +95,7 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
   const { toast } = useToast();
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
   const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
-  const { data: centers = [] } = useQuery<ExamCenter[]>({ queryKey: ["/api/exam-centers"] });
+  const { data: centers = [] } = useQuery<ExamCenter[]>({ queryKey: ["/api/centers"] });
 
   const form = useForm<PacketFormData>({
     resolver: zodResolver(packetFormSchema),
@@ -420,7 +420,7 @@ export default function PacketTracking() {
   });
 
   const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
-  const { data: centers = [] } = useQuery<ExamCenter[]>({ queryKey: ["/api/exam-centers"] });
+  const { data: centers = [] } = useQuery<ExamCenter[]>({ queryKey: ["/api/centers"] });
 
   const subjectMap = Object.fromEntries(subjects.map(s => [s.id, s.name]));
   const centerMap = Object.fromEntries(centers.map(c => [c.id, c.name]));
