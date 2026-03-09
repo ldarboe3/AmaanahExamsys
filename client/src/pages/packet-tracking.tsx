@@ -25,13 +25,13 @@ import {
 import {
   Search, Plus, Package, Truck, Building2, CheckCircle, AlertTriangle,
   Lock, Clock, ArrowLeft, Smartphone, RefreshCw, MapPin, GitBranch,
-  Eye, BarChart3, QrCode, Printer,
+  Eye, BarChart3, QrCode, Printer, Info, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import QRCode from "qrcode";
-import type { ExamPacket, ExamYear, Subject, ExamCenter } from "@shared/schema";
+import type { ExamPacket, ExamYear, Subject, ExamCenter, Region, Cluster } from "@shared/schema";
 
 // ── Status config ────────────────────────────────────────────────────────────
 
@@ -101,18 +101,59 @@ function generateSealNumber(): string {
 
 function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { toast } = useToast();
+  const [selectedRegionId, setSelectedRegionId] = useState<number | null>(null);
+  const [selectedClusterId, setSelectedClusterId] = useState<number | null>(null);
+
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
-  const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
-  const { data: centers = [] } = useQuery<ExamCenter[]>({ queryKey: ["/api/centers"] });
+  const { data: allSubjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
+  const { data: regions = [] } = useQuery<Region[]>({ queryKey: ["/api/regions"] });
+  const { data: clusters = [] } = useQuery<Cluster[]>({
+    queryKey: ["/api/clusters", selectedRegionId],
+    queryFn: () => apiRequest("GET", selectedRegionId ? `/api/clusters?regionId=${selectedRegionId}` : "/api/clusters").then(r => r.json()),
+  });
+  const { data: centers = [] } = useQuery<ExamCenter[]>({
+    queryKey: ["/api/centers", selectedClusterId],
+    queryFn: () => apiRequest("GET", selectedClusterId ? `/api/centers?clusterId=${selectedClusterId}` : "/api/centers").then(r => r.json()),
+  });
+
+  // Unique grades from subjects in the system
+  const availableGrades = [...new Set(allSubjects.map(s => s.grade))].sort((a, b) => a - b);
 
   const form = useForm<PacketFormData>({
     resolver: zodResolver(packetFormSchema),
     defaultValues: {
-      examYearId: 0, subjectId: 0, grade: 6,
-      destinationCenterId: 0, paperCount: 0,
+      examYearId: 0, subjectId: 0,
+      grade: availableGrades[0] ?? 6,
+      destinationCenterId: 0, destinationRegionId: null, destinationClusterId: null,
+      paperCount: 0,
       securitySealNumber: generateSealNumber(),
     },
   });
+
+  const selectedGrade = form.watch("grade");
+  const subjectsForGrade = allSubjects.filter(s => s.grade === Number(selectedGrade));
+
+  // Reset subject when grade changes
+  const handleGradeChange = (val: string) => {
+    form.setValue("grade", Number(val));
+    form.setValue("subjectId", 0);
+  };
+
+  // When region changes, reset cluster and center
+  const handleRegionChange = (regionId: number | null) => {
+    setSelectedRegionId(regionId);
+    setSelectedClusterId(null);
+    form.setValue("destinationRegionId", regionId);
+    form.setValue("destinationClusterId", null);
+    form.setValue("destinationCenterId", 0);
+  };
+
+  // When cluster changes, reset center
+  const handleClusterChange = (clusterId: number | null) => {
+    setSelectedClusterId(clusterId);
+    form.setValue("destinationClusterId", clusterId);
+    form.setValue("destinationCenterId", 0);
+  };
 
   const mutation = useMutation({
     mutationFn: (data: PacketFormData) => apiRequest("POST", "/api/exam-packets", data),
@@ -121,6 +162,8 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
       queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/packet-events/dashboard/stats"] });
       form.reset();
+      setSelectedRegionId(null);
+      setSelectedClusterId(null);
       onClose();
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -128,13 +171,15 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Exam Packet</DialogTitle>
           <DialogDescription>Register a new exam paper packet for tracking.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-4">
+
+            {/* Exam Year + Grade */}
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="examYearId" render={({ field }) => (
                 <FormItem>
@@ -151,40 +196,98 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
               <FormField control={form.control} name="grade" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Grade</FormLabel>
-                  <Select onValueChange={field.onChange} value={String(field.value)}>
+                  <Select onValueChange={handleGradeChange} value={String(field.value)}>
                     <FormControl><SelectTrigger data-testid="select-grade"><SelectValue placeholder="Grade" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      {[4,5,6,7,8,9,10,11,12].map(g => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}
+                      {availableGrades.map(g => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )} />
             </div>
+
+            {/* Subject — filtered by grade */}
             <FormField control={form.control} name="subjectId" render={({ field }) => (
               <FormItem>
                 <FormLabel>Subject</FormLabel>
-                <Select onValueChange={field.onChange} value={String(field.value)}>
-                  <FormControl><SelectTrigger data-testid="select-subject"><SelectValue placeholder="Select subject" /></SelectTrigger></FormControl>
+                <Select onValueChange={field.onChange} value={String(field.value)} disabled={subjectsForGrade.length === 0}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-subject">
+                      <SelectValue placeholder={subjectsForGrade.length === 0 ? "Select a grade first" : "Select subject"} />
+                    </SelectTrigger>
+                  </FormControl>
                   <SelectContent>
-                    {subjects.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                    {subjectsForGrade.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
             )} />
-            <FormField control={form.control} name="destinationCenterId" render={({ field }) => (
+
+            {/* Region → Cluster → Center cascade */}
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Destination</p>
+
+              {/* Region */}
               <FormItem>
-                <FormLabel>Destination Center</FormLabel>
-                <Select onValueChange={field.onChange} value={String(field.value)}>
-                  <FormControl><SelectTrigger data-testid="select-center"><SelectValue placeholder="Select center" /></SelectTrigger></FormControl>
+                <FormLabel>Region</FormLabel>
+                <Select
+                  onValueChange={v => handleRegionChange(v === "0" ? null : Number(v))}
+                  value={selectedRegionId ? String(selectedRegionId) : "0"}
+                >
+                  <SelectTrigger data-testid="select-region">
+                    <SelectValue placeholder="Select region" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {centers.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                    <SelectItem value="0">— Select region —</SelectItem>
+                    {regions.map(r => <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <FormMessage />
               </FormItem>
-            )} />
+
+              {/* Cluster — enabled after region picked */}
+              <FormItem>
+                <FormLabel>Cluster</FormLabel>
+                <Select
+                  onValueChange={v => handleClusterChange(v === "0" ? null : Number(v))}
+                  value={selectedClusterId ? String(selectedClusterId) : "0"}
+                  disabled={!selectedRegionId}
+                >
+                  <SelectTrigger data-testid="select-cluster">
+                    <SelectValue placeholder={!selectedRegionId ? "Select region first" : "Select cluster"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">— Select cluster —</SelectItem>
+                    {clusters.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormItem>
+
+              {/* Center — enabled after cluster picked */}
+              <FormField control={form.control} name="destinationCenterId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Exam Center</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={String(field.value)}
+                    disabled={!selectedClusterId}
+                  >
+                    <FormControl>
+                      <SelectTrigger data-testid="select-center">
+                        <SelectValue placeholder={!selectedClusterId ? "Select cluster first" : centers.length === 0 ? "No centers in this cluster" : "Select center"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {centers.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+
+            {/* Paper Count + Security Seal */}
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="paperCount" render={({ field }) => (
                 <FormItem>
@@ -212,6 +315,7 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
                 </FormItem>
               )} />
             </div>
+
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
               <Button type="submit" disabled={mutation.isPending} data-testid="button-create-packet">
@@ -545,6 +649,7 @@ export default function PacketTracking() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
   const [timelineBarcode, setTimelineBarcode] = useState<string | null>(null);
+  const [showStatusFlow, setShowStatusFlow] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/packet-events/dashboard/stats"],
@@ -626,6 +731,53 @@ export default function PacketTracking() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Status Flow explanation */}
+      <div className="rounded-md border bg-muted/30">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium gap-2"
+          onClick={() => setShowStatusFlow(v => !v)}
+          data-testid="button-toggle-status-flow"
+        >
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Info className="w-4 h-4 shrink-0" />
+            How does packet status change?
+          </span>
+          {showStatusFlow ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+        {showStatusFlow && (
+          <div className="px-4 pb-4 space-y-3">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Packet status is driven by events recorded in the <strong>Mobile Scanner</strong> app.
+              Each scan at a handover point records an event that automatically advances the packet to the next status.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {[
+                { event: "Packet created in system",        status: "Created",            who: "HQ Admin" },
+                { event: "Packed event scanned",           status: "→ Packed",           who: "HQ Packer (mobile)" },
+                { event: "Dispatch to Region scanned",     status: "→ Dispatched (Region)", who: "HQ Logistics (mobile)" },
+                { event: "Region receipt scanned",         status: "→ At Region",        who: "Regional Officer (mobile)" },
+                { event: "Dispatch to Cluster scanned",    status: "→ Dispatched (Cluster)", who: "Regional Officer (mobile)" },
+                { event: "Cluster receipt scanned",        status: "→ At Cluster",       who: "Cluster Officer (mobile)" },
+                { event: "Center delivery scanned",        status: "→ At Center",        who: "Center Examiner (mobile)" },
+                { event: "Opened before exam",             status: "→ Opened",           who: "Examiner (mobile)" },
+                { event: "Sealed after exam",              status: "→ Sealed",           who: "Examiner (mobile)" },
+                { event: "Return dispatch chain",          status: "→ Returning",        who: "Center / Cluster / Region (mobile)" },
+                { event: "Received back at HQ",            status: "→ Returned",         who: "HQ Logistics (mobile)" },
+              ].map((step, i) => (
+                <div key={i} className="flex items-start gap-2 p-2 rounded-sm bg-background">
+                  <span className="w-5 h-5 rounded-full bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                  <div>
+                    <p className="font-medium text-foreground">{step.event}</p>
+                    <p className="text-muted-foreground">{step.status} &mdash; <em>{step.who}</em></p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Tabs */}
       <Tabs defaultValue="packets">
