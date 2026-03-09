@@ -15549,6 +15549,19 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ============ Public Mobile API — Exam Schedules Sync (no auth required) ============
+  app.get("/api/public/exam-schedules", async (req, res) => {
+    try {
+      const filters: any = { isPublished: true };
+      if (req.query.examYearId) filters.examYearId = parseInt(req.query.examYearId as string);
+      if (req.query.grade) filters.grade = parseInt(req.query.grade as string);
+      const schedules = await storage.getExamSchedules(filters);
+      res.json(schedules);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============ AIITS - Staff ID Card Generation ============
   app.get("/api/staff-profiles/:id/id-card", isAuthenticated, async (req, res) => {
     try {
