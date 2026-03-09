@@ -1,0 +1,46 @@
+Features This App Currently Has
+Authentication
+•	Login with Employee ID (EID) — barcode scan or manual entry
+•	6-digit PIN creation and unlock
+•	Auto-lock after 3 minutes of inactivity
+•	Lockout after 5 failed PIN attempts (5-minute lock)
+•	Role-based home screens (Examiner vs Cluster Operations Officer)
+Home Screen / Exam Timer
+•	HQ-controlled exam schedule picker (fetched from backend)
+•	Live countdown timer with start/pause/stop controls
+•	Audio alert in the final 5 minutes (beeping accelerates)
+•	"HQ SET" badge showing timing is locked by administration
+Exam Cards (Quick Action)
+•	Barcode scan or manual index number input
+•	Green tick success confirmation
+•	Scan history log
+•	Sync to backend
+Student Attendance (Tab)
+•	Scan/submit attendance by index number and subject
+•	Dashboard with stats (total scans, unique students)
+•	Bar charts by subject and center
+•	Comparison view: registered vs present vs absent per subject
+•	Duplicate scan detection
+Envelope & Packet Management (Quick Action)
+•	Record envelope opening and sealing events
+•	Packet barcode tracking with subject and exam center
+•	Evidence capture (photo/video) per envelope event
+•	Integrity dashboard: flags packets missing evidence
+•	Sync status tracking
+Integrity & Investigation (Quick Action)
+•	Automatic integrity flag generation (8 flag types: absent script returned, missing opening evidence, late exam start, etc.)
+•	Flags dashboard with severity levels (Critical / High / Medium / Low)
+•	Investigation report grouped by severity
+•	Sync status monitoring with session history
+Staff Profile (Tab)
+•	Read-only view of staff info
+•	App settings section
+________________________________________
+Connection to AmaanahExamsys
+Partially connected — not fully integrated yet.
+What's connected	What's not
+Staff verification — when you log in with your EID, the app calls the amaanah.gm API to check if your account is active or suspended	User roles are NOT fetched from AmaanahExamsys — the app currently relies on a role the user selects manually during login
+Account blocking works (suspended/revoked accounts are rejected)	Permissions and access levels are not driven by AmaanahExamsys account types
+	Exam schedules are managed in this app's own database, not synced from AmaanahExamsys
+So right now, the app verifies that you exist in the system, but it doesn't yet pull your role, permissions, or assigned center from AmaanahExamsys automatically. That deeper integration would be the next step for a production-ready version.
+
