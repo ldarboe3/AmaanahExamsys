@@ -16108,6 +16108,118 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ===== Packet Events API (Event-Based Tracking) =====
+
+  const packetEventCreateSchema = z.object({
+    clientEventId: z.string().optional().nullable(),
+    packetId: z.coerce.number().int().positive(),
+    eventType: z.enum(['packed', 'dispatched', 'received', 'opened', 'sealed', 'return_dispatched', 'return_received', 'archived']),
+    senderStaffId: z.coerce.number().int().positive().optional().nullable(),
+    receiverStaffId: z.coerce.number().int().positive().optional().nullable(),
+    locationRegionId: z.coerce.number().int().positive().optional().nullable(),
+    locationClusterId: z.coerce.number().int().positive().optional().nullable(),
+    locationCenterId: z.coerce.number().int().positive().optional().nullable(),
+    gpsLatitude: z.string().optional().nullable(),
+    gpsLongitude: z.string().optional().nullable(),
+    deviceId: z.string().optional().nullable(),
+    sealNumber: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+    eventTime: z.string().optional().nullable(),
+  });
+
+  // Get dashboard stats for packet tracking
+  app.get("/api/packet-events/dashboard/stats", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "regional_logistics", "cluster_logistics", "examiner"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const examYearId = req.query.examYearId ? Number(req.query.examYearId) : undefined;
+      const stats = await storage.getPacketsDashboardStats(examYearId);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get packets for the current user's role
+  app.get("/api/packet-events/assigned", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(403).json({ message: "Access denied" });
+      const packets = await storage.getPacketsForRole(user.role || '', req.session.userId!);
+      res.json(packets);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get full event timeline for a packet by barcode
+  app.get("/api/packet-events/timeline/:barcode", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(403).json({ message: "Access denied" });
+      const packet = await storage.getExamPacketByBarcode(req.params.barcode);
+      if (!packet) return res.status(404).json({ message: "Packet not found" });
+      const events = await storage.getPacketEvents(packet.id);
+      res.json({ packet, events });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Record a new packet event
+  app.post("/api/packet-events", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "regional_logistics", "cluster_logistics", "examiner"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const parsed = packetEventCreateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+      }
+      // Check for duplicate by clientEventId
+      if (parsed.data.clientEventId) {
+        const existing = await storage.getPacketEventByClientId(parsed.data.clientEventId);
+        if (existing) return res.json({ event: existing, duplicate: true });
+      }
+      const event = await storage.createPacketEvent({
+        ...parsed.data,
+        eventTime: parsed.data.eventTime ? new Date(parsed.data.eventTime) : new Date(),
+      });
+      res.status(201).json({ event });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Bulk sync offline packet events
+  app.post("/api/packet-events/sync", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "regional_logistics", "cluster_logistics", "examiner"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const syncSchema = z.object({
+        events: z.array(packetEventCreateSchema).min(1),
+      });
+      const parsed = syncSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+      }
+      const result = await storage.syncPacketEvents(
+        parsed.data.events.map(e => ({
+          ...e,
+          eventTime: e.eventTime ? new Date(e.eventTime) : new Date(),
+        }))
+      );
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ===== Exam Scheduling & Time Enforcement Routes =====
 
   const examScheduleCreateSchema = z.object({

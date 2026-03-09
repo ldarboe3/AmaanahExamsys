@@ -1,0 +1,166 @@
+Redesign the Packet Tracking system with a **mobile-first architecture**.
+
+### Core Principle
+
+All **packet scanning must be done through a mobile app**, not the web dashboard. The web system (ExamSys) is **only for monitoring, reporting, and viewing packet history**.
+
+---
+
+### Architecture
+
+Build two components:
+
+1. **Mobile Field App (Android / PWA)**
+2. **ExamSys Web Dashboard**
+
+Both connect to a **Packet Tracking API**.
+
+Mobile app handles:
+
+* Barcode scanning
+* GPS capture
+* event recording
+* offline storage
+* syncing to server
+
+Web dashboard handles:
+
+* viewing packet tracking history
+* monitoring packet status
+* reporting and alerts
+
+---
+
+### Tracking Model (Event-Based)
+
+Do not rely on static status fields.
+Use an **event timeline**.
+
+Packet events:
+
+PACKED
+DISPATCHED
+RECEIVED
+OPENED
+SEALED
+RETURN_DISPATCHED
+RETURN_RECEIVED
+ARCHIVED
+
+Packet status should be **derived from the latest event**.
+
+---
+
+### Data Recorded for Every Event
+
+packet_id
+event_type
+sender_staff_id
+receiver_staff_id
+timestamp
+gps_lat
+gps_long
+device_id
+seal_number (optional)
+
+---
+
+### Mobile App Workflow (Scan-First)
+
+App opens → camera scanner opens.
+
+User scans packet barcode → system loads packet → shows action options depending on role:
+
+Receive Packet
+Dispatch Packet
+Open Packet (exam start)
+Seal Packet (exam finished)
+Return Dispatch
+
+GPS and timestamp must be captured automatically.
+
+---
+
+### Offline Support
+
+Mobile app must work offline.
+
+Store events locally using **SQLite or IndexedDB** in an EVENT_QUEUE table.
+
+When connection returns, sync events to server.
+
+---
+
+### Role-Based Access
+
+Users only see packets relevant to them.
+
+Roles:
+HQ Logistics
+Region Officer
+Cluster Officer
+Exam Supervisor
+Return Logistics
+
+Each role only sees packets assigned to their region/cluster/center.
+
+---
+
+### Web Dashboard (ExamSys)
+
+The dashboard should display a **Chain-of-Custody Statement** for each packet.
+
+Example view:
+
+Packet ID: ENG-G9-C045
+Subject: English
+Grade: 9
+Center: Brikama Upper
+
+Tracking Timeline:
+
+Time | Event | From | To | Location
+07:12 | Packed | HQ | Logistics | Banjul
+08:40 | Dispatched | HQ | Region | Banjul
+12:55 | Received | Region | Region | West Coast
+16:10 | Received | Cluster | Cluster | Brikama
+07:45 | Delivered | Cluster | Supervisor | Center
+09:02 | Opened | Supervisor | - | Exam Hall
+11:30 | Sealed | Supervisor | - | Exam Hall
+
+---
+
+### Dashboard Monitoring
+
+Dashboard should show:
+
+Total Packets
+Delivered to Centers
+In Transit
+Delayed
+Returned to HQ
+
+Optional: map view of packet locations.
+
+---
+
+### Security Features
+
+Seal number recorded when scripts are sealed.
+
+Alert if:
+
+* seal mismatch
+* packet missing expected scan
+* unauthorized open event
+
+---
+
+Build clean APIs for:
+
+POST /packet-event
+GET /packet/{id}/timeline
+GET /packets/assigned
+GET /dashboard/stats
+
+The system must be **mobile-first, scan-first, offline-first, and event-based**.

@@ -41,9 +41,10 @@ import {
   type IntegrityFlagEvent, type InsertIntegrityFlagEvent,
   type DeviceSyncSession, type InsertDeviceSyncSession,
   type SyncErrorLog, type InsertSyncErrorLog,
-  examPackets, handoverLogs,
+  examPackets, handoverLogs, packetEvents,
   type ExamPacket, type InsertExamPacket,
   type HandoverLog, type InsertHandoverLog,
+  type PacketEvent, type InsertPacketEvent,
   examSchedules, examSessionLogs,
   type ExamSchedule, type InsertExamSchedule,
   type ExamSessionLog, type InsertExamSessionLog,
@@ -445,6 +446,14 @@ export interface IStorage {
   getHandoverLogs(packetId: number): Promise<HandoverLog[]>;
   getHandoverLogByClientEventId(clientEventId: string): Promise<HandoverLog | undefined>;
   bulkSyncHandoverLogs(logs: InsertHandoverLog[]): Promise<HandoverLog[]>;
+
+  // ===== Packet Events (Event-Based Tracking) =====
+  createPacketEvent(event: InsertPacketEvent): Promise<PacketEvent>;
+  getPacketEvents(packetId: number): Promise<PacketEvent[]>;
+  getPacketEventByClientId(clientEventId: string): Promise<PacketEvent | undefined>;
+  syncPacketEvents(events: InsertPacketEvent[]): Promise<{ created: number; skipped: number }>;
+  getPacketsDashboardStats(examYearId?: number): Promise<any>;
+  getPacketsForRole(role: string, userId: string): Promise<ExamPacket[]>;
 
   // ===== Exam Scheduling & Time Enforcement =====
   createExamSchedule(schedule: InsertExamSchedule): Promise<ExamSchedule>;
@@ -2585,6 +2594,79 @@ export class DatabaseStorage implements IStorage {
     }
     return results;
   }
+
+  // ===== Packet Events (Event-Based Tracking) =====
+  async createPacketEvent(event: InsertPacketEvent): Promise<PacketEvent> {
+    const [created] = await db.insert(packetEvents).values(event).returning();
+    // Update packet status based on event type
+    const statusMap: Record<string, string> = {
+      packed: 'packed',
+      dispatched: 'dispatched_to_region',
+      received: 'at_region',
+      opened: 'opened',
+      sealed: 'sealed',
+      return_dispatched: 'returned_to_cluster',
+      return_received: 'returned_to_hq',
+      archived: 'completed',
+    };
+    const newStatus = statusMap[event.eventType];
+    if (newStatus) {
+      await db.update(examPackets)
+        .set({ status: newStatus as any })
+        .where(eq(examPackets.id, event.packetId));
+    }
+    return created;
+  }
+
+  async getPacketEvents(packetId: number): Promise<PacketEvent[]> {
+    return db.select().from(packetEvents)
+      .where(eq(packetEvents.packetId, packetId))
+      .orderBy(asc(packetEvents.eventTime));
+  }
+
+  async getPacketEventByClientId(clientEventId: string): Promise<PacketEvent | undefined> {
+    const [event] = await db.select().from(packetEvents)
+      .where(eq(packetEvents.clientEventId, clientEventId));
+    return event;
+  }
+
+  async syncPacketEvents(events: InsertPacketEvent[]): Promise<{ created: number; skipped: number }> {
+    let created = 0, skipped = 0;
+    for (const event of events) {
+      if (event.clientEventId) {
+        const existing = await this.getPacketEventByClientId(event.clientEventId);
+        if (existing) { skipped++; continue; }
+      }
+      await this.createPacketEvent(event);
+      created++;
+    }
+    return { created, skipped };
+  }
+
+  async getPacketsDashboardStats(examYearId?: number): Promise<any> {
+    const conditions = examYearId ? [eq(examPackets.examYearId, examYearId)] : [];
+    const packets = await db.select().from(examPackets)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    const stats = {
+      total: packets.length,
+      packed: packets.filter(p => p.status === 'packed').length,
+      inTransit: packets.filter(p => ['dispatched_to_region','dispatched_to_cluster','dispatched_to_center','returned_to_cluster','returned_to_region'].includes(p.status)).length,
+      atLocation: packets.filter(p => ['at_region','at_cluster','at_center'].includes(p.status)).length,
+      opened: packets.filter(p => p.status === 'opened').length,
+      administered: packets.filter(p => p.status === 'administered').length,
+      sealed: packets.filter(p => p.status === 'sealed').length,
+      returned: packets.filter(p => ['returned_to_hq','completed'].includes(p.status)).length,
+      missing: packets.filter(p => p.status === 'missing').length,
+    };
+    return stats;
+  }
+
+  async getPacketsForRole(role: string, userId: string): Promise<ExamPacket[]> {
+    // For logistics roles, return packets they are responsible for
+    // For now return all packets (admin sees all)
+    return db.select().from(examPackets).orderBy(desc(examPackets.id));
+  }
+
   // ===== Exam Scheduling & Time Enforcement =====
   async createExamSchedule(schedule: InsertExamSchedule): Promise<ExamSchedule> {
     const [created] = await db.insert(examSchedules).values(schedule).returning();

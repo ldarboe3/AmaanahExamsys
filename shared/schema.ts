@@ -1591,6 +1591,53 @@ export const handoverLogs = pgTable("handover_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ─── Event-Based Packet Tracking ───────────────────────────────────────────
+
+export const packetEventTypeEnum = pgEnum('packet_event_type', [
+  'packed', 'dispatched', 'received', 'opened', 'sealed',
+  'return_dispatched', 'return_received', 'archived'
+]);
+
+export const packetEvents = pgTable("packet_events", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  clientEventId: varchar("client_event_id", { length: 100 }).unique(),
+  packetId: integer("packet_id").notNull().references(() => examPackets.id),
+  eventType: packetEventTypeEnum("event_type").notNull(),
+  senderStaffId: integer("sender_staff_id").references(() => staffProfiles.id),
+  receiverStaffId: integer("receiver_staff_id").references(() => staffProfiles.id),
+  locationRegionId: integer("location_region_id").references(() => regions.id),
+  locationClusterId: integer("location_cluster_id").references(() => clusters.id),
+  locationCenterId: integer("location_center_id").references(() => examCenters.id),
+  gpsLatitude: decimal("gps_latitude", { precision: 10, scale: 7 }),
+  gpsLongitude: decimal("gps_longitude", { precision: 10, scale: 7 }),
+  deviceId: varchar("device_id", { length: 100 }),
+  sealNumber: varchar("seal_number", { length: 100 }),
+  notes: text("notes"),
+  isSynced: boolean("is_synced").default(true),
+  eventTime: timestamp("event_time").notNull().defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPacketEventSchema = createInsertSchema(packetEvents).omit({
+  id: true, createdAt: true,
+});
+export type InsertPacketEvent = z.infer<typeof insertPacketEventSchema>;
+export type PacketEvent = typeof packetEvents.$inferSelect;
+
+// Derive a simplified display status from the latest event type
+export const PACKET_EVENT_STATUS: Record<string, string> = {
+  packed: 'Packed',
+  dispatched: 'In Transit',
+  received: 'At Location',
+  opened: 'Opened',
+  sealed: 'Sealed',
+  return_dispatched: 'Returning',
+  return_received: 'Return Received',
+  archived: 'Completed',
+};
+
+// ───────────────────────────────────────────────────────────────────────────
+
 export const insertExamPacketSchema = createInsertSchema(examPackets).pick({
   examYearId: true,
   subjectId: true,

@@ -70,6 +70,7 @@ import VerifyCertificate from "@/pages/verify-certificate";
 import StaffIdentity from "@/pages/staff-identity";
 import VerifyStaff from "@/pages/verify-staff";
 import PacketTracking from "@/pages/packet-tracking";
+import MobilePacketScan from "@/pages/mobile-packet-scan";
 import ExamScheduling from "@/pages/exam-scheduling";
 import StudentAttendance from "@/pages/student-attendance";
 
@@ -111,6 +112,9 @@ function AuthenticatedRoutes() {
       </Route>
       <Route path="/packet-tracking">
         {() => <ProtectedRoute component={PacketTracking} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics"]} />}
+      </Route>
+      <Route path="/mobile-packet-scan">
+        {() => <ProtectedRoute component={MobilePacketScan} allowedRoles={["super_admin", "examination_admin", "regional_logistics", "cluster_logistics", "examiner"]} />}
       </Route>
       <Route path="/exam-scheduling" component={ExamScheduling} />
       <Route path="/exam-day">
