@@ -25,11 +25,12 @@ import {
 import {
   Search, Plus, Package, Truck, Building2, CheckCircle, AlertTriangle,
   Lock, Clock, ArrowLeft, Smartphone, RefreshCw, MapPin, GitBranch,
-  Eye, BarChart3, QrCode,
+  Eye, BarChart3, QrCode, Printer,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import QRCode from "qrcode";
 import type { ExamPacket, ExamYear, Subject, ExamCenter } from "@shared/schema";
 
 // ── Status config ────────────────────────────────────────────────────────────
@@ -423,6 +424,119 @@ function ChainOfCustodyTab({ onViewTimeline }: { onViewTimeline: (barcode: strin
   );
 }
 
+// ── Print Label ───────────────────────────────────────────────────────────────
+
+async function printPacketLabel(
+  packet: ExamPacket,
+  subjectName: string,
+  centerName: string,
+  examYearLabel: string,
+) {
+  const qrDataUrl = await QRCode.toDataURL(packet.barcode, {
+    width: 200,
+    margin: 1,
+    color: { dark: "#000000", light: "#ffffff" },
+  });
+
+  const statusLabel = (STATUS_CFG[packet.status]?.label ?? packet.status);
+  const printDate = new Date().toLocaleString();
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Packet Label – ${packet.barcode}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #fff; color: #111; }
+    @page { size: A5 landscape; margin: 10mm; }
+    .label {
+      width: 190mm; min-height: 118mm;
+      border: 2px solid #0d9488; border-radius: 6px;
+      padding: 10mm; display: flex; flex-direction: column; gap: 6mm;
+    }
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1.5px solid #0d9488; padding-bottom: 4mm;
+    }
+    .org-name { font-size: 16pt; font-weight: 900; color: #0d9488; letter-spacing: 0.5px; }
+    .org-sub  { font-size: 8pt; color: #555; margin-top: 1mm; }
+    .title-badge {
+      background: #0d9488; color: #fff;
+      font-size: 9pt; font-weight: 700;
+      padding: 3px 10px; border-radius: 4px;
+    }
+    .body { display: flex; gap: 8mm; flex: 1; }
+    .details { flex: 1; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 6mm; }
+    .field label { font-size: 7pt; text-transform: uppercase; color: #888; letter-spacing: 0.5px; }
+    .field p { font-size: 10pt; font-weight: 700; color: #111; margin-top: 1px; }
+    .field p.mono { font-family: 'Courier New', monospace; font-size: 9pt; }
+    .qr-block { display: flex; flex-direction: column; align-items: center; gap: 2mm; }
+    .qr-block img { width: 38mm; height: 38mm; border: 1px solid #e5e7eb; border-radius: 4px; }
+    .qr-label { font-size: 7pt; color: #555; text-align: center; max-width: 40mm; }
+    .barcode-strip {
+      background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 4px;
+      padding: 3mm 4mm; text-align: center;
+    }
+    .barcode-strip .bc-text { font-family: 'Courier New', monospace; font-size: 13pt; font-weight: 900; letter-spacing: 2px; color: #0d9488; }
+    .barcode-strip .bc-hint { font-size: 7pt; color: #888; margin-top: 1mm; }
+    .footer { border-top: 1px solid #e5e7eb; padding-top: 3mm; display: flex; justify-content: space-between; align-items: center; }
+    .footer p { font-size: 7pt; color: #aaa; }
+    .status-badge {
+      display: inline-block; background: #d1fae5; color: #065f46;
+      font-size: 8pt; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="label">
+  <div class="header">
+    <div>
+      <div class="org-name">AMAANAH</div>
+      <div class="org-sub">Examination Management System &nbsp;|&nbsp; ${examYearLabel}</div>
+    </div>
+    <div class="title-badge">EXAM PAPER PACKET</div>
+  </div>
+
+  <div class="body">
+    <div class="details">
+      <div class="grid">
+        <div class="field"><label>Subject</label><p>${subjectName}</p></div>
+        <div class="field"><label>Grade</label><p>Grade ${packet.grade}</p></div>
+        <div class="field"><label>Destination Center</label><p>${centerName}</p></div>
+        <div class="field"><label>Paper Count</label><p>${packet.paperCount} papers</p></div>
+        <div class="field"><label>Security Seal #</label><p class="mono">${packet.securitySealNumber ?? "—"}</p></div>
+        <div class="field"><label>Status</label><p><span class="status-badge">${statusLabel}</span></p></div>
+      </div>
+    </div>
+    <div class="qr-block">
+      <img src="${qrDataUrl}" alt="QR Code" />
+      <div class="qr-label">Scan with Amaanah Mobile App to track this packet</div>
+    </div>
+  </div>
+
+  <div class="barcode-strip">
+    <div class="bc-text">${packet.barcode}</div>
+    <div class="bc-hint">Packet Tracking Barcode &nbsp;|&nbsp; Scan on mobile app at each handover</div>
+  </div>
+
+  <div class="footer">
+    <p>Printed: ${printDate}</p>
+    <p>Amaanah Exam Management System</p>
+  </div>
+</div>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank", "width=900,height=650");
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 400);
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function PacketTracking() {
@@ -443,9 +557,11 @@ export default function PacketTracking() {
 
   const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
   const { data: centers = [] } = useQuery<ExamCenter[]>({ queryKey: ["/api/centers"] });
+  const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
 
   const subjectMap = Object.fromEntries(subjects.map(s => [s.id, s.name]));
   const centerMap = Object.fromEntries(centers.map(c => [c.id, c.name]));
+  const examYearMap = Object.fromEntries(examYears.map(y => [y.id, y.year]));
 
   const filtered = packets.filter(p => {
     const matchSearch = !search
@@ -592,15 +708,31 @@ export default function PacketTracking() {
                       <TableCell>{p.paperCount}</TableCell>
                       <TableCell><StatusBadge status={p.status} /></TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setTimelineBarcode(p.barcode)}
-                          data-testid={`button-view-timeline-${p.id}`}
-                        >
-                          <Eye className="w-3.5 h-3.5 mr-1" />
-                          Timeline
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => printPacketLabel(
+                              p,
+                              subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
+                              centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
+                              examYearMap[p.examYearId] ? String(examYearMap[p.examYearId]) : `Year ${p.examYearId}`,
+                            )}
+                            data-testid={`button-print-label-${p.id}`}
+                          >
+                            <Printer className="w-3.5 h-3.5 mr-1" />
+                            Print Label
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setTimelineBarcode(p.barcode)}
+                            data-testid={`button-view-timeline-${p.id}`}
+                          >
+                            <Eye className="w-3.5 h-3.5 mr-1" />
+                            Timeline
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
