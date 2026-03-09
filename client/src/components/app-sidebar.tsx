@@ -34,6 +34,8 @@ import {
   Shield,
   Package,
   Timer,
+  ScanLine,
+  Smartphone,
   type LucideIcon,
 } from "lucide-react";
 
@@ -63,6 +65,14 @@ const staffManagementDefs: MenuItemDef[] = [
 
 const examLogisticsDefs: MenuItemDef[] = [
   { key: "packetTracking", url: "/packet-tracking", icon: Package },
+  { key: "examScheduling", url: "/exam-scheduling", icon: Timer },
+  { key: "studentAttendance", url: "/student-attendance", icon: ScanLine },
+  { key: "mobileAttendanceScan", url: "/mobile-attendance-scan", icon: Smartphone },
+];
+
+const examinerMenuDefs: MenuItemDef[] = [
+  { key: "mobilePacketScan", url: "/mobile-packet-scan", icon: Package },
+  { key: "mobileAttendanceScan", url: "/mobile-attendance-scan", icon: Smartphone },
   { key: "examScheduling", url: "/exam-scheduling", icon: Timer },
 ];
 
@@ -107,18 +117,18 @@ export function AppSidebar({ side = "left" }: AppSidebarProps) {
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'examination_admin' || user?.role === 'logistics_admin';
   const isLogisticsOfficer = user?.role === 'regional_logistics' || user?.role === 'cluster_logistics';
+  const isExaminer = user?.role === 'examiner';
   const isSchoolAdmin = user?.role === 'school_admin';
-  // Default to false for school admins unless explicitly true - ensures unpaid schools are restricted
   const registrationFeePaid = (user as any)?.registrationFeePaid === true;
-  
-  // Determine which menu to show
+
   let menuDefs: MenuItemDef[];
   if (isAdmin) {
     menuDefs = adminMenuDefs;
   } else if (isLogisticsOfficer) {
     menuDefs = logisticsOfficerMenuDefs;
+  } else if (isExaminer) {
+    menuDefs = examinerMenuDefs;
   } else if (isSchoolAdmin && !registrationFeePaid) {
-    // School hasn't paid registration fee - only show Payments
     menuDefs = schoolPendingPaymentMenuDefs;
   } else {
     menuDefs = schoolAdminMenuDefs;

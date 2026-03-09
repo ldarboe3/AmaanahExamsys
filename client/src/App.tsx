@@ -71,6 +71,7 @@ import StaffIdentity from "@/pages/staff-identity";
 import VerifyStaff from "@/pages/verify-staff";
 import PacketTracking from "@/pages/packet-tracking";
 import MobilePacketScan from "@/pages/mobile-packet-scan";
+import MobileAttendanceScan from "@/pages/mobile-attendance-scan";
 import ExamScheduling from "@/pages/exam-scheduling";
 import StudentAttendance from "@/pages/student-attendance";
 
@@ -116,6 +117,9 @@ function AuthenticatedRoutes() {
       <Route path="/mobile-packet-scan">
         {() => <ProtectedRoute component={MobilePacketScan} allowedRoles={["super_admin", "examination_admin", "regional_logistics", "cluster_logistics", "examiner"]} />}
       </Route>
+      <Route path="/mobile-attendance-scan">
+        {() => <ProtectedRoute component={MobileAttendanceScan} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "regional_coordinator", "cluster_coordinator", "examiner"]} />}
+      </Route>
       <Route path="/exam-scheduling" component={ExamScheduling} />
       <Route path="/exam-day">
         {() => <ProtectedRoute component={ExamDay} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "examiner"]} />}
@@ -124,7 +128,7 @@ function AuthenticatedRoutes() {
         {() => <ProtectedRoute component={ExamExecution} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "examiner"]} />}
       </Route>
       <Route path="/student-attendance">
-        {() => <ProtectedRoute component={StudentAttendance} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "examiner"]} />}
+        {() => <ProtectedRoute component={StudentAttendance} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "regional_coordinator", "cluster_coordinator"]} />}
       </Route>
       <Route path="/users">
         {() => <ProtectedRoute component={UsersPage} allowedRoles={["super_admin"]} />}
