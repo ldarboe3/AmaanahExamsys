@@ -91,7 +91,7 @@ const schoolPendingPaymentMenuDefs: MenuItemDef[] = [
 ];
 
 const logisticsOfficerMenuDefs: MenuItemDef[] = [
-  { key: "packetTracking", url: "/packet-tracking", icon: Package },
+  { key: "mobilePacketScan", url: "/mobile-packet-scan", icon: Package },
   { key: "mobileTimetable", url: "/mobile-timetable", icon: CalendarDays },
 ];
 
