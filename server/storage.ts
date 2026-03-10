@@ -430,7 +430,7 @@ export interface IStorage {
   getStaffProfile(id: number): Promise<StaffProfile | undefined>;
   getStaffProfileByStaffId(staffIdNumber: string): Promise<StaffProfile | undefined>;
   getStaffProfileByEmployeeId(employeeId: string): Promise<StaffProfile | undefined>;
-  getAllStaffProfiles(): Promise<StaffProfile[]>;
+  getAllStaffProfiles(filters?: { search?: string; status?: string; role?: string; department?: string }): Promise<StaffProfile[]>;
   updateStaffProfile(id: number, profile: Partial<InsertStaffProfile & { staffIdNumber?: string; confirmationCode?: string; cardPrintedAt?: Date; cardIssuedAt?: Date; activatedAt?: Date; suspendedAt?: Date; revokedAt?: Date; suspendReason?: string; revokeReason?: string }>): Promise<StaffProfile | undefined>;
   deleteStaffProfile(id: number): Promise<boolean>;
   createStaffIdEvent(event: InsertStaffIdEvent): Promise<StaffIdEvent>;
@@ -2499,8 +2499,23 @@ export class DatabaseStorage implements IStorage {
     return profile;
   }
 
-  async getAllStaffProfiles(): Promise<StaffProfile[]> {
-    return db.select().from(staffProfiles).orderBy(desc(staffProfiles.createdAt));
+  async getAllStaffProfiles(filters?: { search?: string; status?: string; role?: string; department?: string }): Promise<StaffProfile[]> {
+    const conditions: any[] = [];
+    if (filters?.status) conditions.push(eq(staffProfiles.status, filters.status));
+    if (filters?.role) conditions.push(eq(staffProfiles.role, filters.role));
+    if (filters?.department) conditions.push(eq(staffProfiles.department, filters.department));
+    if (filters?.search) {
+      const term = `%${filters.search}%`;
+      conditions.push(or(
+        ilike(staffProfiles.firstName, term),
+        ilike(staffProfiles.lastName, term),
+        ilike(staffProfiles.staffIdNumber, term),
+        ilike(staffProfiles.employeeId, term),
+        ilike(staffProfiles.email, term),
+      ));
+    }
+    if (conditions.length === 0) return db.select().from(staffProfiles).orderBy(desc(staffProfiles.createdAt));
+    return db.select().from(staffProfiles).where(and(...conditions)).orderBy(desc(staffProfiles.createdAt));
   }
 
   async updateStaffProfile(id: number, profile: Partial<InsertStaffProfile & { staffIdNumber?: string; confirmationCode?: string; cardPrintedAt?: Date; cardIssuedAt?: Date; activatedAt?: Date; suspendedAt?: Date; revokedAt?: Date; suspendReason?: string; revokeReason?: string }>): Promise<StaffProfile | undefined> {

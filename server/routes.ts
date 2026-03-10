@@ -15164,7 +15164,13 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       if (!['super_admin', 'examination_admin'].includes(user.role || '')) {
         return res.status(403).json({ message: "Access denied" });
       }
-      const profiles = await storage.getAllStaffProfiles();
+      const filters: { search?: string; status?: string; role?: string; department?: string } = {};
+      if (req.query.search) filters.search = req.query.search as string;
+      if (req.query.status) filters.status = req.query.status as string;
+      if (req.query.role) filters.role = req.query.role as string;
+      if (req.query.department) filters.department = req.query.department as string;
+
+      const profiles = await storage.getAllStaffProfiles(filters);
       const allRegions = await storage.getAllRegions();
       const allClusters = await storage.getAllClusters();
       const allCenters = await storage.getAllExamCenters();

@@ -36,15 +36,19 @@ import type { StaffProfile, Region, Cluster } from "@shared/schema";
 
 const departmentOptions = [
   "Administration",
-  "Examinations",
-  "Logistics",
-  "Finance",
+  "Public Relations",
+  "Secretariat & Records",
   "Human Resources",
-  "IT & Systems",
-  "Quality Assurance",
+  "Finance & Accounts",
+  "Assets & Procurement",
+  "Monitoring & Quality Assurance",
+  "Curriculum & Learning",
+  "Examinations",
+  "ICT",
+  "Projects & Endowments",
+  "Qur'anic & Majalis",
   "Regional Operations",
-  "Training & Development",
-  "Communications",
+  "Cluster Operations",
 ] as const;
 
 const staffProfileSchema = z.object({
@@ -53,8 +57,8 @@ const staffProfileSchema = z.object({
   middleName: z.string().optional(),
   fullNameArabic: z.string().optional(),
   role: z.enum([
-    "hq_director", "hq_staff", "regional_coordinator", "regional_staff",
-    "cluster_officer", "examiner", "invigilator", "supervisor", "monitor", "temporary_staff",
+    "hq_director", "hq_staff", "regional_coordinator",
+    "cluster_officer", "examiner", "invigilator", "supervisor", "monitor",
   ]),
   department: z.string().optional(),
   regionId: z.coerce.number().optional().nullable(),
@@ -87,13 +91,11 @@ const roleLabels: Record<string, string> = {
   hq_director: "HQ Director",
   hq_staff: "HQ Staff",
   regional_coordinator: "Regional Coordinator",
-  regional_staff: "Regional Staff",
   cluster_officer: "Cluster Operations Officer",
   examiner: "Examiner",
   invigilator: "Invigilator",
   supervisor: "Supervisor",
   monitor: "Monitor",
-  temporary_staff: "Temporary Staff",
 };
 
 function StaffTableSkeleton() {
@@ -133,12 +135,13 @@ export default function StaffIdentityPage() {
   const [pageSize, setPageSize] = useState(10);
 
   const { data: staffProfiles = [], isLoading } = useQuery<StaffProfile[]>({
-    queryKey: ["/api/staff-profiles", { search: searchTerm, status: statusFilter !== "all" ? statusFilter : undefined, role: roleFilter !== "all" ? roleFilter : undefined }],
+    queryKey: ["/api/staff-profiles", { search: searchTerm, status: statusFilter !== "all" ? statusFilter : undefined, role: roleFilter !== "all" ? roleFilter : undefined, department: departmentFilter !== "all" ? departmentFilter : undefined }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchTerm) params.set("search", searchTerm);
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (roleFilter !== "all") params.set("role", roleFilter);
+      if (departmentFilter !== "all") params.set("department", departmentFilter);
       const res = await fetch(`/api/staff-profiles?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch staff profiles");
       return res.json();
@@ -303,13 +306,9 @@ export default function StaffIdentityPage() {
     ? clusters.filter((c) => c.regionId === form.watch("regionId"))
     : clusters;
 
-  const filteredByDepartment = departmentFilter === "all"
-    ? staffProfiles
-    : staffProfiles.filter((s) => s.department === departmentFilter);
-
-  const totalStaffFiltered = filteredByDepartment.length;
+  const totalStaffFiltered = staffProfiles.length;
   const totalPages = Math.ceil(totalStaffFiltered / pageSize);
-  const paginatedStaff = filteredByDepartment.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const paginatedStaff = staffProfiles.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
   const statusCounts = {
     total: staffProfiles.length,
