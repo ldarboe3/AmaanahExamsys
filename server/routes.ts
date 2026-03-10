@@ -7117,6 +7117,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: fromZodError(parsed.error).message });
       }
       const entry = await storage.createTimetableEntry(parsed.data);
+      // Keep exam_schedules in sync so the execution mobile app can read it
+      await storage.syncTimetableToSchedule(entry).catch(() => {});
       res.status(201).json(entry);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -7243,6 +7245,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           grade,
           venue: entry.venue || null,
         });
+        // Keep exam_schedules in sync so the execution mobile app can read it
+        await storage.syncTimetableToSchedule(newEntry).catch(() => {});
         created.push(newEntry);
       }
 
@@ -16816,6 +16820,15 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       }
       await storage.deleteExamSchedule(parseInt(req.params.id));
       res.json({ message: "Schedule deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/exam-sessions/live", isAuthenticated, async (req, res) => {
+    try {
+      const sessions = await storage.getLiveExamSessions();
+      res.json(sessions);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

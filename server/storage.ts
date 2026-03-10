@@ -462,10 +462,12 @@ export interface IStorage {
   getExamSchedules(filters?: { examYearId?: number; grade?: number; isPublished?: boolean }): Promise<ExamSchedule[]>;
   updateExamSchedule(id: number, data: Partial<ExamSchedule>): Promise<ExamSchedule | undefined>;
   deleteExamSchedule(id: number): Promise<boolean>;
+  syncTimetableToSchedule(timetableEntry: ExamTimetable): Promise<ExamSchedule>;
   createExamSessionLog(log: InsertExamSessionLog): Promise<ExamSessionLog>;
   getExamSessionLog(id: number): Promise<ExamSessionLog | undefined>;
   getExamSessionLogs(filters?: { scheduleId?: number; centerId?: number; status?: string }): Promise<ExamSessionLog[]>;
   updateExamSessionLog(id: number, data: Partial<ExamSessionLog>): Promise<ExamSessionLog | undefined>;
+  getLiveExamSessions(): Promise<any[]>;
   getMonitoringData(examYearId: number, examDate?: string): Promise<any>;
 
   createExamPacketVerification(data: InsertExamPacketVerification): Promise<ExamPacketVerification>;
@@ -2701,6 +2703,68 @@ export class DatabaseStorage implements IStorage {
   async deleteExamSchedule(id: number): Promise<boolean> {
     const result = await db.delete(examSchedules).where(eq(examSchedules.id, id));
     return true;
+  }
+
+  async syncTimetableToSchedule(timetableEntry: ExamTimetable): Promise<ExamSchedule> {
+    const [sh, sm] = timetableEntry.startTime.split(":").map(Number);
+    const [eh, em] = timetableEntry.endTime.split(":").map(Number);
+    const durationMinutes = (eh * 60 + em) - (sh * 60 + sm);
+
+    const existing = await db.select().from(examSchedules)
+      .where(and(
+        eq(examSchedules.examYearId, timetableEntry.examYearId),
+        eq(examSchedules.subjectId, timetableEntry.subjectId),
+        eq(examSchedules.grade, timetableEntry.grade),
+        eq(examSchedules.examDate, timetableEntry.examDate),
+      )).limit(1);
+
+    if (existing.length > 0) {
+      const [updated] = await db.update(examSchedules).set({
+        scheduledStartTime: timetableEntry.startTime,
+        scheduledEndTime: timetableEntry.endTime,
+        durationMinutes,
+        isPublished: true,
+        timetableId: timetableEntry.id,
+        updatedAt: new Date(),
+      }).where(eq(examSchedules.id, existing[0].id)).returning();
+      return updated;
+    }
+
+    const [created] = await db.insert(examSchedules).values({
+      examYearId: timetableEntry.examYearId,
+      subjectId: timetableEntry.subjectId,
+      grade: timetableEntry.grade,
+      examDate: timetableEntry.examDate,
+      scheduledStartTime: timetableEntry.startTime,
+      scheduledEndTime: timetableEntry.endTime,
+      durationMinutes,
+      timetableId: timetableEntry.id,
+      isPublished: true,
+      notes: "Synced from timetable",
+    }).returning();
+    return created;
+  }
+
+  async getLiveExamSessions(): Promise<any[]> {
+    const today = new Date().toISOString().split("T")[0];
+    const liveStatuses = ["started_on_time", "started_late", "in_progress"];
+    const allSessions = await db.select().from(examSessionLogs)
+      .where(inArray(examSessionLogs.status, liveStatuses as any[]))
+      .orderBy(desc(examSessionLogs.actualStartTime));
+
+    if (allSessions.length === 0) return [];
+
+    const centers = await this.getAllExamCenters();
+    const scheduleIds = Array.from(new Set(allSessions.map(s => s.scheduleId)));
+    const schedsList = await db.select().from(examSchedules).where(inArray(examSchedules.id, scheduleIds));
+    const subjects = await this.getAllSubjects();
+
+    return allSessions.map(session => {
+      const schedule = schedsList.find(s => s.id === session.scheduleId);
+      const center = centers.find(c => c.id === session.centerId);
+      const subject = schedule ? subjects.find(s => s.id === schedule.subjectId) : null;
+      return { ...session, center, schedule, subject };
+    });
   }
 
   async createExamSessionLog(log: InsertExamSessionLog): Promise<ExamSessionLog> {

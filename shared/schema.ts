@@ -1712,6 +1712,7 @@ export const examSchedules = pgTable("exam_schedules", {
   scheduledStartTime: varchar("scheduled_start_time", { length: 10 }).notNull(),
   durationMinutes: integer("duration_minutes").notNull(),
   scheduledEndTime: varchar("scheduled_end_time", { length: 10 }).notNull(),
+  timetableId: integer("timetable_id").references(() => examTimetable.id),
   isPublished: boolean("is_published").default(false),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
