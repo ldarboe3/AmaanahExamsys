@@ -63,6 +63,8 @@ export const users = pgTable("users", {
   status: userStatusEnum("status").default('pending'),
   schoolId: integer("school_id"),
   centerId: integer("center_id"),
+  assignedRegionId: integer("assigned_region_id"),
+  assignedClusterId: integer("assigned_cluster_id"),
   studentId: integer("student_id"),
   examinerId: integer("examiner_id"),
   mustChangePassword: boolean("must_change_password").default(false),

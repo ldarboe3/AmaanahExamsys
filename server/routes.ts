@@ -281,6 +281,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       status: user.status,
       schoolId: user.schoolId,
       centerId: user.centerId,
+      assignedRegionId: user.assignedRegionId,
+      assignedClusterId: user.assignedClusterId,
       studentId: user.studentId,
       examinerId: user.examinerId,
       mustChangePassword: user.mustChangePassword,
@@ -289,6 +291,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       updatedAt: user.updatedAt,
       registrationFeePaid, // Use computed value, not stored
     };
+
+    // Resolve scope name for field-staff roles (examiner, regional/cluster logistics)
+    let scopeName: string | null = null;
+    if (user.centerId) {
+      const center = await storage.getExamCenter(user.centerId);
+      scopeName = center?.name ?? null;
+    } else if (user.assignedClusterId) {
+      const cluster = await storage.getCluster(user.assignedClusterId);
+      scopeName = cluster?.name ?? null;
+    } else if (user.assignedRegionId) {
+      const region = await storage.getRegion(user.assignedRegionId);
+      scopeName = region?.name ?? null;
+    }
+    (userResponse as any).scopeName = scopeName;
+
     res.json(userResponse);
   });
 
@@ -15829,6 +15846,9 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       const filters: any = { isPublished: true };
       if (req.query.examYearId) filters.examYearId = parseInt(req.query.examYearId as string);
       if (req.query.grade) filters.grade = parseInt(req.query.grade as string);
+      if (req.query.centerId) filters.centerId = parseInt(req.query.centerId as string);
+      if (req.query.clusterId) filters.clusterId = parseInt(req.query.clusterId as string);
+      if (req.query.regionId) filters.regionId = parseInt(req.query.regionId as string);
       const schedules = await storage.getExamSchedules(filters);
       res.json(schedules);
     } catch (error: any) {
@@ -16694,8 +16714,20 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       if (req.query.examYearId) filters.examYearId = parseInt(req.query.examYearId as string);
       if (req.query.grade) filters.grade = parseInt(req.query.grade as string);
       if (req.query.isPublished !== undefined) filters.isPublished = req.query.isPublished === 'true';
+      if (req.query.centerId) filters.centerId = parseInt(req.query.centerId as string);
+      if (req.query.clusterId) filters.clusterId = parseInt(req.query.clusterId as string);
+      if (req.query.regionId) filters.regionId = parseInt(req.query.regionId as string);
       const schedules = await storage.getExamSchedules(filters);
-      res.json(schedules);
+      const subjects = await storage.getAllSubjects();
+      const examYearsList = await storage.getAllExamYears();
+      const enriched = schedules.map((s: any) => ({
+        ...s,
+        startTime: s.scheduledStartTime,
+        endTime: s.scheduledEndTime,
+        subject: subjects.find((sub: any) => sub.id === s.subjectId),
+        examYear: examYearsList.find((ey: any) => ey.id === s.examYearId),
+      }));
+      res.json(enriched);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

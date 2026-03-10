@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Clock, BookOpen, RefreshCw, WifiOff } from "lucide-react";
+import { CalendarDays, Clock, BookOpen, RefreshCw, WifiOff, MapPin } from "lucide-react";
 import type { ExamYear } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 
 type ExamStatus = "active" | "conducted" | "scheduled";
 
@@ -39,6 +40,7 @@ function calcDuration(start: string, end: string) {
 export default function MobileTimetable() {
   const [now, setNow] = useState(() => new Date());
   const [online, setOnline] = useState(navigator.onLine);
+  const { user } = useAuth();
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000);
@@ -56,10 +58,40 @@ export default function MobileTimetable() {
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
   const activeYear = (examYears as ExamYear[]).find((y) => y.isActive) || (examYears as ExamYear[])[0];
 
+  // Build scoped query URL based on user role
+  const scopeParam = (() => {
+    if (!user) return "";
+    if ((user as any).centerId) return `&centerId=${(user as any).centerId}`;
+    if ((user as any).assignedClusterId) return `&clusterId=${(user as any).assignedClusterId}`;
+    if ((user as any).assignedRegionId) return `&regionId=${(user as any).assignedRegionId}`;
+    return "";
+  })();
+
+  const scheduleUrl = activeYear
+    ? `/api/exam-schedules?examYearId=${activeYear.id}&isPublished=true${scopeParam}`
+    : null;
+
   const { data: entries = [], isLoading, refetch, isFetching } = useQuery<any[]>({
-    queryKey: ["/api/timetable", activeYear?.id],
-    enabled: !!activeYear,
+    queryKey: ["/api/exam-schedules", activeYear?.id, scopeParam],
+    queryFn: async () => {
+      if (!scheduleUrl) return [];
+      const res = await fetch(scheduleUrl, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!activeYear && !!user,
   });
+
+  // Scope label text — use resolved name from auth if available
+  const scopeLabel = (() => {
+    if (!user) return null;
+    const u = user as any;
+    if (u.scopeName) return u.scopeName;
+    if (u.centerId) return `Center #${u.centerId}`;
+    if (u.assignedClusterId) return `Cluster #${u.assignedClusterId}`;
+    if (u.assignedRegionId) return `Region #${u.assignedRegionId}`;
+    return null; // HQ/admin: no scope label needed
+  })();
 
   const todayStr = now.toISOString().slice(0, 10);
 
@@ -106,6 +138,12 @@ export default function MobileTimetable() {
             </span>
           )}
         </p>
+        {scopeLabel && (
+          <div className="flex items-center gap-1.5 mt-1.5 text-xs opacity-80">
+            <MapPin className="w-3 h-3 shrink-0" />
+            <span>Viewing: {scopeLabel}</span>
+          </div>
+        )}
       </div>
 
       {/* Body */}

@@ -459,7 +459,7 @@ export interface IStorage {
   // ===== Exam Scheduling & Time Enforcement =====
   createExamSchedule(schedule: InsertExamSchedule): Promise<ExamSchedule>;
   getExamSchedule(id: number): Promise<ExamSchedule | undefined>;
-  getExamSchedules(filters?: { examYearId?: number; grade?: number; isPublished?: boolean }): Promise<ExamSchedule[]>;
+  getExamSchedules(filters?: { examYearId?: number; grade?: number; isPublished?: boolean; centerId?: number; clusterId?: number; regionId?: number }): Promise<ExamSchedule[]>;
   updateExamSchedule(id: number, data: Partial<ExamSchedule>): Promise<ExamSchedule | undefined>;
   deleteExamSchedule(id: number): Promise<boolean>;
   syncTimetableToSchedule(timetableEntry: ExamTimetable): Promise<ExamSchedule>;
@@ -2686,11 +2686,34 @@ export class DatabaseStorage implements IStorage {
     return schedule;
   }
 
-  async getExamSchedules(filters?: { examYearId?: number; grade?: number; isPublished?: boolean }): Promise<ExamSchedule[]> {
+  async getExamSchedules(filters?: { examYearId?: number; grade?: number; isPublished?: boolean; centerId?: number; clusterId?: number; regionId?: number }): Promise<ExamSchedule[]> {
     const conditions: any[] = [];
     if (filters?.examYearId) conditions.push(eq(examSchedules.examYearId, filters.examYearId));
     if (filters?.grade) conditions.push(eq(examSchedules.grade, filters.grade));
     if (filters?.isPublished !== undefined) conditions.push(eq(examSchedules.isPublished, filters.isPublished));
+
+    // Scope filtering via exam_session_logs → exam_centers
+    let centerIds: number[] | null = null;
+    if (filters?.centerId) {
+      centerIds = [filters.centerId];
+    } else if (filters?.clusterId) {
+      const centers = await db.select({ id: examCenters.id }).from(examCenters).where(eq(examCenters.clusterId, filters.clusterId));
+      centerIds = centers.map(c => c.id);
+    } else if (filters?.regionId) {
+      const centers = await db.select({ id: examCenters.id }).from(examCenters).where(eq(examCenters.regionId, filters.regionId));
+      centerIds = centers.map(c => c.id);
+    }
+
+    if (centerIds && centerIds.length > 0) {
+      const sessionRows = await db.selectDistinct({ scheduleId: examSessionLogs.scheduleId })
+        .from(examSessionLogs)
+        .where(inArray(examSessionLogs.centerId, centerIds));
+      if (sessionRows.length > 0) {
+        conditions.push(inArray(examSchedules.id, sessionRows.map(r => r.scheduleId)));
+      }
+      // If no sessions yet, fall through without the filter (show full national schedule)
+    }
+
     if (conditions.length === 0) return db.select().from(examSchedules).orderBy(asc(examSchedules.examDate), asc(examSchedules.scheduledStartTime));
     return db.select().from(examSchedules).where(and(...conditions)).orderBy(asc(examSchedules.examDate), asc(examSchedules.scheduledStartTime));
   }
