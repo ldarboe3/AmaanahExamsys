@@ -45,6 +45,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OfflineSyncBanner } from "@/components/OfflineSyncBanner";
 import { useEffect } from "react";
+import { Redirect } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
 import Home from "@/pages/home";
@@ -113,7 +114,7 @@ function AuthenticatedRoutes() {
         {() => <ProtectedRoute component={StaffIdentity} allowedRoles={["super_admin", "examination_admin"]} />}
       </Route>
       <Route path="/packet-tracking">
-        {() => <ProtectedRoute component={PacketTracking} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics"]} />}
+        {() => <ProtectedRoute component={PacketTracking} allowedRoles={["super_admin", "examination_admin", "logistics_admin"]} />}
       </Route>
       <Route path="/mobile-packet-scan">
         {() => <ProtectedRoute component={MobilePacketScan} allowedRoles={["super_admin", "examination_admin", "regional_logistics", "cluster_logistics", "examiner"]} />}
@@ -188,6 +189,25 @@ function PublicRoutes() {
   );
 }
 
+const MOBILE_ONLY_ROLES = ["regional_logistics", "cluster_logistics"];
+
+function MobileOnlyLayout() {
+  return (
+    <div className="min-h-screen w-full bg-background">
+      <OfflineSyncBanner />
+      <Switch>
+        <Route path="/mobile-packet-scan" component={MobilePacketScan} />
+        <Route path="/mobile-timetable" component={MobileTimetable} />
+        <Route path="/profile" component={Profile} />
+        <Route path="/change-password" component={ChangePassword} />
+        <Route>
+          <Redirect to="/mobile-packet-scan" />
+        </Route>
+      </Switch>
+    </div>
+  );
+}
+
 function AuthenticatedLayout() {
   const { isRTL } = useLanguage();
   
@@ -247,7 +267,7 @@ function OfflineToastListener() {
 }
 
 function AppContent() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return <LoadingScreen />;
@@ -255,6 +275,10 @@ function AppContent() {
 
   if (!isAuthenticated) {
     return <PublicRoutes />;
+  }
+
+  if (user?.role && MOBILE_ONLY_ROLES.includes(user.role)) {
+    return <MobileOnlyLayout />;
   }
 
   return <AuthenticatedLayout />;
