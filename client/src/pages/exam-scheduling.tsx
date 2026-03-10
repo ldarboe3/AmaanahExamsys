@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
@@ -21,6 +21,29 @@ import {
   RefreshCw, CheckCheck
 } from "lucide-react";
 import type { ExamYear, Subject } from "@shared/schema";
+
+type ExamStatus = "active" | "conducted" | "scheduled";
+
+function getExamStatus(examDate: string, startTime: string, endTime: string, now: Date): ExamStatus {
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
+  const examDay = new Date(examDate + "T00:00:00"); examDay.setHours(0, 0, 0, 0);
+  if (examDay < today) return "conducted";
+  if (examDay > today) return "scheduled";
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const startMin = sh * 60 + sm;
+  const endMin = eh * 60 + em;
+  if (nowMin < startMin) return "scheduled";
+  if (nowMin <= endMin) return "active";
+  return "conducted";
+}
+
+const STATUS_BADGE: Record<ExamStatus, { label: string; classes: string }> = {
+  scheduled: { label: "Scheduled", classes: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800" },
+  active:    { label: "Active",    classes: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 border border-green-300 dark:border-green-700" },
+  conducted: { label: "Conducted", classes: "bg-slate-100 text-slate-500 dark:bg-slate-800/60 dark:text-slate-400 border border-slate-200 dark:border-slate-700" },
+};
 
 const LATE_REASON_LABELS: Record<string, string> = {
   transport_delay: "Transport Delay",
@@ -66,6 +89,13 @@ export default function ExamScheduling() {
   ]);
 
   const isHQ = user?.role === "super_admin" || user?.role === "examination_admin";
+
+  // Live clock — updates every 60 seconds so status badges stay current
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
   const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
@@ -218,31 +248,58 @@ export default function ExamScheduling() {
             </Card>
           ) : (
             <div className="space-y-3">
-              {Array.from(new Set(timetableEntries.map((e: any) => e.examDate))).sort().map(date => (
-                <Card key={date}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-primary" />
-                      {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {timetableEntries.filter((e: any) => e.examDate === date).sort((a: any, b: any) => a.startTime.localeCompare(b.startTime)).map((entry: any) => (
-                        <div key={entry.id} className="flex flex-wrap items-center gap-3 py-2 border-t first:border-t-0">
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground w-28 shrink-0">
-                            <Clock className="w-3 h-3" />
-                            {entry.startTime} – {entry.endTime}
-                          </div>
-                          <div className="flex-1 font-medium">{entry.subject?.name || entry.subject?.arabicName || `Subject #${entry.subjectId}`}</div>
-                          <Badge variant="outline">Grade {entry.grade}</Badge>
-                          {entry.subject?.isCore && <Badge variant="secondary">Core</Badge>}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {Array.from(new Set(timetableEntries.map((e: any) => e.examDate))).sort().map(date => {
+                const today = new Date(now); today.setHours(0, 0, 0, 0);
+                const cardDay = new Date(date + "T00:00:00"); cardDay.setHours(0, 0, 0, 0);
+                const isToday = cardDay.getTime() === today.getTime();
+                const isPast  = cardDay < today;
+                return (
+                  <Card key={date} className={isToday ? "ring-2 ring-primary/60" : ""}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex flex-wrap items-center gap-2">
+                        <Calendar className={`w-4 h-4 ${isToday ? "text-primary" : isPast ? "text-muted-foreground" : "text-primary"}`} />
+                        <span className={isPast && !isToday ? "text-muted-foreground" : ""}>
+                          {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </span>
+                        {isToday && (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary text-primary-foreground">Today</span>
+                        )}
+                        {isPast && !isToday && (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">Past</span>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-0">
+                        {timetableEntries.filter((e: any) => e.examDate === date).sort((a: any, b: any) => a.startTime.localeCompare(b.startTime)).map((entry: any) => {
+                          const status = getExamStatus(entry.examDate, entry.startTime, entry.endTime, now);
+                          const badge = STATUS_BADGE[status];
+                          return (
+                            <div key={entry.id} className="flex flex-wrap items-center gap-3 py-2.5 border-t first:border-t-0">
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground w-28 shrink-0">
+                                <Clock className="w-3 h-3" />
+                                {entry.startTime} – {entry.endTime}
+                              </div>
+                              <div className="flex-1 font-medium">{entry.subject?.name || entry.subject?.arabicName || `Subject #${entry.subjectId}`}</div>
+                              <Badge variant="outline">Grade {entry.grade}</Badge>
+                              {entry.subject?.isCore && <Badge variant="secondary">Core</Badge>}
+                              <span
+                                className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full ${badge.classes}`}
+                                data-testid={`badge-status-${entry.id}`}
+                              >
+                                {status === "active" && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
+                                )}
+                                {badge.label}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
