@@ -72,6 +72,7 @@ import VerifyStaff from "@/pages/verify-staff";
 import PacketTracking from "@/pages/packet-tracking";
 import MobilePacketScan from "@/pages/mobile-packet-scan";
 import MobileAttendanceScan from "@/pages/mobile-attendance-scan";
+import MobileTimetable from "@/pages/mobile-timetable";
 import ExamScheduling from "@/pages/exam-scheduling";
 import StudentAttendance from "@/pages/student-attendance";
 
@@ -119,6 +120,9 @@ function AuthenticatedRoutes() {
       </Route>
       <Route path="/mobile-attendance-scan">
         {() => <ProtectedRoute component={MobileAttendanceScan} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "regional_coordinator", "cluster_coordinator", "examiner"]} />}
+      </Route>
+      <Route path="/mobile-timetable">
+        {() => <ProtectedRoute component={MobileTimetable} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics", "regional_coordinator", "cluster_coordinator", "examiner"]} />}
       </Route>
       <Route path="/exam-scheduling" component={ExamScheduling} />
       <Route path="/exam-day">

@@ -36,6 +36,7 @@ import {
   Timer,
   ScanLine,
   Smartphone,
+  CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 
@@ -72,7 +73,7 @@ const examLogisticsDefs: MenuItemDef[] = [
 const examinerMenuDefs: MenuItemDef[] = [
   { key: "mobilePacketScan", url: "/mobile-packet-scan", icon: Package },
   { key: "mobileAttendanceScan", url: "/mobile-attendance-scan", icon: Smartphone },
-  { key: "examScheduling", url: "/exam-scheduling", icon: Timer },
+  { key: "mobileTimetable", url: "/mobile-timetable", icon: CalendarDays },
 ];
 
 const schoolAdminMenuDefs: MenuItemDef[] = [
@@ -91,7 +92,7 @@ const schoolPendingPaymentMenuDefs: MenuItemDef[] = [
 
 const logisticsOfficerMenuDefs: MenuItemDef[] = [
   { key: "packetTracking", url: "/packet-tracking", icon: Package },
-  { key: "examScheduling", url: "/exam-scheduling", icon: Timer },
+  { key: "mobileTimetable", url: "/mobile-timetable", icon: CalendarDays },
 ];
 
 const managementDefs: MenuItemDef[] = [
