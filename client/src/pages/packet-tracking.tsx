@@ -570,6 +570,20 @@ async function printPacketLabel(
   const timeRange = startTime && endTime ? `${startTime} – ${endTime}` : startTime ?? null;
   const hasSchedule = !!(fmtDate || timeRange);
 
+  // Calculate duration from start/end times
+  const durationLabel = (() => {
+    if (!startTime || !endTime) return null;
+    const [sh, sm] = startTime.split(":").map(Number);
+    const [eh, em] = endTime.split(":").map(Number);
+    const mins = (eh * 60 + em) - (sh * 60 + sm);
+    if (mins <= 0) return null;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h > 0 && m > 0) return `${h} hr ${m} min`;
+    if (h > 0) return `${h} hr${h > 1 ? "s" : ""}`;
+    return `${m} min`;
+  })();
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -627,6 +641,13 @@ async function printPacketLabel(
     .schedule-banner .sch-val  { font-size: 16pt; font-weight: 800; letter-spacing: 0.3px; }
     .schedule-banner .sch-divider { width: 1px; background: rgba(255,255,255,0.35); align-self: stretch; }
     .schedule-banner .sch-time  { font-size: 20pt; font-weight: 900; letter-spacing: 1px; }
+    .schedule-banner .sch-duration { font-size: 18pt; font-weight: 900; letter-spacing: 0.5px; }
+    .schedule-banner .sch-dur-pill {
+      display: inline-block; background: rgba(255,255,255,0.2);
+      border: 1.5px solid rgba(255,255,255,0.45);
+      border-radius: 4px; padding: 2px 10px; margin-top: 2px;
+      font-size: 17pt; font-weight: 900; letter-spacing: 0.5px;
+    }
     .no-schedule-notice {
       background: #fef3c7; color: #92400e;
       border-radius: 6px; padding: 3mm 7mm; font-size: 10pt; font-style: italic;
@@ -656,6 +677,11 @@ async function printPacketLabel(
     ${timeRange ? `<div>
       <div class="sch-label">Session Time</div>
       <div class="sch-time">${timeRange}</div>
+    </div>` : ""}
+    ${timeRange && durationLabel ? `<div class="sch-divider"></div>` : ""}
+    ${durationLabel ? `<div>
+      <div class="sch-label">Duration</div>
+      <div class="sch-dur-pill">${durationLabel}</div>
     </div>` : ""}
   </div>` : `
   <div class="no-schedule-notice">&#9888; No timetable entry found for this subject — check center timetable before dispatching.</div>`}
