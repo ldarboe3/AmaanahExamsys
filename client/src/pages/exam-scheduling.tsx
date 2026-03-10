@@ -16,11 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Calendar, Clock, Plus, CheckCircle2, AlertTriangle,
-  Timer, Eye, Send, XCircle, PlayCircle, StopCircle,
+  Timer, PlayCircle,
   Activity, BarChart3, MapPin, Sparkles, Loader2, Save,
   RefreshCw, CheckCheck
 } from "lucide-react";
-import type { ExamSchedule, ExamYear, Subject } from "@shared/schema";
+import type { ExamYear, Subject } from "@shared/schema";
 
 const LATE_REASON_LABELS: Record<string, string> = {
   transport_delay: "Transport Delay",
@@ -50,13 +50,10 @@ export default function ExamScheduling() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("schedules");
+  const [activeTab, setActiveTab] = useState("timetable");
   const [selectedExamYearId, setSelectedExamYearId] = useState<string>("");
   const [selectedGrade, setSelectedGrade] = useState<string>("");
   const [monitoringDate, setMonitoringDate] = useState<string>("");
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showRecordStartDialog, setShowRecordStartDialog] = useState(false);
-  const [selectedSchedule, setSelectedSchedule] = useState<ExamSchedule | null>(null);
   const [showAIDialog, setShowAIDialog] = useState(false);
   const [aiSchedule, setAiSchedule] = useState<any[]>([]);
   const [aiReplaceExisting, setAiReplaceExisting] = useState(false);
@@ -73,16 +70,6 @@ export default function ExamScheduling() {
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
   const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
   const { data: centers = [] } = useQuery<any[]>({ queryKey: ["/api/centers"] });
-
-  const scheduleFilters = new URLSearchParams();
-  if (selectedExamYearId) scheduleFilters.set("examYearId", selectedExamYearId);
-  if (selectedGrade) scheduleFilters.set("grade", selectedGrade);
-
-  const { data: schedules = [], isLoading: schedulesLoading } = useQuery<ExamSchedule[]>({
-    queryKey: ["/api/exam-schedules", selectedExamYearId, selectedGrade],
-    queryFn: () => fetch(`/api/exam-schedules?${scheduleFilters.toString()}`, { credentials: "include" }).then(r => r.json()),
-    enabled: !!selectedExamYearId,
-  });
 
   const timetableFilters = new URLSearchParams();
   if (selectedExamYearId) timetableFilters.set("examYearId", selectedExamYearId);
@@ -102,51 +89,6 @@ export default function ExamScheduling() {
     queryKey: ["/api/exam-scheduling/monitoring", selectedExamYearId, monitoringDate],
     queryFn: () => fetch(`/api/exam-scheduling/monitoring?${monParams.toString()}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!selectedExamYearId && isHQ && activeTab === "monitoring",
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/exam-schedules", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/exam-schedules"] });
-      setShowCreateDialog(false);
-      toast({ title: "Schedule created successfully" });
-    },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-  });
-
-  const publishMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("POST", `/api/exam-schedules/${id}/publish`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/exam-schedules"] });
-      toast({ title: "Schedule published" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/exam-schedules/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/exam-schedules"] });
-      toast({ title: "Schedule deleted" });
-    },
-  });
-
-  const recordStartMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/exam-sessions/record-start", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/exam-scheduling/monitoring"] });
-      setShowRecordStartDialog(false);
-      toast({ title: "Exam start recorded" });
-    },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-  });
-
-  const recordEndMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("POST", `/api/exam-sessions/${id}/record-end`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/exam-scheduling/monitoring"] });
-      toast({ title: "Exam end recorded" });
-    },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const aiGenerateMutation = useMutation({
@@ -192,8 +134,6 @@ export default function ExamScheduling() {
   const uniqueGrades = Array.from(new Set(
     examYears.find(ey => ey.id === Number(selectedExamYearId))?.grades || []
   )).sort();
-
-  const uniqueDates = Array.from(new Set(schedules.map(s => s.examDate))).sort();
 
   return (
     <div className="space-y-6" data-testid="exam-scheduling-page">
@@ -253,9 +193,6 @@ export default function ExamScheduling() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList data-testid="tabs-scheduling">
-          <TabsTrigger value="schedules" data-testid="tab-schedules">
-            <Calendar className="w-4 h-4 mr-1" /> Schedules
-          </TabsTrigger>
           <TabsTrigger value="timetable" data-testid="tab-timetable">
             <Clock className="w-4 h-4 mr-1" /> Timetable
           </TabsTrigger>
@@ -265,108 +202,6 @@ export default function ExamScheduling() {
             </TabsTrigger>
           )}
         </TabsList>
-
-        <TabsContent value="schedules" className="space-y-4">
-          {isHQ && (
-            <div className="flex justify-end">
-              <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-                <DialogTrigger asChild>
-                  <Button data-testid="button-create-schedule" disabled={!selectedExamYearId}>
-                    <Plus className="w-4 h-4 mr-1" /> Create Schedule
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Create Exam Schedule</DialogTitle>
-                  </DialogHeader>
-                  <CreateScheduleForm
-                    examYearId={Number(selectedExamYearId)}
-                    subjects={subjects}
-                    grades={uniqueGrades}
-                    onSubmit={(data) => createMutation.mutate(data)}
-                    isPending={createMutation.isPending}
-                  />
-                </DialogContent>
-              </Dialog>
-            </div>
-          )}
-
-          {!selectedExamYearId ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">Select an exam year to view schedules</CardContent></Card>
-          ) : schedulesLoading ? (
-            <div className="space-y-3">
-              {[1,2,3].map(i => <Skeleton key={i} className="h-20 w-full" />)}
-            </div>
-          ) : schedules.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">No schedules found. Create one to get started.</CardContent></Card>
-          ) : (
-            <div className="space-y-3">
-              {uniqueDates.map(date => (
-                <Card key={date}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-primary" />
-                      {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {schedules.filter(s => s.examDate === date).map(schedule => (
-                        <div
-                          key={schedule.id}
-                          className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-md border"
-                          data-testid={`schedule-row-${schedule.id}`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="flex flex-col">
-                              <span className="font-medium text-sm">{getSubjectName(schedule.subjectId)}</span>
-                              <span className="text-xs text-muted-foreground">Grade {schedule.grade}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>{schedule.scheduledStartTime} - {schedule.scheduledEndTime}</span>
-                            <Badge variant="secondary" className="text-xs">{schedule.durationMinutes} min</Badge>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {schedule.isPublished ? (
-                              <Badge variant="default" data-testid={`badge-published-${schedule.id}`}>Published</Badge>
-                            ) : (
-                              <Badge variant="secondary" data-testid={`badge-draft-${schedule.id}`}>Draft</Badge>
-                            )}
-                            {isHQ && !schedule.isPublished && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => publishMutation.mutate(schedule.id)}
-                                disabled={publishMutation.isPending}
-                                data-testid={`button-publish-${schedule.id}`}
-                              >
-                                <Send className="w-3.5 h-3.5 mr-1" /> Publish
-                              </Button>
-                            )}
-                            {isHQ && !schedule.isPublished && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  if (confirm("Delete this schedule?")) deleteMutation.mutate(schedule.id);
-                                }}
-                                data-testid={`button-delete-${schedule.id}`}
-                              >
-                                <XCircle className="w-3.5 h-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
 
         <TabsContent value="timetable" className="space-y-4">
           {!selectedExamYearId ? (
@@ -527,22 +362,6 @@ export default function ExamScheduling() {
           </TabsContent>
         )}
       </Tabs>
-
-      <Dialog open={showRecordStartDialog} onOpenChange={setShowRecordStartDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Record Exam Start</DialogTitle>
-          </DialogHeader>
-          {selectedSchedule && (
-            <RecordStartForm
-              schedule={selectedSchedule}
-              centers={centers}
-              onSubmit={(data) => recordStartMutation.mutate(data)}
-              isPending={recordStartMutation.isPending}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* AI Auto-Schedule Dialog */}
       <Dialog open={showAIDialog} onOpenChange={(open) => { setShowAIDialog(open); if (!open) setAiSchedule([]); }}>
@@ -789,171 +608,3 @@ function SummaryCard({ label, value, icon, variant }: { label: string; value: nu
   );
 }
 
-function CreateScheduleForm({ examYearId, subjects, grades, onSubmit, isPending }: {
-  examYearId: number;
-  subjects: Subject[];
-  grades: number[];
-  onSubmit: (data: any) => void;
-  isPending: boolean;
-}) {
-  const [subjectId, setSubjectId] = useState("");
-  const [grade, setGrade] = useState("");
-  const [examDate, setExamDate] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [duration, setDuration] = useState("60");
-  const [notes, setNotes] = useState("");
-
-  const calculateEndTime = (start: string, dur: number): string => {
-    if (!start) return "";
-    const [h, m] = start.split(":").map(Number);
-    const totalMin = h * 60 + m + dur;
-    const endH = Math.floor(totalMin / 60) % 24;
-    const endM = totalMin % 60;
-    return `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
-  };
-
-  const endTime = calculateEndTime(startTime, parseInt(duration) || 0);
-
-  const filteredSubjects = grade ? subjects.filter(s => s.grade === parseInt(grade)) : subjects;
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label>Grade</Label>
-          <Select value={grade} onValueChange={setGrade}>
-            <SelectTrigger data-testid="input-schedule-grade">
-              <SelectValue placeholder="Select Grade" />
-            </SelectTrigger>
-            <SelectContent>
-              {grades.map(g => <SelectItem key={g} value={g.toString()}>Grade {g}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label>Subject</Label>
-          <Select value={subjectId} onValueChange={setSubjectId}>
-            <SelectTrigger data-testid="input-schedule-subject">
-              <SelectValue placeholder="Select Subject" />
-            </SelectTrigger>
-            <SelectContent>
-              {filteredSubjects.map(s => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div>
-        <Label>Exam Date</Label>
-        <Input type="date" value={examDate} onChange={e => setExamDate(e.target.value)} data-testid="input-schedule-date" />
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <div>
-          <Label>Start Time</Label>
-          <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} data-testid="input-schedule-start" />
-        </div>
-        <div>
-          <Label>Duration (min)</Label>
-          <Input type="number" value={duration} onChange={e => setDuration(e.target.value)} min={10} max={480} data-testid="input-schedule-duration" />
-        </div>
-        <div>
-          <Label>End Time</Label>
-          <Input value={endTime} readOnly className="bg-muted" data-testid="input-schedule-end" />
-        </div>
-      </div>
-      <div>
-        <Label>Notes (optional)</Label>
-        <Textarea value={notes} onChange={e => setNotes(e.target.value)} data-testid="input-schedule-notes" />
-      </div>
-      <Button
-        className="w-full"
-        onClick={() => onSubmit({
-          examYearId,
-          subjectId: parseInt(subjectId),
-          grade: parseInt(grade),
-          examDate,
-          scheduledStartTime: startTime,
-          durationMinutes: parseInt(duration),
-          scheduledEndTime: endTime,
-          notes: notes || null,
-        })}
-        disabled={isPending || !subjectId || !grade || !examDate || !startTime}
-        data-testid="button-submit-schedule"
-      >
-        {isPending ? "Creating..." : "Create Schedule"}
-      </Button>
-    </div>
-  );
-}
-
-function RecordStartForm({ schedule, centers, onSubmit, isPending }: {
-  schedule: ExamSchedule;
-  centers: any[];
-  onSubmit: (data: any) => void;
-  isPending: boolean;
-}) {
-  const [centerId, setCenterId] = useState("");
-  const [candidateCount, setCandidateCount] = useState("");
-  const [reasonCode, setReasonCode] = useState("");
-  const [reasonDetails, setReasonDetails] = useState("");
-  const [notes, setNotes] = useState("");
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <Label>Center</Label>
-        <Select value={centerId} onValueChange={setCenterId}>
-          <SelectTrigger data-testid="input-session-center">
-            <SelectValue placeholder="Select Center" />
-          </SelectTrigger>
-          <SelectContent>
-            {centers.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
-        <Label>Number of Candidates</Label>
-        <Input type="number" value={candidateCount} onChange={e => setCandidateCount(e.target.value)} data-testid="input-session-candidates" />
-      </div>
-      <div>
-        <Label>Late Start Reason (if applicable)</Label>
-        <Select value={reasonCode} onValueChange={setReasonCode}>
-          <SelectTrigger data-testid="input-session-reason">
-            <SelectValue placeholder="Select reason (if late)" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(LATE_REASON_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      {reasonCode && (
-        <div>
-          <Label>Reason Details</Label>
-          <Textarea value={reasonDetails} onChange={e => setReasonDetails(e.target.value)} data-testid="input-session-reason-details" />
-        </div>
-      )}
-      <div>
-        <Label>Notes</Label>
-        <Textarea value={notes} onChange={e => setNotes(e.target.value)} data-testid="input-session-notes" />
-      </div>
-      <Button
-        className="w-full"
-        onClick={() => onSubmit({
-          scheduleId: schedule.id,
-          centerId: parseInt(centerId),
-          actualStartTime: new Date().toISOString(),
-          candidateCount: candidateCount ? parseInt(candidateCount) : undefined,
-          lateStartReasonCode: reasonCode || null,
-          lateStartReasonDetails: reasonDetails || null,
-          notes: notes || null,
-        })}
-        disabled={isPending || !centerId}
-        data-testid="button-submit-start"
-      >
-        <PlayCircle className="w-4 h-4 mr-1" />
-        {isPending ? "Recording..." : "Record Start"}
-      </Button>
-    </div>
-  );
-}
