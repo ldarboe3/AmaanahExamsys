@@ -32,7 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import QRCode from "qrcode";
-import type { ExamPacket, ExamYear, Subject, ExamCenter, Region, Cluster } from "@shared/schema";
+import type { ExamPacket, ExamYear, Subject, ExamCenter, Region, Cluster, ExamTimetable } from "@shared/schema";
 import amanahLogoUrl from "@assets/Amana_Logo_1770390631299.jpeg";
 
 // ── Status config ────────────────────────────────────────────────────────────
@@ -548,6 +548,9 @@ async function printPacketLabel(
   subjectName: string,
   centerName: string,
   examYearLabel: string,
+  examDate?: string,
+  startTime?: string,
+  endTime?: string,
 ) {
   const [qrDataUrl, logoDataUrl] = await Promise.all([
     QRCode.toDataURL(packet.barcode, {
@@ -560,6 +563,12 @@ async function printPacketLabel(
 
   const statusLabel = (STATUS_CFG[packet.status]?.label ?? packet.status);
   const printDate = new Date().toLocaleString();
+
+  const fmtDate = examDate
+    ? new Date(examDate + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+    : null;
+  const timeRange = startTime && endTime ? `${startTime} – ${endTime}` : startTime ?? null;
+  const hasSchedule = !!(fmtDate || timeRange);
 
   const html = `<!DOCTYPE html>
 <html>
@@ -609,6 +618,19 @@ async function printPacketLabel(
       display: inline-block; background: #d1fae5; color: #065f46;
       font-size: 12pt; font-weight: 700; padding: 3px 12px; border-radius: 20px;
     }
+    .schedule-banner {
+      background: #0f766e; color: #fff;
+      border-radius: 6px; padding: 4mm 7mm;
+      display: flex; align-items: center; justify-content: space-between; gap: 8mm;
+    }
+    .schedule-banner .sch-label { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.7px; opacity: 0.85; margin-bottom: 1.5px; }
+    .schedule-banner .sch-val  { font-size: 16pt; font-weight: 800; letter-spacing: 0.3px; }
+    .schedule-banner .sch-divider { width: 1px; background: rgba(255,255,255,0.35); align-self: stretch; }
+    .schedule-banner .sch-time  { font-size: 20pt; font-weight: 900; letter-spacing: 1px; }
+    .no-schedule-notice {
+      background: #fef3c7; color: #92400e;
+      border-radius: 6px; padding: 3mm 7mm; font-size: 10pt; font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -623,6 +645,20 @@ async function printPacketLabel(
     </div>
     <div class="title-badge">EXAM PAPER PACKET</div>
   </div>
+
+  ${hasSchedule ? `
+  <div class="schedule-banner">
+    ${fmtDate ? `<div>
+      <div class="sch-label">Examination Date</div>
+      <div class="sch-val">${fmtDate}</div>
+    </div>` : ""}
+    ${fmtDate && timeRange ? `<div class="sch-divider"></div>` : ""}
+    ${timeRange ? `<div>
+      <div class="sch-label">Session Time</div>
+      <div class="sch-time">${timeRange}</div>
+    </div>` : ""}
+  </div>` : `
+  <div class="no-schedule-notice">&#9888; No timetable entry found for this subject — check center timetable before dispatching.</div>`}
 
   <div class="body">
     <div class="details">
@@ -846,10 +882,15 @@ export default function PacketTracking() {
   const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
   const { data: centers = [] } = useQuery<ExamCenter[]>({ queryKey: ["/api/centers"] });
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
+  const { data: timetable = [] } = useQuery<ExamTimetable[]>({ queryKey: ["/api/timetable"] });
 
   const subjectMap = Object.fromEntries(subjects.map(s => [s.id, s.name]));
   const centerMap = Object.fromEntries(centers.map(c => [c.id, c.name]));
   const examYearMap = Object.fromEntries(examYears.map(y => [y.id, y.year]));
+  // keyed by subjectId — last write wins if duplicates exist across years; prefer active exam year entry
+  const timetableBySubject = Object.fromEntries(
+    [...timetable].reverse().map(t => [t.subjectId, t])
+  );
 
   const filtered = packets.filter(p => {
     const matchSearch = !search
@@ -1041,12 +1082,18 @@ export default function PacketTracking() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => printPacketLabel(
-                              p,
-                              subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
-                              centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
-                              examYearMap[p.examYearId] ? String(examYearMap[p.examYearId]) : `Year ${p.examYearId}`,
-                            )}
+                            onClick={() => {
+                              const tt = timetableBySubject[p.subjectId];
+                              printPacketLabel(
+                                p,
+                                subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
+                                centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
+                                examYearMap[p.examYearId] ? String(examYearMap[p.examYearId]) : `Year ${p.examYearId}`,
+                                tt?.examDate ?? undefined,
+                                tt?.startTime ?? undefined,
+                                tt?.endTime ?? undefined,
+                              );
+                            }}
                             data-testid={`button-print-label-${p.id}`}
                           >
                             <Printer className="w-3.5 h-3.5 mr-1" />
