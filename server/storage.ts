@@ -41,10 +41,11 @@ import {
   type IntegrityFlagEvent, type InsertIntegrityFlagEvent,
   type DeviceSyncSession, type InsertDeviceSyncSession,
   type SyncErrorLog, type InsertSyncErrorLog,
-  examPackets, handoverLogs, packetEvents,
+  examPackets, handoverLogs, packetEvents, mobilePacketScans,
   type ExamPacket, type InsertExamPacket,
   type HandoverLog, type InsertHandoverLog,
   type PacketEvent, type InsertPacketEvent,
+  type MobilePacketScan, type InsertMobilePacketScan,
   examSchedules, examSessionLogs,
   type ExamSchedule, type InsertExamSchedule,
   type ExamSessionLog, type InsertExamSessionLog,
@@ -501,6 +502,10 @@ export interface IStorage {
   updateDeviceSyncSession(id: number, data: Partial<DeviceSyncSession>): Promise<DeviceSyncSession | undefined>;
   createSyncErrorLog(log: InsertSyncErrorLog): Promise<SyncErrorLog>;
   getSyncErrorLogs(sessionId: number): Promise<SyncErrorLog[]>;
+
+  // ===== Mobile Packet Scans =====
+  createMobilePacketScan(scan: InsertMobilePacketScan): Promise<MobilePacketScan>;
+  getMobilePacketScans(packetId: number): Promise<MobilePacketScan[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3027,6 +3032,18 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(syncErrorLogs)
       .where(eq(syncErrorLogs.sessionId, sessionId))
       .orderBy(desc(syncErrorLogs.createdAt));
+  }
+
+  // ===== Mobile Packet Scans =====
+  async createMobilePacketScan(scan: InsertMobilePacketScan): Promise<MobilePacketScan> {
+    const [created] = await db.insert(mobilePacketScans).values(scan).returning();
+    return created;
+  }
+
+  async getMobilePacketScans(packetId: number): Promise<MobilePacketScan[]> {
+    return db.select().from(mobilePacketScans)
+      .where(eq(mobilePacketScans.packetId, packetId))
+      .orderBy(asc(mobilePacketScans.scannedAt));
   }
 }
 

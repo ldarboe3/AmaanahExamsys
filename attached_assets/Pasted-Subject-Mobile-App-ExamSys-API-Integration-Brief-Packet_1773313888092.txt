@@ -1,0 +1,104 @@
+Subject: Mobile App — ExamSys API Integration Brief (Packet Tracking)
+
+We have a field mobile app (Amaanah Examiner App) built in Expo React Native that handles packet dispatch and tracking for field staff (Regional Coordinators, Cluster Officers, and Examiners). It currently stores packet data locally and we need to connect it to ExamSys as the single source of truth.
+
+What the mobile app needs from ExamSys:
+
+1. List packets (with filtering)
+
+GET /api/mobile/packets?region=&cluster=&center=&status=
+Returns all packets relevant to the authenticated staff member's location. Each packet should include:
+
+{
+  "id": "unique identifier",
+  "barcode": "PKT-2026-G6-MTH-C1-001",
+  "subject": "Mathematics",
+  "examCenter": "Brikama Center A",
+  "region": "West Coast Region",
+  "cluster": "Cluster 1",
+  "status": "at_region",
+  "statusLabel": "At Region",
+  "createdAt": "ISO datetime",
+  "updatedAt": "ISO datetime"
+}
+2. Get a single packet by barcode
+
+GET /api/mobile/packets/:barcode
+Returns the packet object above plus its full scan history array:
+
+"scans": [
+  {
+    "id": 1,
+    "action": "receive",
+    "fromStatus": "dispatched_to_region",
+    "toStatus": "at_region",
+    "scannedByName": "Ousman Jallow",
+    "scannedByRole": "regional_coordinator",
+    "location": "West Coast Region",
+    "notes": null,
+    "scannedAt": "ISO datetime"
+  }
+]
+3. Get the next available action for a packet (by role)
+
+GET /api/mobile/packets/:barcode/action?role=regional_coordinator
+Returns:
+
+{
+  "packet": { ...packet object... },
+  "action": {
+    "action": "dispatch",
+    "nextStatus": "dispatched_to_cluster",
+    "actionLabel": "Dispatch to Cluster"
+  }
+}
+Return "action": null if no action is available for that role at that status.
+
+4. Submit a scan event
+
+POST /api/mobile/packets/scan
+Body:
+{
+  "barcode": "PKT-2026-G6-MTH-C1-001",
+  "scannedBy": "staff EID",
+  "scannedByName": "Ousman Jallow",
+  "scannedByRole": "regional_coordinator",
+  "location": "West Coast Region",
+  "notes": "optional"
+}
+The backend should auto-determine the action from the current packet status + role. Returns the updated packet and the scan record. Reject duplicate scans (same action on same status) with a clear error message.
+
+5. Packet stats summary
+
+GET /api/mobile/packets/stats
+Returns:
+
+{
+  "total": 12,
+  "dispatching": 4,
+  "atCenter": 3,
+  "returning": 2,
+  "completed": 3
+}
+Status flow (15 steps):
+
+at_hq → dispatched_to_region → at_region → dispatched_to_cluster → at_cluster → dispatched_to_center → at_center → opened → sealed → return_to_cluster → return_at_cluster → return_to_region → return_at_region → return_to_hq → completed
+Role permissions:
+
+Role	Allowed actions
+hq_staff	dispatch (at_hq), receive_return (return_to_hq)
+regional_coordinator	receive (dispatched_to_region), dispatch (at_region), forward_return (return_at_region)
+cluster_officer	receive (dispatched_to_cluster), dispatch (at_cluster), forward_return (return_at_cluster)
+examiner	receive (dispatched_to_center), open (at_center), seal (opened), dispatch_return (sealed)
+Only Examiners may open or seal packets.
+
+Authentication:
+The mobile app authenticates staff via your existing GET /api/public/staff-card-scan/{EID}:{TOKEN} endpoint (already integrated and working). For the packet APIs, please accept the staff's EID as a header:
+
+X-Staff-ID: EID123456
+or include it in the request body (we currently send it as scannedBy in the scan body).
+
+Once these endpoints are live, we will update the mobile app's base URL from the local Express proxy to point directly to https://amaanah.gm/api/mobile/... and all packet data will flow through ExamSys in real time.
+
+Please let us know if you need the full database schema (packets + packet_scans tables) or any clarification.
+

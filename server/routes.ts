@@ -17881,6 +17881,261 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ─── Mobile Packet API (Amaanah Examiner App integration) ────────────────────
+  // Auth: X-Staff-ID header containing staff EID, or scannedBy in body.
+  // All responses use the existing ExamSys status names directly.
+
+  const MOBILE_ROLE_ACTIONS: Record<string, Array<{
+    triggerStatus: string; action: string; nextStatus: string; actionLabel: string;
+  }>> = {
+    hq_staff: [
+      { triggerStatus: "packed",          action: "dispatch",        nextStatus: "dispatched_to_region", actionLabel: "Dispatch to Region" },
+      { triggerStatus: "returned_to_hq",  action: "receive_return",  nextStatus: "completed",            actionLabel: "Receive Return & Complete" },
+    ],
+    regional_coordinator: [
+      { triggerStatus: "dispatched_to_region", action: "receive",       nextStatus: "at_region",             actionLabel: "Receive at Region" },
+      { triggerStatus: "at_region",            action: "dispatch",      nextStatus: "dispatched_to_cluster", actionLabel: "Dispatch to Cluster" },
+      { triggerStatus: "returned_to_region",   action: "forward_return",nextStatus: "returned_to_hq",        actionLabel: "Forward Return to HQ" },
+    ],
+    cluster_officer: [
+      { triggerStatus: "dispatched_to_cluster", action: "receive",        nextStatus: "at_cluster",           actionLabel: "Receive at Cluster" },
+      { triggerStatus: "at_cluster",            action: "dispatch",       nextStatus: "dispatched_to_center", actionLabel: "Dispatch to Center" },
+      { triggerStatus: "collected",             action: "receive_return", nextStatus: "returned_to_cluster",  actionLabel: "Receive Return from Center" },
+      { triggerStatus: "returned_to_cluster",   action: "forward_return", nextStatus: "returned_to_region",   actionLabel: "Forward Return to Region" },
+    ],
+    examiner: [
+      { triggerStatus: "dispatched_to_center", action: "receive",         nextStatus: "at_center", actionLabel: "Receive at Center" },
+      { triggerStatus: "at_center",            action: "open",            nextStatus: "opened",    actionLabel: "Open Packet" },
+      { triggerStatus: "opened",               action: "seal",            nextStatus: "sealed",    actionLabel: "Seal Packet" },
+      { triggerStatus: "sealed",               action: "dispatch_return", nextStatus: "collected", actionLabel: "Dispatch Return to Cluster" },
+    ],
+  };
+
+  const STATUS_LABELS: Record<string, string> = {
+    created: "Created", packed: "Packed",
+    dispatched_to_region: "Dispatched to Region", at_region: "At Region",
+    dispatched_to_cluster: "Dispatched to Cluster", at_cluster: "At Cluster",
+    dispatched_to_center: "Dispatched to Center", at_center: "At Center",
+    opened: "Opened", administered: "Administered", sealed: "Sealed",
+    collected: "Collected for Return",
+    returned_to_cluster: "Returned to Cluster", returned_to_region: "Returned to Region",
+    returned_to_hq: "Returned to HQ", completed: "Completed",
+    missing: "Missing", damaged: "Damaged",
+  };
+
+  function buildPacketResponse(p: any, regions: any[], clusters: any[], centers: any[]) {
+    const region = regions.find((r: any) => r.id === p.destinationRegionId);
+    const cluster = clusters.find((c: any) => c.id === p.destinationClusterId);
+    const center = centers.find((c: any) => c.id === p.destinationCenterId);
+    return {
+      id: String(p.id),
+      barcode: p.barcode,
+      grade: p.grade,
+      subject: p.subjectName ?? null,
+      examCenter: center?.name ?? null,
+      region: region?.name ?? null,
+      cluster: cluster?.name ?? null,
+      status: p.status,
+      statusLabel: STATUS_LABELS[p.status] ?? p.status,
+      paperCount: p.paperCount,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+    };
+  }
+
+  // 1. List packets with optional filtering
+  app.get("/api/mobile/packets", async (req, res) => {
+    try {
+      const { region, cluster, center, status } = req.query as Record<string, string>;
+      let packets = await storage.getExamPackets();
+      if (region)  packets = packets.filter(p => String(p.destinationRegionId)  === region);
+      if (cluster) packets = packets.filter(p => String(p.destinationClusterId) === cluster);
+      if (center)  packets = packets.filter(p => String(p.destinationCenterId)  === center);
+      if (status)  packets = packets.filter(p => p.status === status);
+
+      const [allRegions, allClusters, allCenters, allSubjects] = await Promise.all([
+        storage.getAllRegions(),
+        storage.getAllClusters(),
+        storage.getAllExamCenters(),
+        storage.getAllSubjects(),
+      ]);
+      const subjectMap = Object.fromEntries(allSubjects.map((s: any) => [s.id, s.name]));
+      const enriched = packets.map(p => buildPacketResponse(
+        { ...p, subjectName: subjectMap[p.subjectId] },
+        allRegions, allClusters, allCenters
+      ));
+      res.json(enriched);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 2. Get single packet by barcode (includes scan history)
+  app.get("/api/mobile/packets/stats", async (_req, res) => {
+    try {
+      const packets = await storage.getExamPackets();
+      const inTransitStatuses = new Set(["dispatched_to_region","dispatched_to_cluster","dispatched_to_center","collected"]);
+      const atCenterStatuses  = new Set(["at_center","opened","administered","sealed"]);
+      const returningStatuses = new Set(["returned_to_cluster","returned_to_region","returned_to_hq"]);
+      res.json({
+        total:       packets.length,
+        dispatching: packets.filter(p => inTransitStatuses.has(p.status)).length,
+        atCenter:    packets.filter(p => atCenterStatuses.has(p.status)).length,
+        returning:   packets.filter(p => returningStatuses.has(p.status)).length,
+        completed:   packets.filter(p => p.status === "completed").length,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/mobile/packets/:barcode", async (req, res) => {
+    try {
+      const packet = await storage.getExamPacketByBarcode(req.params.barcode);
+      if (!packet) return res.status(404).json({ message: "Packet not found" });
+
+      const [allRegions, allClusters, allCenters, allSubjects, scans] = await Promise.all([
+        storage.getAllRegions(),
+        storage.getAllClusters(),
+        storage.getAllExamCenters(),
+        storage.getAllSubjects(),
+        storage.getMobilePacketScans(packet.id),
+      ]);
+      const subjectMap = Object.fromEntries(allSubjects.map((s: any) => [s.id, s.name]));
+      const base = buildPacketResponse(
+        { ...packet, subjectName: subjectMap[packet.subjectId] },
+        allRegions, allClusters, allCenters
+      );
+      res.json({
+        ...base,
+        scans: scans.map(s => ({
+          id: s.id,
+          action: s.action,
+          fromStatus: s.fromStatus,
+          toStatus: s.toStatus,
+          scannedByName: s.scannedByName,
+          scannedByRole: s.scannedByRole,
+          location: s.location ?? null,
+          notes: s.notes ?? null,
+          scannedAt: s.scannedAt,
+        })),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 3. Get next available action for a role
+  app.get("/api/mobile/packets/:barcode/action", async (req, res) => {
+    try {
+      const { role } = req.query as { role?: string };
+      const packet = await storage.getExamPacketByBarcode(req.params.barcode);
+      if (!packet) return res.status(404).json({ message: "Packet not found" });
+
+      const [allRegions, allClusters, allCenters, allSubjects] = await Promise.all([
+        storage.getAllRegions(), storage.getAllClusters(),
+        storage.getAllExamCenters(), storage.getAllSubjects(),
+      ]);
+      const subjectMap = Object.fromEntries(allSubjects.map((s: any) => [s.id, s.name]));
+      const packetObj = buildPacketResponse(
+        { ...packet, subjectName: subjectMap[packet.subjectId] },
+        allRegions, allClusters, allCenters
+      );
+
+      const roleActions = role ? (MOBILE_ROLE_ACTIONS[role] ?? []) : [];
+      const available = roleActions.find(ra => ra.triggerStatus === packet.status) ?? null;
+      res.json({
+        packet: packetObj,
+        action: available ? {
+          action: available.action,
+          nextStatus: available.nextStatus,
+          actionLabel: available.actionLabel,
+        } : null,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 4. Submit a scan event
+  app.post("/api/mobile/packets/scan", async (req, res) => {
+    try {
+      const { barcode, scannedBy, scannedByName, scannedByRole, location, notes, gpsLatitude, gpsLongitude } = req.body;
+      if (!barcode || !scannedBy || !scannedByName || !scannedByRole) {
+        return res.status(400).json({ message: "barcode, scannedBy, scannedByName and scannedByRole are required" });
+      }
+
+      const packet = await storage.getExamPacketByBarcode(barcode);
+      if (!packet) return res.status(404).json({ message: "Packet not found" });
+
+      const roleActions = MOBILE_ROLE_ACTIONS[scannedByRole] ?? [];
+      const match = roleActions.find(ra => ra.triggerStatus === packet.status);
+      if (!match) {
+        return res.status(422).json({
+          message: `No action available for role '${scannedByRole}' on a packet with status '${packet.status}'.`,
+        });
+      }
+
+      // Reject duplicate: same role+action on same fromStatus already recorded
+      const existingScans = await storage.getMobilePacketScans(packet.id);
+      const duplicate = existingScans.find(
+        s => s.scannedByEid === scannedBy && s.fromStatus === packet.status && s.action === match.action
+      );
+      if (duplicate) {
+        return res.status(409).json({
+          message: `Duplicate scan: this action ('${match.action}') was already recorded for this packet by this staff member.`,
+        });
+      }
+
+      // Advance packet status
+      await storage.updateExamPacket(packet.id, { status: match.nextStatus as any, updatedAt: new Date() });
+
+      // Record scan
+      const scan = await storage.createMobilePacketScan({
+        packetId: packet.id,
+        barcode,
+        scannedByEid: scannedBy,
+        scannedByName,
+        scannedByRole,
+        action: match.action,
+        fromStatus: packet.status as any,
+        toStatus: match.nextStatus as any,
+        location: location ?? null,
+        notes: notes ?? null,
+        gpsLatitude: gpsLatitude ?? null,
+        gpsLongitude: gpsLongitude ?? null,
+      });
+
+      const updatedPacket = await storage.getExamPacketByBarcode(barcode);
+      const [allRegions, allClusters, allCenters, allSubjects] = await Promise.all([
+        storage.getAllRegions(), storage.getAllClusters(),
+        storage.getAllExamCenters(), storage.getAllSubjects(),
+      ]);
+      const subjectMap = Object.fromEntries(allSubjects.map((s: any) => [s.id, s.name]));
+      const packetObj = buildPacketResponse(
+        { ...updatedPacket!, subjectName: subjectMap[updatedPacket!.subjectId] },
+        allRegions, allClusters, allCenters
+      );
+
+      res.json({
+        packet: packetObj,
+        scan: {
+          id: scan.id,
+          action: scan.action,
+          fromStatus: scan.fromStatus,
+          toStatus: scan.toStatus,
+          scannedByName: scan.scannedByName,
+          scannedByRole: scan.scannedByRole,
+          location: scan.location ?? null,
+          notes: scan.notes ?? null,
+          scannedAt: scan.scannedAt,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }
 

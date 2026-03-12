@@ -2086,3 +2086,30 @@ export type InsertDeviceSyncSession = z.infer<typeof insertDeviceSyncSessionSche
 export type DeviceSyncSession = typeof deviceSyncSessions.$inferSelect;
 export type InsertSyncErrorLog = z.infer<typeof insertSyncErrorLogSchema>;
 export type SyncErrorLog = typeof syncErrorLogs.$inferSelect;
+
+// ─── Mobile Packet Scans ──────────────────────────────────────────────────────
+// Lightweight scan records submitted by the Amaanah Examiner mobile app.
+// Stores scanner identity as strings (EID-based auth, not user-account-based).
+
+export const mobilePacketScans = pgTable("mobile_packet_scans", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  packetId: integer("packet_id").notNull().references(() => examPackets.id),
+  barcode: varchar("barcode", { length: 50 }).notNull(),
+  scannedByEid: varchar("scanned_by_eid", { length: 20 }).notNull(),
+  scannedByName: varchar("scanned_by_name", { length: 120 }).notNull(),
+  scannedByRole: varchar("scanned_by_role", { length: 60 }).notNull(),
+  action: varchar("action", { length: 40 }).notNull(),
+  fromStatus: packetStatusEnum("from_status").notNull(),
+  toStatus: packetStatusEnum("to_status").notNull(),
+  location: varchar("location", { length: 120 }),
+  notes: text("notes"),
+  gpsLatitude: decimal("gps_latitude", { precision: 10, scale: 7 }),
+  gpsLongitude: decimal("gps_longitude", { precision: 10, scale: 7 }),
+  scannedAt: timestamp("scanned_at").defaultNow().notNull(),
+});
+
+export const insertMobilePacketScanSchema = createInsertSchema(mobilePacketScans).omit({
+  id: true, scannedAt: true,
+});
+export type InsertMobilePacketScan = z.infer<typeof insertMobilePacketScanSchema>;
+export type MobilePacketScan = typeof mobilePacketScans.$inferSelect;
