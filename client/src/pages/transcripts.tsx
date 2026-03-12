@@ -47,6 +47,7 @@ import {
   AlertCircle,
   Award,
   Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -415,8 +416,42 @@ export default function Transcripts() {
     setPreviewLoading(false);
   };
 
-  const handleDownload = (transcriptId: number) => {
-    window.open(`/api/transcripts/${transcriptId}/download`, '_blank');
+  const handleDownload = async (transcriptId: number, studentId?: number) => {
+    try {
+      const response = await fetch(`/api/transcripts/${transcriptId}/download`, { credentials: 'include' });
+      if (response.status === 404) {
+        toast({
+          title: isRTL ? "ملف PDF غير موجود" : "PDF File Missing",
+          description: isRTL
+            ? "ملف PDF غير موجود. سيتم إعادة إنشاؤه الآن..."
+            : "PDF file is missing. Regenerating now...",
+        });
+        if (studentId) {
+          generateTranscriptMutation.mutate([studentId]);
+        }
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status}`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filename = contentDisposition?.match(/filename="(.+)"/)?.[1] || `transcript_${transcriptId}.pdf`;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast({
+        title: isRTL ? "خطأ في التنزيل" : "Download Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handlePrintAll = () => {
@@ -912,11 +947,25 @@ export default function Transcripts() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => handleDownload(transcript.id)}
+                                    onClick={() => handleDownload(transcript.id, student.id)}
                                     data-testid={`button-download-${student.id}`}
                                     title={isRTL ? "تنزيل" : "Download"}
                                   >
                                     <Download className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => generateTranscriptMutation.mutate([student.id])}
+                                    disabled={generateTranscriptMutation.isPending}
+                                    data-testid={`button-regenerate-${student.id}`}
+                                    title={isRTL ? "إعادة إنشاء PDF" : "Regenerate PDF"}
+                                  >
+                                    {generateTranscriptMutation.isPending ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="w-4 h-4" />
+                                    )}
                                   </Button>
                                 </>
                               )}
@@ -1058,7 +1107,7 @@ export default function Transcripts() {
               {t.common.cancel}
             </Button>
             {previewTranscript && (
-              <Button onClick={() => handleDownload(previewTranscript.id)}>
+              <Button onClick={() => handleDownload(previewTranscript.id, previewStudent?.id)}>
                 <Download className="w-4 h-4 me-2" />
                 {isRTL ? "تنزيل PDF" : "Download PDF"}
               </Button>

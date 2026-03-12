@@ -10066,12 +10066,59 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const existingCerts = await storage.getCertificatesByExamYear(targetExamYear.id);
         const existingCert = existingCerts.find(c => c.studentId === studentId);
         if (existingCert) {
-          // Certificate already exists - skip and return it as already generated
-          generatedCerts.push({
-            ...existingCert,
-            studentName: `${student.firstName} ${student.lastName}`,
-            alreadyExists: true,
-          });
+          // Check if the PDF file actually exists on disk
+          const fsSync = await import('fs');
+          const pdfExists = existingCert.pdfUrl && fsSync.existsSync(existingCert.pdfUrl);
+          if (pdfExists) {
+            // PDF file exists - return existing cert
+            generatedCerts.push({
+              ...existingCert,
+              studentName: `${student.firstName} ${student.lastName}`,
+              alreadyExists: true,
+            });
+            continue;
+          }
+          // PDF file is missing - regenerate it and update the record
+          try {
+            const regenQrToken = existingCert.qrToken || generateQRToken();
+            const regenCertNumber = existingCert.certificateNumber;
+            const regenVerifyUrl = `${process.env.PRODUCTION_DOMAIN || 'https://amaanah.gm'}/verify/${regenQrToken}`;
+            const regenQrCodeDataUrl = await generateCertificateQRCodeDataUrl(regenVerifyUrl);
+            const regenPdfPath = await generatePrimaryCertificatePDF({
+              student: {
+                id: student.id,
+                firstName: student.firstName,
+                lastName: student.lastName,
+                middleName: student.middleName,
+                gender: student.gender as 'male' | 'female',
+                dateOfBirth: student.dateOfBirth,
+                placeOfBirth: student.placeOfBirth,
+                grade: student.grade,
+                indexNumber: student.indexNumber,
+              },
+              school: { id: school.id, name: school.name, address: school.address, arabicName: school.name, arabicAddress: school.address },
+              examYear: {
+                id: targetExamYear.id,
+                year: targetExamYear.year,
+                hijriYear: targetExamYear.hijriYear,
+                examStartDate: targetExamYear.examStartDate,
+                examEndDate: targetExamYear.examEndDate,
+              },
+              finalGrade,
+              qrToken: regenQrToken,
+              certificateNumber: regenCertNumber,
+              verifyUrl: regenVerifyUrl,
+              qrCodeDataUrl: regenQrCodeDataUrl,
+            });
+            const updatedCert = await storage.updateCertificate(existingCert.id, { pdfUrl: regenPdfPath });
+            generatedCerts.push({
+              ...(updatedCert || existingCert),
+              studentName: `${student.firstName} ${student.lastName}`,
+            });
+          } catch (regenErr: any) {
+            console.error(`Failed to regenerate certificate PDF for student ${studentId}:`, regenErr.message);
+            errors.push({ studentId, studentName: `${student.firstName} ${student.lastName}`, error: regenErr.message, errorAr: 'فشل في إعادة إنشاء الشهادة' });
+          }
           continue;
         }
         
@@ -10649,9 +10696,31 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           // This ensures idempotent generation - same student always gets same number
           const existingTranscript = await storage.getTranscriptByStudentAndExamYear(studentId, targetExamYear.id);
           if (existingTranscript) {
-            // Transcript already exists for this student - return it
+            // Check if the PDF file actually exists on disk
+            const fsCheck = await import('fs');
+            const pdfExists = existingTranscript.pdfUrl && fsCheck.existsSync(existingTranscript.pdfUrl);
+            if (pdfExists) {
+              // PDF file exists - return existing transcript
+              generatedTranscripts.push({
+                ...existingTranscript,
+                studentName: `${student.firstName} ${student.middleName || ''} ${student.lastName}`.trim(),
+                percentage: transcriptData.percentage.toFixed(1),
+                finalGrade: transcriptData.finalGrade.arabic,
+              });
+              continue;
+            }
+            // PDF file is missing - regenerate using existing transcript data
+            const existingQrToken = existingTranscript.qrToken || generateQRToken();
+            const existingBaseUrl = process.env.PRODUCTION_DOMAIN || 'https://amaanah.gm';
+            const existingVerifyUrl = `${existingBaseUrl}/verify/transcript/${existingQrToken}`;
+            const existingQrCodeDataUrl = await generateQRCodeDataUrl(existingVerifyUrl);
+            transcriptData.transcriptNumber = existingTranscript.transcriptNumber || `G6TR-${targetExamYear.year}-${String(studentId).padStart(4, '0')}`;
+
+            transcriptData.qrCodeDataUrl = existingQrCodeDataUrl;
+            const regenPdfPath = await generateTranscriptPDF(transcriptData);
+            const updatedTranscript = await storage.updateTranscript(existingTranscript.id, { pdfUrl: regenPdfPath });
             generatedTranscripts.push({
-              ...existingTranscript,
+              ...(updatedTranscript || existingTranscript),
               studentName: `${student.firstName} ${student.middleName || ''} ${student.lastName}`.trim(),
               percentage: transcriptData.percentage.toFixed(1),
               finalGrade: transcriptData.finalGrade.arabic,
@@ -10883,8 +10952,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         : path.join(process.cwd(), transcript.pdfUrl);
 
       if (!fs.existsSync(pdfPath)) {
-        console.error(`[PDF Download] File not found at path: ${pdfPath}`);
-        return res.status(404).json({ message: "PDF file not found" });
+        console.error(`[PDF Download] Transcript PDF not found at path: ${pdfPath}`);
+        return res.status(404).json({ message: "PDF file not found. Please click Generate again to recreate this PDF." });
       }
       
       await storage.incrementTranscriptPrintCount(transcript.id);

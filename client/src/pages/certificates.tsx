@@ -49,6 +49,7 @@ import {
   AlertCircle,
   FileCheck2,
   Printer,
+  RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -429,8 +430,42 @@ export default function Certificates() {
     setShowPreviewDialog(true);
   };
 
-  const handleDownload = (certificateId: number) => {
-    window.open(`/api/certificates/${certificateId}/download`, '_blank');
+  const handleDownload = async (certificateId: number, studentId?: number) => {
+    try {
+      const response = await fetch(`/api/certificates/${certificateId}/download`, { credentials: 'include' });
+      if (response.status === 404) {
+        toast({
+          title: isRTL ? "ملف PDF غير موجود" : "PDF File Missing",
+          description: isRTL
+            ? "ملف PDF غير موجود. سيتم إعادة إنشاؤه الآن..."
+            : "PDF file is missing. Regenerating now...",
+        });
+        if (studentId) {
+          generatePrimaryMutation.mutate([studentId]);
+        }
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status}`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filename = contentDisposition?.match(/filename="(.+)"/)?.[1] || `certificate_${certificateId}.pdf`;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast({
+        title: isRTL ? "خطأ في التنزيل" : "Download Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handlePrintAll = () => {
@@ -880,12 +915,26 @@ export default function Certificates() {
                                 size="icon"
                                 onClick={() => {
                                   const cert = getStudentCertificate(student.id);
-                                  if (cert) handleDownload(cert.id);
+                                  if (cert) handleDownload(cert.id, student.id);
                                 }}
                                 data-testid={`button-download-${student.id}`}
                                 title={isRTL ? "تنزيل" : "Download"}
                               >
                                 <Download className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => generatePrimaryMutation.mutate([student.id])}
+                                disabled={generatePrimaryMutation.isPending}
+                                data-testid={`button-regenerate-${student.id}`}
+                                title={isRTL ? "إعادة إنشاء PDF" : "Regenerate PDF"}
+                              >
+                                {generatePrimaryMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="w-4 h-4" />
+                                )}
                               </Button>
                             </>
                           )}
@@ -1086,7 +1135,7 @@ export default function Certificates() {
               {t.common.cancel}
             </Button>
             {previewCertificate && (
-              <Button onClick={() => handleDownload(previewCertificate.id)}>
+              <Button onClick={() => handleDownload(previewCertificate.id, previewStudent?.id)}>
                 <Download className="w-4 h-4 me-2" />
                 {isRTL ? "تنزيل PDF" : "Download PDF"}
               </Button>
