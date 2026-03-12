@@ -6,8 +6,8 @@ import fs from "fs";
 import path from "path";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments, studentResults, examCards } from "@shared/schema";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments, studentResults, examCards, attendanceRecords } from "@shared/schema";
+import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
 import {
@@ -18265,6 +18265,113 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
           scannedAt: scan.scannedAt,
         },
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─── Mobile Attendance Count API ─────────────────────────────────────────────
+  // GET /api/mobile/attendance/count
+  // Auth: X-Staff-ID: {EID} header
+  // Scope params: ?subject=Mathematics&center=...  OR  &cluster=...  OR  &region=...
+  // HQ scope: just ?subject=Mathematics (no center/cluster/region)
+  app.get("/api/mobile/attendance/count", async (req, res) => {
+    try {
+      const eid = req.headers['x-staff-id'] as string | undefined;
+      if (!eid) return res.status(401).json({ message: "X-Staff-ID header required" });
+
+      const staffProfile = await storage.getStaffProfileByEmployeeId(eid);
+      if (!staffProfile) return res.status(401).json({ message: "Staff not found for provided EID" });
+
+      const subjectParam = req.query.subject as string | undefined;
+      const centerParam  = req.query.center  as string | undefined;
+      const clusterParam = req.query.cluster as string | undefined;
+      const regionParam  = req.query.region  as string | undefined;
+      const examYearIdParam = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+
+      // Resolve exam year (default to active)
+      let examYearId = examYearIdParam;
+      if (!examYearId) {
+        const activeYear = await storage.getActiveExamYear();
+        if (activeYear) examYearId = activeYear.id;
+      }
+
+      // Resolve subject name → subjectId
+      let subjectId: number | undefined;
+      let subjectName: string = subjectParam || 'All Subjects';
+      if (subjectParam) {
+        const allSubjects = await storage.getAllSubjects() as any[];
+        const subject = allSubjects.find(s =>
+          s.name.toLowerCase() === subjectParam.toLowerCase() || s.name === subjectParam
+        );
+        if (subject) { subjectId = subject.id; subjectName = subject.name; }
+      }
+
+      // Resolve scope → list of centerIds + scopeLabel
+      const allCenters = await storage.getAllExamCenters() as any[];
+      const centerNameMap = new Map<number, string>(allCenters.map((c: any) => [c.id, c.name]));
+      let centerIds: number[] = [];
+      let scopeLabel = 'National';
+
+      if (centerParam) {
+        const center = allCenters.find((c: any) =>
+          c.name.toLowerCase() === centerParam.toLowerCase() || c.name === centerParam
+        );
+        if (center) { centerIds = [center.id]; scopeLabel = center.name; }
+        else { centerIds = []; scopeLabel = centerParam; }
+      } else if (clusterParam) {
+        const allClusters = await storage.getAllClusters() as any[];
+        const cluster = allClusters.find((c: any) =>
+          c.name.toLowerCase() === clusterParam.toLowerCase() || c.name === clusterParam
+        );
+        if (cluster) {
+          const clusterCenters = await storage.getExamCentersByCluster(cluster.id) as any[];
+          centerIds = clusterCenters.map((c: any) => c.id);
+          scopeLabel = cluster.name;
+        }
+      } else if (regionParam) {
+        const allRegions = await storage.getAllRegions() as any[];
+        const region = allRegions.find((r: any) =>
+          r.name.toLowerCase() === regionParam.toLowerCase() || r.name === regionParam
+        );
+        if (region) {
+          const regionCenters = await storage.getExamCentersByRegion(region.id) as any[];
+          centerIds = regionCenters.map((c: any) => c.id);
+          scopeLabel = region.name;
+        }
+      } else {
+        // HQ scope — all centers
+        centerIds = allCenters.map((c: any) => c.id);
+      }
+
+      // Build WHERE conditions
+      const conditions: any[] = [eq(attendanceRecords.isPresent, true)];
+      if (subjectId)   conditions.push(eq(attendanceRecords.subjectId, subjectId));
+      if (examYearId)  conditions.push(eq(attendanceRecords.examYearId, examYearId));
+      if (centerIds.length > 0) conditions.push(inArray(attendanceRecords.centerId, centerIds));
+
+      // Aggregate: count per center
+      const rows = await db
+        .select({
+          centerId: attendanceRecords.centerId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(attendanceRecords)
+        .where(and(...conditions))
+        .groupBy(attendanceRecords.centerId);
+
+      // Build center breakdown sorted highest → lowest
+      const centerBreakdown = rows
+        .map(r => ({
+          center: centerNameMap.get(r.centerId) ?? `Center ${r.centerId}`,
+          centerId: r.centerId,
+          count: r.count,
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      const total = centerBreakdown.reduce((sum, r) => sum + r.count, 0);
+
+      res.json({ total, scopeLabel, subjectName, centerBreakdown });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
