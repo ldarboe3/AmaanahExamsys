@@ -15915,6 +15915,16 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ============ Public Mobile API — Subjects list (no auth required) ============
+  app.get("/api/public/subjects", async (_req, res) => {
+    try {
+      const subjects = await storage.getAllSubjects();
+      res.json(subjects.map((s: any) => ({ id: s.id, name: s.name, grade: s.grade })));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============ Public Mobile API — Exam Schedules Sync (no auth required) ============
   app.get("/api/public/exam-schedules", async (req, res) => {
     try {
@@ -15924,8 +15934,63 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       if (req.query.centerId) filters.centerId = parseInt(req.query.centerId as string);
       if (req.query.clusterId) filters.clusterId = parseInt(req.query.clusterId as string);
       if (req.query.regionId) filters.regionId = parseInt(req.query.regionId as string);
-      const schedules = await storage.getExamSchedules(filters);
-      res.json(schedules);
+      const includePackets = req.query.includePackets === 'true';
+
+      const [schedules, allSubjects] = await Promise.all([
+        storage.getExamSchedules(filters),
+        storage.getAllSubjects(),
+      ]);
+
+      // Build subject ID → name map for transparent name resolution
+      const subjectMap = new Map<number, string>();
+      for (const s of allSubjects as any[]) subjectMap.set(s.id, s.name);
+
+      // Enrich schedules with subjectName
+      const enriched: any[] = schedules.map((sch: any) => ({
+        ...sch,
+        subjectName: subjectMap.get(sch.subjectId) ?? `Subject ${sch.subjectId}`,
+      }));
+
+      // Optionally attach packets for each schedule (for clickable card feature)
+      if (includePackets) {
+        const examCentersList = await storage.getAllExamCenters();
+        const centerMap = new Map<number, string>();
+        for (const c of examCentersList as any[]) centerMap.set(c.id, c.name);
+
+        // Statuses that indicate the packet has been received at the exam center
+        const receivedStatuses = new Set([
+          'at_center', 'opened', 'sealed',
+          'return_dispatched', 'return_received', 'archived',
+        ]);
+
+        // Fetch all packets for the relevant exam year(s) once
+        const packetFilters: any = {};
+        if (filters.examYearId) packetFilters.examYearId = filters.examYearId;
+        const allPackets = await storage.getExamPackets(packetFilters);
+
+        // Group packets by subjectId + grade key
+        const packetsByKey = new Map<string, any[]>();
+        for (const pkt of allPackets as any[]) {
+          const key = `${pkt.subjectId}:${pkt.grade}`;
+          if (!packetsByKey.has(key)) packetsByKey.set(key, []);
+          packetsByKey.get(key)!.push(pkt);
+        }
+
+        for (const sch of enriched) {
+          const key = `${sch.subjectId}:${sch.grade}`;
+          const pkts = packetsByKey.get(key) ?? [];
+          sch.packets = pkts.map((pkt: any) => ({
+            id: pkt.id,
+            barcode: pkt.barcode,
+            centerName: centerMap.get(pkt.destinationCenterId) ?? `Center ${pkt.destinationCenterId}`,
+            centerId: pkt.destinationCenterId,
+            status: pkt.status,
+            received: receivedStatuses.has(pkt.status),
+          }));
+        }
+      }
+
+      res.json(enriched);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
