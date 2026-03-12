@@ -153,7 +153,16 @@ export default function Transcripts() {
   const schools = schoolsResponse?.data || [];
 
   const { data: allTranscripts } = useQuery<Transcript[]>({
-    queryKey: ["/api/transcripts"],
+    queryKey: ["/api/transcripts", selectedExamYear],
+    queryFn: async () => {
+      const url = selectedExamYear
+        ? `/api/transcripts?examYearId=${selectedExamYear}`
+        : '/api/transcripts';
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch transcripts');
+      return response.json();
+    },
+    enabled: !!selectedExamYear,
   });
 
   const activeExamYear = examYears?.find(y => y.isActive);
@@ -282,7 +291,7 @@ export default function Transcripts() {
         });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/transcripts/eligible-g6-students"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transcripts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transcripts", selectedExamYear] });
       setSelectedStudents([]);
     },
     onError: (error: Error) => {
@@ -306,7 +315,7 @@ export default function Transcripts() {
           ? `تم حذف ${data.deletedRecords} كشف درجات و ${data.deletedFiles} ملف`
           : `Deleted ${data.deletedRecords} transcript records and ${data.deletedFiles} files`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/transcripts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transcripts", selectedExamYear] });
       queryClient.invalidateQueries({ queryKey: ["/api/transcripts/eligible-g6-students"] });
       setSelectedStudents([]);
       setShowDeleteConfirm(false);
