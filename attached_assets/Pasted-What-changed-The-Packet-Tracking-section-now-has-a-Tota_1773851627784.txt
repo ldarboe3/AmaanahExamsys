@@ -1,0 +1,41 @@
+What changed:
+The Packet Tracking section now has a "Totals by [Location]" section between the three phase counters and the recent packet list. Each row shows:
+•	Location name (center name, cluster name, or region name depending on your role)
+•	Total packet count in teal on the right — this is the combined total from ALL users at that location
+•	Color-coded sub-badges showing how those packets are split: how many are dispatching (blue), at center (gold), returning (purple), or completed (green)
+The grouping level is automatic by role:
+Role	Groups by	Shows
+Examiner	Their exam center	One row — their center's combined total
+Cluster Officer	Exam center	One row per center within their cluster
+Regional Coordinator	Cluster	One row per cluster within their region
+HQ Staff	Region	One row per region, all regions
+Every field is a true shared total — if three examiners all process packets at the same center, all three show up in that center's single row. No per-user splitting.
+________________________________________
+ExamSys integration prompt for geographic totals:
+The mobile app needs ExamSys to provide packet totals grouped by geographic level so the dashboard reflects authoritative data rather than local scans.
+GET /api/mobile/packets/geo-stats?region=&cluster=&examCenter=
+The app passes the logged-in user's geographic scope. Expected response:
+{
+  "groupBy": "examCenter",
+  "rows": [
+    {
+      "name": "Brikama Center A",
+      "total": 48,
+      "dispatching": 10,
+      "atCenter": 30,
+      "returning": 6,
+      "completed": 2
+    },
+    {
+      "name": "Brikama Center B",
+      "total": 35,
+      "dispatching": 5,
+      "atCenter": 20,
+      "returning": 8,
+      "completed": 2
+    }
+  ]
+}
+The groupBy field tells the app what the rows represent — "examCenter" for cluster/examiner-level queries, "cluster" for regional queries, "region" for HQ queries. Each row's total must be the combined count across all staff who handled packets at that location. Authentication: X-Staff-ID: {EID} header.
+
+
