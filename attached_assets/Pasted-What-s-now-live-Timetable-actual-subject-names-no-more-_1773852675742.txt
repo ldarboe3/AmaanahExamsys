@@ -1,0 +1,33 @@
+What's now live:
+
+Timetable — actual subject names (no more "Subject 51")
+
+The backend proxy now detects when ExamSys returns schedules with a subjectId number but no readable name. When that happens, it automatically calls ExamSys's subjects list (amaanah.gm/api/public/subjects) to build an ID → name map and stamps the name onto every schedule before sending it to the app. This runs transparently — the demo data always had proper names, and live ExamSys data will too once the endpoint exists.
+
+Timetable — clickable subject cards
+
+Every exam card now has a small "Tap to view packets" hint and is fully pressable. Tapping opens a slide-up sheet showing:
+
+Subject name, grade, date, and time window at the top
+A Exam Packets section listing every packet for that subject, each showing:
+Barcode and exam center name
+Green "Received" badge — if the packet has reached at_center, opened, sealed, or any return stage
+Amber "Not Received" badge — if the packet is still in transit from HQ through region/cluster
+Empty state with a clear message if no packets have been created for that subject yet
+ExamSys integration prompt for the subject names fix:
+
+The mobile app's timetable fetches exam schedules from amaanah.gm/api/public/exam-schedules. Currently the schedules return with a subjectId (e.g. 51) but no human-readable subject or subjectName field, which causes the app to display "Subject 51" instead of the actual subject.
+
+We need one of the following from the ExamSys backend:
+
+Option A (preferred — no change needed to schedules):
+Expose GET /api/public/subjects returning an array like:
+
+[{ "id": 51, "name": "Mathematics" }, { "id": 52, "name": "English Language" }, ...]
+The mobile backend will call this automatically to resolve names.
+
+Option B (cleaner — change schedules endpoint):
+Include subject or subjectName as a string field directly in each schedule object returned by /api/public/exam-schedules, e.g.:
+
+{ "subjectId": 51, "subject": "Mathematics", "examDate": "2026-03-15", ... }
+Either option will work — Option A requires no change to the schedules endpoint and the app backend handles the lookup automatically.
