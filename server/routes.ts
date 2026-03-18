@@ -18105,18 +18105,98 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   });
 
   // 2. Get single packet by barcode (includes scan history)
-  app.get("/api/mobile/packets/stats", async (_req, res) => {
+  app.get("/api/mobile/packets/stats", async (req, res) => {
     try {
-      const packets = await storage.getExamPackets();
-      const inTransitStatuses = new Set(["dispatched_to_region","dispatched_to_cluster","dispatched_to_center","collected"]);
-      const atCenterStatuses  = new Set(["at_center","opened","administered","sealed"]);
-      const returningStatuses = new Set(["returned_to_cluster","returned_to_region","returned_to_hq"]);
+      const eid = req.headers['x-staff-id'] as string | undefined;
+      if (!eid) return res.status(401).json({ message: "X-Staff-ID header required" });
+
+      const staffProfile = await storage.getStaffProfileByEmployeeId(eid);
+      if (!staffProfile) return res.status(401).json({ message: "Staff not found for provided EID" });
+
+      const examCenterParam = req.query.examCenter as string | undefined;
+      const clusterParam = req.query.cluster as string | undefined;
+      const regionParam = req.query.region as string | undefined;
+
+      // Resolve scope → list of centerIds + apply role-based filtering
+      const allCenters = await storage.getAllExamCenters() as any[];
+      const centerMap = new Map<number, string>(allCenters.map((c: any) => [c.id, c.name]));
+      let centerIds: number[] = [];
+
+      if (examCenterParam) {
+        const center = allCenters.find((c: any) =>
+          c.name.toLowerCase() === examCenterParam.toLowerCase() || c.name === examCenterParam
+        );
+        if (center) centerIds = [center.id];
+      } else if (clusterParam) {
+        const allClusters = await storage.getAllClusters() as any[];
+        const cluster = allClusters.find((c: any) =>
+          c.name.toLowerCase() === clusterParam.toLowerCase() || c.name === clusterParam
+        );
+        if (cluster) {
+          const clusterCenters = await storage.getExamCentersByCluster(cluster.id) as any[];
+          centerIds = clusterCenters.map((c: any) => c.id);
+        }
+      } else if (regionParam) {
+        const allRegions = await storage.getAllRegions() as any[];
+        const region = allRegions.find((r: any) =>
+          r.name.toLowerCase() === regionParam.toLowerCase() || r.name === regionParam
+        );
+        if (region) {
+          const regionCenters = await storage.getExamCentersByRegion(region.id) as any[];
+          centerIds = regionCenters.map((c: any) => c.id);
+        }
+      } else if (staffProfile.role === 'examiner') {
+        // Examiner: only their center
+        if (staffProfile.centerId) centerIds = [staffProfile.centerId];
+      } else if (staffProfile.role === 'cluster_officer') {
+        // Cluster Officer: only their cluster
+        if (staffProfile.clusterId) {
+          const clusterCenters = await storage.getExamCentersByCluster(staffProfile.clusterId) as any[];
+          centerIds = clusterCenters.map((c: any) => c.id);
+        }
+      } else if (staffProfile.role === 'regional_coordinator') {
+        // Regional Coordinator: only their region
+        if (staffProfile.regionId) {
+          const regionCenters = await storage.getExamCentersByRegion(staffProfile.regionId) as any[];
+          centerIds = regionCenters.map((c: any) => c.id);
+        }
+      } else {
+        // HQ Staff: all centers
+        centerIds = allCenters.map((c: any) => c.id);
+      }
+
+      // Filter packets by centerIds
+      let packets = await storage.getExamPackets();
+      if (centerIds.length > 0) {
+        packets = (packets as any[]).filter(p => centerIds.includes(p.destinationCenterId));
+      } else {
+        packets = [];
+      }
+
+      // Phase groupings for aggregation
+      const dispatchingStatuses = new Set(['at_hq', 'dispatched_to_region', 'at_region', 'dispatched_to_cluster', 'at_cluster', 'dispatched_to_center']);
+      const atCenterStatuses = new Set(['at_center', 'opened', 'sealed']);
+      const returningStatuses = new Set(['returned_to_cluster', 'returned_to_region', 'returned_to_hq']);
+
+      // Count by status (for detailed byStatus response)
+      const byStatus: Record<string, number> = {};
+      for (const p of packets as any[]) {
+        byStatus[p.status] = (byStatus[p.status] || 0) + 1;
+      }
+
+      // Aggregate counts
+      const dispatching = (packets as any[]).filter(p => dispatchingStatuses.has(p.status)).length;
+      const atCenter = (packets as any[]).filter(p => atCenterStatuses.has(p.status)).length;
+      const returning = (packets as any[]).filter(p => returningStatuses.has(p.status)).length;
+      const completed = (packets as any[]).filter(p => p.status === 'completed').length;
+
       res.json({
-        total:       packets.length,
-        dispatching: packets.filter(p => inTransitStatuses.has(p.status)).length,
-        atCenter:    packets.filter(p => atCenterStatuses.has(p.status)).length,
-        returning:   packets.filter(p => returningStatuses.has(p.status)).length,
-        completed:   packets.filter(p => p.status === "completed").length,
+        total: packets.length,
+        dispatching,
+        atCenter,
+        returning,
+        completed,
+        byStatus,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
