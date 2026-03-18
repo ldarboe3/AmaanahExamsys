@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Clock, BookOpen, RefreshCw, WifiOff, MapPin } from "lucide-react";
+import { CalendarDays, Clock, BookOpen, RefreshCw, WifiOff, MapPin, Package } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
 import type { ExamYear } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -40,6 +42,8 @@ function calcDuration(start: string, end: string) {
 export default function MobileTimetable() {
   const [now, setNow] = useState(() => new Date());
   const [online, setOnline] = useState(navigator.onLine);
+  const [selectedExam, setSelectedExam] = useState<any>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -68,7 +72,7 @@ export default function MobileTimetable() {
   })();
 
   const scheduleUrl = activeYear
-    ? `/api/exam-schedules?examYearId=${activeYear.id}&isPublished=true${scopeParam}`
+    ? `/api/exam-schedules?examYearId=${activeYear.id}&isPublished=true&includePackets=true${scopeParam}`
     : null;
 
   const { data: entries = [], isLoading, refetch, isFetching } = useQuery<any[]>({
@@ -203,7 +207,11 @@ export default function MobileTimetable() {
                     return (
                       <div
                         key={entry.id}
-                        className={`px-4 py-3 ${status === "active" ? "bg-green-50 dark:bg-green-950/30" : ""}`}
+                        className={`px-4 py-3 cursor-pointer hover-elevate transition-all ${status === "active" ? "bg-green-50 dark:bg-green-950/30" : ""}`}
+                        onClick={() => {
+                          setSelectedExam(entry);
+                          setSheetOpen(true);
+                        }}
                         data-testid={`row-timetable-${entry.id}`}
                       >
                         {/* Status badge + time */}
@@ -258,6 +266,11 @@ export default function MobileTimetable() {
                               Core
                             </span>
                           )}
+                          {(entry.packets || []).length > 0 && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                              Tap to view packets
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
@@ -275,6 +288,89 @@ export default function MobileTimetable() {
         {" · "}
         {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
       </div>
+
+      {/* Packet Details Sheet */}
+      {selectedExam && (
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetContent side="bottom" className="h-[80vh] overflow-y-auto rounded-t-2xl">
+            <SheetHeader className="space-y-4 pb-4 border-b">
+              {/* Subject details */}
+              <div>
+                <SheetTitle className="text-2xl leading-tight">
+                  {selectedExam.subject?.arabicName && (
+                    <span className="block text-right font-arabic text-xl leading-tight mb-1" dir="rtl">
+                      {selectedExam.subject.arabicName}
+                    </span>
+                  )}
+                  {selectedExam.subject?.name || selectedExam.subjectName || `Subject ${selectedExam.subjectId}`}
+                </SheetTitle>
+                <SheetDescription className="text-base mt-2">
+                  <div className="flex items-center gap-3">
+                    <span className="px-2 py-1 rounded-full bg-muted text-muted-foreground text-xs">
+                      Grade {selectedExam.grade}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {new Date(selectedExam.examDate + "T00:00:00").toLocaleDateString("en-US", {
+                        weekday: "long", month: "long", day: "numeric"
+                      })}
+                    </span>
+                  </div>
+                  <div className="text-muted-foreground mt-2 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    <span className="font-mono">
+                      {selectedExam.startTime} – {selectedExam.endTime}
+                    </span>
+                  </div>
+                </SheetDescription>
+              </div>
+            </SheetHeader>
+
+            {/* Exam Packets Section */}
+            <div className="mt-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Package className="w-5 h-5 text-muted-foreground" />
+                <h3 className="text-lg font-semibold">Exam Packets</h3>
+              </div>
+
+              {(!selectedExam.packets || selectedExam.packets.length === 0) ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground gap-2">
+                  <Package className="w-12 h-12 opacity-20" />
+                  <p className="font-medium">No packets created yet</p>
+                  <p className="text-xs">Packets will appear here once they're prepared for this exam.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedExam.packets.map((packet: any) => (
+                    <div
+                      key={packet.id}
+                      className="flex items-start justify-between gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono text-sm text-muted-foreground truncate" title={packet.barcode}>
+                          {packet.barcode}
+                        </div>
+                        <div className="text-base font-medium mt-0.5">
+                          {packet.centerName || `Center ${packet.centerId}`}
+                        </div>
+                      </div>
+                      <Badge
+                        variant={packet.received ? "outline" : "secondary"}
+                        className={
+                          packet.received
+                            ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+                            : "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+                        }
+                      >
+                        {packet.received ? "Received" : "Not Received"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }
