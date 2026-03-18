@@ -351,34 +351,49 @@ export default function MobileAttendanceScan() {
 
       <div className="flex-1 flex flex-col gap-4 p-4">
 
-        {/* Subject selector */}
+        {/* Subject selector — Today's exams only */}
         <Card data-testid="card-subject-select">
           <CardContent className="pt-4 pb-3">
-            <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              <BookOpen className="w-4 h-4 inline mr-1.5 -mt-0.5" />
-              Subject / Session
-            </label>
-            <Select
-              value={selectedSubjectId?.toString() || ""}
-              onValueChange={(v) => setSelectedSubjectId(parseInt(v))}
-            >
-              <SelectTrigger className="w-full" data-testid="select-subject">
-                <SelectValue placeholder="Choose a subject to scan for" />
-              </SelectTrigger>
-              <SelectContent>
-                {ctx.data.schedules.map((sch) => (
-                  <SelectItem key={sch.subjectId} value={sch.subjectId.toString()} data-testid={`option-subject-${sch.subjectId}`}>
-                    {sch.subject?.name || `Subject ${sch.subjectId}`}
-                    {sch.grade && ` — Grade ${sch.grade}`}
-                  </SelectItem>
-                ))}
-                {ctx.data.schedules.length === 0 && ctx.data.subjects.map((sub) => (
-                  <SelectItem key={sub.id} value={sub.id.toString()} data-testid={`option-subject-${sub.id}`}>
-                    {sub.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-muted-foreground">
+                <BookOpen className="w-4 h-4 inline mr-1.5 -mt-0.5" />
+                Select Subject
+              </label>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 font-medium">
+                <Clock className="w-3 h-3 inline mr-1 -mt-0.5" />
+                Today only · {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </span>
+            </div>
+
+            {ctx.data.schedules.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-5 gap-1.5 text-center text-muted-foreground border border-dashed rounded-md">
+                <BookOpen className="w-8 h-8 opacity-30" />
+                <p className="text-sm font-medium">No exams scheduled today</p>
+                <p className="text-xs">Check back when today's exams are published.</p>
+              </div>
+            ) : (
+              <Select
+                value={selectedSubjectId?.toString() || ""}
+                onValueChange={(v) => setSelectedSubjectId(parseInt(v))}
+              >
+                <SelectTrigger className="w-full" data-testid="select-subject">
+                  <SelectValue placeholder="Choose a subject to scan for" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ctx.data.schedules.map((sch) => (
+                    <SelectItem key={sch.subjectId} value={sch.subjectId.toString()} data-testid={`option-subject-${sch.subjectId}`}>
+                      <span className="flex items-center gap-2">
+                        <span>{sch.subject?.name || sch.subjectName || `Subject ${sch.subjectId}`}</span>
+                        {sch.grade && <span className="text-muted-foreground">· Gr {sch.grade}</span>}
+                        {sch.scheduledStartTime && (
+                          <span className="font-mono text-xs text-muted-foreground">{sch.scheduledStartTime}</span>
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </CardContent>
         </Card>
 

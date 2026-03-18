@@ -13,7 +13,7 @@ import {
 import {
   QrCode, Wifi, WifiOff, RefreshCw, CheckCircle, AlertTriangle,
   Package, Truck, Building2, Lock, ArrowLeft, Clock, MapPin,
-  ChevronLeft, Upload, Trash2,
+  ChevronLeft, Upload, Trash2, BarChart3,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -276,6 +276,16 @@ export default function MobilePacketScan() {
   const userRole: string = me?.role ?? "examiner";
   const availableActions = ROLE_ACTIONS[userRole] ?? ROLE_ACTIONS["examiner"];
 
+  // Packet stats
+  const { data: stats } = useQuery<{
+    total: number; packed: number; inTransit: number; atLocation: number;
+    opened: number; administered: number; sealed: number; returned: number; missing: number;
+  }>({
+    queryKey: ["/api/packet-events/dashboard/stats"],
+    queryFn: () => apiRequest("GET", "/api/packet-events/dashboard/stats").then(r => r.json()),
+    refetchInterval: 60000,
+  });
+
   // Online/offline detection
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -463,6 +473,37 @@ export default function MobilePacketScan() {
           </div>
         </div>
       </div>
+
+      {/* Packet Stats Strip */}
+      {stats && (
+        <div className="border-b bg-muted/30 px-3 py-2 overflow-x-auto" data-testid="stats-strip">
+          <div className="flex items-center gap-1 min-w-max">
+            <BarChart3 className="w-3.5 h-3.5 text-muted-foreground mr-1 shrink-0" />
+            <div className="flex items-center gap-2 text-xs">
+              <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium">
+                <Package className="w-3 h-3" />
+                {stats.total} Total
+              </span>
+              <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 font-medium">
+                <Truck className="w-3 h-3" />
+                {stats.inTransit} Dispatching
+              </span>
+              <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 font-medium">
+                <Building2 className="w-3 h-3" />
+                {stats.atLocation} At Locations
+              </span>
+              <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 font-medium">
+                <Lock className="w-3 h-3" />
+                {(stats.opened ?? 0) + (stats.administered ?? 0) + (stats.sealed ?? 0)} Active
+              </span>
+              <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-cyan-100 dark:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300 font-medium">
+                <ArrowLeft className="w-3 h-3" />
+                {stats.returned} Returned
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 p-4 space-y-4">
         {/* Scan area */}
