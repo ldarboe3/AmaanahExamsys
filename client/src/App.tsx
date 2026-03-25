@@ -238,7 +238,15 @@ function AuthenticatedLayout() {
           </main>
           <footer className="border-t bg-muted/30 py-3 text-center">
             <p className="text-xs text-muted-foreground">
-              Developed by <span className="font-bold">SkyNet Innovation Hub</span>
+              Developed by{" "}
+              <a
+                href="https://theskyinnovationhub.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold hover:underline"
+              >
+                SkyNet Innovation Hub
+              </a>
             </p>
           </footer>
         </div>

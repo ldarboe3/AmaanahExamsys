@@ -378,7 +378,15 @@ export function PublicFooter() {
         
         <div className="border-t border-white/5 mt-6 pt-4 text-center">
           <p className="text-xs text-white/40">
-            {isRTL ? 'تم التطوير بواسطة ' : 'Developed by '}<span className="font-bold text-white/60">{isRTL ? 'مركز سكاي نت للابتكار' : 'SkyNet Innovation Hub'}</span>
+            {isRTL ? 'تم التطوير بواسطة ' : 'Developed by '}{" "}
+            <a
+              href="https://theskyinnovationhub.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold text-white/60 hover:text-white/80 hover:underline transition-colors"
+            >
+              {isRTL ? 'مركز سكاي نت للابتكار' : 'SkyNet Innovation Hub'}
+            </a>
           </p>
         </div>
       </div>
