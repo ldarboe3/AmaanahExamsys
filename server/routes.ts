@@ -207,6 +207,52 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ===== Sitemap & robots.txt =====
+  app.get("/sitemap.xml", (req, res) => {
+    const base = `${req.protocol}://${req.get("host")}`;
+    const today = new Date().toISOString().split("T")[0];
+
+    const pages = [
+      { url: "/",                              changefreq: "weekly",  priority: "1.0" },
+      { url: "/about",                         changefreq: "monthly", priority: "0.8" },
+      { url: "/about/organisation-structure",  changefreq: "monthly", priority: "0.6" },
+      { url: "/about/senior-executives",       changefreq: "monthly", priority: "0.6" },
+      { url: "/programmes",                    changefreq: "monthly", priority: "0.8" },
+      { url: "/statistics",                    changefreq: "monthly", priority: "0.7" },
+      { url: "/membership",                    changefreq: "monthly", priority: "0.7" },
+      { url: "/news",                          changefreq: "weekly",  priority: "0.8" },
+      { url: "/resources",                     changefreq: "monthly", priority: "0.7" },
+      { url: "/contact",                       changefreq: "yearly",  priority: "0.6" },
+      { url: "/results",                       changefreq: "weekly",  priority: "0.9" },
+      { url: "/school-registration",           changefreq: "yearly",  priority: "0.6" },
+      { url: "/verify",                        changefreq: "yearly",  priority: "0.5" },
+      { url: "/verify-staff",                  changefreq: "yearly",  priority: "0.5" },
+      { url: "/login",                         changefreq: "yearly",  priority: "0.4" },
+    ];
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${pages.map(p => `  <url>
+    <loc>${base}${p.url}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>${p.changefreq}</changefreq>
+    <priority>${p.priority}</priority>
+  </url>`).join("\n")}
+</urlset>`;
+
+    res.setHeader("Content-Type", "application/xml");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(xml);
+  });
+
+  app.get("/robots.txt", (req, res) => {
+    const base = `${req.protocol}://${req.get("host")}`;
+    const txt = `User-agent: *\nAllow: /\nDisallow: /dashboard\nDisallow: /schools\nDisallow: /students\nDisallow: /admin-results\nDisallow: /certificates\nDisallow: /transcripts\nDisallow: /payments\nDisallow: /users\nDisallow: /analytics\nDisallow: /audit-logs\nDisallow: /reports\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`;
+    res.setHeader("Content-Type", "text/plain");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(txt);
+  });
+
   // Session setup
   app.use(
     session({
