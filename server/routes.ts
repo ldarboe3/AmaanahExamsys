@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { generateExamScheduleWithAI } from "./aiScheduler";
+import { fireSkyOSExamImportWebhook } from "./skyosWebhook";
 import fs from "fs";
 import path from "path";
 import { storage } from "./storage";
@@ -5142,6 +5143,14 @@ ${pages.map(p => `  <url>
 
       console.log(`[RESULTS BULK UPLOAD] Created/updated ${resultsCreated} results for ${matchedResults.length} students`);
 
+      // Fire Sky OS billing webhook asynchronously after successful bulk publish
+      if (resultsCreated > 0) {
+        const importedByLabel = user?.username || user?.email || "system";
+        fireSkyOSExamImportWebhook(parseInt(examYearId), importedByLabel).catch((err) => {
+          console.error("[SkyOS] Webhook fire error:", err.message);
+        });
+      }
+
       res.json({
         success: true,
         studentsProcessed: matchedResults.length,
@@ -9224,6 +9233,14 @@ ${pages.map(p => `  <url>
           console.error("Error sending result publication notifications:", notificationError.message);
           // Don't fail the entire publish if notifications fail
         }
+      }
+
+      // Fire Sky OS billing webhook asynchronously after successful publish
+      if (count > 0) {
+        const importedByLabel = user?.username || user?.email || "system";
+        fireSkyOSExamImportWebhook(parseInt(examYearId), importedByLabel).catch((err) => {
+          console.error("[SkyOS] Webhook fire error:", err.message);
+        });
       }
 
       res.json({ 
