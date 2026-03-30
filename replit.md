@@ -57,6 +57,15 @@ The system is built on a robust architecture featuring a React-based frontend, a
 - **Scalability**: Designed to support countrywide examinations through a multi-tenant architecture.
 - **Security**: Utilizes token-based workflows, bcrypt for password hashing, and robust role-based access control.
 
+## Sky OS Billing Integration
+- **Trigger**: Fires automatically when exam results are published (`/api/results/publish`) or bulk-uploaded and auto-published (`/api/bulk-upload/results/confirm`)
+- **Webhook**: `POST {SKYOS_WEBHOOK_URL}/api/amaanah/exam-import`
+- **Auth**: `X-Api-Key` header using `SKYOS_API_KEY` secret
+- **Payload**: `{ examYear (integer), grades: [{ grade, studentCount }] (only >0), importedBy (username) }`
+- **Response**: `{ success, invoiceNumber, totalFee, ... }` — invoice auto-delivered to Amaanah client portal on Sky OS
+- **Key File**: `server/skyosWebhook.ts`
+- **Environment Variables**: `SKYOS_WEBHOOK_URL`, `SKYOS_API_KEY` (set as shared env vars)
+
 ## External Dependencies
 - **Database**: PostgreSQL
 - **ORM**: Drizzle ORM
