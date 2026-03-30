@@ -86,6 +86,7 @@ app.use((req, res, next) => {
     log("Initializing server...");
     await registerRoutes(httpServer, app);
     log("Routes registered successfully");
+    log(`[SkyOS] Webhook configured: ${process.env.SKYOS_WEBHOOK_URL ? "YES (" + process.env.SKYOS_WEBHOOK_URL.substring(0, 40) + "...)" : "NO — set SKYOS_WEBHOOK_URL and SKYOS_API_KEY secrets"}`);
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
