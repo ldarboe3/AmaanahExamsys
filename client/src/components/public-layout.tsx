@@ -70,6 +70,15 @@ export function PublicHeader() {
 
   return (
     <header className="sticky top-0 z-50 w-full">
+      {/* Gambia flag stripe — 5 bands: red, white, blue, white, green */}
+      <div className="flex h-[5px] w-full">
+        <div className="flex-1 bg-[#CE1126]" />
+        <div className="w-[3px] bg-white" />
+        <div className="flex-[2] bg-[#3B7BDB]" />
+        <div className="w-[3px] bg-white" />
+        <div className="flex-1 bg-[#3A7728]" />
+      </div>
+
       {/* Top contact bar */}
       <div className="bg-[#0d3320] text-white/80 text-xs py-2 hidden md:block">
         <div className="container mx-auto px-4 flex items-center justify-between gap-4 flex-wrap">
