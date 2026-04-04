@@ -71,7 +71,7 @@ export function PublicHeader() {
   return (
     <header className="sticky top-0 z-50 w-full">
       {/* Top contact bar */}
-      <div className="bg-[#0f1e45] text-white/80 text-xs py-2 hidden md:block">
+      <div className="bg-[#0d3320] text-white/80 text-xs py-2 hidden md:block">
         <div className="container mx-auto px-4 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-5">
             <span className="flex items-center gap-1.5">
@@ -104,8 +104,8 @@ export function PublicHeader() {
       <nav
         className={`w-full transition-all duration-300 ${
           isScrolled
-            ? "bg-[#162553] shadow-lg shadow-[#0f1e45]/40"
-            : "bg-[#162553]"
+            ? "bg-[#155530] shadow-lg shadow-[#0d3320]/40"
+            : "bg-[#155530]"
         }`}
       >
         <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
@@ -148,7 +148,7 @@ export function PublicHeader() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="center"
-                    className="min-w-[200px] bg-[#0f1e45] border-white/10 rounded-lg shadow-xl"
+                    className="min-w-[200px] bg-[#0d3320] border-white/10 rounded-lg shadow-xl"
                   >
                     {item.children.map((child) => (
                       <DropdownMenuItem
@@ -200,7 +200,7 @@ export function PublicHeader() {
             <Link href="/login">
               <Button
                 size="sm"
-                className="bg-amber-400 hover:bg-amber-300 text-[#0f1e45] font-bold shadow-md border-0"
+                className="bg-amber-400 hover:bg-amber-300 text-[#0d3320] font-bold shadow-md border-0"
                 data-testid="button-portal-login"
               >
                 {t.website.portalLogin}
@@ -222,7 +222,7 @@ export function PublicHeader() {
               </SheetTrigger>
               <SheetContent
                 side={isRTL ? "left" : "right"}
-                className="w-[300px] sm:w-[350px] bg-[#0f1e45] border-white/10"
+                className="w-[300px] sm:w-[350px] bg-[#0d3320] border-white/10"
               >
                 <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
                   <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center">
@@ -264,7 +264,7 @@ export function PublicHeader() {
                       </Button>
                     </Link>
                     <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                      <Button className="w-full bg-amber-400 hover:bg-amber-300 text-[#0f1e45] font-bold border-0">
+                      <Button className="w-full bg-amber-400 hover:bg-amber-300 text-[#0d3320] font-bold border-0">
                         {t.website.portalLogin}
                       </Button>
                     </Link>
@@ -283,7 +283,7 @@ export function PublicFooter() {
   const { t, isRTL } = useLanguage();
 
   return (
-    <footer className="relative overflow-hidden bg-[#0a1530]">
+    <footer className="relative overflow-hidden bg-[#0a2318]">
       {/* Subtle geometric pattern */}
       <div className="absolute inset-0 opacity-[0.03]">
         <div
@@ -319,21 +319,21 @@ export function PublicFooter() {
               <div className="flex items-center gap-2">
                 <a
                   href="#"
-                  className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-amber-400 hover:text-[#0f1e45] transition-all duration-200"
+                  className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-amber-400 hover:text-[#0d3320] transition-all duration-200"
                   aria-label="Facebook"
                 >
                   <Facebook className="w-4 h-4" />
                 </a>
                 <a
                   href="#"
-                  className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-amber-400 hover:text-[#0f1e45] transition-all duration-200"
+                  className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-amber-400 hover:text-[#0d3320] transition-all duration-200"
                   aria-label="Twitter"
                 >
                   <Twitter className="w-4 h-4" />
                 </a>
                 <a
                   href="#"
-                  className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-amber-400 hover:text-[#0f1e45] transition-all duration-200"
+                  className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-amber-400 hover:text-[#0d3320] transition-all duration-200"
                   aria-label="YouTube"
                 >
                   <Youtube className="w-4 h-4" />

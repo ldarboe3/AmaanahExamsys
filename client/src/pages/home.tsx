@@ -158,7 +158,7 @@ export default function Home() {
           style={{ backgroundImage: `url(${heroImage})` }}
         />
         {/* Dark navy overlay for readability */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0a1530]/92 via-[#0f1e45]/85 to-[#162553]/75" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0a2318]/92 via-[#0d3320]/85 to-[#155530]/75" />
         {/* Subtle gold radial glow top-right */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-500/10 via-transparent to-transparent" />
         {/* Bottom fade to background */}
@@ -199,7 +199,7 @@ export default function Home() {
               <Link href="/membership">
                 <Button
                   size="lg"
-                  className="w-full sm:w-auto text-base px-8 bg-amber-400 hover:bg-amber-300 text-[#0f1e45] font-bold border-0 shadow-lg shadow-amber-900/30"
+                  className="w-full sm:w-auto text-base px-8 bg-amber-400 hover:bg-amber-300 text-[#0d3320] font-bold border-0 shadow-lg shadow-amber-900/30"
                   data-testid="button-get-involved"
                 >
                   {t.website.getInvolved}
@@ -265,7 +265,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-14 md:py-20 bg-[#0f1e45] relative overflow-hidden">
+      <section className="py-14 md:py-20 bg-[#0d3320] relative overflow-hidden">
         {/* Geometric background pattern */}
         <div className="absolute inset-0 opacity-[0.04]">
           <div
@@ -344,7 +344,7 @@ export default function Home() {
             </div>
             <div className="order-1 lg:order-2 relative">
               <div className="relative">
-                <div className="absolute -inset-4 bg-gradient-to-br from-[#162553]/30 to-amber-500/15 rounded-3xl blur-2xl" />
+                <div className="absolute -inset-4 bg-gradient-to-br from-[#155530]/30 to-amber-500/15 rounded-3xl blur-2xl" />
                 <img 
                   src={teacherImage} 
                   alt="Islamic education in The Gambia" 
@@ -378,10 +378,10 @@ export default function Home() {
 
           <div className="grid md:grid-cols-3 gap-8">
             <Card className="group border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-card/80 backdrop-blur-sm overflow-hidden" data-testid="card-service-1">
-              <div className="h-1.5 bg-gradient-to-r from-[#162553] to-[#1e3a8a]" />
+              <div className="h-1.5 bg-gradient-to-r from-[#155530] to-[#1e7a42]" />
               <CardHeader className="pb-4">
-                <div className="w-14 h-14 rounded-2xl bg-[#162553]/10 dark:bg-[#162553]/30 flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110">
-                  <Handshake className="w-7 h-7 text-[#162553] dark:text-amber-400" />
+                <div className="w-14 h-14 rounded-2xl bg-[#155530]/10 dark:bg-[#155530]/30 flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110">
+                  <Handshake className="w-7 h-7 text-[#155530] dark:text-amber-400" />
                 </div>
                 <CardTitle className="text-xl">{isRTL ? "الشراكة الحكومية" : "Government Partnership"}</CardTitle>
               </CardHeader>
@@ -412,10 +412,10 @@ export default function Home() {
             </Card>
 
             <Card className="group border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-card/80 backdrop-blur-sm overflow-hidden" data-testid="card-service-3">
-              <div className="h-1.5 bg-gradient-to-r from-[#0f1e45] to-[#162553]" />
+              <div className="h-1.5 bg-gradient-to-r from-[#0d3320] to-[#155530]" />
               <CardHeader className="pb-4">
-                <div className="w-14 h-14 rounded-2xl bg-[#0f1e45]/10 dark:bg-[#0f1e45]/40 flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110">
-                  <Award className="w-7 h-7 text-[#162553] dark:text-amber-400" />
+                <div className="w-14 h-14 rounded-2xl bg-[#0d3320]/10 dark:bg-[#0d3320]/40 flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110">
+                  <Award className="w-7 h-7 text-[#155530] dark:text-amber-400" />
                 </div>
                 <CardTitle className="text-xl">{isRTL ? "الشهادات" : "Certification"}</CardTitle>
               </CardHeader>
@@ -451,7 +451,7 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-8">
             {newsItems.map((item, i) => (
               <Card key={i} className="group border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden" data-testid={`card-news-${i}`}>
-                <div className="h-1 bg-gradient-to-r from-[#162553] to-amber-400" />
+                <div className="h-1 bg-gradient-to-r from-[#155530] to-amber-400" />
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3 mb-3">
                     <Badge variant="secondary" className="text-xs font-medium">{item.category}</Badge>
@@ -480,7 +480,7 @@ export default function Home() {
           style={{ backgroundImage: `url(${graduationImage})` }}
         />
         {/* Deep navy overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0a1530]/97 via-[#0f1e45]/95 to-[#162553]/92" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0a2318]/97 via-[#0d3320]/95 to-[#155530]/92" />
         {/* Gold top accent line */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
 
@@ -500,7 +500,7 @@ export default function Home() {
             <Link href="/results">
               <Button
                 size="lg"
-                className="min-w-[200px] text-base bg-amber-400 hover:bg-amber-300 text-[#0f1e45] font-bold border-0 shadow-xl"
+                className="min-w-[200px] text-base bg-amber-400 hover:bg-amber-300 text-[#0d3320] font-bold border-0 shadow-xl"
                 data-testid="button-result-checker"
               >
                 <FileCheck className="w-5 h-5 me-2" />
@@ -537,7 +537,7 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto">
             <Card className="border-0 shadow-2xl overflow-hidden" data-testid="card-newsletter">
-              <div className="h-1.5 bg-gradient-to-r from-[#162553] via-amber-400 to-[#162553]" />
+              <div className="h-1.5 bg-gradient-to-r from-[#155530] via-amber-400 to-[#155530]" />
               <CardContent className="p-8 md:p-12 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
                   <Mail className="w-8 h-8 text-primary" />

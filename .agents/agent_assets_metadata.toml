@@ -1,0 +1,20 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "0UB26jGi1ILAkMl81OBur"
+uri = "file://attached_assets/generated_images/african_madrassah_students_studying.png"
+type = "image"
+title = "african madrassah students"
+
+[[generated]]
+id = "K1GqcK9CfKOG2NTOvNcvl"
+uri = "file://attached_assets/generated_images/islamic_teacher_teaching_students.png"
+type = "image"
+title = "african islamic teacher"
+
+[[generated]]
+id = "4FBWEiv9tp28wajJFI4vH"
+uri = "file://attached_assets/generated_images/islamic_school_graduation_ceremony.png"
+type = "image"
+title = "african muslim graduation"
