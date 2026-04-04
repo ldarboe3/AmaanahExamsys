@@ -107,7 +107,7 @@ export function PublicHeader() {
               data-testid="topbar-new-portal"
             >
               <ExternalLink className="w-3 h-3" />
-              New Portal
+              Monitoring & QA Portal
             </a>
             <span className="text-white/30">|</span>
             <Link href="/login">
