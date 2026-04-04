@@ -73,9 +73,9 @@ export function PublicHeader() {
       {/* Gambia flag stripe — 5 bands: red, white, blue, white, green */}
       <div className="flex h-[5px] w-full">
         <div className="flex-1 bg-[#CE1126]" />
-        <div className="w-[8px] bg-white" />
+        <div className="w-[16px] bg-white" />
         <div className="flex-[2] bg-[#3B7BDB]" />
-        <div className="w-[8px] bg-white" />
+        <div className="w-[16px] bg-white" />
         <div className="flex-1 bg-[#3A7728]" />
       </div>
 
