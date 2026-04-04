@@ -157,8 +157,8 @@ export default function Home() {
           className="absolute inset-0 bg-cover bg-center scale-105"
           style={{ backgroundImage: `url(${heroImage})` }}
         />
-        {/* Dark navy overlay for readability */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0a2318]/92 via-[#0d3320]/85 to-[#155530]/75" />
+        {/* Dark green overlay — heavier on the left where text sits */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0a2318]/95 via-[#0a2318]/80 to-[#0a2318]/40" />
         {/* Subtle gold radial glow top-right */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-500/10 via-transparent to-transparent" />
         {/* Bottom fade to background */}
@@ -191,7 +191,7 @@ export default function Home() {
               )}
             </h1>
 
-            <p className="text-lg md:text-xl text-white/75 mb-10 max-w-2xl leading-relaxed">
+            <p className="text-lg md:text-xl text-white/95 mb-10 max-w-2xl leading-relaxed [text-shadow:0_1px_4px_rgba(0,0,0,0.5)]">
               {t.website.strengtheningUnity}
             </p>
 
@@ -210,7 +210,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="w-full sm:w-auto text-base px-8 bg-white/5 backdrop-blur-md border-white/25 text-white hover:bg-white/15"
+                  className="w-full sm:w-auto text-base px-8 bg-white/15 backdrop-blur-md border-white/60 text-white font-semibold hover:bg-white/25"
                   data-testid="button-learn-about"
                 >
                   {t.website.learnAboutAmaanah}
@@ -227,8 +227,8 @@ export default function Home() {
                 { value: "28+", label: isRTL ? "سنوات الخدمة" : "Years of Service" },
               ].map((stat) => (
                 <div key={stat.label} className="flex items-center gap-2">
-                  <span className="text-2xl font-extrabold text-amber-400">{stat.value}</span>
-                  <span className="text-white/50 text-sm">{stat.label}</span>
+                  <span className="text-2xl font-extrabold text-amber-400 [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]">{stat.value}</span>
+                  <span className="text-white/85 text-sm font-medium [text-shadow:0_1px_4px_rgba(0,0,0,0.7)]">{stat.label}</span>
                 </div>
               ))}
             </div>
@@ -479,19 +479,19 @@ export default function Home() {
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: `url(${graduationImage})` }}
         />
-        {/* Deep navy overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0a2318]/97 via-[#0d3320]/95 to-[#155530]/92" />
+        {/* Deep green overlay — uniform darkness for consistent text readability */}
+        <div className="absolute inset-0 bg-[#0a2318]/93" />
         {/* Gold top accent line */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
 
         <div className="relative container mx-auto px-4 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-6 rounded-full border border-amber-400/30 bg-amber-400/10">
-            <span className="text-amber-400 text-sm font-semibold">{isRTL ? "خدماتنا" : "Our Services"}</span>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-6 rounded-full border border-amber-400/50 bg-amber-400/20">
+            <span className="text-amber-300 text-sm font-bold">{isRTL ? "خدماتنا" : "Our Services"}</span>
           </div>
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-6">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-6 [text-shadow:0_2px_8px_rgba(0,0,0,0.5)]">
             {isRTL ? "الوصول إلى خدماتنا" : "Access Our Services"}
           </h2>
-          <p className="text-white/70 text-lg max-w-2xl mx-auto mb-10">
+          <p className="text-white/95 text-lg max-w-2xl mx-auto mb-10 [text-shadow:0_1px_4px_rgba(0,0,0,0.5)]">
             {isRTL
               ? "تحقق من نتائج الامتحانات، تحقق من الشهادات، أو سجل مدرستك مع الأمانة."
               : "Check your examination results, verify certificates, or register your school with AMAANAH."}
@@ -511,7 +511,7 @@ export default function Home() {
               <Button
                 size="lg"
                 variant="outline"
-                className="min-w-[200px] text-base border-white/25 text-white hover:bg-white/15"
+                className="min-w-[200px] text-base bg-white/15 backdrop-blur-sm border-white/60 text-white font-semibold hover:bg-white/25"
                 data-testid="button-verify-certificate"
               >
                 <Award className="w-5 h-5 me-2" />
@@ -522,7 +522,7 @@ export default function Home() {
               <Button
                 size="lg"
                 variant="outline"
-                className="min-w-[200px] text-base border-white/25 text-white hover:bg-white/15"
+                className="min-w-[200px] text-base bg-white/15 backdrop-blur-sm border-white/60 text-white font-semibold hover:bg-white/25"
                 data-testid="button-register-school"
               >
                 <School className="w-5 h-5 me-2" />
