@@ -217,15 +217,6 @@ export function PublicHeader() {
                 {t.website.checkResults}
               </Button>
             </Link>
-            <Link href="/login">
-              <Button
-                size="sm"
-                className="bg-amber-400 hover:bg-amber-300 text-[#0d3320] font-bold shadow-md border-0"
-                data-testid="button-portal-login"
-              >
-                {t.website.portalLogin}
-              </Button>
-            </Link>
 
             {/* Mobile language toggle */}
             <div className="flex md:hidden">
@@ -281,11 +272,6 @@ export function PublicHeader() {
                     <Link href="/results" onClick={() => setMobileMenuOpen(false)}>
                       <Button variant="outline" className="w-full border-white/20 text-white hover:bg-white/10">
                         {t.website.checkResults}
-                      </Button>
-                    </Link>
-                    <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                      <Button className="w-full bg-amber-400 hover:bg-amber-300 text-[#0d3320] font-bold border-0">
-                        {t.website.portalLogin}
                       </Button>
                     </Link>
                   </div>
