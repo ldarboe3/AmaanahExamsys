@@ -24,15 +24,15 @@
   --card-foreground: 220 25% 17%;
   --card-border: 174 30% 92%;
   
-  /* Teal-tinted sidebar */
-  --sidebar: 166 50% 97%;
-  --sidebar-foreground: 220 25% 17%;
-  --sidebar-border: 174 30% 88%;
-  --sidebar-primary: 174 84% 32%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 166 45% 93%;
-  --sidebar-accent-foreground: 174 60% 20%;
-  --sidebar-ring: 174 84% 32%;
+  /* Amaanah Green sidebar — matches public site branding */
+  --sidebar: 145 57% 20%;
+  --sidebar-foreground: 0 0% 93%;
+  --sidebar-border: 145 55% 14%;
+  --sidebar-primary: 43 96% 56%;
+  --sidebar-primary-foreground: 145 60% 8%;
+  --sidebar-accent: 145 52% 27%;
+  --sidebar-accent-foreground: 0 0% 95%;
+  --sidebar-ring: 43 96% 56%;
   
   /* Popovers */
   --popover: 0 0% 100%;
@@ -120,15 +120,15 @@
   --card-foreground: 174 15% 94%;
   --card-border: 220 18% 14%;
   
-  /* Dark sidebar with teal accent */
-  --sidebar: 220 25% 7%;
-  --sidebar-foreground: 174 15% 92%;
-  --sidebar-border: 220 20% 12%;
-  --sidebar-primary: 174 72% 42%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 220 25% 14%;
-  --sidebar-accent-foreground: 174 15% 92%;
-  --sidebar-ring: 174 72% 42%;
+  /* Amaanah deep green sidebar for dark mode */
+  --sidebar: 154 56% 9%;
+  --sidebar-foreground: 0 0% 88%;
+  --sidebar-border: 154 55% 12%;
+  --sidebar-primary: 43 92% 52%;
+  --sidebar-primary-foreground: 154 60% 6%;
+  --sidebar-accent: 154 50% 15%;
+  --sidebar-accent-foreground: 0 0% 90%;
+  --sidebar-ring: 43 92% 52%;
   
   /* Dark popovers */
   --popover: 220 25% 8%;

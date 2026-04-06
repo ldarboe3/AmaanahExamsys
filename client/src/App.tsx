@@ -221,9 +221,17 @@ function AuthenticatedLayout() {
       <div className="flex h-screen w-full">
         <AppSidebar side={isRTL ? "right" : "left"} />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center justify-between gap-2 p-4 border-b">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-2">
+          {/* Gambia flag stripe */}
+          <div className="flex h-[4px] w-full shrink-0">
+            <div className="flex-1 bg-[#CE1126]" />
+            <div className="w-[16px] bg-white" />
+            <div className="flex-[2] bg-[#3B7BDB]" />
+            <div className="w-[16px] bg-white" />
+            <div className="flex-1 bg-[#3A7728]" />
+          </div>
+          <header className="flex items-center justify-between gap-2 px-4 py-3 bg-sidebar border-b border-sidebar-border text-sidebar-foreground">
+            <SidebarTrigger className="text-sidebar-foreground hover:text-white hover:bg-sidebar-accent" data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-2 [&_button]:text-sidebar-foreground [&_button:hover]:text-white [&_svg]:text-sidebar-foreground">
               <NotificationsDropdown />
               <DocumentationButton />
               <LanguageToggle />

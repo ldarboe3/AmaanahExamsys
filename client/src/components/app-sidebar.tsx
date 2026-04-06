@@ -140,16 +140,18 @@ export function AppSidebar({ side = "left" }: AppSidebarProps) {
 
   return (
     <Sidebar side={side}>
-      <SidebarHeader className="border-b border-sidebar-border">
+      <SidebarHeader className="border-b border-sidebar-border bg-sidebar-border/30">
         <div className="flex items-center gap-3 px-2 py-3">
-          <img 
-            src={amanahLogo} 
-            alt="AMAANAH Logo" 
-            className="w-10 h-10 object-contain"
-          />
-          <div className="flex flex-col">
-            <span className="text-base font-semibold text-sidebar-foreground">{t.app.name}</span>
-            <span className="text-xs text-muted-foreground">{t.app.tagline}</span>
+          <div className="w-10 h-10 rounded-lg overflow-hidden ring-2 ring-sidebar-primary/40 shrink-0">
+            <img 
+              src={amanahLogo} 
+              alt="AMAANAH Logo" 
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-bold text-sidebar-foreground truncate">{t.app.name}</span>
+            <span className="text-[10px] text-sidebar-foreground/50 truncate leading-tight">{t.app.tagline}</span>
           </div>
         </div>
       </SidebarHeader>
