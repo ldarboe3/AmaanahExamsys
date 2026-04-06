@@ -2586,6 +2586,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteExamPacket(id: number): Promise<boolean> {
+    // Delete all dependent records first to satisfy foreign key constraints
+    await db.delete(mobilePacketScans).where(eq(mobilePacketScans.packetId, id));
+    await db.delete(examPacketVerifications).where(eq(examPacketVerifications.packetId, id));
+    await db.delete(packetEvents).where(eq(packetEvents.packetId, id));
+    await db.delete(handoverLogs).where(eq(handoverLogs.packetId, id));
     const result = await db.delete(examPackets).where(eq(examPackets.id, id)).returning();
     return result.length > 0;
   }
