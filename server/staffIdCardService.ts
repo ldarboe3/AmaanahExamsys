@@ -274,7 +274,7 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
     doc.font('Helvetica')
       .fontSize(4)
       .fillColor(WHITE)
-      .text(data.employeeId || data.staffIdNumber, barcodeX, barcodeY + barcodeH + 1, { width: barcodeW, align: 'center' });
+      .text(data.employeeId || data.staffIdNumber, barcodeX, barcodeY + barcodeH - 1, { width: barcodeW, align: 'center', lineBreak: false });
   } catch {}
 }
 
@@ -418,7 +418,7 @@ function drawBackPage(doc: typeof PDFDocument.prototype, data: StaffCardData, ha
   doc.font(hasAmiri ? 'Amiri' : 'Helvetica')
     .fontSize(4)
     .fillColor(WHITE)
-    .text('Scan QR to verify', 8, H * 0.88 + 12, { width: W - 16, align: 'center' });
+    .text('Scan QR to verify', 8, H * 0.88 + 12, { width: W - 16, align: 'center', lineBreak: false });
 }
 
 async function loadPhotoBuffer(photoUrl: string | null | undefined): Promise<Buffer | null> {
