@@ -1447,10 +1447,6 @@ export const staffRoleEnum = pgEnum('staff_role', [
   'regional_staff',
   'cluster_officer',
   'examiner',
-  'invigilator',
-  'supervisor',
-  'monitor',
-  'temporary_staff'
 ]);
 
 export const staffProfiles = pgTable("staff_profiles", {

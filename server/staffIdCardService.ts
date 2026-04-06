@@ -56,10 +56,6 @@ const roleLabels: Record<string, string> = {
   regional_staff: "Regional Staff",
   cluster_officer: "Cluster Operations Officer",
   examiner: "Examiner",
-  invigilator: "Invigilator",
-  supervisor: "Supervisor",
-  monitor: "Monitor",
-  temporary_staff: "Temporary Staff",
 };
 
 function getLogoPath(): string {

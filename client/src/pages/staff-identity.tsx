@@ -62,8 +62,8 @@ const staffProfileSchema = z.object({
   middleName: z.string().optional(),
   fullNameArabic: z.string().optional(),
   role: z.enum([
-    "hq_director", "hq_staff", "regional_coordinator",
-    "cluster_officer", "examiner", "invigilator", "supervisor", "monitor",
+    "hq_director", "hq_staff", "regional_coordinator", "regional_staff",
+    "cluster_officer", "examiner",
   ]),
   department: z.string().optional(),
   regionId: z.coerce.number().optional().nullable(),
@@ -96,11 +96,9 @@ const roleLabels: Record<string, string> = {
   hq_director: "HQ Director",
   hq_staff: "HQ Staff",
   regional_coordinator: "Regional Coordinator",
+  regional_staff: "Regional Staff",
   cluster_officer: "Cluster Operations Officer",
   examiner: "Examiner",
-  invigilator: "Invigilator",
-  supervisor: "Supervisor",
-  monitor: "Monitor",
 };
 
 function StaffTableSkeleton() {

@@ -25,12 +25,8 @@ const roleLabels: Record<string, string> = {
   hq_staff: "HQ Staff",
   regional_coordinator: "Regional Coordinator",
   regional_staff: "Regional Staff",
-  cluster_officer: "Cluster Officer",
+  cluster_officer: "Cluster Operations Officer",
   examiner: "Examiner",
-  invigilator: "Invigilator",
-  supervisor: "Supervisor",
-  monitor: "Monitor",
-  temporary_staff: "Temporary Staff",
 };
 
 export default function VerifyStaffPage() {
