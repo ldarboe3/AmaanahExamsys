@@ -266,15 +266,11 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
   drawGreenWaveFooter(doc, W, H);
 
   const barcodeW = 70;
-  const barcodeH = 18;
+  const barcodeH = 20;
   const barcodeX = (W - barcodeW) / 2;
-  const barcodeY = H * 0.88 + 8;
+  const barcodeY = H * 0.88 + 6;
   try {
     doc.image(barcodeBuffer, barcodeX, barcodeY, { width: barcodeW, height: barcodeH });
-    doc.font('Helvetica')
-      .fontSize(4)
-      .fillColor(WHITE)
-      .text(data.employeeId || data.staffIdNumber, barcodeX, barcodeY + barcodeH - 1, { width: barcodeW, align: 'center', lineBreak: false });
   } catch {}
 }
 
