@@ -15712,6 +15712,38 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Bulk delete staff profiles (super_admin only)
+  app.post("/api/staff-profiles/bulk-delete", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super admin can delete staff profiles" });
+      }
+      const { ids } = req.body as { ids: number[] };
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: "No IDs provided" });
+      }
+      let deleted = 0;
+      for (const id of ids) {
+        const existing = await storage.getStaffProfile(id);
+        if (!existing) continue;
+        await storage.deleteStaffProfile(id);
+        await storage.createAuditLog({
+          action: 'staff_profile_deleted',
+          entityType: 'staff_profile',
+          entityId: id.toString(),
+          userId: user.id,
+          newData: { details: `Bulk deleted staff profile: ${existing.firstName} ${existing.lastName} (${existing.staffIdNumber})` },
+        });
+        deleted++;
+      }
+      res.json({ message: `${deleted} staff profile(s) deleted`, deleted });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/staff-profiles/:id/events", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);

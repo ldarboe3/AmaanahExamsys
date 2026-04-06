@@ -25,6 +25,11 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Search, MoreVertical, Eye, Edit, Plus, UserCheck, Trash2,
   Shield, ShieldAlert, ShieldOff, ShieldCheck, CreditCard,
@@ -133,6 +138,8 @@ export default function StaffIdentityPage() {
   const [workLocation, setWorkLocation] = useState<"hq" | "field">("hq");
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
 
   const { data: staffProfiles = [], isLoading } = useQuery<StaffProfile[]>({
     queryKey: ["/api/staff-profiles", { search: searchTerm, status: statusFilter !== "all" ? statusFilter : undefined, role: roleFilter !== "all" ? roleFilter : undefined, department: departmentFilter !== "all" ? departmentFilter : undefined }],
@@ -245,6 +252,22 @@ export default function StaffIdentityPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/staff-profiles"] });
       toast({ title: "Staff profile deleted" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const res = await apiRequest("POST", "/api/staff-profiles/bulk-delete", { ids });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff-profiles"] });
+      setSelectedIds(new Set());
+      setShowBulkDeleteDialog(false);
+      toast({ title: `${data.deleted} profile(s) deleted successfully` });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -474,15 +497,60 @@ export default function StaffIdentityPage() {
               <p className="text-sm">Create a new staff profile to get started</p>
             </div>
           ) : (
+            <>
+            {selectedIds.size > 0 && (
+              <div className="flex items-center justify-between gap-3 mb-3 px-4 py-2.5 bg-primary/10 border border-primary/20 rounded-md">
+                <span className="text-sm font-medium text-primary">
+                  {selectedIds.size} profile{selectedIds.size !== 1 ? "s" : ""} selected
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedIds(new Set())}
+                  >
+                    Clear selection
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setShowBulkDeleteDialog(true)}
+                    data-testid="button-bulk-delete"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Selected ({selectedIds.size})
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="rounded-md border overflow-hidden">
               <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[30%]">Staff</TableHead>
-                    <TableHead className="w-[18%]">Role / Dept</TableHead>
-                    <TableHead className="w-[14%]">Region</TableHead>
-                    <TableHead className="w-[12%]">Status</TableHead>
-                    <TableHead className="w-[20%]">Contact</TableHead>
+                    <TableHead className="w-[40px] px-3">
+                      <Checkbox
+                        checked={paginatedStaff.length > 0 && paginatedStaff.every(s => selectedIds.has(s.id))}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedIds(prev => new Set([...prev, ...paginatedStaff.map(s => s.id)]));
+                          } else {
+                            setSelectedIds(prev => {
+                              const next = new Set(prev);
+                              paginatedStaff.forEach(s => next.delete(s.id));
+                              return next;
+                            });
+                          }
+                        }}
+                        data-testid="checkbox-select-all"
+                        aria-label="Select all on this page"
+                      />
+                    </TableHead>
+                    <TableHead className="w-[28%]">Staff</TableHead>
+                    <TableHead className="w-[17%]">Role / Dept</TableHead>
+                    <TableHead className="w-[13%]">Region</TableHead>
+                    <TableHead className="w-[11%]">Status</TableHead>
+                    <TableHead className="w-[18%]">Contact</TableHead>
                     <TableHead className="w-[6%]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -492,8 +560,28 @@ export default function StaffIdentityPage() {
                     const StatusIcon = sConfig.icon;
                     const regionName = regions.find((r) => r.id === staff.regionId)?.name;
                     const clusterName = clusters.find((c) => c.id === staff.clusterId)?.name;
+                    const isSelected = selectedIds.has(staff.id);
                     return (
-                      <TableRow key={staff.id} data-testid={`row-staff-${staff.id}`}>
+                      <TableRow
+                        key={staff.id}
+                        data-testid={`row-staff-${staff.id}`}
+                        className={isSelected ? "bg-primary/5" : ""}
+                      >
+                        <TableCell className="px-3">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              setSelectedIds(prev => {
+                                const next = new Set(prev);
+                                if (checked) next.add(staff.id);
+                                else next.delete(staff.id);
+                                return next;
+                              });
+                            }}
+                            data-testid={`checkbox-select-${staff.id}`}
+                            aria-label={`Select ${staff.firstName} ${staff.lastName}`}
+                          />
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <Avatar className="h-9 w-9 shrink-0">
@@ -588,6 +676,7 @@ export default function StaffIdentityPage() {
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </CardContent>
         {totalStaffFiltered > 0 && (
@@ -1069,6 +1158,28 @@ export default function StaffIdentityPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Staff Profile{selectedIds.size !== 1 ? "s" : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the selected {selectedIds.size} staff profile{selectedIds.size !== 1 ? "s" : ""} and all associated data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+              data-testid="button-confirm-bulk-delete"
+            >
+              {bulkDeleteMutation.isPending ? "Deleting…" : `Delete ${selectedIds.size} Profile${selectedIds.size !== 1 ? "s" : ""}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
