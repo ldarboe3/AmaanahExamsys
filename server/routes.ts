@@ -89,17 +89,7 @@ const bankSlipUpload = multer({
 });
 
 const staffPhotoUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      const uploadDir = path.join(process.cwd(), 'uploads');
-      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-      cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-      const ext = file.originalname.split('.').pop();
-      cb(null, `staff-${Date.now()}-${randomBytes(4).toString('hex')}.${ext}`);
-    }
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req: any, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
@@ -15819,7 +15809,47 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
 
       if (!req.file) return res.status(400).json({ message: "No photo uploaded" });
 
-      const photoUrl = `/uploads/${req.file.filename}`;
+      // Upload to persistent object storage (not ephemeral local disk)
+      const { ObjectStorageService } = await import("./objectStorage");
+      const objectStorageService = new ObjectStorageService();
+
+      const fileExt = req.file.originalname.split('.').pop() || 'jpg';
+      const uniqueFilename = `staff-photo-${id}-${Date.now()}.${fileExt}`;
+
+      let uploadURL: string;
+      let objectPath: string;
+      try {
+        const result = await objectStorageService.getObjectEntityUploadURL(uniqueFilename);
+        uploadURL = result.uploadURL;
+        objectPath = result.objectPath;
+      } catch (urlError: any) {
+        console.error("Failed to get upload URL for staff photo:", urlError);
+        return res.status(500).json({ message: "Failed to prepare photo upload. Please try again." });
+      }
+
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: req.file.buffer,
+        headers: { 'Content-Type': req.file.mimetype },
+      });
+
+      if (!uploadResponse.ok) {
+        console.error("Staff photo upload to object storage failed:", uploadResponse.status);
+        return res.status(500).json({ message: "Failed to upload photo. Please try again." });
+      }
+
+      let photoUrl: string;
+      try {
+        photoUrl = await objectStorageService.trySetObjectEntityAclPolicy(
+          uploadURL,
+          { owner: user.id, visibility: 'public' }
+        );
+        if (!photoUrl) throw new Error("ACL policy returned empty path");
+      } catch (aclError: any) {
+        console.error("Failed to set ACL for staff photo:", aclError);
+        return res.status(500).json({ message: "Photo uploaded but could not be made accessible. Please try again." });
+      }
+
       const updated = await storage.updateStaffProfile(id, { photoUrl });
 
       await storage.createStaffIdEvent({
