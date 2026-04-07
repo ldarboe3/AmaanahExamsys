@@ -18,7 +18,7 @@ import {
   Calendar, Clock, Plus, CheckCircle2, AlertTriangle,
   Timer, PlayCircle,
   Activity, BarChart3, MapPin, Sparkles, Loader2, Save,
-  RefreshCw, CheckCheck
+  RefreshCw, CheckCheck, Building2
 } from "lucide-react";
 import type { ExamYear, Subject } from "@shared/schema";
 
@@ -202,6 +202,7 @@ export default function ExamScheduling() {
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
   const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
   const { data: centers = [] } = useQuery<any[]>({ queryKey: ["/api/centers"] });
+  const { data: regions = [] } = useQuery<any[]>({ queryKey: ["/api/regions"] });
 
   const timetableFilters = new URLSearchParams();
   if (selectedExamYearId) timetableFilters.set("examYearId", selectedExamYearId);
@@ -356,6 +357,34 @@ export default function ExamScheduling() {
             </Card>
           ) : (
             <div className="space-y-3">
+              {/* Coverage banner — shows which regions/centers this timetable applies to */}
+              {centers.length > 0 ? (
+                <div className="rounded-md border bg-muted/30 p-3 flex flex-wrap items-center gap-4 text-sm">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <MapPin className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
+                    <span className="font-medium text-foreground">National Coverage</span>
+                    <span>— this timetable applies to:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300">
+                      {regions.length} {regions.length === 1 ? "Region" : "Regions"}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                      {centers.length} Exam {centers.length === 1 ? "Center" : "Centers"}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 p-3 flex items-start gap-2.5 text-sm">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                  <div>
+                    <span className="font-semibold text-amber-700 dark:text-amber-400">No exam centers registered yet. </span>
+                    <span className="text-muted-foreground">
+                      Go to <a href="/regions-clusters" className="underline font-medium text-foreground">Regions &amp; Clusters</a> to add centers before this timetable can be used for packet generation.
+                    </span>
+                  </div>
+                </div>
+              )}
               {Array.from(new Set(timetableEntries.map((e: any) => e.examDate))).sort().map(date => {
                 const today = new Date(now); today.setHours(0, 0, 0, 0);
                 const cardDay = new Date(date + "T00:00:00"); cardDay.setHours(0, 0, 0, 0);
