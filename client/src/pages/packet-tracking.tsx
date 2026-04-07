@@ -901,12 +901,12 @@ export default function PacketTracking() {
   const { data: stats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/packet-events/dashboard/stats"],
     queryFn: () => apiRequest("GET", "/api/packet-events/dashboard/stats").then(r => r.json()),
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
   });
 
   const { data: packets = [], isLoading: packetsLoading, dataUpdatedAt } = useQuery<ExamPacket[]>({
     queryKey: ["/api/exam-packets"],
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
   });
 
   const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
