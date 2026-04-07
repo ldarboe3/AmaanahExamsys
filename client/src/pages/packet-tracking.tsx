@@ -901,10 +901,12 @@ export default function PacketTracking() {
   const { data: stats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/packet-events/dashboard/stats"],
     queryFn: () => apiRequest("GET", "/api/packet-events/dashboard/stats").then(r => r.json()),
+    refetchInterval: 30_000,
   });
 
-  const { data: packets = [], isLoading: packetsLoading } = useQuery<ExamPacket[]>({
+  const { data: packets = [], isLoading: packetsLoading, dataUpdatedAt } = useQuery<ExamPacket[]>({
     queryKey: ["/api/exam-packets"],
+    refetchInterval: 30_000,
   });
 
   const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
@@ -1089,12 +1091,19 @@ export default function PacketTracking() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
-              queryClient.invalidateQueries({ queryKey: ["/api/packet-events/dashboard/stats"] });
-            }} data-testid="button-refresh-packets">
-              <RefreshCw className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {dataUpdatedAt > 0 && (
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  Updated {new Date(dataUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+              <Button variant="outline" size="icon" disabled={packetsLoading} onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/packet-events/dashboard/stats"] });
+              }} data-testid="button-refresh-packets">
+                <RefreshCw className={`w-4 h-4 ${packetsLoading ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
           </div>
 
           <Card>
