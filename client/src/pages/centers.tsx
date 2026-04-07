@@ -52,19 +52,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts";
-import {
   Search,
   MoreVertical,
   Eye,
@@ -85,9 +72,6 @@ import {
   Clock,
   Package,
   TrendingUp,
-  BarChart3,
-  ChevronDown,
-  ChevronUp,
   Truck,
   ShieldAlert,
   PlayCircle,
@@ -187,7 +171,6 @@ const CARD_THEMES = [
   },
 ];
 
-const LOGISTICS_COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#06b6d4", "#8b5cf6"];
 
 function formatElapsedTime(startTime: string): string {
   const start = new Date(startTime).getTime();
@@ -512,264 +495,6 @@ function CenterCardSkeleton() {
   );
 }
 
-const CHART_COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#06b6d4", "#8b5cf6", "#ec4899", "#14b8a6"];
-
-function CustomTooltip({ active, payload, label }: any) {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-background border rounded-md shadow-md px-3 py-2 text-sm">
-        <p className="font-medium mb-1 text-foreground">{label}</p>
-        {payload.map((p: any, i: number) => (
-          <p key={i} style={{ color: p.fill || p.color }} className="text-xs">
-            {p.name}: <span className="font-semibold">{p.value}</span>
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-}
-
-function MonitoringCharts({
-  monitoring,
-  centers,
-}: {
-  monitoring: CenterMonitoringData[];
-  centers: CenterWithRelations[];
-}) {
-  const [activeTab, setActiveTab] = useState("attendance");
-  const [collapsed, setCollapsed] = useState(false);
-
-  const attendanceData = monitoring.map(m => ({
-    name: m.centerName.length > 12 ? m.centerName.substring(0, 12) + "…" : m.centerName,
-    fullName: m.centerName,
-    Attendance: m.attendanceCount,
-  }));
-
-  const malpracticeData = monitoring.map(m => ({
-    name: m.centerName.length > 12 ? m.centerName.substring(0, 12) + "…" : m.centerName,
-    fullName: m.centerName,
-    Cases: m.malpracticeCount,
-  }));
-
-  // Aggregate packet locations across all centers
-  const locationTotals: Record<string, number> = {};
-  monitoring.forEach(m => {
-    Object.entries(m.packetByLocation).forEach(([loc, count]) => {
-      locationTotals[loc] = (locationTotals[loc] || 0) + count;
-    });
-  });
-  const logisticsData = Object.entries(locationTotals)
-    .filter(([, v]) => v > 0)
-    .map(([loc, count]) => ({
-      name: LOCATION_LABELS[loc] || loc,
-      value: count,
-    }));
-
-  // Session status aggregation
-  const sessionStatusData: Record<string, number> = {};
-  monitoring.forEach(m => {
-    if (m.latestSession) {
-      const s = m.latestSession.status;
-      sessionStatusData[s] = (sessionStatusData[s] || 0) + 1;
-    } else {
-      sessionStatusData["not_started"] = (sessionStatusData["not_started"] || 0) + 1;
-    }
-  });
-  const sessionPieData = Object.entries(sessionStatusData).map(([status, count]) => ({
-    name: status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
-    value: count,
-  }));
-
-  // Summary metrics
-  const totalAttendance = monitoring.reduce((s, m) => s + m.attendanceCount, 0);
-  const totalMalpractice = monitoring.reduce((s, m) => s + m.malpracticeCount, 0);
-  const totalPackets = monitoring.reduce((s, m) => s + m.totalPackets, 0);
-  const activeSessions = monitoring.filter(m =>
-    m.latestSession && ["started_on_time", "started_late"].includes(m.latestSession.status)
-  ).length;
-  const notStarted = monitoring.filter(m => !m.latestSession || m.latestSession.status === "scheduled").length;
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
-              <BarChart3 className="w-4 h-4 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-base">Performance Dashboard</CardTitle>
-              <CardDescription className="text-xs">Live monitoring across all exam centers</CardDescription>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCollapsed(c => !c)}
-            data-testid="button-toggle-dashboard"
-          >
-            {collapsed ? <ChevronDown className="w-4 h-4 me-1" /> : <ChevronUp className="w-4 h-4 me-1" />}
-            {collapsed ? "Show Charts" : "Hide Charts"}
-          </Button>
-        </div>
-
-        {/* Quick summary metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-          <div className="bg-green-50/70 dark:bg-green-950/20 rounded-md px-3 py-2">
-            <p className="text-xs text-muted-foreground">Total Present</p>
-            <p className="text-lg font-bold text-green-700 dark:text-green-400">{totalAttendance.toLocaleString()}</p>
-          </div>
-          <div className="bg-red-50/70 dark:bg-red-950/20 rounded-md px-3 py-2">
-            <p className="text-xs text-muted-foreground">Malpractice Cases</p>
-            <p className="text-lg font-bold text-red-700 dark:text-red-400">{totalMalpractice.toLocaleString()}</p>
-          </div>
-          <div className="bg-blue-50/70 dark:bg-blue-950/20 rounded-md px-3 py-2">
-            <p className="text-xs text-muted-foreground">Active Sessions</p>
-            <p className="text-lg font-bold text-blue-700 dark:text-blue-400">{activeSessions}</p>
-          </div>
-          <div className="bg-amber-50/70 dark:bg-amber-950/20 rounded-md px-3 py-2">
-            <p className="text-xs text-muted-foreground">Not Started</p>
-            <p className="text-lg font-bold text-amber-700 dark:text-amber-400">{notStarted}</p>
-          </div>
-        </div>
-      </CardHeader>
-
-      {!collapsed && (
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="attendance" data-testid="tab-attendance-chart">
-                <Users className="w-3.5 h-3.5 me-1.5" />
-                Attendance
-              </TabsTrigger>
-              <TabsTrigger value="malpractice" data-testid="tab-malpractice-chart">
-                <ShieldAlert className="w-3.5 h-3.5 me-1.5" />
-                Malpractice
-              </TabsTrigger>
-              <TabsTrigger value="logistics" data-testid="tab-logistics-chart">
-                <Truck className="w-3.5 h-3.5 me-1.5" />
-                Logistics
-              </TabsTrigger>
-              <TabsTrigger value="sessions" data-testid="tab-sessions-chart">
-                <Timer className="w-3.5 h-3.5 me-1.5" />
-                Sessions
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="attendance">
-              {attendanceData.some(d => d.Attendance > 0) ? (
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={attendanceData} margin={{ top: 4, right: 8, left: 0, bottom: 24 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted/40" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="Attendance" radius={[4, 4, 0, 0]}>
-                      {attendanceData.map((_, index) => (
-                        <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-40 flex items-center justify-center text-sm text-muted-foreground">
-                  No attendance data recorded yet
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="malpractice">
-              {malpracticeData.some(d => d.Cases > 0) ? (
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={malpracticeData} margin={{ top: 4, right: 8, left: 0, bottom: 24 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted/40" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="Cases" radius={[4, 4, 0, 0]} fill="#ef4444">
-                      {malpracticeData.map((_, index) => (
-                        <Cell key={index} fill={`hsl(${0 + index * 10}, 70%, 55%)`} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-40 flex items-center justify-center text-sm text-muted-foreground">
-                  No malpractice cases reported
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="logistics">
-              {logisticsData.length > 0 ? (
-                <div className="flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height={240}>
-                    <PieChart>
-                      <Pie
-                        data={logisticsData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={90}
-                        paddingAngle={3}
-                        dataKey="value"
-                      >
-                        {logisticsData.map((_, index) => (
-                          <Cell key={index} fill={LOGISTICS_COLORS[index % LOGISTICS_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "11px" }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-40 flex items-center justify-center text-sm text-muted-foreground">
-                  No paper packets in the system yet
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="sessions">
-              {sessionPieData.length > 0 ? (
-                <div className="flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height={240}>
-                    <PieChart>
-                      <Pie
-                        data={sessionPieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={90}
-                        paddingAngle={3}
-                        dataKey="value"
-                      >
-                        {sessionPieData.map((entry, index) => {
-                          const color = entry.name.toLowerCase().includes("not started") ? "#94a3b8"
-                            : entry.name.toLowerCase().includes("late") ? "#f59e0b"
-                            : entry.name.toLowerCase().includes("completed") ? "#22c55e"
-                            : "#6366f1";
-                          return <Cell key={index} fill={color} />;
-                        })}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "11px" }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-40 flex items-center justify-center text-sm text-muted-foreground">
-                  No exam sessions recorded yet
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      )}
-    </Card>
-  );
-}
 
 export default function Centers() {
   const { toast } = useToast();
@@ -1058,11 +783,6 @@ export default function Centers() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Monitoring Dashboard Charts */}
-      {monitoring && monitoring.length > 0 && (
-        <MonitoringCharts monitoring={monitoring} centers={centers || []} />
-      )}
 
       {/* Filters */}
       <Card>
