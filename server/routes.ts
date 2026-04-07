@@ -16463,7 +16463,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
-  // Auto-generate packets for all subjects × all centers for an exam year
+  // Auto-generate packets for all timetabled subjects × centers for an exam year
   app.post("/api/exam-packets/auto-generate", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
@@ -16475,24 +16475,33 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         examYearId: z.coerce.number().int().positive(),
         skipExisting: z.boolean().optional().default(true),
         bufferPercent: z.number().min(0).max(100).optional().default(15),
+        regionId: z.coerce.number().int().positive().optional().nullable(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Validation error" });
-      const { examYearId, skipExisting, bufferPercent } = parsed.data;
+      const { examYearId, skipExisting, bufferPercent, regionId } = parsed.data;
 
       const examYear = await storage.getExamYear(examYearId);
       if (!examYear) return res.status(400).json({ message: "Exam year not found" });
 
-      // Get all subjects relevant to this exam year
+      // Use PUBLISHED timetable subjects for this exam year (aligned with scheduled exams)
       const allSubjects = await storage.getAllSubjects();
-      const examGrades: number[] = (examYear as any).grades ?? [];
-      // If examYear has grades filter, use it; otherwise use all subjects
-      const subjects = examGrades.length > 0
-        ? allSubjects.filter((s: any) => examGrades.includes(s.grade))
-        : allSubjects;
+      const publishedSchedules = await storage.getExamSchedules({ examYearId, isPublished: true });
+      const timetabledSubjectIds = [...new Set(publishedSchedules.map((s: any) => s.subjectId))];
+      const subjects = timetabledSubjectIds.length > 0
+        ? allSubjects.filter((s: any) => timetabledSubjectIds.includes(s.id))
+        : (() => {
+            // Fallback: filter by exam year grades if timetable not yet published
+            const examGrades: number[] = (examYear as any).grades ?? [];
+            return examGrades.length > 0
+              ? allSubjects.filter((s: any) => examGrades.includes(s.grade))
+              : allSubjects;
+          })();
 
-      // Get all exam centers
-      const centers = await storage.getAllExamCenters();
+      // Get centers — scoped to a specific region if requested, otherwise all centers
+      const centers = regionId
+        ? await storage.getExamCentersByRegion(regionId)
+        : await storage.getAllExamCenters();
 
       // Build center → student count map
       const centerStudentCount: Record<number, number> = {};
@@ -16573,6 +16582,9 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         created: created.length,
         skipped,
         total: created.length + skipped,
+        subjectCount: subjects.length,
+        centerCount: centers.length,
+        timetableBased: timetabledSubjectIds.length > 0,
         packets: created,
       });
     } catch (error: any) {
