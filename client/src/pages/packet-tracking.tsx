@@ -990,15 +990,19 @@ export default function PacketTracking() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const { data: stats, isLoading: statsLoading } = useQuery<any>({
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery<any>({
     queryKey: ["/api/packet-events/dashboard/stats"],
     queryFn: () => apiRequest("GET", "/api/packet-events/dashboard/stats").then(r => r.json()),
     refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
   });
 
-  const { data: packets = [], isLoading: packetsLoading, dataUpdatedAt } = useQuery<ExamPacket[]>({
+  const { data: packets = [], isLoading: packetsLoading, dataUpdatedAt, refetch: refetchPackets } = useQuery<ExamPacket[]>({
     queryKey: ["/api/exam-packets"],
     refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
   });
 
   const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
@@ -1186,12 +1190,12 @@ export default function PacketTracking() {
             <div className="flex items-center gap-2">
               {dataUpdatedAt > 0 && (
                 <span className="text-xs text-muted-foreground whitespace-nowrap">
-                  Updated {new Date(dataUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  Updated {new Date(dataUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
               )}
               <Button variant="outline" size="icon" disabled={packetsLoading} onClick={() => {
-                queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
-                queryClient.invalidateQueries({ queryKey: ["/api/packet-events/dashboard/stats"] });
+                refetchPackets();
+                refetchStats();
               }} data-testid="button-refresh-packets">
                 <RefreshCw className={`w-4 h-4 ${packetsLoading ? "animate-spin" : ""}`} />
               </Button>
