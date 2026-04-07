@@ -7,7 +7,7 @@ import fs from "fs";
 import path from "path";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments, studentResults, examCards, attendanceRecords } from "@shared/schema";
+import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments, studentResults, examCards, attendanceRecords, packetEvents } from "@shared/schema";
 import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
@@ -18573,7 +18573,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       // Advance packet status
       await storage.updateExamPacket(packet.id, { status: match.nextStatus as any, updatedAt: new Date() });
 
-      // Record scan
+      // Record scan in mobile_packet_scans table
       const scan = await storage.createMobilePacketScan({
         packetId: packet.id,
         barcode,
@@ -18588,6 +18588,38 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         gpsLatitude: gpsLatitude ?? null,
         gpsLongitude: gpsLongitude ?? null,
       });
+
+      // Also bridge to packetEvents table so web dashboard timeline and stats reflect mobile scans.
+      // We insert directly (bypassing createPacketEvent's status-overwrite side effect) because
+      // the mobile scan endpoint already handles status updates with the correct multi-hop status.
+      const ACTION_TO_EVENT_TYPE: Record<string, string> = {
+        pack:            'packed',
+        dispatch:        'dispatched',
+        receive:         'received',
+        open:            'opened',
+        seal:            'sealed',
+        dispatch_return: 'dispatched',
+        forward_return:  'dispatched',
+        receive_return:  'received',
+      };
+      const bridgeEventType = ACTION_TO_EVENT_TYPE[match.action];
+      if (bridgeEventType) {
+        const staffRow = await storage.getStaffProfileByEmployeeId(scannedBy);
+        db.insert(packetEvents).values({
+          clientEventId: `mobile-${scan.id}`,
+          packetId: packet.id,
+          eventType: bridgeEventType as any,
+          senderStaffId: staffRow?.id ?? null,
+          locationRegionId: packet.destinationRegionId ?? null,
+          locationClusterId: packet.destinationClusterId ?? null,
+          locationCenterId: packet.destinationCenterId ?? null,
+          gpsLatitude: gpsLatitude ? String(gpsLatitude) : null,
+          gpsLongitude: gpsLongitude ? String(gpsLongitude) : null,
+          notes: notes ? `[Mobile: ${match.action}] ${notes}` : `[Mobile: ${match.action}] by ${scannedByName}`,
+          isSynced: true,
+          eventTime: new Date(),
+        }).catch((err: any) => { console.error('[Mobile bridge] Failed to create packetEvent:', err?.message ?? err); });
+      }
 
       const updatedPacket = await storage.getExamPacketByBarcode(barcode);
       const [allRegions, allClusters, allCenters, allSubjects] = await Promise.all([
