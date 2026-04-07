@@ -15866,55 +15866,45 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Shared helper: build staff verification response
+  async function buildStaffVerifyResponse(profile: any): Promise<object> {
+    const [allRegions, allClusters, allCenters] = await Promise.all([
+      profile.regionId  ? storage.getAllRegions()      : Promise.resolve([]),
+      profile.clusterId ? storage.getAllClusters()     : Promise.resolve([]),
+      profile.centerId  ? storage.getAllExamCenters()  : Promise.resolve([]),
+    ]);
+    return {
+      verified: true,
+      staffIdNumber: profile.staffIdNumber,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      middleName: profile.middleName,
+      photoUrl: profile.photoUrl,
+      role: profile.role,
+      phone: profile.phone,
+      email: profile.email,
+      regionId: profile.regionId,
+      regionName: allRegions.find((r: any) => r.id === profile.regionId)?.name ?? null,
+      clusterId: profile.clusterId,
+      clusterName: allClusters.find((c: any) => c.id === profile.clusterId)?.name ?? null,
+      centerId: profile.centerId,
+      centerName: allCenters.find((c: any) => c.id === profile.centerId)?.name ?? null,
+      status: profile.status,
+      issueDate: profile.issueDate,
+      isActive: profile.status === 'activated',
+      isSuspended: profile.status === 'suspended',
+      isRevoked: profile.status === 'revoked',
+    };
+  }
+
   app.get("/api/public/staff-verify/:staffIdNumber", async (req, res) => {
     try {
       const profile = await storage.getStaffProfileByStaffId(req.params.staffIdNumber);
       if (!profile) {
         return res.status(404).json({ message: "Staff ID not found", verified: false });
       }
-
-      let regionName: string | null = null;
-      let clusterName: string | null = null;
-      let centerName: string | null = null;
-
-      if (profile.regionId) {
-        const regions = await storage.getAllRegions();
-        const region = regions.find((r: any) => r.id === profile.regionId);
-        regionName = region ? region.name : null;
-      }
-      if (profile.clusterId) {
-        const clusters = await storage.getAllClusters();
-        const cluster = clusters.find((c: any) => c.id === profile.clusterId);
-        clusterName = cluster ? cluster.name : null;
-      }
-      if (profile.centerId) {
-        const centers = await storage.getAllExamCenters();
-        const center = centers.find((c: any) => c.id === profile.centerId);
-        centerName = center ? center.name : null;
-      }
-
-      res.json({
-        verified: true,
-        staffIdNumber: profile.staffIdNumber,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        middleName: profile.middleName,
-        photoUrl: profile.photoUrl,
-        role: profile.role,
-        phone: profile.phone,
-        email: profile.email,
-        regionId: profile.regionId,
-        regionName,
-        clusterId: profile.clusterId,
-        clusterName,
-        centerId: profile.centerId,
-        centerName,
-        status: profile.status,
-        issueDate: profile.issueDate,
-        isActive: profile.status === 'activated',
-        isSuspended: profile.status === 'suspended',
-        isRevoked: profile.status === 'revoked',
-      });
+      res.setHeader('Cache-Control', 'public, max-age=30');
+      res.json(await buildStaffVerifyResponse(profile));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -15927,48 +15917,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return res.status(404).json({ message: "Staff not found by EID", verified: false });
       }
 
-      let regionName: string | null = null;
-      let clusterName: string | null = null;
-      let centerName: string | null = null;
-
-      if (profile.regionId) {
-        const regions = await storage.getAllRegions();
-        const region = regions.find((r: any) => r.id === profile.regionId);
-        regionName = region ? region.name : null;
-      }
-      if (profile.clusterId) {
-        const clusters = await storage.getAllClusters();
-        const cluster = clusters.find((c: any) => c.id === profile.clusterId);
-        clusterName = cluster ? cluster.name : null;
-      }
-      if (profile.centerId) {
-        const centers = await storage.getAllExamCenters();
-        const center = centers.find((c: any) => c.id === profile.centerId);
-        centerName = center ? center.name : null;
-      }
-
-      res.json({
-        verified: true,
-        staffIdNumber: profile.staffIdNumber,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        middleName: profile.middleName,
-        photoUrl: profile.photoUrl,
-        role: profile.role,
-        phone: profile.phone,
-        email: profile.email,
-        regionId: profile.regionId,
-        regionName,
-        clusterId: profile.clusterId,
-        clusterName,
-        centerId: profile.centerId,
-        centerName,
-        status: profile.status,
-        issueDate: profile.issueDate,
-        isActive: profile.status === 'activated',
-        isSuspended: profile.status === 'suspended',
-        isRevoked: profile.status === 'revoked',
-      });
+      res.setHeader('Cache-Control', 'public, max-age=30');
+      res.json(await buildStaffVerifyResponse(profile));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -15993,48 +15943,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return res.status(403).json({ verified: false, message: "Card verification failed — token mismatch. Please contact HQ." });
       }
 
-      let regionName: string | null = null;
-      let clusterName: string | null = null;
-      let centerName: string | null = null;
-      if (profile.regionId) {
-        const regions = await storage.getAllRegions();
-        const region = regions.find((r: any) => r.id === profile.regionId);
-        regionName = region ? region.name : null;
-      }
-      if (profile.clusterId) {
-        const clusters = await storage.getAllClusters();
-        const cluster = clusters.find((c: any) => c.id === profile.clusterId);
-        clusterName = cluster ? cluster.name : null;
-      }
-      if (profile.centerId) {
-        const centers = await storage.getAllExamCenters();
-        const center = centers.find((c: any) => c.id === profile.centerId);
-        centerName = center ? center.name : null;
-      }
-
-      res.json({
-        verified: true,
-        staffIdNumber: profile.staffIdNumber,
-        employeeId: profile.employeeId,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        middleName: profile.middleName,
-        photoUrl: profile.photoUrl,
-        role: profile.role,
-        phone: profile.phone,
-        email: profile.email,
-        regionId: profile.regionId,
-        regionName,
-        clusterId: profile.clusterId,
-        clusterName,
-        centerId: profile.centerId,
-        centerName,
-        status: profile.status,
-        issueDate: profile.issueDate,
-        isActive: profile.status === 'activated',
-        isSuspended: profile.status === 'suspended',
-        isRevoked: profile.status === 'revoked',
-      });
+      const verifyData: any = await buildStaffVerifyResponse(profile);
+      verifyData.employeeId = profile.employeeId;
+      res.setHeader('Cache-Control', 'public, max-age=30');
+      res.json(verifyData);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

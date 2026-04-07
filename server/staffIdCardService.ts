@@ -74,8 +74,8 @@ async function generateBarcodePng(text: string, opts?: { width?: number; height?
   const barcodeOpts: any = {
     bcid: 'code128',
     text: text,
-    scale: 3,
-    height: opts?.height || 8,
+    scale: 4,
+    height: opts?.height || 12,
     includetext: false,
     backgroundcolor: 'FFFFFF',
     barcolor: '000000',

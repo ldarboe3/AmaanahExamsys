@@ -38,13 +38,22 @@ export default function VerifyStaffPage() {
     queryKey: ["/api/staff-verify", queryId],
     queryFn: async () => {
       if (!queryId) return null;
-      const isEid = /^\d{6,10}$/.test(queryId.trim());
-      const url = isEid
-        ? `/api/public/staff-verify-by-eid/${queryId.trim()}`
-        : `/api/public/staff-verify/${queryId.trim()}`;
+      const q = queryId.trim();
+      // Barcode on the ID card encodes "EID:confirmationCode" — route to card-scan endpoint
+      const isBarcodePayload = /^\d{6,10}:.+/.test(q);
+      const isEid = !isBarcodePayload && /^\d{6,10}$/.test(q);
+      const url = isBarcodePayload
+        ? `/api/public/staff-card-scan/${encodeURIComponent(q)}`
+        : isEid
+          ? `/api/public/staff-verify-by-eid/${q}`
+          : `/api/public/staff-verify/${q}`;
       const res = await fetch(url);
       if (!res.ok) {
         if (res.status === 404) return { notFound: true };
+        if (res.status === 403) {
+          const body = await res.json().catch(() => ({}));
+          return { tokenMismatch: true, message: body.message };
+        }
         throw new Error("Verification failed");
       }
       return res.json();
@@ -104,13 +113,25 @@ export default function VerifyStaffPage() {
               <XCircle className="mx-auto h-12 w-12 text-destructive mb-3" />
               <p className="text-lg font-medium">Staff Not Found</p>
               <p className="text-sm text-muted-foreground mt-1">
-                No staff member found with ID "{queryId}". Please check the ID and try again.
+                No staff member found with that ID. Please check and try again.
               </p>
             </CardContent>
           </Card>
         )}
 
-        {staffData && !staffData.notFound && sDisplay && StatusIcon && (
+        {staffData?.tokenMismatch && (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <ShieldAlert className="mx-auto h-12 w-12 text-chart-5 mb-3" />
+              <p className="text-lg font-medium">Card Verification Failed</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {staffData.message || "This card could not be authenticated. It may have been reprinted or tampered with. Contact HQ."}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {staffData && !staffData.notFound && !staffData.tokenMismatch && sDisplay && StatusIcon && (
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
