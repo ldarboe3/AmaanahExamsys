@@ -15952,6 +15952,97 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ============ Public Mobile API — Packet Sync (no session auth; validated by staffId) ============
+  // POST /api/public/packet-sync
+  // Body: { barcode, status, staffId, staffName, staffRole, timestamp? }
+  // staffId may be an EID (digits) or a staffIdNumber (AMS-XXXXX).
+  // The endpoint validates the staff member exists and that the requested status is
+  // a legitimate next-step for the packet's current status and the staff role.
+  app.post("/api/public/packet-sync", async (req, res) => {
+    try {
+      const { barcode, status: targetStatus, staffId, staffName, staffRole, timestamp, location, notes, gpsLatitude, gpsLongitude } = req.body;
+
+      if (!barcode || !targetStatus || !staffId || !staffRole) {
+        return res.status(400).json({ success: false, message: "barcode, status, staffId and staffRole are required." });
+      }
+
+      // Resolve staff — accept EID (digits) or staffIdNumber (AMS-…)
+      const isEid = /^\d+$/.test(String(staffId));
+      const staffProfile = isEid
+        ? await storage.getStaffProfileByEmployeeId(String(staffId))
+        : await storage.getStaffProfileByStaffId(String(staffId));
+      if (!staffProfile) {
+        return res.status(401).json({ success: false, message: "Staff member not found. Sync rejected." });
+      }
+      if (staffProfile.status !== 'activated') {
+        return res.status(403).json({ success: false, message: "Staff account is not active. Sync rejected." });
+      }
+
+      // Resolve packet
+      const packet = await storage.getExamPacketByBarcode(barcode);
+      if (!packet) {
+        return res.status(404).json({ success: false, message: `Packet '${barcode}' not found.` });
+      }
+
+      // Validate the requested target status is the expected next step for this role
+      const roleActions: Array<{ triggerStatus: string; action: string; nextStatus: string }> =
+        (MOBILE_ROLE_ACTIONS[staffRole] ?? []);
+      const match = roleActions.find(ra => ra.triggerStatus === packet.status && ra.nextStatus === targetStatus);
+      if (!match) {
+        // Packet may already be at the target status (idempotent re-sync)
+        if (packet.status === targetStatus) {
+          return res.json({ success: true, message: "Already up to date.", barcode, status: packet.status });
+        }
+        return res.status(422).json({
+          success: false,
+          message: `Cannot transition '${barcode}' from '${packet.status}' to '${targetStatus}' for role '${staffRole}'.`,
+          currentStatus: packet.status,
+        });
+      }
+
+      // Reject duplicate scan (same staff, same from→to transition already recorded)
+      const existingScans = await storage.getMobilePacketScans(packet.id);
+      const duplicate = existingScans.find(
+        s => s.scannedByEid === String(staffProfile.employeeId) &&
+             s.fromStatus === packet.status &&
+             s.toStatus === targetStatus
+      );
+      if (duplicate) {
+        return res.json({ success: true, message: "Already synced (duplicate).", barcode, status: targetStatus });
+      }
+
+      // Apply status update
+      await storage.updateExamPacket(packet.id, { status: targetStatus as any, updatedAt: new Date() });
+
+      // Record scan history
+      await storage.createMobilePacketScan({
+        packetId: packet.id,
+        barcode,
+        scannedByEid: String(staffProfile.employeeId),
+        scannedByName: staffName || `${staffProfile.firstName} ${staffProfile.lastName}`,
+        scannedByRole: staffRole,
+        action: match.action,
+        fromStatus: packet.status as any,
+        toStatus: targetStatus as any,
+        location: location ?? null,
+        notes: notes ?? null,
+        gpsLatitude: gpsLatitude ?? null,
+        gpsLongitude: gpsLongitude ?? null,
+      });
+
+      res.json({
+        success: true,
+        barcode,
+        previousStatus: packet.status,
+        status: targetStatus,
+        action: match.action,
+        syncedAt: timestamp ?? new Date().toISOString(),
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // ============ Public Mobile API — Subjects list (no auth required) ============
   app.get("/api/public/subjects", async (_req, res) => {
     try {
