@@ -1010,11 +1010,17 @@ export default function PacketTracking() {
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
   const { data: timetable = [] } = useQuery<ExamTimetable[]>({ queryKey: ["/api/timetable"] });
   const { data: regions = [] } = useQuery<Region[]>({ queryKey: ["/api/regions"] });
+  const { data: clusters = [] } = useQuery<Cluster[]>({ queryKey: ["/api/clusters"] });
 
   const subjectMap = Object.fromEntries(subjects.map(s => [s.id, s.name]));
   const centerMap = Object.fromEntries(centers.map(c => [c.id, c.name]));
   const examYearMap = Object.fromEntries(examYears.map(y => [y.id, y.year]));
   const regionMap = Object.fromEntries(regions.map(r => [r.id, r.name]));
+  const clusterMap = Object.fromEntries(clusters.map(c => [c.id, c.name]));
+
+  // Build region/cluster from center data as fallback (center always carries its regionId/clusterId)
+  const centerToRegionMap = Object.fromEntries(centers.map(c => [c.id, (c as any).regionId]));
+  const centerToClusterMap = Object.fromEntries(centers.map(c => [c.id, (c as any).clusterId]));
   const availableGrades = Array.from(new Set(packets.map(p => p.grade))).sort((a, b) => a - b);
   // keyed by subjectId — last write wins if duplicates exist across years; prefer active exam year entry
   const timetableBySubject = Object.fromEntries(
@@ -1210,6 +1216,8 @@ export default function PacketTracking() {
                     <TableHead>Barcode</TableHead>
                     <TableHead>Grade</TableHead>
                     <TableHead>Subject</TableHead>
+                    <TableHead>Region</TableHead>
+                    <TableHead>Cluster</TableHead>
                     <TableHead>Center</TableHead>
                     <TableHead>Papers</TableHead>
                     <TableHead>Status</TableHead>
@@ -1219,21 +1227,28 @@ export default function PacketTracking() {
                 <TableBody>
                   {packetsLoading && [1,2,3,4,5].map(i => (
                     <TableRow key={i}>
-                      {[1,2,3,4,5,6,7].map(j => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
+                      {[1,2,3,4,5,6,7,8,9].map(j => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
                     </TableRow>
                   ))}
                   {!packetsLoading && filtered.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                      <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                         {packets.length === 0 ? "No packets created yet." : "No packets match your search."}
                       </TableCell>
                     </TableRow>
                   )}
-                  {filtered.map(p => (
+                  {filtered.map(p => {
+                    const regionId = p.destinationRegionId ?? centerToRegionMap[p.destinationCenterId];
+                    const clusterId = p.destinationClusterId ?? centerToClusterMap[p.destinationCenterId];
+                    const regionLabel = regionId ? (regionMap[regionId] ?? `Region ${regionId}`) : "—";
+                    const clusterLabel = clusterId ? (clusterMap[clusterId] ?? `Cluster ${clusterId}`) : "—";
+                    return (
                     <TableRow key={p.id} data-testid={`row-packet-${p.id}`}>
                       <TableCell className="font-mono text-sm">{p.barcode}</TableCell>
                       <TableCell>Grade {p.grade}</TableCell>
                       <TableCell className="text-sm">{subjectMap[p.subjectId] ?? `#${p.subjectId}`}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{regionLabel}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{clusterLabel}</TableCell>
                       <TableCell className="text-sm">{centerMap[p.destinationCenterId] ?? `#${p.destinationCenterId}`}</TableCell>
                       <TableCell>{p.paperCount}</TableCell>
                       <TableCell><StatusBadge status={p.status} /></TableCell>
@@ -1280,7 +1295,7 @@ export default function PacketTracking() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ); })}
                 </TableBody>
               </Table>
             </div>
