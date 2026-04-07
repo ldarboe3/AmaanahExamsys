@@ -18156,8 +18156,124 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   });
 
   // ─── Mobile Packet API (Amaanah Examiner App integration) ────────────────────
-  // Auth: X-Staff-ID header containing staff EID, or scannedBy in body.
+  // Auth: X-Staff-ID: {EID} header  OR  Authorization: Bearer {EID}:{confirmationCode}
   // All responses use the existing ExamSys status names directly.
+
+  // Helper: resolve staff from request using any supported mobile auth method
+  async function resolveStaffFromRequest(req: Request): Promise<any | null> {
+    // Method 1: X-Staff-ID header
+    const eid = req.headers['x-staff-id'] as string | undefined;
+    if (eid) {
+      return await storage.getStaffProfileByEmployeeId(eid);
+    }
+    // Method 2: Authorization: Bearer {EID}:{confirmationCode}  OR  Bearer {EID}
+    const authHeader = req.headers['authorization'] as string | undefined;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const bearerPayload = authHeader.slice(7).trim();
+      const colonIdx = bearerPayload.indexOf(':');
+      if (colonIdx !== -1) {
+        const bearerEid = bearerPayload.substring(0, colonIdx);
+        const bearerToken = bearerPayload.substring(colonIdx + 1);
+        const profile = await storage.getStaffProfileByEmployeeId(bearerEid);
+        if (profile && profile.confirmationCode && profile.confirmationCode === bearerToken) {
+          return profile;
+        }
+        return null; // token provided but mismatch — reject
+      } else {
+        // Bearer {EID} only — less secure, allow for read-only lookups
+        return await storage.getStaffProfileByEmployeeId(bearerPayload);
+      }
+    }
+    return null;
+  }
+
+  // GET /api/mobile/regions — list all regions with cluster info
+  app.get("/api/mobile/regions", async (req, res) => {
+    try {
+      const staff = await resolveStaffFromRequest(req);
+      if (!staff) return res.status(401).json({ message: "Authentication required. Use X-Staff-ID or Authorization: Bearer header." });
+      const regions = await storage.getAllRegions();
+      res.json(regions.map((r: any) => ({ id: r.id, name: r.name, code: r.code ?? null })));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/mobile/clusters — list clusters (optionally filtered by ?regionId=)
+  app.get("/api/mobile/clusters", async (req, res) => {
+    try {
+      const staff = await resolveStaffFromRequest(req);
+      if (!staff) return res.status(401).json({ message: "Authentication required. Use X-Staff-ID or Authorization: Bearer header." });
+      const regionId = req.query.regionId ? Number(req.query.regionId) : undefined;
+      const clusters = regionId
+        ? await storage.getClustersByRegion(regionId)
+        : await storage.getAllClusters();
+      res.json((clusters as any[]).map((c: any) => ({ id: c.id, name: c.name, regionId: c.regionId, code: c.code ?? null })));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/mobile/centers — list exam centers (optionally filtered by ?regionId= or ?clusterId=)
+  app.get("/api/mobile/centers", async (req, res) => {
+    try {
+      const staff = await resolveStaffFromRequest(req);
+      if (!staff) return res.status(401).json({ message: "Authentication required. Use X-Staff-ID or Authorization: Bearer header." });
+      const regionId = req.query.regionId ? Number(req.query.regionId) : undefined;
+      const clusterId = req.query.clusterId ? Number(req.query.clusterId) : undefined;
+      let centers: any[];
+      if (clusterId) {
+        centers = await storage.getExamCentersByCluster(clusterId);
+      } else if (regionId) {
+        centers = await storage.getExamCentersByRegion(regionId);
+      } else {
+        centers = await storage.getAllExamCenters();
+      }
+      // Enrich with region and cluster names
+      const allRegions = await storage.getAllRegions();
+      const allClusters = await storage.getAllClusters();
+      const regionMap = Object.fromEntries((allRegions as any[]).map((r: any) => [r.id, r.name]));
+      const clusterMap = Object.fromEntries((allClusters as any[]).map((c: any) => [c.id, c.name]));
+      res.json(centers.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        code: c.code ?? null,
+        regionId: c.regionId ?? null,
+        regionName: c.regionId ? (regionMap[c.regionId] ?? null) : null,
+        clusterId: c.clusterId ?? null,
+        clusterName: c.clusterId ? (clusterMap[c.clusterId] ?? null) : null,
+        address: c.address ?? null,
+      })));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/mobile/centers/:id — single center detail
+  app.get("/api/mobile/centers/:id", async (req, res) => {
+    try {
+      const staff = await resolveStaffFromRequest(req);
+      if (!staff) return res.status(401).json({ message: "Authentication required." });
+      const center = await storage.getExamCenter(Number(req.params.id));
+      if (!center) return res.status(404).json({ message: "Center not found" });
+      const allRegions = await storage.getAllRegions();
+      const allClusters = await storage.getAllClusters();
+      const regionMap = Object.fromEntries((allRegions as any[]).map((r: any) => [r.id, r.name]));
+      const clusterMap = Object.fromEntries((allClusters as any[]).map((c: any) => [c.id, c.name]));
+      res.json({
+        id: (center as any).id,
+        name: (center as any).name,
+        code: (center as any).code ?? null,
+        regionId: (center as any).regionId ?? null,
+        regionName: (center as any).regionId ? (regionMap[(center as any).regionId] ?? null) : null,
+        clusterId: (center as any).clusterId ?? null,
+        clusterName: (center as any).clusterId ? (clusterMap[(center as any).clusterId] ?? null) : null,
+        address: (center as any).address ?? null,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   const MOBILE_ROLE_ACTIONS: Record<string, Array<{
     triggerStatus: string; action: string; nextStatus: string; actionLabel: string;
@@ -18207,14 +18323,24 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     const region = regions.find((r: any) => r.id === p.destinationRegionId);
     const cluster = clusters.find((c: any) => c.id === p.destinationClusterId);
     const center = centers.find((c: any) => c.id === p.destinationCenterId);
+    const centerName = center?.name ?? null;
+    const clusterName = cluster?.name ?? null;
+    const regionName = region?.name ?? null;
     return {
       id: String(p.id),
       barcode: p.barcode,
       grade: p.grade,
       subject: p.subjectName ?? null,
-      examCenter: center?.name ?? null,
-      region: region?.name ?? null,
-      cluster: cluster?.name ?? null,
+      // Center/cluster/region — multiple field aliases for mobile app compatibility
+      examCenter: centerName,        // legacy field name
+      centerName: centerName,        // explicit alias
+      centerId: p.destinationCenterId ?? null,
+      cluster: clusterName,          // legacy field name
+      clusterName: clusterName,      // explicit alias
+      clusterId: p.destinationClusterId ?? null,
+      region: regionName,            // legacy field name
+      regionName: regionName,        // explicit alias
+      regionId: p.destinationRegionId ?? null,
       status: p.status,
       statusLabel: STATUS_LABELS[p.status] ?? p.status,
       paperCount: p.paperCount,
@@ -18253,11 +18379,8 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
   // 2. Get single packet by barcode (includes scan history)
   app.get("/api/mobile/packets/stats", async (req, res) => {
     try {
-      const eid = req.headers['x-staff-id'] as string | undefined;
-      if (!eid) return res.status(401).json({ message: "X-Staff-ID header required" });
-
-      const staffProfile = await storage.getStaffProfileByEmployeeId(eid);
-      if (!staffProfile) return res.status(401).json({ message: "Staff not found for provided EID" });
+      const staffProfile = await resolveStaffFromRequest(req);
+      if (!staffProfile) return res.status(401).json({ message: "Authentication required. Use X-Staff-ID or Authorization: Bearer header." });
 
       const examCenterParam = req.query.examCenter as string | undefined;
       const clusterParam = req.query.cluster as string | undefined;
@@ -18498,16 +18621,13 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
 
   // ─── Mobile Attendance Count API ─────────────────────────────────────────────
   // GET /api/mobile/attendance/count
-  // Auth: X-Staff-ID: {EID} header
+  // Auth: X-Staff-ID: {EID} header  OR  Authorization: Bearer {EID}:{confirmationCode}
   // Scope params: ?subject=Mathematics&center=...  OR  &cluster=...  OR  &region=...
   // HQ scope: just ?subject=Mathematics (no center/cluster/region)
   app.get("/api/mobile/attendance/count", async (req, res) => {
     try {
-      const eid = req.headers['x-staff-id'] as string | undefined;
-      if (!eid) return res.status(401).json({ message: "X-Staff-ID header required" });
-
-      const staffProfile = await storage.getStaffProfileByEmployeeId(eid);
-      if (!staffProfile) return res.status(401).json({ message: "Staff not found for provided EID" });
+      const staffProfile = await resolveStaffFromRequest(req);
+      if (!staffProfile) return res.status(401).json({ message: "Authentication required. Use X-Staff-ID or Authorization: Bearer header." });
 
       const subjectParam = req.query.subject as string | undefined;
       const centerParam  = req.query.center  as string | undefined;
