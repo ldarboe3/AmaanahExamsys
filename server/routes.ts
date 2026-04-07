@@ -18148,6 +18148,12 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     triggerStatus: string; action: string; nextStatus: string; actionLabel: string;
   }>> = {
     hq_staff: [
+      { triggerStatus: "created",         action: "pack",            nextStatus: "packed",               actionLabel: "Mark as Packed" },
+      { triggerStatus: "packed",          action: "dispatch",        nextStatus: "dispatched_to_region", actionLabel: "Dispatch to Region" },
+      { triggerStatus: "returned_to_hq",  action: "receive_return",  nextStatus: "completed",            actionLabel: "Receive Return & Complete" },
+    ],
+    hq_director: [
+      { triggerStatus: "created",         action: "pack",            nextStatus: "packed",               actionLabel: "Mark as Packed" },
       { triggerStatus: "packed",          action: "dispatch",        nextStatus: "dispatched_to_region", actionLabel: "Dispatch to Region" },
       { triggerStatus: "returned_to_hq",  action: "receive_return",  nextStatus: "completed",            actionLabel: "Receive Return & Complete" },
     ],
@@ -18299,7 +18305,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       }
 
       // Phase groupings for aggregation
-      const dispatchingStatuses = new Set(['at_hq', 'dispatched_to_region', 'at_region', 'dispatched_to_cluster', 'at_cluster', 'dispatched_to_center']);
+      const dispatchingStatuses = new Set(['created', 'packed', 'at_hq', 'dispatched_to_region', 'at_region', 'dispatched_to_cluster', 'at_cluster', 'dispatched_to_center']);
       const atCenterStatuses = new Set(['at_center', 'opened', 'sealed']);
       const returningStatuses = new Set(['returned_to_cluster', 'returned_to_region', 'returned_to_hq']);
 

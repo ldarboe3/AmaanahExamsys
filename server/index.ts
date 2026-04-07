@@ -11,7 +11,8 @@ app.use(cors({
   origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Staff-ID'],
+  exposedHeaders: ['X-Staff-ID'],
 }));
 
 // Trust proxy - required for secure cookies to work behind Replit's reverse proxy in production
