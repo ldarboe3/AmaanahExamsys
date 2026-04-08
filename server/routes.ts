@@ -18966,6 +18966,243 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // ─── Platform enrichment API (used by Expo mobile app to get real names) ────
+  // These are intentionally public (no session auth) so the mobile app can call
+  // them without a browser session. An in-memory cache is rebuilt every 5 min.
+
+  const platformCache: { packets: any[] | null; builtAt: number } = {
+    packets: null,
+    builtAt: 0,
+  };
+  const PLATFORM_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  async function getPlatformPackets(): Promise<any[]> {
+    if (platformCache.packets && Date.now() - platformCache.builtAt < PLATFORM_CACHE_TTL) {
+      return platformCache.packets;
+    }
+    // Rebuild cache
+    const [packets, regions, clusters, centers, subjects] = await Promise.all([
+      storage.getExamPackets(),
+      storage.getAllRegions(),
+      storage.getAllClusters(),
+      storage.getAllExamCenters(),
+      storage.getAllSubjects(),
+    ]);
+    const regionMap: Record<number, { name: string; code: string | null }> = {};
+    for (const r of regions as any[]) regionMap[r.id] = { name: r.name, code: r.code ?? null };
+    const clusterMap: Record<number, { name: string }> = {};
+    for (const c of clusters as any[]) clusterMap[c.id] = { name: c.name };
+    const centerMap: Record<number, { name: string }> = {};
+    for (const c of centers as any[]) centerMap[c.id] = { name: c.name };
+    const subjectMap: Record<number, string> = {};
+    for (const s of subjects as any[]) subjectMap[s.id] = s.name;
+
+    platformCache.packets = (packets as any[]).map(p => {
+      const reg = regionMap[p.destinationRegionId] ?? null;
+      const clu = clusterMap[p.destinationClusterId] ?? null;
+      const cen = centerMap[p.destinationCenterId] ?? null;
+      return {
+        id: String(p.id),
+        barcode: p.barcode,
+        grade: p.grade ?? null,
+        subject: subjectMap[p.subjectId] ?? null,
+        subjectId: p.subjectId ?? null,
+        // Center — real name, never a barcode-parsed placeholder
+        examCenter: cen?.name ?? null,
+        centerName: cen?.name ?? null,
+        centerId: p.destinationCenterId ?? null,
+        // Cluster — real name
+        cluster: clu?.name ?? null,
+        clusterName: clu?.name ?? null,
+        clusterId: p.destinationClusterId ?? null,
+        // Region — real name
+        region: reg?.name ?? null,
+        regionName: reg?.name ?? null,
+        regionCode: reg?.code ?? null,
+        regionId: p.destinationRegionId ?? null,
+        // Status
+        status: p.status,
+        statusLabel: STATUS_LABELS[p.status as string] ?? p.status,
+        paperCount: p.paperCount ?? null,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      };
+    });
+    platformCache.builtAt = Date.now();
+    return platformCache.packets!;
+  }
+
+  // Warm the cache at startup (non-blocking)
+  getPlatformPackets().catch(err =>
+    console.error("[Platform cache] Initial load failed:", err?.message ?? err)
+  );
+
+  // GET /api/platform/all-packets
+  // Returns every exam packet with real names for region, cluster, center, and subject.
+  // The mobile app calls this once on launch to overwrite any barcode-parsed placeholders.
+  app.get("/api/platform/all-packets", async (_req, res) => {
+    try {
+      const packets = await getPlatformPackets();
+      res.setHeader("Cache-Control", "public, max-age=60");
+      res.json({ packets, count: packets.length, builtAt: new Date(platformCache.builtAt).toISOString() });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/platform/enrich
+  // Body: { barcode: string }
+  // Returns enriched packet info (real names) for a single barcode.
+  // Used by the mobile app after scanning a barcode to replace placeholder data.
+  app.post("/api/platform/enrich", async (req, res) => {
+    try {
+      const { barcode } = req.body;
+      if (!barcode) return res.status(400).json({ message: "barcode is required" });
+
+      const packets = await getPlatformPackets();
+      const enriched = packets.find(p => p.barcode === barcode.trim());
+      if (!enriched) {
+        // Barcode not in cache — look up directly and return
+        const packet = await storage.getExamPacketByBarcode(barcode.trim());
+        if (!packet) return res.status(404).json({ message: "Packet not found" });
+
+        // Bust cache so next call picks up the new packet
+        platformCache.packets = null;
+        const freshPackets = await getPlatformPackets();
+        const freshEnriched = freshPackets.find(p => p.barcode === barcode.trim());
+        if (!freshEnriched) return res.status(404).json({ message: "Packet not found after refresh" });
+        return res.json(freshEnriched);
+      }
+
+      res.json(enriched);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/platform/packet-scan
+  // Body: { barcode, staffEid, staffName, staffRole, action?, notes?, gpsLatitude?, gpsLongitude? }
+  // Auth: optional X-Staff-ID header OR Authorization: Bearer {EID}:{confirmationCode}
+  // Records a scan event and advances the packet to the next status.
+  // Returns: { success, packet (enriched), action, fromStatus, toStatus }
+  app.post("/api/platform/packet-scan", async (req, res) => {
+    try {
+      const { barcode, staffEid, staffName, staffRole, notes, gpsLatitude, gpsLongitude } = req.body;
+      if (!barcode || !staffRole) {
+        return res.status(400).json({ message: "barcode and staffRole are required" });
+      }
+
+      const packet = await storage.getExamPacketByBarcode(barcode.trim());
+      if (!packet) return res.status(404).json({ message: "Packet not found: " + barcode });
+
+      const roleActions = MOBILE_ROLE_ACTIONS[staffRole] ?? [];
+      const match = roleActions.find(ra => ra.triggerStatus === packet.status);
+      if (!match) {
+        return res.status(422).json({
+          message: `No action available for role '${staffRole}' on packet in status '${packet.status}'.`,
+          currentStatus: packet.status,
+          currentStatusLabel: STATUS_LABELS[packet.status] ?? packet.status,
+        });
+      }
+
+      // Deduplicate: same role+fromStatus+action already recorded?
+      const existingScans = await storage.getMobilePacketScans(packet.id);
+      const duplicate = existingScans.find(
+        s => s.scannedByRole === staffRole &&
+             s.fromStatus === packet.status &&
+             s.action === match.action
+      );
+      if (duplicate) {
+        // Idempotent — return current (possibly already-advanced) state
+        const packets = await getPlatformPackets();
+        const enriched = packets.find(p => p.barcode === barcode.trim()) ?? { barcode, status: packet.status };
+        return res.json({
+          success: true,
+          duplicate: true,
+          message: "Already recorded — returning current state.",
+          packet: enriched,
+          action: match.action,
+          fromStatus: packet.status,
+          toStatus: match.nextStatus,
+        });
+      }
+
+      // Advance packet status
+      await storage.updateExamPacket(packet.id, {
+        status: match.nextStatus as any,
+        updatedAt: new Date(),
+      });
+
+      // Resolve staff record if EID provided
+      const staffProfile = staffEid
+        ? await storage.getStaffProfileByEmployeeId(String(staffEid))
+        : null;
+
+      // Record scan in mobile_packet_scans
+      const scan = await storage.createMobilePacketScan({
+        packetId: packet.id,
+        barcode: packet.barcode,
+        scannedByEid: staffEid ? String(staffEid) : (staffProfile?.employeeId ?? "unknown"),
+        scannedByName: staffName ?? (staffProfile ? `${staffProfile.firstName} ${staffProfile.lastName}` : "Unknown"),
+        scannedByRole: staffRole,
+        action: match.action,
+        fromStatus: packet.status as any,
+        toStatus: match.nextStatus as any,
+        location: null,
+        notes: notes ?? null,
+        gpsLatitude: gpsLatitude ? String(gpsLatitude) : null,
+        gpsLongitude: gpsLongitude ? String(gpsLongitude) : null,
+      });
+
+      // Bridge to packetEvents table for the web timeline
+      const ACTION_TO_EVENT: Record<string, string> = {
+        pack: "packed", dispatch: "dispatched", receive: "received",
+        open: "opened", seal: "sealed",
+        dispatch_return: "return_dispatched", forward_return: "return_dispatched",
+        receive_return: "return_received",
+      };
+      const evtType = ACTION_TO_EVENT[match.action];
+      if (evtType) {
+        db.insert(packetEvents).values({
+          clientEventId: `platform-${scan.id}`,
+          packetId: packet.id,
+          eventType: evtType as any,
+          senderStaffId: staffProfile?.id ?? null,
+          locationRegionId: packet.destinationRegionId ?? null,
+          locationClusterId: packet.destinationClusterId ?? null,
+          locationCenterId: packet.destinationCenterId ?? null,
+          gpsLatitude: gpsLatitude ? String(gpsLatitude) : null,
+          gpsLongitude: gpsLongitude ? String(gpsLongitude) : null,
+          notes: notes ? `[Platform: ${match.action}] ${notes}` : `[Platform: ${match.action}] by ${staffName ?? "unknown"}`,
+          isSynced: true,
+          eventTime: new Date(),
+        }).catch((err: any) => {
+          console.error("[Platform scan bridge] Failed to write packetEvent:", err?.message ?? err);
+        });
+      }
+
+      // Bust packet cache so next all-packets call reflects new status
+      platformCache.packets = null;
+
+      // Return enriched packet with updated status
+      const freshPackets = await getPlatformPackets();
+      const enriched = freshPackets.find(p => p.barcode === barcode.trim());
+
+      res.json({
+        success: true,
+        packet: enriched ?? { barcode, status: match.nextStatus },
+        action: match.action,
+        actionLabel: match.actionLabel,
+        fromStatus: packet.status,
+        toStatus: match.nextStatus,
+        toStatusLabel: STATUS_LABELS[match.nextStatus] ?? match.nextStatus,
+        scannedAt: scan.scannedAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }
 
