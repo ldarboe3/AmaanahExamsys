@@ -16355,6 +16355,50 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Center-view packet tracking — all packets destined for a specific center
+  // Accessible to all authenticated users (broader access for center dashboards)
+  app.get("/api/exam-packets/for-center/:centerId", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const centerId = parseInt(req.params.centerId);
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+
+      const result = await pool.query(`
+        SELECT
+          ep.id,
+          ep.barcode,
+          ep.grade,
+          ep.paper_count,
+          ep.status,
+          ep.current_location_type,
+          ep.created_at,
+          ep.updated_at,
+          ep.sealed_at,
+          ep.last_handover_at,
+          ep.notes,
+          s.name AS subject_name,
+          -- latest mobile scan info
+          (SELECT mps.scanned_by_name FROM mobile_packet_scans mps WHERE mps.packet_id = ep.id ORDER BY mps.scanned_at DESC LIMIT 1) AS last_scanner_name,
+          (SELECT mps.scanned_at FROM mobile_packet_scans mps WHERE mps.packet_id = ep.id ORDER BY mps.scanned_at DESC LIMIT 1) AS last_scanned_at,
+          (SELECT mps.scanned_by_role FROM mobile_packet_scans mps WHERE mps.packet_id = ep.id ORDER BY mps.scanned_at DESC LIMIT 1) AS last_scanner_role,
+          (SELECT COUNT(*)::int FROM mobile_packet_scans mps WHERE mps.packet_id = ep.id) AS total_scans,
+          -- received at center: has status at_center or beyond (opened/sealed/collected/returned/completed)
+          (ep.status IN ('at_center','opened','administered','sealed','collected','returned_to_cluster','returned_to_region','returned_to_hq','completed')) AS received_at_center
+        FROM exam_packets ep
+        JOIN subjects s ON ep.subject_id = s.id
+        WHERE ep.destination_center_id = $1
+          AND ($2::int IS NULL OR ep.exam_year_id = $2)
+        ORDER BY ep.grade ASC, s.name ASC, ep.barcode ASC
+      `, [centerId, examYearId ?? null]);
+
+      res.json(result.rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/exam-packets/:id", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);

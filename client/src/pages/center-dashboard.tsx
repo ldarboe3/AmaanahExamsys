@@ -63,6 +63,12 @@ import {
   Printer,
   Filter,
   Minus,
+  Truck,
+  ScanLine,
+  ChevronDown,
+  ChevronUp,
+  PackageCheck,
+  PackageX,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -1109,80 +1115,305 @@ function MalpracticeTab({
   );
 }
 
+interface CenterPacketRow {
+  id: number;
+  barcode: string;
+  grade: number;
+  paper_count: number;
+  status: string;
+  current_location_type: string;
+  created_at: string;
+  updated_at: string;
+  last_handover_at?: string;
+  subject_name: string;
+  last_scanner_name?: string;
+  last_scanned_at?: string;
+  last_scanner_role?: string;
+  total_scans: number;
+  received_at_center: boolean;
+}
+
+const PACKET_STATUS_LABELS: Record<string, string> = {
+  created: "Created",
+  packed: "Packed",
+  dispatched_to_region: "Dispatched to Region",
+  at_region: "At Region",
+  dispatched_to_cluster: "Dispatched to Cluster",
+  at_cluster: "At Cluster",
+  dispatched_to_center: "In Transit to Center",
+  at_center: "Received at Center",
+  opened: "Opened",
+  administered: "Administered",
+  sealed: "Sealed",
+  collected: "Collected",
+  returned_to_cluster: "Returned to Cluster",
+  returned_to_region: "Returned to Region",
+  returned_to_hq: "Returned to HQ",
+  completed: "Completed",
+  missing: "Missing",
+  damaged: "Damaged",
+};
+
+function PacketStatusBadge({ status }: { status: string }) {
+  const receivedStatuses = new Set(['at_center', 'opened', 'administered', 'sealed', 'collected', 'returned_to_cluster', 'returned_to_region', 'returned_to_hq', 'completed']);
+  const inTransitStatuses = new Set(['dispatched_to_region', 'dispatched_to_cluster', 'dispatched_to_center', 'at_region', 'at_cluster']);
+  const isReceived = receivedStatuses.has(status);
+  const isInTransit = inTransitStatuses.has(status);
+  const isDanger = status === 'missing' || status === 'damaged';
+
+  if (isDanger) return (
+    <Badge variant="outline" className="border-destructive text-destructive gap-1 whitespace-nowrap">
+      <XCircle className="w-3 h-3" />
+      {PACKET_STATUS_LABELS[status] ?? status}
+    </Badge>
+  );
+  if (isReceived) return (
+    <Badge variant="outline" className="border-chart-2 text-chart-2 gap-1 whitespace-nowrap">
+      <PackageCheck className="w-3 h-3" />
+      {PACKET_STATUS_LABELS[status] ?? status}
+    </Badge>
+  );
+  if (isInTransit) return (
+    <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-400 gap-1 whitespace-nowrap">
+      <Truck className="w-3 h-3" />
+      {PACKET_STATUS_LABELS[status] ?? status}
+    </Badge>
+  );
+  return (
+    <Badge variant="outline" className="text-muted-foreground gap-1 whitespace-nowrap">
+      <PackageX className="w-3 h-3" />
+      {PACKET_STATUS_LABELS[status] ?? status}
+    </Badge>
+  );
+}
+
 function LogisticsTab({ 
-  paperMovements, 
+  centerId,
+  examYearId,
   scriptMovements 
 }: { 
-  paperMovements: CenterDashboardData["paperMovements"];
+  centerId: number;
+  examYearId?: number;
   scriptMovements: CenterDashboardData["scriptMovements"];
 }) {
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      prepared: "secondary",
-      dispatched: "default",
-      received: "default",
-      stored: "outline",
-      distributed: "default",
-      collected: "default",
-      returned: "outline",
-    };
-    return colors[status] || "secondary";
-  };
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [gradeFilter, setGradeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [barcodeSearch, setBarcodeSearch] = useState("");
+
+  const { data: packets, isLoading, refetch } = useQuery<CenterPacketRow[]>({
+    queryKey: ["/api/exam-packets/for-center", centerId, examYearId],
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (examYearId) params.set("examYearId", String(examYearId));
+      const res = await fetch(`/api/exam-packets/for-center/${centerId}?${params}`);
+      if (!res.ok) throw new Error("Failed to load packets");
+      return res.json();
+    },
+  });
+
+  const grades = packets ? [...new Set(packets.map(p => p.grade))].sort((a, b) => a - b) : [];
+
+  const filtered = (packets ?? []).filter(p => {
+    const matchesGrade = gradeFilter === "all" || String(p.grade) === gradeFilter;
+    const matchesBarcode = !barcodeSearch || p.barcode.toLowerCase().includes(barcodeSearch.toLowerCase()) || p.subject_name.toLowerCase().includes(barcodeSearch.toLowerCase());
+    const matchesStatus = statusFilter === "all" ||
+      (statusFilter === "received" && p.received_at_center) ||
+      (statusFilter === "in_transit" && ['dispatched_to_center', 'dispatched_to_cluster', 'dispatched_to_region', 'at_cluster', 'at_region'].includes(p.status)) ||
+      (statusFilter === "not_dispatched" && ['created', 'packed'].includes(p.status));
+    return matchesGrade && matchesBarcode && matchesStatus;
+  });
+
+  const totalPackets = packets?.length ?? 0;
+  const receivedCount = packets?.filter(p => p.received_at_center).length ?? 0;
+  const inTransitCount = packets?.filter(p => ['dispatched_to_center', 'dispatched_to_cluster', 'dispatched_to_region', 'at_cluster', 'at_region'].includes(p.status)).length ?? 0;
+  const notDispatchedCount = packets?.filter(p => ['created', 'packed'].includes(p.status)).length ?? 0;
 
   return (
     <div className="space-y-4">
+      {/* Packet Tracking Section */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Package className="w-4 h-4" />
-                Paper Movements
-              </CardTitle>
-              <CardDescription>
-                Track question papers and materials
-              </CardDescription>
-            </div>
-            <Button size="sm" variant="outline">
-              <Plus className="w-4 h-4 me-2" />
-              Record Receipt
-            </Button>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 flex-wrap">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              Exam Packet Tracking
+            </CardTitle>
+            <CardDescription>
+              All packets assigned to this center — live from logistics system
+            </CardDescription>
           </div>
+          <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-refresh-packets">
+            <RefreshCw className="w-4 h-4 me-2" />
+            Refresh
+          </Button>
         </CardHeader>
-        <CardContent>
-          {paperMovements.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No paper movements recorded</p>
+        <CardContent className="space-y-4">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-md border p-3 text-center">
+              <p className="text-xl font-semibold">{totalPackets}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Total Packets</p>
+            </div>
+            <div className="rounded-md border p-3 text-center">
+              <p className="text-xl font-semibold text-chart-2">{receivedCount}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Received</p>
+            </div>
+            <div className="rounded-md border p-3 text-center">
+              <p className="text-xl font-semibold text-amber-600 dark:text-amber-400">{inTransitCount}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">In Transit</p>
+            </div>
+            <div className="rounded-md border p-3 text-center">
+              <p className="text-xl font-semibold text-muted-foreground">{notDispatchedCount}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Not Dispatched</p>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-2">
+            <div className="relative flex-1 min-w-44">
+              <ScanLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search barcode or subject..."
+                value={barcodeSearch}
+                onChange={e => setBarcodeSearch(e.target.value)}
+                className="pl-9"
+                data-testid="input-packet-search"
+              />
+            </div>
+            <Select value={gradeFilter} onValueChange={setGradeFilter}>
+              <SelectTrigger className="w-36" data-testid="select-packet-grade">
+                <Filter className="w-4 h-4 me-2 text-muted-foreground" />
+                <SelectValue placeholder="All Grades" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Grades</SelectItem>
+                {grades.map(g => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-44" data-testid="select-packet-status">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="received">Received at Center</SelectItem>
+                <SelectItem value="in_transit">In Transit</SelectItem>
+                <SelectItem value="not_dispatched">Not Dispatched</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Table */}
+          {isLoading ? (
+            <div className="space-y-2">
+              {[1,2,3,4].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+            </div>
+          ) : !packets || packets.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">No exam packets have been assigned to this center yet.</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">No packets match your filter.</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Grade</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paperMovements.map(movement => (
-                  <TableRow key={movement.id}>
-                    <TableCell className="font-medium">{movement.paperType}</TableCell>
-                    <TableCell>{movement.quantity}</TableCell>
-                    <TableCell>{movement.grade ? `Grade ${movement.grade}` : "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusColor(movement.status)}>
-                        {movement.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{new Date(movement.createdAt).toLocaleDateString()}</TableCell>
+            <div className="rounded-md border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8"></TableHead>
+                    <TableHead>Barcode</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Grade</TableHead>
+                    <TableHead>Papers</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Last Update</TableHead>
+                    <TableHead>Scans</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map(packet => (
+                    <>
+                      <TableRow
+                        key={packet.id}
+                        className="cursor-pointer"
+                        onClick={() => setExpandedId(expandedId === packet.id ? null : packet.id)}
+                        data-testid={`row-packet-${packet.id}`}
+                      >
+                        <TableCell className="text-muted-foreground">
+                          {expandedId === packet.id
+                            ? <ChevronUp className="w-4 h-4" />
+                            : <ChevronDown className="w-4 h-4" />}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{packet.barcode}</TableCell>
+                        <TableCell className="font-medium text-sm">{packet.subject_name}</TableCell>
+                        <TableCell className="text-sm">Grade {packet.grade}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{packet.paper_count}</TableCell>
+                        <TableCell>
+                          <PacketStatusBadge status={packet.status} />
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {packet.last_scanned_at
+                            ? new Date(packet.last_scanned_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })
+                            : packet.updated_at
+                            ? new Date(packet.updated_at).toLocaleDateString()
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{packet.total_scans}</TableCell>
+                      </TableRow>
+                      {expandedId === packet.id && (
+                        <TableRow key={`${packet.id}-detail`}>
+                          <TableCell colSpan={8} className="bg-muted/30 p-0">
+                            <div className="px-6 py-4 space-y-3">
+                              <div className="grid sm:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <p className="text-xs text-muted-foreground mb-1">Current Location</p>
+                                  <div className="flex items-center gap-1.5 font-medium">
+                                    <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                                    {packet.current_location_type.charAt(0).toUpperCase() + packet.current_location_type.slice(1)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground mb-1">Last Scanned By</p>
+                                  <div className="flex items-center gap-1.5 font-medium">
+                                    <ScanLine className="w-3.5 h-3.5 text-muted-foreground" />
+                                    {packet.last_scanner_name
+                                      ? `${packet.last_scanner_name} (${packet.last_scanner_role?.replace(/_/g, " ")})`
+                                      : "Not yet scanned"}
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground mb-1">Received at Center</p>
+                                  <div className="flex items-center gap-1.5 font-medium">
+                                    {packet.received_at_center
+                                      ? <><CheckCircle2 className="w-3.5 h-3.5 text-chart-2" /><span className="text-chart-2">Yes</span></>
+                                      : <><XCircle className="w-3.5 h-3.5 text-muted-foreground" /><span className="text-muted-foreground">Not yet</span></>}
+                                  </div>
+                                </div>
+                              </div>
+                              {packet.last_scanned_at && (
+                                <p className="text-xs text-muted-foreground">
+                                  Last scan: {new Date(packet.last_scanned_at).toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
+          <p className="text-xs text-muted-foreground text-right">
+            Showing {filtered.length} of {totalPackets} packets · auto-refreshes every 30 seconds
+          </p>
         </CardContent>
       </Card>
 
+      {/* Script Collections - legacy section */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -1195,10 +1426,6 @@ function LogisticsTab({
                 Track answer script handling
               </CardDescription>
             </div>
-            <Button size="sm" variant="outline">
-              <Plus className="w-4 h-4 me-2" />
-              Record Collection
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -1223,9 +1450,7 @@ function LogisticsTab({
                     <TableCell className="text-chart-2">{movement.presentCount || 0}</TableCell>
                     <TableCell className="text-destructive">{movement.absentCount || 0}</TableCell>
                     <TableCell>
-                      <Badge variant={getStatusColor(movement.status)}>
-                        {movement.status}
-                      </Badge>
+                      <Badge variant="outline">{movement.status}</Badge>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1549,7 +1774,8 @@ export default function CenterDashboard() {
 
             <TabsContent value="logistics" className="mt-4">
               <LogisticsTab 
-                paperMovements={paperMovements} 
+                centerId={centerId}
+                examYearId={examYear?.id}
                 scriptMovements={scriptMovements} 
               />
             </TabsContent>
