@@ -14276,6 +14276,57 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // Center-wide attendance roster — all students at a center with live scan status
+  app.get("/api/attendance/center-records", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const centerId = req.query.centerId ? parseInt(req.query.centerId as string) : undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+
+      if (!centerId) return res.status(400).json({ message: "centerId is required" });
+
+      const result = await pool.query(`
+        WITH center_students AS (
+          SELECT s.id, s.first_name, s.middle_name, s.last_name, s.index_number, s.grade, s.school_id, s.exam_year_id,
+                 sc.name AS school_name
+          FROM students s
+          JOIN schools sc ON s.school_id = sc.id
+          WHERE sc.assigned_center_id = $1
+            AND ($2::int IS NULL OR s.exam_year_id = $2)
+        ),
+        attendance_data AS (
+          SELECT ar.student_id, ar.subject_id, ar.is_present, ar.check_in_time,
+                 sub.name AS subject_name
+          FROM attendance_records ar
+          JOIN subjects sub ON ar.subject_id = sub.id
+          WHERE ar.center_id = $1
+            AND ($2::int IS NULL OR ar.exam_year_id = $2)
+        )
+        SELECT
+          cs.id AS student_id,
+          cs.first_name,
+          cs.middle_name,
+          cs.last_name,
+          cs.index_number,
+          cs.grade,
+          cs.school_name,
+          ad.subject_id,
+          ad.subject_name,
+          ad.is_present,
+          ad.check_in_time
+        FROM center_students cs
+        LEFT JOIN attendance_data ad ON cs.id = ad.student_id
+        ORDER BY ad.check_in_time DESC NULLS LAST, cs.last_name ASC, cs.first_name ASC, ad.subject_name ASC
+      `, [centerId, examYearId ?? null]);
+
+      res.json(result.rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Attendance monitoring summary — counts per center+subject with totals
   app.get("/api/attendance/monitoring-summary", isAuthenticated, async (req, res) => {
     try {

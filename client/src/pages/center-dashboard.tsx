@@ -61,6 +61,8 @@ import {
   Hash,
   ClipboardList,
   Printer,
+  Filter,
+  Minus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -382,11 +384,28 @@ function TimetableTab({ timetable, printInfo }: { timetable: CenterDashboardData
   );
 }
 
+interface CenterAttendanceRow {
+  student_id: number;
+  first_name: string;
+  middle_name?: string;
+  last_name: string;
+  index_number?: string;
+  grade: number;
+  school_name: string;
+  subject_id?: number;
+  subject_name?: string;
+  is_present?: boolean;
+  check_in_time?: string;
+}
+
 function AttendanceTab({ centerId, examYearId, schoolId, printInfo }: { centerId: number; examYearId?: number; schoolId?: number | null; printInfo?: PrintInfo }) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [lookupResult, setLookupResult] = useState<any>(null);
   const [isLooking, setIsLooking] = useState(false);
+  const [rosterSearch, setRosterSearch] = useState("");
+  const [gradeFilter, setGradeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const isSchoolView = !!schoolId;
 
   // For school admin: fetch their students' attendance records
@@ -403,6 +422,21 @@ function AttendanceTab({ centerId, examYearId, schoolId, printInfo }: { centerId
       if (examYearId) params.set("examYearId", String(examYearId));
       const res = await fetch(`/api/attendance/school-records?${params}`);
       if (!res.ok) throw new Error("Failed to fetch attendance");
+      return res.json();
+    },
+  });
+
+  // For admin: fetch all students at this center with live attendance from mobile scans
+  const { data: centerRecords, isLoading: isLoadingCenter, refetch: refetchCenter } = useQuery<CenterAttendanceRow[]>({
+    queryKey: ["/api/attendance/center-records", { centerId, examYearId }],
+    enabled: !isSchoolView,
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("centerId", String(centerId));
+      if (examYearId) params.set("examYearId", String(examYearId));
+      const res = await fetch(`/api/attendance/center-records?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch center attendance");
       return res.json();
     },
   });
@@ -673,33 +707,191 @@ function AttendanceTab({ centerId, examYearId, schoolId, printInfo }: { centerId
         </Card>
       )}
 
-      {/* Admin-only options */}
-      {!isSchoolView && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <ClipboardList className="w-4 h-4" />
-              Attendance Options
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-4">
-              <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2">
-                <FileText className="w-6 h-6" />
-                <span>Print Attendance Sheet</span>
+      {/* Admin-only: live attendance roster from mobile scans */}
+      {!isSchoolView && (() => {
+        const totalStudents = centerRecords ? new Set(centerRecords.map(r => r.student_id)).size : 0;
+        const presentCount = centerRecords?.filter(r => r.is_present === true).length ?? 0;
+        const absentCount = centerRecords?.filter(r => r.is_present === false).length ?? 0;
+        const notScannedCount = centerRecords?.filter(r => r.is_present == null).length ?? 0;
+
+        const grades = centerRecords
+          ? [...new Set(centerRecords.map(r => r.grade))].sort((a, b) => a - b)
+          : [];
+
+        const filtered = (centerRecords ?? []).filter(row => {
+          const fullName = `${row.first_name} ${row.middle_name ?? ""} ${row.last_name}`.toLowerCase();
+          const matchesSearch = !rosterSearch ||
+            fullName.includes(rosterSearch.toLowerCase()) ||
+            (row.index_number ?? "").includes(rosterSearch) ||
+            row.school_name.toLowerCase().includes(rosterSearch.toLowerCase());
+          const matchesGrade = gradeFilter === "all" || String(row.grade) === gradeFilter;
+          const matchesStatus = statusFilter === "all" ||
+            (statusFilter === "present" && row.is_present === true) ||
+            (statusFilter === "absent" && row.is_present === false) ||
+            (statusFilter === "not_scanned" && row.is_present == null);
+          return matchesSearch && matchesGrade && matchesStatus;
+        });
+
+        return (
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4 flex-wrap">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4" />
+                  Student Attendance Roster
+                </CardTitle>
+                <CardDescription>
+                  Live from mobile scanner — auto-refreshes every 30 seconds
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchCenter()}
+                data-testid="button-refresh-roster"
+              >
+                <RefreshCw className="w-4 h-4 me-2" />
+                Refresh
               </Button>
-              <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2">
-                <Users className="w-6 h-6" />
-                <span>Bulk Mark by Grade</span>
-              </Button>
-              <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2">
-                <RefreshCw className="w-6 h-6" />
-                <span>Sync Attendance</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Summary stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-xl font-semibold">{totalStudents}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Total Students</p>
+                </div>
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-xl font-semibold text-chart-2">{presentCount}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Present</p>
+                </div>
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-xl font-semibold text-destructive">{absentCount}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Absent</p>
+                </div>
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-xl font-semibold text-muted-foreground">{notScannedCount}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Not Scanned</p>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap gap-2">
+                <div className="relative flex-1 min-w-48">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search student, school..."
+                    value={rosterSearch}
+                    onChange={e => setRosterSearch(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-roster-search"
+                  />
+                </div>
+                <Select value={gradeFilter} onValueChange={setGradeFilter}>
+                  <SelectTrigger className="w-36" data-testid="select-grade-filter">
+                    <Filter className="w-4 h-4 me-2 text-muted-foreground" />
+                    <SelectValue placeholder="All Grades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Grades</SelectItem>
+                    {grades.map(g => (
+                      <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-40" data-testid="select-status-filter">
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="present">Present</SelectItem>
+                    <SelectItem value="absent">Absent</SelectItem>
+                    <SelectItem value="not_scanned">Not Scanned</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Table */}
+              {isLoadingCenter ? (
+                <div className="space-y-2">
+                  {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-11 w-full" />)}
+                </div>
+              ) : !centerRecords || centerRecords.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">No students assigned to this center yet.</p>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p className="text-sm">No students match your search.</p>
+                </div>
+              ) : (
+                <div className="rounded-md border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Student Name</TableHead>
+                        <TableHead>Index No.</TableHead>
+                        <TableHead>School</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Exam Status</TableHead>
+                        <TableHead className="text-muted-foreground">Time</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((row, idx) => {
+                        const fullName = [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(" ");
+                        const isPresent = row.is_present === true;
+                        const isAbsent = row.is_present === false;
+                        const notScanned = row.is_present == null;
+                        return (
+                          <TableRow key={`${row.student_id}-${row.subject_id ?? idx}`} data-testid={`row-attendance-${row.student_id}`}>
+                            <TableCell className="font-medium">{fullName}</TableCell>
+                            <TableCell className="font-mono text-sm text-muted-foreground">
+                              {row.index_number || "—"}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{row.school_name}</TableCell>
+                            <TableCell className="text-sm">
+                              {row.subject_name || <span className="text-muted-foreground">—</span>}
+                            </TableCell>
+                            <TableCell>
+                              {notScanned ? (
+                                <Badge variant="outline" className="text-muted-foreground gap-1">
+                                  <Minus className="w-3 h-3" />
+                                  Not Scanned
+                                </Badge>
+                              ) : isPresent ? (
+                                <Badge variant="outline" className="border-chart-2 text-chart-2 gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Present
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="border-destructive text-destructive gap-1">
+                                  <XCircle className="w-3 h-3" />
+                                  Absent
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {row.check_in_time
+                                ? new Date(row.check_in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                                : "—"}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground text-right">
+                Showing {filtered.length} of {centerRecords?.length ?? 0} records
+              </p>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }
