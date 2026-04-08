@@ -116,6 +116,8 @@ interface CenterDashboardData {
     email?: string;
     phone?: string;
     schoolBadge?: string | null;
+    studentCount?: number;
+    gradeBreakdown?: Record<number, number>;
   }>;
   timetable: Array<{
     id: number;
@@ -1464,6 +1466,13 @@ function LogisticsTab({
 }
 
 function SchoolsTab({ schools }: { schools: CenterDashboardData["schools"] }) {
+  const [search, setSearch] = useState("");
+
+  const filtered = schools.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    (s.email || "").toLowerCase().includes(search.toLowerCase())
+  );
+
   if (schools.length === 0) {
     return (
       <Card>
@@ -1476,47 +1485,99 @@ function SchoolsTab({ schools }: { schools: CenterDashboardData["schools"] }) {
     );
   }
 
+  const totalStudents = schools.reduce((sum, s) => sum + (s.studentCount || 0), 0);
+
   return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {schools.map(school => (
-        <Card key={school.id} className="hover-elevate">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-4">
-              {school.schoolBadge ? (
-                <div className="shrink-0">
-                  <img
-                    src={school.schoolBadge}
-                    alt={`${school.name} badge`}
-                    className="w-16 h-16 rounded-md object-contain border border-muted shadow-sm bg-white dark:bg-background"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = "none";
-                      const fallback = target.nextElementSibling as HTMLElement;
-                      if (fallback) fallback.style.display = "flex";
-                    }}
-                  />
-                  <div className="w-16 h-16 rounded-md bg-primary/10 items-center justify-center hidden">
-                    <School className="w-8 h-8 text-primary" />
-                  </div>
-                </div>
-              ) : (
-                <div className="w-16 h-16 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                  <School className="w-8 h-8 text-primary" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="font-medium leading-snug">{school.name}</p>
-                <Badge variant="outline" className="mt-1.5 text-xs">
-                  {school.schoolType}
-                </Badge>
-                {school.email && (
-                  <p className="text-xs text-muted-foreground mt-2 truncate">{school.email}</p>
-                )}
-              </div>
-            </div>
+    <div className="space-y-4">
+      {/* Summary strip */}
+      <div className="flex flex-wrap gap-3 items-center justify-between">
+        <div className="flex flex-wrap gap-3">
+          <div className="bg-primary/10 text-primary rounded-md px-3 py-1.5 text-sm font-medium flex items-center gap-2">
+            <School className="w-4 h-4" />
+            {schools.length} {schools.length === 1 ? "School" : "Schools"}
+          </div>
+          <div className="bg-muted rounded-md px-3 py-1.5 text-sm font-medium flex items-center gap-2 text-muted-foreground">
+            <Users className="w-4 h-4" />
+            {totalStudents} Students enrolled
+          </div>
+        </div>
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search schools..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9"
+            data-testid="input-schools-search"
+          />
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center">
+            <p className="text-muted-foreground">No schools match your search.</p>
           </CardContent>
         </Card>
-      ))}
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map(school => (
+            <Card key={school.id} className="hover-elevate" data-testid={`card-school-${school.id}`}>
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  {school.schoolBadge ? (
+                    <div className="shrink-0">
+                      <img
+                        src={school.schoolBadge}
+                        alt={`${school.name} badge`}
+                        className="w-14 h-14 rounded-md object-contain border border-muted bg-white dark:bg-background"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                          const fallback = target.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = "flex";
+                        }}
+                      />
+                      <div className="w-14 h-14 rounded-md bg-primary/10 items-center justify-center hidden">
+                        <School className="w-7 h-7 text-primary" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-14 h-14 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                      <School className="w-7 h-7 text-primary" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium leading-snug line-clamp-2" dir="auto">{school.name}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      <Badge variant="outline" className="text-xs">{school.schoolType}</Badge>
+                      {(school.studentCount ?? 0) > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          {school.studentCount} {school.studentCount === 1 ? "student" : "students"}
+                        </Badge>
+                      )}
+                    </div>
+                    {school.gradeBreakdown && Object.keys(school.gradeBreakdown).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {Object.entries(school.gradeBreakdown)
+                          .sort(([a], [b]) => Number(a) - Number(b))
+                          .map(([grade, count]) => (
+                            <span key={grade} className="text-xs text-muted-foreground bg-muted rounded px-1.5 py-0.5">
+                              G{grade}: {count}
+                            </span>
+                          ))}
+                      </div>
+                    )}
+                    {school.email && (
+                      <p className="text-xs text-muted-foreground mt-1 truncate">{school.email}</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -14597,16 +14597,15 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
       }
 
       // Full data for admins
-      const assignments = yearId ? await storage.getCenterAssignmentsByCenter(centerId, yearId) : [];
-      const students = await storage.getStudentsByCenter(centerId);
-      const paperMovements = yearId ? await storage.getPaperMovementsByCenter(centerId, yearId) : [];
-      const scriptMovements = yearId ? await storage.getScriptMovementsByCenter(centerId, yearId) : [];
-      const malpracticeReports = await storage.getMalpracticeReportsByCenter(centerId);
-      const activityLogs = await storage.getCenterActivityLogs(centerId, yearId);
-      const invigilators = await storage.getAssignmentsByCenter(centerId);
-
-      const schoolIds = assignments.map(a => a.schoolId);
-      const schools = await Promise.all(schoolIds.map(id => storage.getSchool(id)));
+      const [schools, students, paperMovements, scriptMovements, malpracticeReports, activityLogs, invigilators] = await Promise.all([
+        storage.getSchoolsByCenter(centerId),
+        storage.getStudentsByCenter(centerId),
+        yearId ? storage.getPaperMovementsByCenter(centerId, yearId) : Promise.resolve([]),
+        yearId ? storage.getScriptMovementsByCenter(centerId, yearId) : Promise.resolve([]),
+        storage.getMalpracticeReportsByCenter(centerId),
+        storage.getCenterActivityLogs(centerId, yearId),
+        storage.getAssignmentsByCenter(centerId),
+      ]);
 
       const totalStudents = yearId ? students.filter(s => s.examYearId === yearId).length : students.length;
       const studentsByGrade = students.reduce((acc: Record<number, number>, s) => {
@@ -14616,13 +14615,28 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return acc;
       }, {});
 
+      // Enrich each school with its year-scoped student count
+      const enrichedSchools = await Promise.all(schools.map(async (school) => {
+        const schoolStudents = await storage.getStudentsBySchool(school.id);
+        const yearStudents = yearId ? schoolStudents.filter(s => s.examYearId === yearId) : schoolStudents;
+        const gradeBreakdown = yearStudents.reduce((acc: Record<number, number>, s) => {
+          acc[s.grade] = (acc[s.grade] || 0) + 1;
+          return acc;
+        }, {});
+        return {
+          ...school,
+          studentCount: yearStudents.length,
+          gradeBreakdown,
+        };
+      }));
+
       res.json({
         center,
         examYear: activeExamYear,
         schoolView: false,
         schoolId: null,
         statistics: {
-          totalSchools: assignments.length,
+          totalSchools: schools.length,
           totalStudents,
           studentsByGrade,
           totalInvigilators: invigilators.length,
@@ -14630,7 +14644,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
           pendingScripts: scriptMovements.filter(s => s.status !== 'stored').length,
           malpracticeCount: malpracticeReports.length,
         },
-        schools: schools.filter(Boolean),
+        schools: enrichedSchools,
         timetable,
         paperMovements,
         scriptMovements,
