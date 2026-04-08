@@ -14717,8 +14717,9 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         return acc;
       }, {});
 
-      // Enrich each school with its year-scoped student count
-      const enrichedSchools = await Promise.all(schools.map(async (school) => {
+      // Enrich each school with its year-scoped student count, then keep only
+      // schools that have at least one student enrolled for the current exam year.
+      const allEnrichedSchools = await Promise.all(schools.map(async (school) => {
         const schoolStudents = await storage.getStudentsBySchool(school.id);
         const yearStudents = yearId ? schoolStudents.filter(s => s.examYearId === yearId) : schoolStudents;
         const gradeBreakdown = yearStudents.reduce((acc: Record<number, number>, s) => {
@@ -14731,6 +14732,10 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
           gradeBreakdown,
         };
       }));
+      // Only show schools that actually have enrolled students for this exam year
+      const enrichedSchools = yearId
+        ? allEnrichedSchools.filter(s => s.studentCount > 0)
+        : allEnrichedSchools;
 
       res.json({
         center,
@@ -14738,7 +14743,7 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
         schoolView: false,
         schoolId: null,
         statistics: {
-          totalSchools: schools.length,
+          totalSchools: enrichedSchools.length,
           totalStudents,
           studentsByGrade,
           totalInvigilators: invigilators.length,
