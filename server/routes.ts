@@ -14276,6 +14276,108 @@ Jane,Smith,,2009-03-22,Town Name,female,10`;
     }
   });
 
+  // School admin: per-student, per-subject attendance matrix
+  app.get("/api/school/attendance-matrix", isAuthenticated, async (req, res) => {
+    try {
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser) return res.status(401).json({ message: "Not authenticated" });
+
+      let schoolId: number | null = null;
+      if (currentUser.role === "school_admin") {
+        schoolId = await getSchoolIdForUser(currentUser);
+        if (!schoolId) return res.status(403).json({ message: "No school associated with this account" });
+      } else if (req.query.schoolId) {
+        schoolId = parseInt(req.query.schoolId as string);
+      }
+      if (!schoolId) return res.status(400).json({ message: "schoolId is required" });
+
+      const activeYear = await storage.getActiveExamYear();
+      if (!activeYear) return res.json({ subjects: [], students: [] });
+
+      const allStudents = await storage.getStudentsBySchool(schoolId);
+      let students = allStudents.filter((s: any) => s.examYearId === activeYear.id && s.status === "approved");
+
+      // Fall back to the most recent exam year that has approved students for this school
+      if (students.length === 0) {
+        const approvedStudents = allStudents.filter((s: any) => s.status === "approved");
+        if (approvedStudents.length > 0) {
+          const maxYearId = Math.max(...approvedStudents.map((s: any) => s.examYearId));
+          students = approvedStudents.filter((s: any) => s.examYearId === maxYearId);
+        }
+      }
+
+      const grades = [...new Set(students.map((s: any) => s.grade))];
+      const allSubjects = await storage.getAllSubjects();
+      const timetable = await storage.getTimetableByExamYear(activeYear.id);
+
+      const relevantSubjects = timetable
+        .filter((t: any) => grades.includes(t.grade))
+        .map((t: any) => {
+          const subj = allSubjects.find((s: any) => s.id === t.subjectId);
+          return {
+            id: t.id,
+            subjectId: t.subjectId,
+            subjectName: subj?.name || "Unknown",
+            subjectArabicName: subj?.arabicName || subj?.name || "",
+            grade: t.grade,
+            examDate: t.examDate,
+            startTime: t.startTime,
+            endTime: t.endTime,
+          };
+        })
+        .sort((a: any, b: any) => {
+          if (a.examDate !== b.examDate) return a.examDate.localeCompare(b.examDate);
+          return a.startTime.localeCompare(b.startTime);
+        });
+
+      const uniqueSubjectMap = new Map<number, (typeof relevantSubjects)[0]>();
+      relevantSubjects.forEach((s: any) => {
+        if (!uniqueSubjectMap.has(s.subjectId)) uniqueSubjectMap.set(s.subjectId, s);
+      });
+      const uniqueSubjects = [...uniqueSubjectMap.values()];
+
+      const studentIds = students.map((s: any) => s.id);
+      const allRecords: any[] = [];
+      for (const studentId of studentIds) {
+        const records = await storage.getAttendanceByStudent(studentId);
+        allRecords.push(...records);
+      }
+
+      const attendanceByStudentSubject = new Map<string, { isPresent: boolean; checkInTime: string | null }>();
+      allRecords.forEach((r: any) => {
+        if (r.subjectId) {
+          const key = `${r.studentId}:${r.subjectId}`;
+          attendanceByStudentSubject.set(key, {
+            isPresent: r.isPresent,
+            checkInTime: r.checkInTime ? new Date(r.checkInTime).toISOString() : null,
+          });
+        }
+      });
+
+      const enrichedStudents = students.map((s: any) => {
+        const attendance: Record<number, { isPresent: boolean; checkInTime: string | null } | null> = {};
+        uniqueSubjects.forEach((subj: any) => {
+          const key = `${s.id}:${subj.subjectId}`;
+          attendance[subj.subjectId] = attendanceByStudentSubject.get(key) ?? null;
+        });
+        return {
+          id: s.id,
+          firstName: s.firstName,
+          middleName: s.middleName,
+          lastName: s.lastName,
+          indexNumber: s.indexNumber,
+          grade: s.grade,
+          gender: s.gender,
+          attendance,
+        };
+      });
+
+      res.json({ subjects: uniqueSubjects, students: enrichedStudents });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Center-wide attendance roster — all students at a center with live scan status
   app.get("/api/attendance/center-records", isAuthenticated, async (req, res) => {
     try {
