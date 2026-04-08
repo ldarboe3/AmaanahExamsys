@@ -2631,21 +2631,51 @@ export class DatabaseStorage implements IStorage {
   // ===== Packet Events (Event-Based Tracking) =====
   async createPacketEvent(event: InsertPacketEvent): Promise<PacketEvent> {
     const [created] = await db.insert(packetEvents).values(event).returning();
-    // Update packet status based on event type
-    const statusMap: Record<string, string> = {
-      packed: 'packed',
-      dispatched: 'dispatched_to_region',
-      received: 'at_region',
-      opened: 'opened',
-      sealed: 'sealed',
-      return_dispatched: 'returned_to_cluster',
-      return_received: 'returned_to_hq',
-      archived: 'completed',
-    };
-    const newStatus = statusMap[event.eventType];
-    if (newStatus) {
+
+    // Derive the correct next status based on the packet's CURRENT status + event type
+    // so we correctly advance through the multi-hop chain without resetting to the wrong step.
+    const [packet] = await db.select({ status: examPackets.status })
+      .from(examPackets).where(eq(examPackets.id, event.packetId));
+    const currentStatus = packet?.status ?? 'created';
+
+    const nextStatus = (() => {
+      switch (event.eventType) {
+        case 'packed':
+          return 'packed';
+        case 'dispatched':
+          if (currentStatus === 'packed' || currentStatus === 'created') return 'dispatched_to_region';
+          if (currentStatus === 'at_region') return 'dispatched_to_cluster';
+          if (currentStatus === 'at_cluster') return 'dispatched_to_center';
+          return 'dispatched_to_region';
+        case 'received':
+          if (currentStatus === 'dispatched_to_region') return 'at_region';
+          if (currentStatus === 'dispatched_to_cluster') return 'at_cluster';
+          if (currentStatus === 'dispatched_to_center') return 'at_center';
+          return 'at_region';
+        case 'opened':
+          return 'opened';
+        case 'sealed':
+          return 'sealed';
+        case 'return_dispatched':
+          if (currentStatus === 'at_center' || currentStatus === 'opened' || currentStatus === 'sealed' ||
+              currentStatus === 'administered') return 'returned_to_cluster';
+          if (currentStatus === 'returned_to_cluster') return 'returned_to_region';
+          if (currentStatus === 'returned_to_region') return 'returned_to_hq';
+          return 'returned_to_cluster';
+        case 'return_received':
+          if (currentStatus === 'returned_to_cluster') return 'returned_to_region';
+          if (currentStatus === 'returned_to_region') return 'returned_to_hq';
+          return 'returned_to_hq';
+        case 'archived':
+          return 'completed';
+        default:
+          return null;
+      }
+    })();
+
+    if (nextStatus) {
       await db.update(examPackets)
-        .set({ status: newStatus as any })
+        .set({ status: nextStatus as any })
         .where(eq(examPackets.id, event.packetId));
     }
     return created;

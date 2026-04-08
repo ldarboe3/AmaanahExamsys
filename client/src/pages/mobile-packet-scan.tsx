@@ -106,41 +106,49 @@ interface PacketInfo {
 
 // ── Event type config per role ────────────────────────────────────────────────
 
-const ROLE_ACTIONS: Record<string, { type: string; label: string; icon: typeof Package; requiresSeal?: boolean }[]> = {
-  super_admin: [
-    { type: "packed",            label: "Mark as Packed",        icon: Package },
-    { type: "dispatched",        label: "Dispatch",              icon: Truck },
-    { type: "received",          label: "Receive",               icon: Building2 },
-    { type: "opened",            label: "Open Packet",           icon: Package },
-    { type: "sealed",            label: "Seal Packet",           icon: Lock, requiresSeal: true },
-    { type: "return_dispatched", label: "Return Dispatch",       icon: ArrowLeft },
-    { type: "return_received",   label: "Return Received",       icon: ArrowLeft },
-    { type: "archived",          label: "Archive",               icon: CheckCircle },
-  ],
-  examination_admin: [
-    { type: "packed",            label: "Mark as Packed",        icon: Package },
-    { type: "dispatched",        label: "Dispatch to Region",    icon: Truck },
-    { type: "return_received",   label: "Return Received at HQ", icon: ArrowLeft },
-    { type: "archived",          label: "Archive",               icon: CheckCircle },
-  ],
-  regional_logistics: [
-    { type: "received",          label: "Receive from HQ",       icon: Building2 },
-    { type: "dispatched",        label: "Dispatch to Cluster",   icon: Truck },
-    { type: "return_received",   label: "Return Received",       icon: ArrowLeft },
-    { type: "return_dispatched", label: "Return Dispatch to HQ", icon: ArrowLeft },
-  ],
-  cluster_logistics: [
-    { type: "received",          label: "Receive from Region",   icon: Building2 },
-    { type: "dispatched",        label: "Dispatch to Center",    icon: Truck },
-    { type: "return_received",   label: "Return Received",       icon: ArrowLeft },
-    { type: "return_dispatched", label: "Return Dispatch",       icon: ArrowLeft },
-  ],
-  examiner: [
-    { type: "received",          label: "Receive Packet",        icon: Building2 },
-    { type: "opened",            label: "Open Packet",           icon: Package },
-    { type: "sealed",            label: "Seal After Exam",       icon: Lock, requiresSeal: true },
-    { type: "return_dispatched", label: "Return to Cluster",     icon: ArrowLeft },
-  ],
+const ALL_ACTIONS: Record<string, { type: string; label: string; icon: typeof Package; requiresSeal?: boolean }> = {
+  packed:            { type: "packed",            label: "Mark as Packed",        icon: Package },
+  dispatched_region: { type: "dispatched",        label: "Dispatch to Region",    icon: Truck },
+  dispatched_cluster:{ type: "dispatched",        label: "Dispatch to Cluster",   icon: Truck },
+  dispatched_center: { type: "dispatched",        label: "Dispatch to Center",    icon: Truck },
+  received_region:   { type: "received",          label: "Receive at Region",     icon: Building2 },
+  received_cluster:  { type: "received",          label: "Receive at Cluster",    icon: Building2 },
+  received_center:   { type: "received",          label: "Receive at Center",     icon: Building2 },
+  opened:            { type: "opened",            label: "Open Packet",           icon: Package },
+  sealed:            { type: "sealed",            label: "Seal Packet",           icon: Lock, requiresSeal: true },
+  return_to_cluster: { type: "return_dispatched", label: "Return to Cluster",     icon: ArrowLeft },
+  return_to_region:  { type: "return_dispatched", label: "Return to Region",      icon: ArrowLeft },
+  return_to_hq:      { type: "return_dispatched", label: "Return to HQ",          icon: ArrowLeft },
+  return_received:   { type: "return_received",   label: "Return Received at HQ", icon: ArrowLeft },
+  archived:          { type: "archived",           label: "Archive",               icon: CheckCircle },
+};
+
+// Which action key is valid for a given packet status (status → action key)
+const STATUS_ACTION_MAP: Record<string, string> = {
+  created:              "packed",
+  packed:               "dispatched_region",
+  dispatched_to_region: "received_region",
+  at_region:            "dispatched_cluster",
+  dispatched_to_cluster:"received_cluster",
+  at_cluster:           "dispatched_center",
+  dispatched_to_center: "received_center",
+  at_center:            "opened",
+  opened:               "sealed",
+  administered:         "sealed",
+  sealed:               "return_to_cluster",
+  returned_to_cluster:  "return_to_region",
+  returned_to_region:   "return_to_hq",
+  returned_to_hq:       "return_received",
+  completed:            "archived",
+};
+
+// Role gating: which event types each role is allowed to perform
+const ROLE_ALLOWED_EVENT_TYPES: Record<string, string[]> = {
+  super_admin:        ["packed","dispatched","received","opened","sealed","return_dispatched","return_received","archived"],
+  examination_admin:  ["packed","dispatched","return_received","archived"],
+  regional_logistics: ["received","dispatched","return_received","return_dispatched"],
+  cluster_logistics:  ["received","dispatched","return_received","return_dispatched"],
+  examiner:           ["received","opened","sealed","return_dispatched"],
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -264,7 +272,8 @@ export default function MobilePacketScan() {
   const [scannedPacket, setScannedPacket] = useState<PacketInfo | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<typeof ROLE_ACTIONS["super_admin"][0] | null>(null);
+  type ActionConfig = { type: string; label: string; icon: typeof Package; requiresSeal?: boolean };
+  const [selectedAction, setSelectedAction] = useState<ActionConfig | null>(null);
   const [offlineQueue, setOfflineQueue] = useState<OfflineEvent[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -274,7 +283,19 @@ export default function MobilePacketScan() {
   const { data: me } = useQuery<any>({ queryKey: ["/api/auth/user"] });
 
   const userRole: string = me?.role ?? "examiner";
-  const availableActions = ROLE_ACTIONS[userRole] ?? ROLE_ACTIONS["examiner"];
+  const allowedEventTypes = ROLE_ALLOWED_EVENT_TYPES[userRole] ?? ROLE_ALLOWED_EVENT_TYPES["examiner"];
+
+  // Compute the single next action valid for the scanned packet's current status,
+  // filtered by whether the logged-in user's role is allowed to perform it.
+  const packetNextAction = scannedPacket
+    ? (() => {
+        const actionKey = STATUS_ACTION_MAP[scannedPacket.status];
+        if (!actionKey) return null;
+        const actionCfg = ALL_ACTIONS[actionKey];
+        if (!actionCfg) return null;
+        return allowedEventTypes.includes(actionCfg.type) ? actionCfg : null;
+      })()
+    : null;
 
   // Packet stats
   const { data: stats } = useQuery<{
@@ -334,7 +355,7 @@ export default function MobilePacketScan() {
   const recordEventMutation = useMutation({
     mutationFn: (event: any) => apiRequest("POST", "/api/packet-events", event).then(r => r.json()),
     onSuccess: (_, vars) => {
-      const actionCfg = availableActions.find(a => a.type === vars.eventType);
+      const actionCfg = Object.values(ALL_ACTIONS).find(a => a.type === vars.eventType);
       toast({ title: "Event recorded", description: actionCfg?.label ?? vars.eventType });
       setRecentScans(prev => [
         { barcode: scannedPacket!.barcode, action: actionCfg?.label ?? vars.eventType, time: new Date().toLocaleTimeString() },
@@ -580,24 +601,27 @@ export default function MobilePacketScan() {
             {/* Action buttons */}
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">Select Action</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {availableActions.map(action => {
-                    const Icon = action.icon;
-                    return (
-                      <Button
-                        key={action.type}
-                        variant="outline"
-                        className="h-auto flex-col gap-1.5 py-3"
-                        onClick={() => setSelectedAction(action)}
-                        data-testid={`button-action-${action.type}`}
-                      >
-                        <Icon className="w-5 h-5" />
-                        <span className="text-xs font-medium leading-tight text-center">{action.label}</span>
-                      </Button>
-                    );
-                  })}
-                </div>
+                <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">Next Action</p>
+                {packetNextAction ? (
+                  <Button
+                    className="w-full h-auto flex-col gap-2 py-4"
+                    onClick={() => setSelectedAction(packetNextAction)}
+                    data-testid={`button-action-${packetNextAction.type}`}
+                  >
+                    <packetNextAction.icon className="w-6 h-6" />
+                    <span className="text-sm font-semibold">{packetNextAction.label}</span>
+                    <span className="text-xs opacity-75">Tap to confirm</span>
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50 text-sm text-muted-foreground">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
+                    <span>
+                      {scannedPacket?.status === 'completed'
+                        ? "This packet has completed its journey."
+                        : "No action available for your role at this stage."}
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
