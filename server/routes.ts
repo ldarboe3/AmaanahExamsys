@@ -16890,50 +16890,113 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
 
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
+      // Pre-fetch halls for all centers so we can create per-hall packets
+      const centerHallsMap: Record<number, any[]> = {};
+      for (const center of centers) {
+        const halls = await storage.getCenterHallsByCenter(center.id);
+        centerHallsMap[center.id] = halls;
+      }
+
       for (const subject of subjects) {
         const subjectCode = ((subject as any).code || (subject as any).name.substring(0, 3))
           .toUpperCase().replace(/\s/g, '').replace(/[()]/g, '');
 
         for (const center of centers) {
-          // Skip if packet already exists for this subject + center + year
-          if (skipExisting && existingPackets.some((p: any) => p.subjectId === subject.id && p.destinationCenterId === center.id)) {
-            skipped++;
-            continue;
-          }
-
+          const halls = centerHallsMap[center.id] ?? [];
           const studentCount = centerStudentCount[center.id] ?? 0;
-          // paper count = students + buffer%, rounded up to nearest 10, minimum 10
-          const rawCount = Math.ceil(studentCount * (1 + (bufferPercent / 100)));
-          const paperCount = Math.max(10, Math.ceil(rawCount / 10) * 10);
 
-          const sealRand = Math.random().toString(36).toUpperCase().slice(2, 7);
-          const securitySealNumber = `SEAL-${dateStr}-${sealRand}`;
+          if (halls.length > 0) {
+            // Hall-based packaging: one packet per hall per subject
+            for (const hall of halls) {
+              // Skip if packet already exists for this subject + center + hall + year
+              if (skipExisting && existingPackets.some((p: any) =>
+                p.subjectId === subject.id &&
+                p.destinationCenterId === center.id &&
+                (p as any).hallId === hall.id
+              )) {
+                skipped++;
+                continue;
+              }
 
-          let barcode: string;
-          let attempts = 0;
-          const baseSeq = (await storage.getExamPackets({ examYearId, grade: (subject as any).grade })).length;
-          do {
-            const seq = String(baseSeq + created.length + 1 + attempts).padStart(3, '0');
-            barcode = `PKT-${examYear.year}-G${(subject as any).grade}-${subjectCode}-C${center.id}-${seq}`;
-            const dup = await storage.getExamPacketByBarcode(barcode);
-            if (!dup) break;
-            attempts++;
-          } while (attempts < 100);
+              // Divide students evenly across halls, rounded up, minimum 10
+              const perHallStudents = Math.ceil(studentCount / halls.length);
+              const rawCount = Math.ceil(perHallStudents * (1 + (bufferPercent / 100)));
+              const paperCount = Math.max(10, Math.ceil(rawCount / 10) * 10);
 
-          const packet = await storage.createExamPacket({
-            examYearId,
-            subjectId: subject.id,
-            grade: (subject as any).grade,
-            destinationCenterId: center.id,
-            destinationRegionId: (center as any).regionId ?? null,
-            destinationClusterId: (center as any).clusterId ?? null,
-            paperCount,
-            securitySealNumber,
-            notes: `Auto-generated: ${studentCount} students + ${bufferPercent}% buffer`,
-            barcode,
-            createdBy: user.id,
-          });
-          created.push(packet);
+              const sealRand = Math.random().toString(36).toUpperCase().slice(2, 7);
+              const securitySealNumber = `SEAL-${dateStr}-${sealRand}`;
+
+              let barcode: string;
+              let attempts = 0;
+              const baseSeq = (await storage.getExamPackets({ examYearId, grade: (subject as any).grade })).length;
+              do {
+                const seq = String(baseSeq + created.length + 1 + attempts).padStart(3, '0');
+                barcode = `PKT-${examYear.year}-G${(subject as any).grade}-${subjectCode}-C${center.id}-H${hall.id}-${seq}`;
+                const dup = await storage.getExamPacketByBarcode(barcode);
+                if (!dup) break;
+                attempts++;
+              } while (attempts < 100);
+
+              const packet = await storage.createExamPacket({
+                examYearId,
+                subjectId: subject.id,
+                grade: (subject as any).grade,
+                destinationCenterId: center.id,
+                destinationRegionId: (center as any).regionId ?? null,
+                destinationClusterId: (center as any).clusterId ?? null,
+                hallId: hall.id,
+                paperCount,
+                securitySealNumber,
+                notes: `Auto-generated: Hall "${hall.name}", ~${perHallStudents} students + ${bufferPercent}% buffer`,
+                barcode,
+                createdBy: user.id,
+              });
+              created.push(packet);
+            }
+          } else {
+            // No halls: create one packet per center (original behavior)
+            if (skipExisting && existingPackets.some((p: any) =>
+              p.subjectId === subject.id &&
+              p.destinationCenterId === center.id &&
+              !(p as any).hallId
+            )) {
+              skipped++;
+              continue;
+            }
+
+            // paper count = students + buffer%, rounded up to nearest 10, minimum 10
+            const rawCount = Math.ceil(studentCount * (1 + (bufferPercent / 100)));
+            const paperCount = Math.max(10, Math.ceil(rawCount / 10) * 10);
+
+            const sealRand = Math.random().toString(36).toUpperCase().slice(2, 7);
+            const securitySealNumber = `SEAL-${dateStr}-${sealRand}`;
+
+            let barcode: string;
+            let attempts = 0;
+            const baseSeq = (await storage.getExamPackets({ examYearId, grade: (subject as any).grade })).length;
+            do {
+              const seq = String(baseSeq + created.length + 1 + attempts).padStart(3, '0');
+              barcode = `PKT-${examYear.year}-G${(subject as any).grade}-${subjectCode}-C${center.id}-${seq}`;
+              const dup = await storage.getExamPacketByBarcode(barcode);
+              if (!dup) break;
+              attempts++;
+            } while (attempts < 100);
+
+            const packet = await storage.createExamPacket({
+              examYearId,
+              subjectId: subject.id,
+              grade: (subject as any).grade,
+              destinationCenterId: center.id,
+              destinationRegionId: (center as any).regionId ?? null,
+              destinationClusterId: (center as any).clusterId ?? null,
+              paperCount,
+              securitySealNumber,
+              notes: `Auto-generated: ${studentCount} students + ${bufferPercent}% buffer`,
+              barcode,
+              createdBy: user.id,
+            });
+            created.push(packet);
+          }
         }
       }
 

@@ -582,25 +582,22 @@ async function toBase64DataUrl(url: string): Promise<string> {
   });
 }
 
-async function printPacketLabel(
-  packet: ExamPacket,
-  subjectName: string,
-  centerName: string,
-  examYearLabel: string,
-  examDate?: string,
-  startTime?: string,
-  endTime?: string,
-) {
-  const [qrDataUrl, logoDataUrl] = await Promise.all([
-    QRCode.toDataURL(packet.barcode, {
-      width: 200,
-      margin: 1,
-      color: { dark: "#000000", light: "#ffffff" },
-    }),
-    toBase64DataUrl(amanahLogoUrl).catch(() => ""),
-  ]);
+interface PrintLabelOpts {
+  packet: ExamPacket;
+  subjectName: string;
+  centerName: string;
+  examYearLabel: string;
+  examDate?: string;
+  startTime?: string;
+  endTime?: string;
+  regionName?: string;
+  clusterName?: string;
+  hallName?: string;
+}
 
-  const statusLabel = (STATUS_CFG[packet.status]?.label ?? packet.status);
+function buildLabelHtml(opts: PrintLabelOpts, qrDataUrl: string, logoDataUrl: string): string {
+  const { packet, subjectName, centerName, examYearLabel, examDate, startTime, endTime, regionName, clusterName, hallName } = opts;
+  const statusLabel = STATUS_CFG[packet.status]?.label ?? packet.status;
   const printDate = new Date().toLocaleString();
 
   const fmtDate = examDate
@@ -609,7 +606,6 @@ async function printPacketLabel(
   const timeRange = startTime && endTime ? `${startTime} – ${endTime}` : startTime ?? null;
   const hasSchedule = !!(fmtDate || timeRange);
 
-  // Calculate duration from start/end times
   const durationLabel = (() => {
     if (!startTime || !endTime) return null;
     const [sh, sm] = startTime.split(":").map(Number);
@@ -623,78 +619,7 @@ async function printPacketLabel(
     return `${m} min`;
   })();
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <title>Packet Label – ${packet.barcode}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; background: #fff; color: #111; }
-    @page { size: A4 landscape; margin: 12mm; }
-    .label {
-      width: 270mm; min-height: 168mm;
-      border: 2.5px solid #0d9488; border-radius: 8px;
-      padding: 12mm; display: flex; flex-direction: column; gap: 7mm;
-    }
-    .header {
-      display: flex; align-items: center; justify-content: space-between;
-      border-bottom: 2px solid #0d9488; padding-bottom: 5mm;
-    }
-    .header-left { display: flex; align-items: center; gap: 5mm; }
-    .header-logo { width: 20mm; height: 20mm; object-fit: contain; flex-shrink: 0; }
-    .org-name { font-size: 26pt; font-weight: 900; color: #0d9488; letter-spacing: 0.5px; }
-    .org-sub  { font-size: 12pt; color: #555; margin-top: 1.5mm; }
-    .title-badge {
-      background: #0d9488; color: #fff;
-      font-size: 13pt; font-weight: 700;
-      padding: 5px 14px; border-radius: 5px; letter-spacing: 0.5px;
-    }
-    .body { display: flex; gap: 10mm; flex: 1; }
-    .details { flex: 1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm 8mm; }
-    .field label { font-size: 9pt; text-transform: uppercase; color: #888; letter-spacing: 0.6px; font-weight: 600; }
-    .field p { font-size: 15pt; font-weight: 700; color: #111; margin-top: 1.5px; }
-    .field p.mono { font-family: 'Courier New', monospace; font-size: 13pt; }
-    .qr-block { display: flex; flex-direction: column; align-items: center; gap: 3mm; }
-    .qr-block img { width: 52mm; height: 52mm; border: 1px solid #e5e7eb; border-radius: 5px; }
-    .qr-label { font-size: 9pt; color: #555; text-align: center; max-width: 56mm; line-height: 1.4; }
-    .barcode-strip {
-      background: #f8fafc; border: 1.5px solid #e5e7eb; border-radius: 5px;
-      padding: 4mm 6mm; text-align: center;
-    }
-    .barcode-strip .bc-text { font-family: 'Courier New', monospace; font-size: 20pt; font-weight: 900; letter-spacing: 3px; color: #0d9488; }
-    .barcode-strip .bc-hint { font-size: 10pt; color: #888; margin-top: 2mm; }
-    .footer { border-top: 1px solid #e5e7eb; padding-top: 4mm; display: flex; justify-content: space-between; align-items: center; }
-    .footer p { font-size: 9pt; color: #aaa; }
-    .status-badge {
-      display: inline-block; background: #d1fae5; color: #065f46;
-      font-size: 12pt; font-weight: 700; padding: 3px 12px; border-radius: 20px;
-    }
-    .schedule-banner {
-      background: #0f766e; color: #fff;
-      border-radius: 6px; padding: 4mm 7mm;
-      display: flex; align-items: center; justify-content: space-between; gap: 8mm;
-    }
-    .schedule-banner .sch-label { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.7px; opacity: 0.85; margin-bottom: 1.5px; }
-    .schedule-banner .sch-val  { font-size: 16pt; font-weight: 800; letter-spacing: 0.3px; }
-    .schedule-banner .sch-divider { width: 1px; background: rgba(255,255,255,0.35); align-self: stretch; }
-    .schedule-banner .sch-time  { font-size: 20pt; font-weight: 900; letter-spacing: 1px; }
-    .schedule-banner .sch-duration { font-size: 18pt; font-weight: 900; letter-spacing: 0.5px; }
-    .schedule-banner .sch-dur-pill {
-      display: inline-block; background: rgba(255,255,255,0.2);
-      border: 1.5px solid rgba(255,255,255,0.45);
-      border-radius: 4px; padding: 2px 10px; margin-top: 2px;
-      font-size: 17pt; font-weight: 900; letter-spacing: 0.5px;
-    }
-    .no-schedule-notice {
-      background: #fef3c7; color: #92400e;
-      border-radius: 6px; padding: 3mm 7mm; font-size: 10pt; font-style: italic;
-    }
-  </style>
-</head>
-<body>
-<div class="label">
+  return `<div class="label">
   <div class="header">
     <div class="header-left">
       ${logoDataUrl ? `<img class="header-logo" src="${logoDataUrl}" alt="Amaanah Logo" />` : ""}
@@ -730,7 +655,10 @@ async function printPacketLabel(
       <div class="grid">
         <div class="field"><label>Subject</label><p>${subjectName}</p></div>
         <div class="field"><label>Grade</label><p>Grade ${packet.grade}</p></div>
+        ${regionName ? `<div class="field"><label>Region</label><p>${regionName}</p></div>` : ""}
+        ${clusterName ? `<div class="field"><label>Cluster</label><p>${clusterName}</p></div>` : ""}
         <div class="field"><label>Destination Center</label><p>${centerName}</p></div>
+        ${hallName ? `<div class="field hall-field"><label>Exam Hall</label><p class="hall-name">${hallName}</p></div>` : ""}
         <div class="field"><label>Paper Count</label><p>${packet.paperCount} papers</p></div>
         <div class="field"><label>Security Seal #</label><p class="mono">${packet.securitySealNumber ?? "—"}</p></div>
         <div class="field"><label>Status</label><p><span class="status-badge">${statusLabel}</span></p></div>
@@ -751,8 +679,90 @@ async function printPacketLabel(
     <p>Printed: ${printDate}</p>
     <p>Amaanah Exam Management System</p>
   </div>
-</div>
-</body>
+</div>`;
+}
+
+const LABEL_STYLES = `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #fff; color: #111; }
+  @page { size: A4 landscape; margin: 12mm; }
+  .label {
+    width: 270mm; min-height: 168mm;
+    border: 2.5px solid #0d9488; border-radius: 8px;
+    padding: 12mm; display: flex; flex-direction: column; gap: 7mm;
+    page-break-after: always;
+  }
+  .label:last-child { page-break-after: avoid; }
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 2px solid #0d9488; padding-bottom: 5mm;
+  }
+  .header-left { display: flex; align-items: center; gap: 5mm; }
+  .header-logo { width: 20mm; height: 20mm; object-fit: contain; flex-shrink: 0; }
+  .org-name { font-size: 26pt; font-weight: 900; color: #0d9488; letter-spacing: 0.5px; }
+  .org-sub  { font-size: 12pt; color: #555; margin-top: 1.5mm; }
+  .title-badge {
+    background: #0d9488; color: #fff;
+    font-size: 13pt; font-weight: 700;
+    padding: 5px 14px; border-radius: 5px; letter-spacing: 0.5px;
+  }
+  .body { display: flex; gap: 10mm; flex: 1; }
+  .details { flex: 1; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm 8mm; }
+  .field label { font-size: 9pt; text-transform: uppercase; color: #888; letter-spacing: 0.6px; font-weight: 600; }
+  .field p { font-size: 15pt; font-weight: 700; color: #111; margin-top: 1.5px; }
+  .field p.mono { font-family: 'Courier New', monospace; font-size: 13pt; }
+  .hall-field { grid-column: 1 / -1; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 5px; padding: 3mm 4mm; }
+  .hall-field label { color: #166534; font-size: 10pt; }
+  .hall-name { color: #14532d !important; font-size: 18pt !important; }
+  .qr-block { display: flex; flex-direction: column; align-items: center; gap: 3mm; }
+  .qr-block img { width: 52mm; height: 52mm; border: 1px solid #e5e7eb; border-radius: 5px; }
+  .qr-label { font-size: 9pt; color: #555; text-align: center; max-width: 56mm; line-height: 1.4; }
+  .barcode-strip {
+    background: #f8fafc; border: 1.5px solid #e5e7eb; border-radius: 5px;
+    padding: 4mm 6mm; text-align: center;
+  }
+  .barcode-strip .bc-text { font-family: 'Courier New', monospace; font-size: 20pt; font-weight: 900; letter-spacing: 3px; color: #0d9488; }
+  .barcode-strip .bc-hint { font-size: 10pt; color: #888; margin-top: 2mm; }
+  .footer { border-top: 1px solid #e5e7eb; padding-top: 4mm; display: flex; justify-content: space-between; align-items: center; }
+  .footer p { font-size: 9pt; color: #aaa; }
+  .status-badge {
+    display: inline-block; background: #d1fae5; color: #065f46;
+    font-size: 12pt; font-weight: 700; padding: 3px 12px; border-radius: 20px;
+  }
+  .schedule-banner {
+    background: #0f766e; color: #fff;
+    border-radius: 6px; padding: 4mm 7mm;
+    display: flex; align-items: center; justify-content: space-between; gap: 8mm;
+  }
+  .schedule-banner .sch-label { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.7px; opacity: 0.85; margin-bottom: 1.5px; }
+  .schedule-banner .sch-val  { font-size: 16pt; font-weight: 800; letter-spacing: 0.3px; }
+  .schedule-banner .sch-divider { width: 1px; background: rgba(255,255,255,0.35); align-self: stretch; }
+  .schedule-banner .sch-time  { font-size: 20pt; font-weight: 900; letter-spacing: 1px; }
+  .schedule-banner .sch-dur-pill {
+    display: inline-block; background: rgba(255,255,255,0.2);
+    border: 1.5px solid rgba(255,255,255,0.45);
+    border-radius: 4px; padding: 2px 10px; margin-top: 2px;
+    font-size: 17pt; font-weight: 900; letter-spacing: 0.5px;
+  }
+  .no-schedule-notice {
+    background: #fef3c7; color: #92400e;
+    border-radius: 6px; padding: 3mm 7mm; font-size: 10pt; font-style: italic;
+  }
+`;
+
+async function printPacketLabel(opts: PrintLabelOpts) {
+  const { packet } = opts;
+  const [qrDataUrl, logoDataUrl] = await Promise.all([
+    QRCode.toDataURL(packet.barcode, { width: 200, margin: 1, color: { dark: "#000000", light: "#ffffff" } }),
+    toBase64DataUrl(amanahLogoUrl).catch(() => ""),
+  ]);
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8" /><title>Packet Label – ${packet.barcode}</title>
+<style>${LABEL_STYLES}</style></head>
+<body>${buildLabelHtml(opts, qrDataUrl, logoDataUrl)}</body>
 </html>`;
 
   const win = window.open("", "_blank", "width=900,height=650");
@@ -761,6 +771,34 @@ async function printPacketLabel(
   win.document.close();
   win.focus();
   setTimeout(() => { win.print(); }, 400);
+}
+
+async function printAllPacketLabels(items: PrintLabelOpts[]) {
+  if (items.length === 0) return;
+  const logoDataUrl = await toBase64DataUrl(amanahLogoUrl).catch(() => "");
+
+  const labelBodies = await Promise.all(
+    items.map(async (opts) => {
+      const qrDataUrl = await QRCode.toDataURL(opts.packet.barcode, {
+        width: 200, margin: 1, color: { dark: "#000000", light: "#ffffff" },
+      });
+      return buildLabelHtml(opts, qrDataUrl, logoDataUrl);
+    })
+  );
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8" /><title>Bulk Packet Labels (${items.length})</title>
+<style>${LABEL_STYLES}</style></head>
+<body>${labelBodies.join("\n")}</body>
+</html>`;
+
+  const win = window.open("", "_blank", "width=900,height=700");
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 600);
 }
 
 // ── Auto-Generate Dialog ──────────────────────────────────────────────────────
@@ -818,7 +856,7 @@ function AutoGenerateDialog({ open, onClose }: { open: boolean; onClose: () => v
             AI Bulk Packet Generation
           </DialogTitle>
           <DialogDescription>
-            Creates one packet per scheduled subject per exam center, with paper counts from enrolled student numbers.
+            Creates one packet per scheduled subject per hall (or per center if no halls are configured), with paper counts from enrolled student numbers.
           </DialogDescription>
         </DialogHeader>
 
@@ -1182,6 +1220,10 @@ export default function PacketTracking() {
             <BarChart3 className="w-3.5 h-3.5 mr-1.5" />
             Packets
           </TabsTrigger>
+          <TabsTrigger value="byhall" data-testid="tab-byhall">
+            <MapPin className="w-3.5 h-3.5 mr-1.5" />
+            By Hall
+          </TabsTrigger>
           <TabsTrigger value="custody" data-testid="tab-custody">
             <GitBranch className="w-3.5 h-3.5 mr-1.5" />
             Chain of Custody
@@ -1240,6 +1282,38 @@ export default function PacketTracking() {
                   Updated {new Date(dataUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
               )}
+              {filtered.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={packetsLoading}
+                  onClick={() => {
+                    const items: PrintLabelOpts[] = filtered.map(p => {
+                      const rId = p.destinationRegionId ?? centerToRegionMap[p.destinationCenterId];
+                      const cId = p.destinationClusterId ?? centerToClusterMap[p.destinationCenterId];
+                      const hId = (p as any).hallId;
+                      const tt = timetableBySubject[p.subjectId];
+                      return {
+                        packet: p,
+                        subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
+                        centerName: centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
+                        examYearLabel: examYearMap[p.examYearId] ? String(examYearMap[p.examYearId]) : `Year ${p.examYearId}`,
+                        examDate: tt?.examDate ?? undefined,
+                        startTime: tt?.startTime ?? undefined,
+                        endTime: tt?.endTime ?? undefined,
+                        regionName: rId ? regionMap[rId] : undefined,
+                        clusterName: cId ? clusterMap[cId] : undefined,
+                        hallName: hId ? hallMap[hId] : undefined,
+                      };
+                    });
+                    printAllPacketLabels(items);
+                  }}
+                  data-testid="button-print-all-labels"
+                >
+                  <Printer className="w-3.5 h-3.5 mr-1.5" />
+                  Print All ({filtered.length})
+                </Button>
+              )}
               <Button variant="outline" size="icon" disabled={packetsLoading} onClick={() => {
                 refetchPackets();
                 refetchStats();
@@ -1284,7 +1358,8 @@ export default function PacketTracking() {
                     const clusterId = p.destinationClusterId ?? centerToClusterMap[p.destinationCenterId];
                     const regionLabel = regionId ? (regionMap[regionId] ?? `Region ${regionId}`) : "—";
                     const clusterLabel = clusterId ? (clusterMap[clusterId] ?? `Cluster ${clusterId}`) : "—";
-                    const hallLabel = (p as any).hallId ? (hallMap[(p as any).hallId] ?? `Hall ${(p as any).hallId}`) : "—";
+                    const hallId = (p as any).hallId;
+                    const hallLabel = hallId ? (hallMap[hallId] ?? `Hall ${hallId}`) : "—";
                     return (
                     <TableRow key={p.id} data-testid={`row-packet-${p.id}`}>
                       <TableCell className="font-mono text-sm">{p.barcode}</TableCell>
@@ -1303,15 +1378,18 @@ export default function PacketTracking() {
                             variant="ghost"
                             onClick={() => {
                               const tt = timetableBySubject[p.subjectId];
-                              printPacketLabel(
-                                p,
-                                subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
-                                centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
-                                examYearMap[p.examYearId] ? String(examYearMap[p.examYearId]) : `Year ${p.examYearId}`,
-                                tt?.examDate ?? undefined,
-                                tt?.startTime ?? undefined,
-                                tt?.endTime ?? undefined,
-                              );
+                              printPacketLabel({
+                                packet: p,
+                                subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
+                                centerName: centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
+                                examYearLabel: examYearMap[p.examYearId] ? String(examYearMap[p.examYearId]) : `Year ${p.examYearId}`,
+                                examDate: tt?.examDate ?? undefined,
+                                startTime: tt?.startTime ?? undefined,
+                                endTime: tt?.endTime ?? undefined,
+                                regionName: regionId ? regionMap[regionId] : undefined,
+                                clusterName: clusterId ? clusterMap[clusterId] : undefined,
+                                hallName: hallId ? hallMap[hallId] : undefined,
+                              });
                             }}
                             data-testid={`button-print-label-${p.id}`}
                           >
@@ -1349,6 +1427,166 @@ export default function PacketTracking() {
               Showing {filtered.length} of {packets.length} packets
             </p>
           )}
+        </TabsContent>
+
+        {/* By Hall tab */}
+        <TabsContent value="byhall" className="mt-4 space-y-4">
+          {packetsLoading ? (
+            <div className="space-y-3">
+              {[1,2,3].map(i => <Skeleton key={i} className="h-32 w-full" />)}
+            </div>
+          ) : packets.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">No packets created yet.</div>
+          ) : (() => {
+            // Group packets by center, then by hall
+            const byCenterHall: Record<number, Record<string, ExamPacket[]>> = {};
+            for (const p of packets) {
+              const cId = p.destinationCenterId;
+              const hKey = (p as any).hallId ? String((p as any).hallId) : "__none__";
+              if (!byCenterHall[cId]) byCenterHall[cId] = {};
+              if (!byCenterHall[cId][hKey]) byCenterHall[cId][hKey] = [];
+              byCenterHall[cId][hKey].push(p);
+            }
+            const centerIds = Object.keys(byCenterHall).map(Number).sort((a, b) => {
+              return (centerMap[a] ?? "").localeCompare(centerMap[b] ?? "");
+            });
+            return centerIds.map(cId => {
+              const rId = centerToRegionMap[cId];
+              const clId = centerToClusterMap[cId];
+              const hallGroups = byCenterHall[cId];
+              const hallKeys = Object.keys(hallGroups).sort((a, b) => {
+                if (a === "__none__") return 1;
+                if (b === "__none__") return -1;
+                return (hallMap[Number(a)] ?? "").localeCompare(hallMap[Number(b)] ?? "");
+              });
+              const totalForCenter = hallKeys.reduce((s, k) => s + hallGroups[k].length, 0);
+              return (
+                <Card key={cId} data-testid={`card-center-halls-${cId}`}>
+                  <CardHeader className="pb-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-teal-600 shrink-0" />
+                          {centerMap[cId] ?? `Center ${cId}`}
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground">
+                          {rId ? regionMap[rId] : "—"}
+                          {clId ? ` › ${clusterMap[clId]}` : ""}
+                        </p>
+                      </div>
+                      <span className="text-xs font-medium bg-muted px-2 py-0.5 rounded-md">
+                        {totalForCenter} packet{totalForCenter !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0 space-y-3">
+                    {hallKeys.map(hKey => {
+                      const hPackets = hallGroups[hKey];
+                      const hId = hKey === "__none__" ? null : Number(hKey);
+                      const hName = hId ? (hallMap[hId] ?? `Hall ${hId}`) : null;
+                      const statusCounts = hPackets.reduce((acc, p) => {
+                        acc[p.status] = (acc[p.status] ?? 0) + 1;
+                        return acc;
+                      }, {} as Record<string, number>);
+                      return (
+                        <div key={hKey} className="rounded-md border bg-muted/20 p-3" data-testid={`hall-group-${cId}-${hKey}`}>
+                          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="font-semibold text-sm">
+                                {hName ?? <span className="italic text-muted-foreground">No Hall Assigned</span>}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1">
+                              {Object.entries(statusCounts).map(([st, cnt]) => (
+                                <span
+                                  key={st}
+                                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium ${STATUS_CFG[st]?.color ?? "bg-slate-100 text-slate-700"}`}
+                                >
+                                  {cnt} {STATUS_CFG[st]?.label ?? st}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {hPackets.map(p => (
+                              <div
+                                key={p.id}
+                                className="flex items-center gap-1.5 bg-background rounded px-2 py-1 text-xs border"
+                                data-testid={`hall-packet-${p.id}`}
+                              >
+                                <span className="font-mono text-muted-foreground">{p.barcode.slice(-8)}</span>
+                                <span className="text-foreground font-medium">{subjectMap[p.subjectId] ?? `#${p.subjectId}`}</span>
+                                <StatusBadge status={p.status} />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-5 px-1 text-[10px]"
+                                  onClick={() => {
+                                    const rId2 = p.destinationRegionId ?? centerToRegionMap[p.destinationCenterId];
+                                    const cId2 = p.destinationClusterId ?? centerToClusterMap[p.destinationCenterId];
+                                    const tt = timetableBySubject[p.subjectId];
+                                    printPacketLabel({
+                                      packet: p,
+                                      subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
+                                      centerName: centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
+                                      examYearLabel: examYearMap[p.examYearId] ? String(examYearMap[p.examYearId]) : `Year ${p.examYearId}`,
+                                      examDate: tt?.examDate ?? undefined,
+                                      startTime: tt?.startTime ?? undefined,
+                                      endTime: tt?.endTime ?? undefined,
+                                      regionName: rId2 ? regionMap[rId2] : undefined,
+                                      clusterName: cId2 ? clusterMap[cId2] : undefined,
+                                      hallName: hId ? hallMap[hId] : undefined,
+                                    });
+                                  }}
+                                  data-testid={`button-hall-print-${p.id}`}
+                                >
+                                  <Printer className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                          {hId && (
+                            <div className="mt-2 flex justify-end">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-7"
+                                onClick={() => {
+                                  const items: PrintLabelOpts[] = hPackets.map(p => {
+                                    const rId2 = p.destinationRegionId ?? centerToRegionMap[p.destinationCenterId];
+                                    const cId2 = p.destinationClusterId ?? centerToClusterMap[p.destinationCenterId];
+                                    const tt = timetableBySubject[p.subjectId];
+                                    return {
+                                      packet: p,
+                                      subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
+                                      centerName: centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
+                                      examYearLabel: examYearMap[p.examYearId] ? String(examYearMap[p.examYearId]) : `Year ${p.examYearId}`,
+                                      examDate: tt?.examDate ?? undefined,
+                                      startTime: tt?.startTime ?? undefined,
+                                      endTime: tt?.endTime ?? undefined,
+                                      regionName: rId2 ? regionMap[rId2] : undefined,
+                                      clusterName: cId2 ? clusterMap[cId2] : undefined,
+                                      hallName: hallMap[hId] ?? undefined,
+                                    };
+                                  });
+                                  printAllPacketLabels(items);
+                                }}
+                                data-testid={`button-print-hall-all-${hId}`}
+                              >
+                                <Printer className="w-3 h-3 mr-1" />
+                                Print Hall Labels ({hPackets.length})
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              );
+            });
+          })()}
         </TabsContent>
 
         {/* Chain of Custody tab */}
