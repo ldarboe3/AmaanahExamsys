@@ -17875,10 +17875,16 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       let students: any[] = [];
       let existingScans: any[] = [];
       if (activeExamYear) {
-        const allStudents = await storage.getStudentsByExamYear(activeExamYear.id);
         const centerAssignments = await storage.getCenterAssignmentsByCenter(centerId, activeExamYear.id);
-        const assignedSchoolIds = centerAssignments.map((a: any) => a.schoolId);
-        students = allStudents.filter(s => assignedSchoolIds.includes(s.schoolId) && s.indexNumber);
+        if (centerAssignments.length > 0) {
+          const allStudents = await storage.getStudentsByExamYear(activeExamYear.id);
+          const assignedSchoolIds = centerAssignments.map((a: any) => a.schoolId);
+          students = allStudents.filter(s => assignedSchoolIds.includes(s.schoolId) && s.indexNumber);
+        } else {
+          // Fallback: no explicit center_assignments for this exam year — use school.assigned_center_id
+          const centerStudents = await storage.getStudentsByCenter(centerId);
+          students = centerStudents.filter(s => s.examYearId === activeExamYear.id && s.indexNumber);
+        }
         existingScans = await storage.getAttendanceByCenterAndExamYear(centerId, activeExamYear.id);
       }
 
