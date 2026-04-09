@@ -149,7 +149,9 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
     currentY += lineHeight;
   };
 
-  const fullName = [data.firstName, data.middleName, data.lastName].filter(Boolean).join(' ');
+  // Reverse word order so PDFKit's bidi engine displays them correctly RTL
+  const rawName = [data.firstName, data.middleName, data.lastName].filter(Boolean).join(' ');
+  const fullName = rawName.split(' ').reverse().join(' ');
   drawField('CANDIDATE NAME', fullName);
 
   // Extra spacing between name and index box
@@ -176,7 +178,8 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
 
   const gradeStr = data.grade === 6 ? 'Grade 6' : data.grade === 9 ? 'Grade 9' : `Grade ${data.grade}`;
   drawField('CLASS / GRADE', gradeStr);
-  drawField('SCHOOL', data.schoolName);
+  const schoolDisplayName = data.schoolName.split(' ').reverse().join(' ');
+  drawField('SCHOOL', schoolDisplayName);
   if (data.regionName) drawField('REGION', data.regionName);
   if (data.clusterName) drawField('CLUSTER', data.clusterName);
   if (data.centerName) drawField('EXAM CENTER', data.centerName);
