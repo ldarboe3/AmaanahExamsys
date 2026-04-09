@@ -271,9 +271,12 @@ export default function ExamScheduling() {
 
   const getSubjectName = (id: number) => subjects.find(s => s.id === id)?.name || `Subject ${id}`;
 
-  const uniqueGrades = Array.from(new Set(
-    examYears.find(ey => ey.id === Number(selectedExamYearId))?.grades || []
-  )).sort();
+  const GRADE_LABELS: Record<number, string> = { 3: "Grade 3 (LBS)", 6: "Grade 6 (UBS)", 9: "Grade 9 (BCS)", 12: "Grade 12 (SSS)" };
+  const ALL_STANDARD_GRADES = [3, 6, 9, 12];
+  const uniqueGrades = Array.from(new Set([
+    ...(examYears.find(ey => ey.id === Number(selectedExamYearId))?.grades || []),
+    ...ALL_STANDARD_GRADES,
+  ])).sort();
 
   // ── Manual entry management ──────────────────────────────────────────
   const emptyForm = { subjectId: "", examDate: "", startTime: "", endTime: "", grade: "" };
@@ -408,7 +411,7 @@ export default function ExamScheduling() {
               <SelectItem value="all">All Grades</SelectItem>
               {uniqueGrades.map(g => (
                 <SelectItem key={g} value={g.toString()} data-testid={`option-grade-${g}`}>
-                  Grade {g}
+                  {GRADE_LABELS[g] || `Grade ${g}`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -736,7 +739,7 @@ export default function ExamScheduling() {
                 <Calendar className="w-4 h-4" />
                 <span>
                   Generating for: <strong>{examYears.find(ey => ey.id === Number(selectedExamYearId))?.name}</strong>
-                  {selectedGrade && selectedGrade !== "all" && <> — Grade {selectedGrade}</>}
+                  {selectedGrade && selectedGrade !== "all" && <> — {GRADE_LABELS[Number(selectedGrade)] || `Grade ${selectedGrade}`}</>}
                 </span>
               </div>
             )}
@@ -983,7 +986,7 @@ export default function ExamScheduling() {
                 </SelectTrigger>
                 <SelectContent>
                   {uniqueGrades.map(g => (
-                    <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>
+                    <SelectItem key={g} value={String(g)}>{GRADE_LABELS[g] || `Grade ${g}`}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

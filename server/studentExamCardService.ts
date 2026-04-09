@@ -39,13 +39,18 @@ interface StudentCardData {
 let logoBuffer: Buffer | null = null;
 function getLogoBuffer(): Buffer | null {
   if (logoBuffer) return logoBuffer;
-  try {
-    const logoPath = path.join(process.cwd(), 'attached_assets/Amana_Logo_1770390631299.jpeg');
-    if (fs.existsSync(logoPath)) {
-      logoBuffer = fs.readFileSync(logoPath);
-      return logoBuffer;
-    }
-  } catch {}
+  const candidates = [
+    path.join(process.cwd(), 'attached_assets/WhatsApp_Image_2026-04-09_at_15.55.56_1775751669894.jpeg'),
+    path.join(process.cwd(), 'attached_assets/Amana_Logo_1770390631299.jpeg'),
+  ];
+  for (const logoPath of candidates) {
+    try {
+      if (fs.existsSync(logoPath)) {
+        logoBuffer = fs.readFileSync(logoPath);
+        return logoBuffer;
+      }
+    } catch {}
+  }
   return null;
 }
 

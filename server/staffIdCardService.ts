@@ -60,6 +60,7 @@ const roleLabels: Record<string, string> = {
 
 function getLogoPath(): string {
   const candidates = [
+    path.resolve(process.cwd(), 'attached_assets', 'WhatsApp_Image_2026-04-09_at_15.55.56_1775751669894.jpeg'),
     path.resolve(process.cwd(), 'attached_assets', 'Amana_Logo_1765129635267.png'),
     path.resolve(process.cwd(), 'attached_assets', 'Amana_Logo_1765049398386.png'),
     path.resolve(process.cwd(), 'attached_assets', 'Amana_Logo_1764991014851.png'),
