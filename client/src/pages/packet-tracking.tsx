@@ -88,6 +88,7 @@ const packetFormSchema = z.object({
   destinationCenterId:  z.coerce.number().min(1, "Center required"),
   destinationRegionId:  z.coerce.number().optional().nullable(),
   destinationClusterId: z.coerce.number().optional().nullable(),
+  hallId:               z.coerce.number().optional().nullable(),
   paperCount:           z.coerce.number().min(0).default(0),
   securitySealNumber:   z.string().optional(),
   notes:                z.string().optional(),
@@ -101,10 +102,13 @@ function generateSealNumber(): string {
   return `SEAL-${ymd}-${rand}`;
 }
 
+interface CenterHallSimple { id: number; name: string; capacity: number; }
+
 function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { toast } = useToast();
   const [selectedRegionId, setSelectedRegionId] = useState<number | null>(null);
   const [selectedClusterId, setSelectedClusterId] = useState<number | null>(null);
+  const [selectedCenterId, setSelectedCenterId] = useState<number | null>(null);
 
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
   const { data: allSubjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
@@ -116,6 +120,10 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
   const { data: centers = [] } = useQuery<ExamCenter[]>({
     queryKey: ["/api/centers", selectedClusterId],
     queryFn: () => apiRequest("GET", selectedClusterId ? `/api/centers?clusterId=${selectedClusterId}` : "/api/centers").then(r => r.json()),
+  });
+  const { data: halls = [] } = useQuery<CenterHallSimple[]>({
+    queryKey: [`/api/centers/${selectedCenterId}/halls`],
+    enabled: !!selectedCenterId,
   });
 
   // Unique grades from subjects in the system
@@ -145,16 +153,20 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
   const handleRegionChange = (regionId: number | null) => {
     setSelectedRegionId(regionId);
     setSelectedClusterId(null);
+    setSelectedCenterId(null);
     form.setValue("destinationRegionId", regionId);
     form.setValue("destinationClusterId", null);
     form.setValue("destinationCenterId", 0);
+    form.setValue("hallId", null);
   };
 
   // When cluster changes, reset center
   const handleClusterChange = (clusterId: number | null) => {
     setSelectedClusterId(clusterId);
+    setSelectedCenterId(null);
     form.setValue("destinationClusterId", clusterId);
     form.setValue("destinationCenterId", 0);
+    form.setValue("hallId", null);
   };
 
   const mutation = useMutation({
@@ -166,6 +178,7 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
       form.reset();
       setSelectedRegionId(null);
       setSelectedClusterId(null);
+      setSelectedCenterId(null);
       onClose();
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -271,7 +284,7 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
                 <FormItem>
                   <FormLabel>Exam Center</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
+                    onValueChange={v => { field.onChange(v); setSelectedCenterId(Number(v)); form.setValue("hallId", null); }}
                     value={String(field.value)}
                     disabled={!selectedClusterId}
                   >
@@ -287,6 +300,32 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
                   <FormMessage />
                 </FormItem>
               )} />
+
+              {/* Hall — optional, shown after center picked */}
+              {selectedCenterId && halls.length > 0 && (
+                <FormField control={form.control} name="hallId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Hall <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                    <Select
+                      onValueChange={v => field.onChange(v === "0" ? null : Number(v))}
+                      value={field.value ? String(field.value) : "0"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-hall">
+                          <SelectValue placeholder="Any hall" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="0">— Any hall —</SelectItem>
+                        {halls.map(h => (
+                          <SelectItem key={h.id} value={String(h.id)}>{h.name} (cap. {h.capacity})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
             </div>
 
             {/* Paper Count + Security Seal */}
@@ -1011,12 +1050,14 @@ export default function PacketTracking() {
   const { data: timetable = [] } = useQuery<ExamTimetable[]>({ queryKey: ["/api/timetable"] });
   const { data: regions = [] } = useQuery<Region[]>({ queryKey: ["/api/regions"] });
   const { data: clusters = [] } = useQuery<Cluster[]>({ queryKey: ["/api/clusters"] });
+  const { data: allHalls = [] } = useQuery<CenterHallSimple[]>({ queryKey: ["/api/center-halls"] });
 
   const subjectMap = Object.fromEntries(subjects.map(s => [s.id, s.name]));
   const centerMap = Object.fromEntries(centers.map(c => [c.id, c.name]));
   const examYearMap = Object.fromEntries(examYears.map(y => [y.id, y.year]));
   const regionMap = Object.fromEntries(regions.map(r => [r.id, r.name]));
   const clusterMap = Object.fromEntries(clusters.map(c => [c.id, c.name]));
+  const hallMap = Object.fromEntries(allHalls.map(h => [h.id, h.name]));
 
   // Build region/cluster from center data as fallback (center always carries its regionId/clusterId)
   const centerToRegionMap = Object.fromEntries(centers.map(c => [c.id, (c as any).regionId]));
@@ -1219,6 +1260,7 @@ export default function PacketTracking() {
                     <TableHead>Region</TableHead>
                     <TableHead>Cluster</TableHead>
                     <TableHead>Center</TableHead>
+                    <TableHead>Hall</TableHead>
                     <TableHead>Papers</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -1227,12 +1269,12 @@ export default function PacketTracking() {
                 <TableBody>
                   {packetsLoading && [1,2,3,4,5].map(i => (
                     <TableRow key={i}>
-                      {[1,2,3,4,5,6,7,8,9].map(j => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
+                      {[1,2,3,4,5,6,7,8,9,10].map(j => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
                     </TableRow>
                   ))}
                   {!packetsLoading && filtered.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                      <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
                         {packets.length === 0 ? "No packets created yet." : "No packets match your search."}
                       </TableCell>
                     </TableRow>
@@ -1242,6 +1284,7 @@ export default function PacketTracking() {
                     const clusterId = p.destinationClusterId ?? centerToClusterMap[p.destinationCenterId];
                     const regionLabel = regionId ? (regionMap[regionId] ?? `Region ${regionId}`) : "—";
                     const clusterLabel = clusterId ? (clusterMap[clusterId] ?? `Cluster ${clusterId}`) : "—";
+                    const hallLabel = (p as any).hallId ? (hallMap[(p as any).hallId] ?? `Hall ${(p as any).hallId}`) : "—";
                     return (
                     <TableRow key={p.id} data-testid={`row-packet-${p.id}`}>
                       <TableCell className="font-mono text-sm">{p.barcode}</TableCell>
@@ -1250,6 +1293,7 @@ export default function PacketTracking() {
                       <TableCell className="text-sm text-muted-foreground">{regionLabel}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{clusterLabel}</TableCell>
                       <TableCell className="text-sm">{centerMap[p.destinationCenterId] ?? `#${p.destinationCenterId}`}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{hallLabel}</TableCell>
                       <TableCell>{p.paperCount}</TableCell>
                       <TableCell><StatusBadge status={p.status} /></TableCell>
                       <TableCell className="text-right">

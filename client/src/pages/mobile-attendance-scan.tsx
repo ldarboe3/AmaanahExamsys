@@ -26,6 +26,7 @@ interface ScanRecord {
   subjectId: number;
   subjectName: string;
   centerId: number;
+  hallId?: number | null;
   examYearId: number;
   scannedBarcode: string;
   checkInTime: string;
@@ -112,6 +113,7 @@ export default function MobileAttendanceScan() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedHallId, setSelectedHallId] = useState<number | null>(null);
   const [barcode, setBarcode] = useState("");
   const [feedback, setFeedback] = useState<FeedbackState>("idle");
   const [feedbackMessage, setFeedbackMessage] = useState("");
@@ -152,6 +154,13 @@ export default function MobileAttendanceScan() {
       setPendingCount(scans.filter(s => s.syncStatus === "pending").length);
     });
   }, []);
+
+  // Halls for the current center (optional - shown when center has halls configured)
+  const centerId = ctx.data?.center?.id;
+  const { data: centerHalls = [] } = useQuery<{ id: number; name: string; capacity: number }[]>({
+    queryKey: [`/api/centers/${centerId}/halls`],
+    enabled: !!centerId,
+  });
 
   const selectedSchedule = ctx.data?.schedules?.find(s => s.subjectId === selectedSubjectId);
   const subjectScans = localScans.filter(s => s.subjectId === selectedSubjectId);
@@ -201,6 +210,7 @@ export default function MobileAttendanceScan() {
       subjectId: selectedSubjectId,
       subjectName: subject?.name || `Subject ${selectedSubjectId}`,
       centerId: ctx.data.center.id,
+      hallId: selectedHallId,
       examYearId: ctx.data.examYearId,
       scannedBarcode: trimmed,
       checkInTime: new Date().toISOString(),
@@ -236,7 +246,8 @@ export default function MobileAttendanceScan() {
 
       const payload = pendingScans.map(s => ({
         studentId: s.studentId, examYearId: s.examYearId, subjectId: s.subjectId,
-        centerId: s.centerId, scannedBarcode: s.scannedBarcode, checkInTime: s.checkInTime,
+        centerId: s.centerId, hallId: s.hallId ?? null,
+        scannedBarcode: s.scannedBarcode, checkInTime: s.checkInTime,
         offlineId: s.id, deviceInfo: s.deviceInfo,
         gpsLatitude: s.gpsLatitude, gpsLongitude: s.gpsLongitude,
       }));
@@ -396,6 +407,33 @@ export default function MobileAttendanceScan() {
             )}
           </CardContent>
         </Card>
+
+        {/* Hall selector — only shown when center has halls configured */}
+        {centerHalls.length > 0 && (
+          <Card data-testid="card-hall-select">
+            <CardContent className="pt-4 pb-3">
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Hall / Room <span className="text-xs font-normal">(optional)</span>
+              </label>
+              <Select
+                value={selectedHallId?.toString() || "0"}
+                onValueChange={(v) => setSelectedHallId(v === "0" ? null : parseInt(v))}
+              >
+                <SelectTrigger className="w-full" data-testid="select-hall">
+                  <SelectValue placeholder="Select hall" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">— No specific hall —</SelectItem>
+                  {centerHalls.map((h) => (
+                    <SelectItem key={h.id} value={h.id.toString()} data-testid={`option-hall-${h.id}`}>
+                      {h.name} (cap. {h.capacity})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Scan zone */}
         {selectedSubjectId ? (

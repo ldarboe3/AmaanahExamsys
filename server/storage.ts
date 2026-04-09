@@ -41,6 +41,7 @@ import {
   type IntegrityFlagEvent, type InsertIntegrityFlagEvent,
   type DeviceSyncSession, type InsertDeviceSyncSession,
   type SyncErrorLog, type InsertSyncErrorLog,
+  centerHalls, type CenterHall, type InsertCenterHall,
   examPackets, handoverLogs, packetEvents, mobilePacketScans,
   type ExamPacket, type InsertExamPacket,
   type HandoverLog, type InsertHandoverLog,
@@ -98,6 +99,14 @@ export interface IStorage {
   getAllExamCenters(): Promise<ExamCenter[]>;
   updateExamCenter(id: number, center: Partial<InsertExamCenter>): Promise<ExamCenter | undefined>;
   deleteExamCenter(id: number): Promise<boolean>;
+
+  // Center Halls
+  createCenterHall(hall: InsertCenterHall): Promise<CenterHall>;
+  getCenterHall(id: number): Promise<CenterHall | undefined>;
+  getCenterHallsByCenter(centerId: number): Promise<CenterHall[]>;
+  getAllCenterHalls(): Promise<CenterHall[]>;
+  updateCenterHall(id: number, hall: Partial<InsertCenterHall>): Promise<CenterHall | undefined>;
+  deleteCenterHall(id: number): Promise<boolean>;
 
   // Schools
   createSchool(school: InsertSchool): Promise<School>;
@@ -730,6 +739,37 @@ export class DatabaseStorage implements IStorage {
 
   async deleteExamCenter(id: number): Promise<boolean> {
     await db.delete(examCenters).where(eq(examCenters.id, id));
+    return true;
+  }
+
+  // Center Halls
+  async createCenterHall(hall: InsertCenterHall): Promise<CenterHall> {
+    const [created] = await db.insert(centerHalls).values(hall).returning();
+    return created;
+  }
+
+  async getCenterHall(id: number): Promise<CenterHall | undefined> {
+    const [hall] = await db.select().from(centerHalls).where(eq(centerHalls.id, id));
+    return hall;
+  }
+
+  async getCenterHallsByCenter(centerId: number): Promise<CenterHall[]> {
+    return db.select().from(centerHalls)
+      .where(eq(centerHalls.centerId, centerId))
+      .orderBy(asc(centerHalls.name));
+  }
+
+  async getAllCenterHalls(): Promise<CenterHall[]> {
+    return db.select().from(centerHalls).orderBy(asc(centerHalls.name));
+  }
+
+  async updateCenterHall(id: number, hall: Partial<InsertCenterHall>): Promise<CenterHall | undefined> {
+    const [updated] = await db.update(centerHalls).set(hall).where(eq(centerHalls.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCenterHall(id: number): Promise<boolean> {
+    await db.delete(centerHalls).where(eq(centerHalls.id, id));
     return true;
   }
 

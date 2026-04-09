@@ -1315,6 +1315,72 @@ ${pages.map(p => `  <url>
     }
   });
 
+  // ─── Center Halls API ─────────────────────────────────────────────────────
+  app.get("/api/centers/:centerId/halls", isAuthenticated, async (req, res) => {
+    try {
+      const halls = await storage.getCenterHallsByCenter(parseInt(req.params.centerId));
+      res.json(halls);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/centers/:centerId/halls", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Only admins can manage halls" });
+      }
+      const hall = await storage.createCenterHall({
+        centerId: parseInt(req.params.centerId),
+        name: req.body.name,
+        capacity: req.body.capacity ?? 30,
+      });
+      res.status(201).json(hall);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/center-halls", isAuthenticated, async (req, res) => {
+    try {
+      const halls = await storage.getAllCenterHalls();
+      res.json(halls);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/center-halls/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Only admins can manage halls" });
+      }
+      const hall = await storage.updateCenterHall(parseInt(req.params.id), {
+        name: req.body.name,
+        capacity: req.body.capacity,
+      });
+      if (!hall) return res.status(404).json({ message: "Hall not found" });
+      res.json(hall);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/center-halls/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Only admins can manage halls" });
+      }
+      await storage.deleteCenterHall(parseInt(req.params.id));
+      res.json({ message: "Hall deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Schools API
   app.get("/api/schools", isAuthenticated, async (req, res) => {
     try {
@@ -16470,6 +16536,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
     destinationCenterId: z.coerce.number().int().positive(),
     destinationRegionId: z.coerce.number().int().positive().optional().nullable(),
     destinationClusterId: z.coerce.number().int().positive().optional().nullable(),
+    hallId: z.coerce.number().int().positive().optional().nullable(),
     paperCount: z.coerce.number().int().min(0).default(0),
     securitySealNumber: z.string().optional().nullable(),
     notes: z.string().optional().nullable(),
@@ -16642,7 +16709,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       if (!parsed.success) {
         return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
       }
-      const { examYearId, subjectId, grade, destinationCenterId, destinationRegionId, destinationClusterId, paperCount, securitySealNumber, notes } = parsed.data;
+      const { examYearId, subjectId, grade, destinationCenterId, destinationRegionId, destinationClusterId, hallId, paperCount, securitySealNumber, notes } = parsed.data;
 
       const examYear = await storage.getExamYear(examYearId);
       const subject = await storage.getSubject(subjectId);
@@ -16666,6 +16733,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         examYearId, subjectId, grade, destinationCenterId,
         destinationRegionId: destinationRegionId || null,
         destinationClusterId: destinationClusterId || null,
+        hallId: hallId || null,
         paperCount: paperCount || 0,
         securitySealNumber: securitySealNumber || null,
         notes: notes || null,
@@ -17969,6 +18037,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
             examYearId: rec.examYearId,
             subjectId: rec.subjectId,
             centerId: rec.centerId,
+            hallId: rec.hallId ?? null,
             isPresent: true,
             checkInTime: rec.checkInTime ? new Date(rec.checkInTime) : new Date(),
             recordedBy: user.id,
@@ -18624,13 +18693,15 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
     missing: "Missing", damaged: "Damaged",
   };
 
-  function buildPacketResponse(p: any, regions: any[], clusters: any[], centers: any[]) {
+  function buildPacketResponse(p: any, regions: any[], clusters: any[], centers: any[], halls?: any[]) {
     const region = regions.find((r: any) => r.id === p.destinationRegionId);
     const cluster = clusters.find((c: any) => c.id === p.destinationClusterId);
     const center = centers.find((c: any) => c.id === p.destinationCenterId);
+    const hall = halls?.find((h: any) => h.id === p.hallId);
     const centerName = center?.name ?? null;
     const clusterName = cluster?.name ?? null;
     const regionName = region?.name ?? null;
+    const hallName = hall?.name ?? null;
     return {
       id: String(p.id),
       barcode: p.barcode,
@@ -18646,6 +18717,8 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       region: regionName,            // legacy field name
       regionName: regionName,        // explicit alias
       regionId: p.destinationRegionId ?? null,
+      hallId: p.hallId ?? null,
+      hallName: hallName,
       status: p.status,
       statusLabel: STATUS_LABELS[p.status] ?? p.status,
       paperCount: p.paperCount,
@@ -18664,16 +18737,17 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       if (center)  packets = packets.filter(p => String(p.destinationCenterId)  === center);
       if (status)  packets = packets.filter(p => p.status === status);
 
-      const [allRegions, allClusters, allCenters, allSubjects] = await Promise.all([
+      const [allRegions, allClusters, allCenters, allSubjects, allHalls] = await Promise.all([
         storage.getAllRegions(),
         storage.getAllClusters(),
         storage.getAllExamCenters(),
         storage.getAllSubjects(),
+        storage.getAllCenterHalls(),
       ]);
       const subjectMap = Object.fromEntries(allSubjects.map((s: any) => [s.id, s.name]));
       const enriched = packets.map(p => buildPacketResponse(
         { ...p, subjectName: subjectMap[p.subjectId] },
-        allRegions, allClusters, allCenters
+        allRegions, allClusters, allCenters, allHalls
       ));
       res.json(enriched);
     } catch (error: any) {

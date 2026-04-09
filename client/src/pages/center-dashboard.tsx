@@ -1465,6 +1465,183 @@ function LogisticsTab({
   );
 }
 
+interface CenterHall { id: number; centerId: number; name: string; capacity: number; }
+
+function HallsTab({ centerId, canManage }: { centerId: number; canManage: boolean }) {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+  const [editingHall, setEditingHall] = useState<CenterHall | null>(null);
+
+  const { data: halls = [], isLoading } = useQuery<CenterHall[]>({
+    queryKey: [`/api/centers/${centerId}/halls`],
+  });
+
+  const hallSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    capacity: z.coerce.number().int().min(1, "Capacity must be at least 1").default(30),
+  });
+  type HallFormData = z.infer<typeof hallSchema>;
+
+  const form = useForm<HallFormData>({
+    resolver: zodResolver(hallSchema),
+    defaultValues: { name: "", capacity: 30 },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: HallFormData) =>
+      apiRequest("POST", `/api/centers/${centerId}/halls`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/centers/${centerId}/halls`] });
+      setShowDialog(false);
+      form.reset();
+      toast({ title: "Hall created" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to create hall", variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: HallFormData) =>
+      apiRequest("PATCH", `/api/center-halls/${editingHall!.id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/centers/${centerId}/halls`] });
+      setShowDialog(false);
+      setEditingHall(null);
+      form.reset();
+      toast({ title: "Hall updated" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to update hall", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/center-halls/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/centers/${centerId}/halls`] });
+      toast({ title: "Hall deleted" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to delete hall", variant: "destructive" }),
+  });
+
+  function openCreate() {
+    setEditingHall(null);
+    form.reset({ name: "", capacity: 30 });
+    setShowDialog(true);
+  }
+
+  function openEdit(hall: CenterHall) {
+    setEditingHall(hall);
+    form.reset({ name: hall.name, capacity: hall.capacity });
+    setShowDialog(true);
+  }
+
+  function onSubmit(data: HallFormData) {
+    if (editingHall) updateMutation.mutate(data);
+    else createMutation.mutate(data);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="font-semibold">Exam Halls</h3>
+          <p className="text-sm text-muted-foreground">Rooms / halls within this center used during examinations</p>
+        </div>
+        {canManage && (
+          <Button size="sm" onClick={openCreate} data-testid="button-add-hall">
+            <Plus className="w-4 h-4 me-2" />
+            Add Hall
+          </Button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1,2,3].map(i => <Skeleton key={i} className="h-12" />)}
+        </div>
+      ) : halls.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">No Halls Configured</h3>
+            <p className="text-muted-foreground">Add halls / rooms to organise students and exam packets by location.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Hall Name</TableHead>
+                <TableHead>Capacity</TableHead>
+                {canManage && <TableHead className="text-end">Actions</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {halls.map(hall => (
+                <TableRow key={hall.id} data-testid={`row-hall-${hall.id}`}>
+                  <TableCell className="font-medium">{hall.name}</TableCell>
+                  <TableCell>{hall.capacity} students</TableCell>
+                  {canManage && (
+                    <TableCell className="text-end">
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => openEdit(hall)} data-testid={`button-edit-hall-${hall.id}`}>
+                          Edit
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => deleteMutation.mutate(hall.id)} data-testid={`button-delete-hall-${hall.id}`}>
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingHall ? "Edit Hall" : "Add Hall"}</DialogTitle>
+            <DialogDescription>
+              {editingHall ? "Update hall details." : "Add a new hall / room to this exam center."}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField control={form.control} name="name" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Hall Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. Hall A, Room 1" data-testid="input-hall-name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="capacity" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Capacity (students)</FormLabel>
+                  <FormControl>
+                    <Input type="number" min={1} data-testid="input-hall-capacity" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-hall">
+                  {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+                  {editingHall ? "Save Changes" : "Add Hall"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function SchoolsTab({ schools }: { schools: CenterDashboardData["schools"] }) {
   const [search, setSearch] = useState("");
 
@@ -1754,13 +1931,14 @@ export default function CenterDashboard() {
             <TabsTrigger value="attendance" data-testid="tab-attendance">Attendance</TabsTrigger>
           </TabsList>
         ) : (
-          <TabsList className="grid grid-cols-6 w-full">
+          <TabsList className="grid grid-cols-7 w-full">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="timetable" data-testid="tab-timetable">Timetable</TabsTrigger>
             <TabsTrigger value="attendance" data-testid="tab-attendance">Attendance</TabsTrigger>
             <TabsTrigger value="malpractice" data-testid="tab-malpractice">Malpractice</TabsTrigger>
             <TabsTrigger value="logistics" data-testid="tab-logistics">Logistics</TabsTrigger>
             <TabsTrigger value="schools" data-testid="tab-schools">Schools</TabsTrigger>
+            <TabsTrigger value="halls" data-testid="tab-halls">Halls</TabsTrigger>
           </TabsList>
         )}
 
@@ -1843,6 +2021,13 @@ export default function CenterDashboard() {
 
             <TabsContent value="schools" className="mt-4">
               <SchoolsTab schools={schools} />
+            </TabsContent>
+
+            <TabsContent value="halls" className="mt-4">
+              <HallsTab
+                centerId={centerId}
+                canManage={['super_admin', 'examination_admin'].includes(user?.role || '')}
+              />
             </TabsContent>
           </>
         )}

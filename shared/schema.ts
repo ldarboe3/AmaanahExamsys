@@ -129,6 +129,23 @@ export const examCenters = pgTable("exam_centers", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Center Halls — sub-entities within an exam center
+export const centerHalls = pgTable("center_halls", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  centerId: integer("center_id").notNull().references(() => examCenters.id),
+  name: varchar("name", { length: 100 }).notNull(),
+  capacity: integer("capacity").default(30),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCenterHallSchema = createInsertSchema(centerHalls).pick({
+  centerId: true,
+  name: true,
+  capacity: true,
+});
+export type InsertCenterHall = z.infer<typeof insertCenterHallSchema>;
+export type CenterHall = typeof centerHalls.$inferSelect;
+
 // Schools
 export const schools = pgTable("schools", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -472,6 +489,7 @@ export const attendanceRecords = pgTable("attendance_records", {
   examYearId: integer("exam_year_id").notNull().references(() => examYears.id),
   subjectId: integer("subject_id").notNull().references(() => subjects.id),
   centerId: integer("center_id").notNull().references(() => examCenters.id),
+  hallId: integer("hall_id").references(() => centerHalls.id),
   isPresent: boolean("is_present").default(false),
   checkInTime: timestamp("check_in_time"),
   notes: text("notes"),
@@ -1120,6 +1138,7 @@ export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords
   examYearId: true,
   subjectId: true,
   centerId: true,
+  hallId: true,
   isPresent: true,
   checkInTime: true,
   notes: true,
@@ -1547,6 +1566,7 @@ export const examPackets = pgTable("exam_packets", {
   destinationCenterId: integer("destination_center_id").notNull().references(() => examCenters.id),
   destinationRegionId: integer("destination_region_id").references(() => regions.id),
   destinationClusterId: integer("destination_cluster_id").references(() => clusters.id),
+  hallId: integer("hall_id").references(() => centerHalls.id),
   paperCount: integer("paper_count").notNull().default(0),
   status: packetStatusEnum("status").default('created').notNull(),
   currentLocationType: locationTypeEnum("current_location_type").default('hq').notNull(),
@@ -1643,6 +1663,7 @@ export const insertExamPacketSchema = createInsertSchema(examPackets).pick({
   destinationCenterId: true,
   destinationRegionId: true,
   destinationClusterId: true,
+  hallId: true,
   paperCount: true,
   securitySealNumber: true,
   notes: true,
