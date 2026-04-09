@@ -40,6 +40,7 @@ import {
   generateInvoiceNumber,
 } from "./emailService";
 import { normalizeSurname } from "./surnameService";
+import { generateTimetablePdf } from "./timetablePdfService";
 import {
   notifyExamYearCreated,
   notifyRegistrationDeadlineApproaching,
@@ -7201,6 +7202,54 @@ ${pages.map(p => `  <url>
       }));
       
       res.json(enrichedTimetable);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PDF download for timetable — must be BEFORE /:id routes
+  app.get("/api/timetable/pdf", isAuthenticated, async (req, res) => {
+    try {
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      const grade = req.query.grade && req.query.grade !== 'all' ? parseInt(req.query.grade as string) : undefined;
+
+      let targetExamYearId = examYearId;
+      if (!targetExamYearId) {
+        const activeYear = await storage.getActiveExamYear();
+        if (activeYear) targetExamYearId = activeYear.id;
+      }
+      if (!targetExamYearId) return res.status(400).json({ message: "examYearId is required" });
+
+      const examYear = await storage.getExamYear(targetExamYearId);
+      if (!examYear) return res.status(404).json({ message: "Exam year not found" });
+
+      const timetable = grade
+        ? await storage.getTimetableByGrade(targetExamYearId, grade)
+        : await storage.getTimetableByExamYear(targetExamYearId);
+
+      const subjects = await storage.getAllSubjects();
+      const enriched = timetable.map((entry: any) => {
+        const subj = subjects.find(s => s.id === entry.subjectId);
+        return {
+          examDate: entry.examDate,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          subjectName: subj?.name || `Subject ${entry.subjectId}`,
+          subjectArabicName: subj?.arabicName || null,
+          grade: entry.grade,
+          isCore: subj?.isCore ?? null,
+        };
+      });
+
+      const pdfBuffer = await generateTimetablePdf({
+        examYearName: examYear.name,
+        grade: grade ?? null,
+        entries: enriched,
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="timetable-${examYear.name}${grade ? `-grade${grade}` : ''}.pdf"`);
+      res.send(pdfBuffer);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

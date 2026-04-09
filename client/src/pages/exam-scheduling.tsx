@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,7 +19,7 @@ import {
   Calendar, Clock, Plus, CheckCircle2, AlertTriangle,
   Timer, PlayCircle,
   Activity, BarChart3, MapPin, Sparkles, Loader2, Save,
-  RefreshCw, CheckCheck, Building2
+  RefreshCw, CheckCheck, Building2, Pencil, Trash2, FileDown
 } from "lucide-react";
 import type { ExamYear, Subject } from "@shared/schema";
 
@@ -274,6 +275,91 @@ export default function ExamScheduling() {
     examYears.find(ey => ey.id === Number(selectedExamYearId))?.grades || []
   )).sort();
 
+  // ── Manual entry management ──────────────────────────────────────────
+  const emptyForm = { subjectId: "", examDate: "", startTime: "", endTime: "", grade: "" };
+  const [showEntryDialog, setShowEntryDialog] = useState(false);
+  const [editEntry, setEditEntry] = useState<any | null>(null);
+  const [entryForm, setEntryForm] = useState(emptyForm);
+  const [entryToDelete, setEntryToDelete] = useState<any | null>(null);
+
+  function openAddEntry() {
+    setEditEntry(null);
+    setEntryForm({ ...emptyForm, grade: selectedGrade && selectedGrade !== "all" ? selectedGrade : uniqueGrades[0]?.toString() || "" });
+    setShowEntryDialog(true);
+  }
+
+  function openEditEntry(entry: any) {
+    setEditEntry(entry);
+    setEntryForm({
+      subjectId: String(entry.subjectId),
+      examDate: entry.examDate,
+      startTime: entry.startTime,
+      endTime: entry.endTime,
+      grade: String(entry.grade),
+    });
+    setShowEntryDialog(true);
+  }
+
+  const createEntryMutation = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/timetable", {
+      examYearId: Number(selectedExamYearId),
+      subjectId: Number(entryForm.subjectId),
+      examDate: entryForm.examDate,
+      startTime: entryForm.startTime,
+      endTime: entryForm.endTime,
+      grade: Number(entryForm.grade),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
+      setShowEntryDialog(false);
+      toast({ title: "Entry added", description: "Timetable entry has been created." });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+  });
+
+  const updateEntryMutation = useMutation({
+    mutationFn: async () => apiRequest("PATCH", `/api/timetable/${editEntry?.id}`, {
+      subjectId: Number(entryForm.subjectId),
+      examDate: entryForm.examDate,
+      startTime: entryForm.startTime,
+      endTime: entryForm.endTime,
+      grade: Number(entryForm.grade),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
+      setShowEntryDialog(false);
+      toast({ title: "Entry updated", description: "Timetable entry has been updated." });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteEntryMutation = useMutation({
+    mutationFn: async (id: number) => apiRequest("DELETE", `/api/timetable/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
+      setEntryToDelete(null);
+      toast({ title: "Entry deleted" });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+  });
+
+  function handleEntrySave() {
+    if (!entryForm.subjectId || !entryForm.examDate || !entryForm.startTime || !entryForm.endTime || !entryForm.grade) {
+      toast({ title: "All fields are required", variant: "destructive" });
+      return;
+    }
+    if (editEntry) updateEntryMutation.mutate();
+    else createEntryMutation.mutate();
+  }
+
+  // ── PDF download ─────────────────────────────────────────────────────
+  function downloadTimetablePdf() {
+    const params = new URLSearchParams();
+    if (selectedExamYearId) params.set("examYearId", selectedExamYearId);
+    if (selectedGrade && selectedGrade !== "all") params.set("grade", selectedGrade);
+    window.open(`/api/timetable/pdf?${params.toString()}`, "_blank");
+  }
+
   return (
     <div className="space-y-6" data-testid="exam-scheduling-page">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -343,6 +429,32 @@ export default function ExamScheduling() {
         </TabsList>
 
         <TabsContent value="timetable" className="space-y-4">
+          {/* HQ Toolbar */}
+          {isHQ && selectedExamYearId && (
+            <div className="flex flex-wrap items-center gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="default"
+                onClick={downloadTimetablePdf}
+                disabled={timetableEntries.length === 0}
+                data-testid="button-download-timetable-pdf"
+                className="gap-2"
+              >
+                <FileDown className="w-4 h-4" />
+                Download PDF
+              </Button>
+              <Button
+                size="default"
+                onClick={openAddEntry}
+                data-testid="button-add-timetable-entry"
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Entry
+              </Button>
+            </div>
+          )}
+
           {!selectedExamYearId ? (
             <Card><CardContent className="py-12 text-center text-muted-foreground">Select an exam year to view the timetable</CardContent></Card>
           ) : timetableLoading ? (
@@ -352,7 +464,7 @@ export default function ExamScheduling() {
               <CardContent className="py-12 text-center text-muted-foreground">
                 <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <p className="font-medium">No Timetable Entries</p>
-                <p className="text-sm mt-1">Use the AI Auto-Schedule button to generate a timetable.</p>
+                <p className="text-sm mt-1">Use the AI Auto-Schedule button to generate a timetable, or add entries manually above.</p>
               </CardContent>
             </Card>
           ) : (
@@ -429,6 +541,27 @@ export default function ExamScheduling() {
                                 )}
                                 {badge.label}
                               </span>
+                              {isHQ && (
+                                <div className="flex items-center gap-1 ml-auto shrink-0">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => openEditEntry(entry)}
+                                    data-testid={`button-edit-entry-${entry.id}`}
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setEntryToDelete(entry)}
+                                    className="text-destructive"
+                                    data-testid={`button-delete-entry-${entry.id}`}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -812,6 +945,128 @@ export default function ExamScheduling() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Add / Edit Entry Dialog ───────────────────────────────── */}
+      <Dialog open={showEntryDialog} onOpenChange={open => { if (!open) setShowEntryDialog(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editEntry ? "Edit Timetable Entry" : "Add Timetable Entry"}</DialogTitle>
+            <DialogDescription>
+              {editEntry ? "Update the details for this timetable entry." : "Add a new entry to the timetable. It will immediately apply to all centers."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Subject */}
+            <div className="space-y-1.5">
+              <Label htmlFor="entry-subject">Subject</Label>
+              <Select value={entryForm.subjectId} onValueChange={v => setEntryForm(f => ({ ...f, subjectId: v }))}>
+                <SelectTrigger id="entry-subject" data-testid="select-entry-subject">
+                  <SelectValue placeholder="Select subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjects.filter(s => s.isActive).map(s => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.name}{s.arabicName ? ` — ${s.arabicName}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Grade */}
+            <div className="space-y-1.5">
+              <Label htmlFor="entry-grade">Grade</Label>
+              <Select value={entryForm.grade} onValueChange={v => setEntryForm(f => ({ ...f, grade: v }))}>
+                <SelectTrigger id="entry-grade" data-testid="select-entry-grade">
+                  <SelectValue placeholder="Select grade" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueGrades.map(g => (
+                    <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Exam Date */}
+            <div className="space-y-1.5">
+              <Label htmlFor="entry-date">Exam Date</Label>
+              <Input
+                id="entry-date"
+                type="date"
+                value={entryForm.examDate}
+                onChange={e => setEntryForm(f => ({ ...f, examDate: e.target.value }))}
+                data-testid="input-entry-date"
+              />
+            </div>
+
+            {/* Time range */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="entry-start">Start Time</Label>
+                <Input
+                  id="entry-start"
+                  type="time"
+                  value={entryForm.startTime}
+                  onChange={e => setEntryForm(f => ({ ...f, startTime: e.target.value }))}
+                  data-testid="input-entry-start"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="entry-end">End Time</Label>
+                <Input
+                  id="entry-end"
+                  type="time"
+                  value={entryForm.endTime}
+                  onChange={e => setEntryForm(f => ({ ...f, endTime: e.target.value }))}
+                  data-testid="input-entry-end"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEntryDialog(false)}>Cancel</Button>
+            <Button
+              onClick={handleEntrySave}
+              disabled={createEntryMutation.isPending || updateEntryMutation.isPending}
+              data-testid="button-save-entry"
+            >
+              {(createEntryMutation.isPending || updateEntryMutation.isPending) ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving...</>
+              ) : (
+                editEntry ? "Update Entry" : "Add Entry"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Entry Confirm ──────────────────────────────────── */}
+      <AlertDialog open={!!entryToDelete} onOpenChange={open => { if (!open) setEntryToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Timetable Entry</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove{" "}
+              <strong>{entryToDelete?.subject?.name || `Subject #${entryToDelete?.subjectId}`}</strong>{" "}
+              on {entryToDelete?.examDate} from the timetable? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3 justify-end">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground"
+              onClick={() => entryToDelete && deleteEntryMutation.mutate(entryToDelete.id)}
+              data-testid="button-confirm-delete-entry"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
