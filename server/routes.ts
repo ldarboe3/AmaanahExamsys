@@ -14546,12 +14546,20 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
 
       const result = await pool.query(`
         WITH center_students AS (
-          SELECT s.id, s.first_name, s.middle_name, s.last_name, s.index_number, s.grade, s.school_id, s.exam_year_id,
+          -- Students whose school is assigned to this center
+          SELECT DISTINCT s.id, s.first_name, s.middle_name, s.last_name, s.index_number, s.grade, s.school_id, s.exam_year_id,
                  sc.name AS school_name
           FROM students s
           JOIN schools sc ON s.school_id = sc.id
-          WHERE sc.assigned_center_id = $1
-            AND ($2::int IS NULL OR s.exam_year_id = $2)
+          WHERE (
+            sc.assigned_center_id = $1
+            OR s.id IN (
+              SELECT DISTINCT student_id FROM attendance_records
+              WHERE center_id = $1
+                AND ($2::int IS NULL OR exam_year_id = $2)
+            )
+          )
+          AND ($2::int IS NULL OR s.exam_year_id = $2)
         ),
         attendance_data AS (
           SELECT ar.student_id, ar.subject_id, ar.is_present, ar.check_in_time,
@@ -14606,21 +14614,21 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       const { rows: attendanceRows } = await pool.query(`
         SELECT
           ec.id AS center_id, ec.name AS center_name,
-          r.id AS region_id, r.name AS region_name,
-          cl.id AS cluster_id, cl.name AS cluster_name,
+          COALESCE(r.id, 0) AS region_id, COALESCE(r.name, 'No Region') AS region_name,
+          COALESCE(cl.id, 0) AS cluster_id, COALESCE(cl.name, 'No Cluster') AS cluster_name,
           sub.id AS subject_id, sub.name AS subject_name, sub.arabic_name AS subject_arabic_name,
           COUNT(DISTINCT ar.student_id)::int AS attended_count
         FROM attendance_records ar
         JOIN exam_centers ec ON ar.center_id = ec.id
-        JOIN regions r ON ec.region_id = r.id
-        JOIN clusters cl ON ec.cluster_id = cl.id
+        LEFT JOIN regions r ON ec.region_id = r.id
+        LEFT JOIN clusters cl ON ec.cluster_id = cl.id
         JOIN subjects sub ON ar.subject_id = sub.id
         WHERE ar.exam_year_id = $1
           AND ($2::int IS NULL OR ec.region_id = $2)
           AND ($3::int IS NULL OR ec.cluster_id = $3)
           AND ($4::int IS NULL OR ec.id = $4)
         GROUP BY ec.id, ec.name, r.id, r.name, cl.id, cl.name, sub.id, sub.name, sub.arabic_name
-        ORDER BY r.name, cl.name, ec.name, sub.name
+        ORDER BY r.name NULLS LAST, cl.name NULLS LAST, ec.name, sub.name
       `, [examYearId, regionId, clusterId, centerId]);
 
       // Total registered students per center via center_assignments
@@ -14872,11 +14880,18 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         return acc;
       }, {});
 
-      // Enrich each school with its year-scoped student count, then keep only
-      // schools that have at least one student enrolled for the current exam year.
-      const allEnrichedSchools = await Promise.all(schools.map(async (school) => {
-        const schoolStudents = await storage.getStudentsBySchool(school.id);
-        const yearStudents = yearId ? schoolStudents.filter(s => s.examYearId === yearId) : schoolStudents;
+      // Enrich each school with its year-scoped student count using already-fetched students
+      // (avoids N+1 queries — one query for all students already done above)
+      const studentsBySchoolId = students.reduce((acc: Record<number, typeof students>, s) => {
+        const key = s.schoolId;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(s);
+        return acc;
+      }, {});
+
+      const allEnrichedSchools = schools.map((school) => {
+        const allSchoolStudents = studentsBySchoolId[school.id] || [];
+        const yearStudents = yearId ? allSchoolStudents.filter(s => s.examYearId === yearId) : allSchoolStudents;
         const gradeBreakdown = yearStudents.reduce((acc: Record<number, number>, s) => {
           acc[s.grade] = (acc[s.grade] || 0) + 1;
           return acc;
@@ -14886,7 +14901,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
           studentCount: yearStudents.length,
           gradeBreakdown,
         };
-      }));
+      });
       // Only show schools that actually have enrolled students for this exam year
       const enrichedSchools = yearId
         ? allEnrichedSchools.filter(s => s.studentCount > 0)

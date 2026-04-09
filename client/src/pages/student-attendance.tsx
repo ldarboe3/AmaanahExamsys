@@ -112,11 +112,7 @@ export default function StudentAttendance() {
   const [clusterId, setClusterId] = useState<string>("all");
   const [centerId, setCenterId] = useState<string>("all");
 
-  // Monitoring state
-  const [monitoringEnabled, setMonitoringEnabled] = useState(false);
-
-  // Validation state
-  const [validationEnabled, setValidationEnabled] = useState(false);
+  // Validation state — monitoring auto-loads when exam year is selected
   const [flagTypeFilter, setFlagTypeFilter] = useState<string>("all");
 
   // Reference data
@@ -142,7 +138,7 @@ export default function StudentAttendance() {
     return p;
   };
 
-  // Monitoring query
+  // Monitoring query — auto-loads when exam year is selected
   const { data: monitoringData = [], isFetching: monitoringLoading, refetch: refetchMonitoring } = useQuery<any[]>({
     queryKey: ["/api/attendance/monitoring-summary", examYearId, regionId, clusterId, centerId],
     queryFn: async () => {
@@ -151,7 +147,7 @@ export default function StudentAttendance() {
       if (!res.ok) throw new Error("Failed to fetch monitoring data");
       return res.json();
     },
-    enabled: monitoringEnabled && examYearId !== "all",
+    enabled: examYearId !== "all",
   });
 
   // Validation query
@@ -163,7 +159,7 @@ export default function StudentAttendance() {
       if (!res.ok) throw new Error("Failed to fetch validation flags");
       return res.json();
     },
-    enabled: validationEnabled && examYearId !== "all",
+    enabled: examYearId !== "all",
   });
 
   // Group monitoring data by region → cluster → center
@@ -204,20 +200,20 @@ export default function StudentAttendance() {
           centers={centers} centerId={centerId} setCenterId={setCenterId}
         />
         <Button
-          onClick={() => { setMonitoringEnabled(true); refetchMonitoring(); }}
+          onClick={() => refetchMonitoring()}
           disabled={examYearId === "all" || monitoringLoading}
           data-testid="button-load-monitoring"
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${monitoringLoading ? "animate-spin" : ""}`} />
-          {monitoringLoading ? "Loading..." : "Load Data"}
+          {monitoringLoading ? "Loading..." : "Refresh"}
         </Button>
       </div>
 
-      {!monitoringEnabled ? (
+      {examYearId === "all" ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 gap-3 text-center">
             <BarChart3 className="h-12 w-12 text-muted-foreground opacity-50" />
-            <p className="text-muted-foreground">Select an exam year and click Load Data to view attendance monitoring</p>
+            <p className="text-muted-foreground">Select an exam year above to view attendance monitoring</p>
           </CardContent>
         </Card>
       ) : monitoringLoading ? (
@@ -315,7 +311,7 @@ export default function StudentAttendance() {
           centers={centers} centerId={centerId} setCenterId={setCenterId}
         />
         <Button
-          onClick={() => { setValidationEnabled(true); refetchFlags(); }}
+          onClick={() => refetchFlags()}
           disabled={examYearId === "all" || flagsLoading}
           data-testid="button-load-flags"
         >
@@ -324,11 +320,11 @@ export default function StudentAttendance() {
         </Button>
       </div>
 
-      {!validationEnabled ? (
+      {examYearId === "all" ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 gap-3 text-center">
             <ShieldAlert className="h-12 w-12 text-muted-foreground opacity-50" />
-            <p className="text-muted-foreground">Select an exam year and click Run Check to detect inconsistencies</p>
+            <p className="text-muted-foreground">Select an exam year above to check for inconsistencies</p>
           </CardContent>
         </Card>
       ) : flagsLoading ? (
