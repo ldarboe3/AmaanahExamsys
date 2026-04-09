@@ -1172,14 +1172,20 @@ ${pages.map(p => `  <url>
         }
       }
       
-      // Add school and student counts for each center
+      // Add school, student, and hall counts for each center
       const centersWithCounts = await Promise.all(centers.map(async (center) => {
-        const schools = await storage.getSchoolsByCenter(center.id);
-        const students = await storage.getStudentsByCenter(center.id);
+        const [schools, students, halls] = await Promise.all([
+          storage.getSchoolsByCenter(center.id),
+          storage.getStudentsByCenter(center.id),
+          storage.getCenterHallsByCenter(center.id),
+        ]);
+        const hallTotalCapacity = halls.reduce((sum: number, h: any) => sum + (h.capacity || 0), 0);
         return {
           ...center,
           assignedSchoolsCount: schools.length,
           assignedStudentsCount: students.length,
+          hallCount: halls.length,
+          hallTotalCapacity,
         };
       }));
       

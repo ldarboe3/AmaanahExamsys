@@ -89,7 +89,6 @@ const centerSchema = z.object({
   address: z.string().optional(),
   regionId: z.coerce.number().min(1, "Region is required"),
   clusterId: z.coerce.number().min(1, "Cluster is required"),
-  capacity: z.coerce.number().min(10, "Capacity must be at least 10"),
   contactPerson: z.string().optional(),
   contactPhone: z.string().optional(),
   contactEmail: z.string().email().optional().or(z.literal("")),
@@ -102,6 +101,8 @@ interface CenterWithRelations extends ExamCenter {
   cluster?: { name: string };
   assignedSchoolsCount?: number;
   assignedStudentsCount?: number;
+  hallCount?: number;
+  hallTotalCapacity?: number;
 }
 
 interface CenterMonitoringData {
@@ -420,10 +421,16 @@ function CenterCard({
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-black/5 dark:border-white/5">
+        <div className="grid grid-cols-5 gap-1 pt-2 border-t border-black/5 dark:border-white/5">
           <div className="text-center">
-            <p className={`text-base font-semibold ${theme.accent}`}>{(center.capacity || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
+            <p className={`text-base font-semibold ${theme.accent}`}>
+              {(center.hallCount && center.hallCount > 0 ? (center.hallTotalCapacity || 0) : (center.capacity || 0)).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
+            </p>
             <p className="text-[10px] text-muted-foreground leading-tight">{t.centers.capacity}</p>
+          </div>
+          <div className="text-center">
+            <p className={`text-base font-semibold ${theme.accent}`}>{(center.hallCount || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Halls</p>
           </div>
           <div className="text-center">
             <p className={`text-base font-semibold ${theme.accent}`}>{(center.assignedSchoolsCount || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
@@ -567,7 +574,6 @@ export default function Centers() {
       address: "",
       regionId: 0,
       clusterId: 0,
-      capacity: 500,
       contactPerson: "",
       contactPhone: "",
       contactEmail: "",
@@ -656,7 +662,7 @@ export default function Centers() {
   });
 
   const openCreateDialog = () => {
-    form.reset({ name: "", code: "", address: "", regionId: 0, clusterId: 0, capacity: 500, contactPerson: "", contactPhone: "", contactEmail: "" });
+    form.reset({ name: "", code: "", address: "", regionId: 0, clusterId: 0, contactPerson: "", contactPhone: "", contactEmail: "" });
     setShowCreateDialog(true);
   };
 
@@ -668,7 +674,6 @@ export default function Centers() {
       address: center.address || "",
       regionId: center.regionId || 0,
       clusterId: center.clusterId || 0,
-      capacity: center.capacity || 500,
       contactPerson: center.contactPerson || "",
       contactPhone: center.contactPhone || "",
       contactEmail: center.contactEmail || "",
@@ -699,7 +704,10 @@ export default function Centers() {
     center.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const totalCapacity = centers?.reduce((sum, c) => sum + (c.capacity || 0), 0) || 0;
+  const totalCapacity = centers?.reduce((sum, c) => {
+    const cap = (c.hallCount && c.hallCount > 0) ? (c.hallTotalCapacity || 0) : (c.capacity || 0);
+    return sum + cap;
+  }, 0) || 0;
   const totalAssigned = centers?.reduce((sum, c) => sum + (c.assignedStudentsCount || 0), 0) || 0;
 
   const monitoringMap = new Map<number, CenterMonitoringData>(
@@ -908,19 +916,6 @@ export default function Centers() {
                 />
                 <FormField
                   control={form.control}
-                  name="capacity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t.centers.capacity}</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" min={10} data-testid="input-center-capacity" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
                   name="regionId"
                   render={({ field }) => (
                     <FormItem>
@@ -1064,17 +1059,6 @@ export default function Centers() {
                 />
                 <FormField
                   control={form.control}
-                  name="capacity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t.centers.capacity}</FormLabel>
-                      <FormControl><Input {...field} type="number" min={10} data-testid="input-edit-center-capacity" /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
                   name="regionId"
                   render={({ field }) => (
                     <FormItem>
@@ -1191,7 +1175,14 @@ export default function Centers() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">{t.centers.capacity}</p>
-                  <p className="font-medium">{selectedCenter.capacity?.toLocaleString(isRTL ? 'ar-EG' : 'en-US') || "—"}</p>
+                  <p className="font-medium">
+                    {selectedCenter.hallCount && selectedCenter.hallCount > 0
+                      ? (selectedCenter.hallTotalCapacity || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')
+                      : (selectedCenter.capacity?.toLocaleString(isRTL ? 'ar-EG' : 'en-US') || "—")}
+                  </p>
+                  {selectedCenter.hallCount && selectedCenter.hallCount > 0 ? (
+                    <p className="text-[10px] text-muted-foreground">from {selectedCenter.hallCount} hall{selectedCenter.hallCount !== 1 ? "s" : ""}</p>
+                  ) : null}
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">{t.common.status}</p>
