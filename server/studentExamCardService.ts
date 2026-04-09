@@ -141,11 +141,11 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
     doc.font(regularFont)
       .fontSize(5.5)
       .fillColor(LIGHT_GRAY)
-      .text(label, labelX, currentY, { width: W - 20 });
+      .text(label, labelX, currentY, { width: W - 20, align: 'right' });
     doc.font(titleFont)
       .fontSize(7)
       .fillColor(DARK)
-      .text(value, valueX, currentY + 7, { width: W - 20 });
+      .text(value, valueX, currentY + 7, { width: W - 20, align: 'right' });
     currentY += lineHeight;
   };
 
@@ -165,7 +165,7 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
   doc.font(regularFont)
     .fontSize(5)
     .fillColor(GRAY)
-    .text('INDEX NUMBER', idxPillX + 8, idxPillY + 3);
+    .text('INDEX NUMBER', idxPillX, idxPillY + 3, { width: idxPillW - 8, align: 'right' });
   // Always use Helvetica-Bold for digits so centering is accurate (Amiri can shift LTR numbers)
   doc.font('Helvetica-Bold')
     .fontSize(14)
@@ -176,7 +176,6 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
 
   const gradeStr = data.grade === 6 ? 'Grade 6' : data.grade === 9 ? 'Grade 9' : `Grade ${data.grade}`;
   drawField('CLASS / GRADE', gradeStr);
-  drawField('GENDER', data.gender === 'male' ? 'Male' : 'Female');
   drawField('SCHOOL', data.schoolName);
   if (data.regionName) drawField('REGION', data.regionName);
   if (data.clusterName) drawField('CLUSTER', data.clusterName);
