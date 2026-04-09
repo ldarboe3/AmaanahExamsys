@@ -29,7 +29,9 @@ interface StudentCardData {
   grade: number;
   gender: string;
   schoolName: string;
-  schoolAddress?: string | null;
+  regionName?: string | null;
+  clusterName?: string | null;
+  centerName?: string | null;
   examYearName: string;
   verifyUrl: string;
 }
@@ -150,6 +152,9 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
   const fullName = [data.firstName, data.middleName, data.lastName].filter(Boolean).join(' ');
   drawField('CANDIDATE NAME', fullName);
 
+  // Extra spacing between name and index box
+  currentY += 4;
+
   doc.save();
   const idxPillW = W - 20;
   const idxPillH = 24;
@@ -161,10 +166,11 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
     .fontSize(5)
     .fillColor(GRAY)
     .text('INDEX NUMBER', idxPillX + 8, idxPillY + 3);
+  // Center the index number digits horizontally inside the box
   doc.font(titleFont)
     .fontSize(13)
     .fillColor(GREEN_DARK)
-    .text(data.indexNumber, idxPillX + 8, idxPillY + 10);
+    .text(data.indexNumber, idxPillX, idxPillY + 10, { width: idxPillW, align: 'center' });
   doc.restore();
   currentY += idxPillH + 4;
 
@@ -172,9 +178,9 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
   drawField('CLASS / GRADE', gradeStr);
   drawField('GENDER', data.gender === 'male' ? 'Male' : 'Female');
   drawField('SCHOOL', data.schoolName);
-  if (data.schoolAddress) {
-    drawField('ADDRESS', data.schoolAddress);
-  }
+  if (data.regionName) drawField('REGION', data.regionName);
+  if (data.clusterName) drawField('CLUSTER', data.clusterName);
+  if (data.centerName) drawField('EXAM CENTER', data.centerName);
 
   if (barcodeBuffer) {
     try {

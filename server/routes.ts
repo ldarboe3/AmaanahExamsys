@@ -6223,8 +6223,13 @@ ${pages.map(p => `  <url>
         return res.status(400).json({ message: "No approved students with index numbers found" });
       }
       
-      const allSchools = await storage.getAllSchools();
-      const allExamYears = await storage.getAllExamYears();
+      const [allSchools, allExamYears, allRegions, allClusters, allCenters] = await Promise.all([
+        storage.getAllSchools(),
+        storage.getAllExamYears(),
+        storage.getAllRegions(),
+        storage.getAllClusters(),
+        storage.getAllExamCenters(),
+      ]);
       
       const { generateStudentExamCard, generateBulkStudentExamCards } = await import('./studentExamCardService');
       
@@ -6232,6 +6237,9 @@ ${pages.map(p => `  <url>
       const cardDataList = filteredStudents.map(student => {
         const school = allSchools.find(s => s.id === student.schoolId);
         const examYear = allExamYears.find(ey => ey.id === student.examYearId);
+        const region = school?.regionId ? allRegions.find(r => r.id === school.regionId) : null;
+        const cluster = school?.clusterId ? allClusters.find(c => c.id === school.clusterId) : null;
+        const center = school?.assignedCenterId ? allCenters.find(ec => ec.id === school.assignedCenterId) : null;
         return {
           indexNumber: student.indexNumber!,
           firstName: student.firstName,
@@ -6240,7 +6248,9 @@ ${pages.map(p => `  <url>
           grade: student.grade,
           gender: student.gender,
           schoolName: school?.name || 'Unknown School',
-          schoolAddress: school?.address || null,
+          regionName: region?.name || null,
+          clusterName: cluster?.name || null,
+          centerName: center?.name || null,
           examYearName: examYear?.name || 'Examination',
           verifyUrl: `${baseUrl}/verify/student/${student.indexNumber}`,
         };
