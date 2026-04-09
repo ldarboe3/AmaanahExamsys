@@ -18919,17 +18919,18 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       const packet = await storage.getExamPacketByBarcode(req.params.barcode);
       if (!packet) return res.status(404).json({ message: "Packet not found" });
 
-      const [allRegions, allClusters, allCenters, allSubjects, scans] = await Promise.all([
+      const [allRegions, allClusters, allCenters, allSubjects, allHalls, scans] = await Promise.all([
         storage.getAllRegions(),
         storage.getAllClusters(),
         storage.getAllExamCenters(),
         storage.getAllSubjects(),
+        storage.getAllCenterHalls(),
         storage.getMobilePacketScans(packet.id),
       ]);
       const subjectMap = Object.fromEntries(allSubjects.map((s: any) => [s.id, s.name]));
       const base = buildPacketResponse(
         { ...packet, subjectName: subjectMap[packet.subjectId] },
-        allRegions, allClusters, allCenters
+        allRegions, allClusters, allCenters, allHalls
       );
       res.json({
         ...base,
@@ -18957,14 +18958,15 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       const packet = await storage.getExamPacketByBarcode(req.params.barcode);
       if (!packet) return res.status(404).json({ message: "Packet not found" });
 
-      const [allRegions, allClusters, allCenters, allSubjects] = await Promise.all([
+      const [allRegions, allClusters, allCenters, allSubjects, allHalls] = await Promise.all([
         storage.getAllRegions(), storage.getAllClusters(),
         storage.getAllExamCenters(), storage.getAllSubjects(),
+        storage.getAllCenterHalls(),
       ]);
       const subjectMap = Object.fromEntries(allSubjects.map((s: any) => [s.id, s.name]));
       const packetObj = buildPacketResponse(
         { ...packet, subjectName: subjectMap[packet.subjectId] },
-        allRegions, allClusters, allCenters
+        allRegions, allClusters, allCenters, allHalls
       );
 
       const roleActions = role ? (MOBILE_ROLE_ACTIONS[role] ?? []) : [];
