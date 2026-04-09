@@ -2712,14 +2712,18 @@ export class DatabaseStorage implements IStorage {
       .where(conditions.length > 0 ? and(...conditions) : undefined);
     const stats = {
       total: packets.length,
-      packed: packets.filter(p => p.status === 'packed').length,
+      // At HQ — created or packed but not yet dispatched
+      packed: packets.filter(p => ['created', 'packed'].includes(p.status)).length,
+      // Moving between locations (forward dispatch or return journey)
       inTransit: packets.filter(p => ['dispatched_to_region','dispatched_to_cluster','dispatched_to_center','returned_to_cluster','returned_to_region'].includes(p.status)).length,
-      atLocation: packets.filter(p => ['at_region','at_cluster','at_center'].includes(p.status)).length,
-      opened: packets.filter(p => p.status === 'opened').length,
-      administered: packets.filter(p => p.status === 'administered').length,
-      sealed: packets.filter(p => p.status === 'sealed').length,
+      // Physically at a location (received, exam in progress)
+      atLocation: packets.filter(p => ['at_region','at_cluster','at_center','opened','administered'].includes(p.status)).length,
+      // Post-exam: sealed or collected awaiting return
+      sealed: packets.filter(p => ['sealed', 'collected'].includes(p.status)).length,
+      // Back at HQ
       returned: packets.filter(p => ['returned_to_hq','completed'].includes(p.status)).length,
       missing: packets.filter(p => p.status === 'missing').length,
+      damaged: packets.filter(p => p.status === 'damaged').length,
     };
     return stats;
   }
