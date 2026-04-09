@@ -2357,7 +2357,7 @@ export default function Students() {
                             </div>
                             <div>
                               <p className="font-medium text-foreground">
-                                {student.firstName} {student.lastName}
+                                {[student.firstName, student.middleName, student.lastName].filter(Boolean).join(" ")}
                               </p>
                               <p className="text-sm text-muted-foreground capitalize">
                                 {student.gender}
