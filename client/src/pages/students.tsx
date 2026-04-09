@@ -77,6 +77,7 @@ import {
   FileSearch,
   Plus,
   Edit,
+  Trash2,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -921,6 +922,29 @@ export default function Students() {
       toast({
         title: t.common.error,
         description: error.message || (isRTL ? "فشل رفض الطالب" : "Failed to reject student"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const [studentToDelete, setStudentToDelete] = useState<any | null>(null);
+
+  const deleteStudentMutation = useMutation({
+    mutationFn: async (studentId: number) => {
+      return apiRequest("DELETE", `/api/students/${studentId}`);
+    },
+    onSuccess: () => {
+      invalidateStudentQueries();
+      setStudentToDelete(null);
+      toast({
+        title: t.common.success,
+        description: isRTL ? "تم حذف الطالب بنجاح" : "Student has been deleted.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل حذف الطالب" : "Failed to delete student"),
         variant: "destructive",
       });
     },
@@ -2425,6 +2449,20 @@ export default function Students() {
                                   </DropdownMenuItem>
                                 </>
                               )}
+                              {/* Delete — admin only */}
+                              {canApproveStudents && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => setStudentToDelete(student)}
+                                    className="text-destructive"
+                                    data-testid={`button-delete-${student.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4 me-2" />
+                                    {isRTL ? "حذف" : "Delete"}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -3213,6 +3251,33 @@ export default function Students() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Student Confirmation Dialog */}
+      <AlertDialog open={!!studentToDelete} onOpenChange={(open) => { if (!open) setStudentToDelete(null); }}>
+        <AlertDialogContent dir={isRTL ? "rtl" : "ltr"}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isRTL ? "حذف الطالب" : "Delete Student"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRTL
+                ? `هل أنت متأكد من حذف "${studentToDelete ? [studentToDelete.firstName, studentToDelete.middleName, studentToDelete.lastName].filter(Boolean).join(' ') : ''}"؟ لا يمكن التراجع عن هذا الإجراء.`
+                : `Are you sure you want to delete "${studentToDelete ? [studentToDelete.firstName, studentToDelete.middleName, studentToDelete.lastName].filter(Boolean).join(' ') : ''}"? This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3 justify-end">
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => studentToDelete && deleteStudentMutation.mutate(studentToDelete.id)}
+              data-testid="button-confirm-delete-student"
+            >
+              <Trash2 className="w-4 h-4 me-2" />
+              {isRTL ? "حذف" : "Delete"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Upload Close Confirmation Dialog */}
       <AlertDialog open={showUploadCloseConfirmation} onOpenChange={setShowUploadCloseConfirmation}>
