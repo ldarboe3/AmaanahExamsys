@@ -166,11 +166,11 @@ function drawFrontPage(doc: typeof PDFDocument, data: StudentCardData, hasAmiri:
     .fontSize(5)
     .fillColor(GRAY)
     .text('INDEX NUMBER', idxPillX + 8, idxPillY + 3);
-  // Center the index number digits horizontally inside the box
-  doc.font(titleFont)
-    .fontSize(13)
+  // Always use Helvetica-Bold for digits so centering is accurate (Amiri can shift LTR numbers)
+  doc.font('Helvetica-Bold')
+    .fontSize(14)
     .fillColor(GREEN_DARK)
-    .text(data.indexNumber, idxPillX, idxPillY + 10, { width: idxPillW, align: 'center' });
+    .text(data.indexNumber, 0, idxPillY + 9, { width: W, align: 'center' });
   doc.restore();
   currentY += idxPillH + 4;
 
