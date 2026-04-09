@@ -1693,14 +1693,6 @@ export default function Students() {
           {/* Hide action buttons for read-only mode */}
           {!isReadOnly && !isPastExamYear && (
             <div className="flex gap-2 flex-wrap">
-              <Button variant="outline" onClick={() => setShowUploadDialog(true)} data-testid="button-upload-csv">
-                <Upload className="w-4 h-4 me-2" />
-                {t.common.uploadCSV}
-              </Button>
-              <Button variant="outline" onClick={() => window.open('/api/templates/students')} data-testid="button-download-template">
-                <FileSpreadsheet className="w-4 h-4 me-2" />
-                {isRTL ? "القالب" : "Template"}
-              </Button>
               {/* Approve All button - only when payment is approved */}
               {canApproveWithPayment && pendingCount > 0 && (
                 <Button 
