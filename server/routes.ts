@@ -4135,6 +4135,7 @@ ${pages.map(p => `  <url>
       const firstNameCol = findColumnIndex(['firstname', 'first']);
       const lastNameCol = findColumnIndex(['lastname', 'last', 'surname']);
       const schoolNameCol = findColumnIndex(['schoolname', 'school']);
+      const schoolAddressCol = findColumnIndex(['schooladdress', 'address', 'schoollocation', 'location']);
       const regionCol = findColumnIndex(['region', 'regionname']);
       const clusterCol = findColumnIndex(['cluster', 'clustername']);
       const genderCol = findColumnIndex(['gender', 'sex']);
@@ -4217,6 +4218,7 @@ ${pages.map(p => `  <url>
         }
 
         const schoolName = schoolNameCol !== -1 ? String(row[schoolNameCol] || '').trim() : '';
+        const schoolAddress = schoolAddressCol !== -1 ? String(row[schoolAddressCol] || '').trim() : '';
         const regionName = regionCol !== -1 ? String(row[regionCol] || '').trim() : '';
         const clusterName = clusterCol !== -1 ? String(row[clusterCol] || '').trim() : '';
         const gender = genderCol !== -1 ? String(row[genderCol] || '').trim().toLowerCase() : '';
@@ -4228,6 +4230,7 @@ ${pages.map(p => `  <url>
             lastName,
             middleName,
             schoolName,
+            schoolAddress,
             regionName,
             clusterName,
             gender: gender === 'm' || gender === 'male' ? 'male' : (gender === 'f' || gender === 'female' ? 'female' : ''),
@@ -4304,10 +4307,30 @@ ${pages.map(p => `  <url>
         }
 
         // Calculate similarity with each candidate school
+        // When address is provided, use it to break ties among name-similar schools
+        const nameAddressScores: { school: any; nameScore: number; addressScore: number }[] = [];
         for (const school of candidateSchools) {
-          const score = calculateSimilarity(schoolName, school.name);
-          if (score >= 0.5 && (!bestMatch || score > bestMatch.score)) {
-            bestMatch = { school, score };
+          const nameScore = calculateSimilarity(schoolName, school.name);
+          if (nameScore >= 0.5) {
+            let addressScore = 0;
+            if (schoolAddress && school.address) {
+              addressScore = calculateSimilarity(schoolAddress, school.address);
+            }
+            nameAddressScores.push({ school, nameScore, addressScore });
+          }
+        }
+
+        if (nameAddressScores.length > 0) {
+          // If address provided and matches, use combined score; otherwise fall back to name-only
+          if (schoolAddress && nameAddressScores.some(s => s.addressScore > 0.3)) {
+            // Weight: 60% name, 40% address
+            nameAddressScores.sort((a, b) => (b.nameScore * 0.6 + b.addressScore * 0.4) - (a.nameScore * 0.6 + a.addressScore * 0.4));
+            const best = nameAddressScores[0];
+            bestMatch = { school: best.school, score: best.nameScore * 0.6 + best.addressScore * 0.4 };
+          } else {
+            nameAddressScores.sort((a, b) => b.nameScore - a.nameScore);
+            const best = nameAddressScores[0];
+            bestMatch = { school: best.school, score: best.nameScore };
           }
         }
 
@@ -4343,6 +4366,7 @@ ${pages.map(p => `  <url>
           lastName,
           middleName,
           schoolName,
+          schoolAddress,
           regionName,
           clusterName,
           gender: normalizedGender,
@@ -11565,11 +11589,11 @@ ${pages.map(p => `  <url>
   // CSV Template endpoints for downloads
   app.get("/api/templates/students", (req, res) => {
     const BOM = '\uFEFF';
-    const csvContent = `firstName,lastName,middleName,dateOfBirth,placeOfBirth,gender,grade
-John,Doe,Michael,2008-05-15,City Name,male,9
-Jane,Smith,,2009-03-22,Town Name,female,10`;
+    const csvContent = `Student Name,School Name,School Address,Region,Cluster,Gender
+John Michael Doe,Darboe Islamic School,Santo Su Gunjur Kombo South,Region 1,Cluster 1,Male
+Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Female`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename=students_template.csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=students_upload_template.csv');
     res.send(BOM + csvContent);
   });
 

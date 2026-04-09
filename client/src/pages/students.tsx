@@ -1576,44 +1576,11 @@ export default function Students() {
                     </div>
                   </div>
                   
-                  {/* Hide upload buttons for read-only mode (past exam years) */}
-                  {!isReadOnly ? (
-                    <div className="mt-4 pt-4 border-t flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedGrade(grade);
-                          setShowUploadDialog(true);
-                        }}
-                        data-testid={`button-upload-grade-${grade}`}
-                      >
-                        <Upload className="w-4 h-4 me-1" />
-                        {isRTL ? "رفع" : "Upload"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.open('/api/templates/students');
-                        }}
-                        data-testid={`button-template-grade-${grade}`}
-                      >
-                        <Download className="w-4 h-4 me-1" />
-                        {isRTL ? "القالب" : "Template"}
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="mt-4 pt-4 border-t">
-                      <p className="text-xs text-muted-foreground text-center">
-                        {isRTL ? "انقر للعرض" : "Click to view"}
-                      </p>
-                    </div>
-                  )}
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="text-xs text-muted-foreground text-center">
+                      {isRTL ? "انقر للعرض" : "Click to view"}
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -2901,14 +2868,27 @@ export default function Students() {
                   />
                 </div>
 
-                <div className="text-xs text-muted-foreground">
-                  <p className="font-medium mb-1">{isRTL ? "الأعمدة المطلوبة:" : "Required columns:"}</p>
-                  <ul className="list-disc list-inside space-y-0.5">
-                    <li>{isRTL ? "اسم الطالب (أو الاسم الأول واسم العائلة)" : "Student Name (or First Name and Last Name)"}</li>
-                    <li>{isRTL ? "اسم المدرسة" : "School Name"}</li>
-                    <li>{isRTL ? "المنطقة (اختياري - يساعد في المطابقة)" : "Region (optional - helps with matching)"}</li>
-                    <li>{isRTL ? "المجموعة (اختياري - يساعد في المطابقة)" : "Cluster (optional - helps with matching)"}</li>
-                  </ul>
+                <div className="space-y-3">
+                  <div className="text-xs text-muted-foreground">
+                    <p className="font-medium mb-1">{isRTL ? "الأعمدة المطلوبة:" : "Required columns:"}</p>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      <li>{isRTL ? "اسم الطالب (أو الاسم الأول واسم العائلة)" : "Student Name (or First Name and Last Name)"}</li>
+                      <li>{isRTL ? "اسم المدرسة" : "School Name"}</li>
+                      <li className="font-medium text-foreground">{isRTL ? "عنوان المدرسة" : "School Address"}</li>
+                      <li>{isRTL ? "المنطقة (اختياري - يساعد في المطابقة)" : "Region (optional - helps with matching)"}</li>
+                      <li>{isRTL ? "المجموعة (اختياري - يساعد في المطابقة)" : "Cluster (optional - helps with matching)"}</li>
+                    </ul>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2"
+                    onClick={() => window.open('/api/templates/students')}
+                    data-testid="button-download-upload-template"
+                  >
+                    <Download className="w-4 h-4" />
+                    {isRTL ? "تنزيل قالب CSV" : "Download CSV Template"}
+                  </Button>
                 </div>
               </div>
             )}
