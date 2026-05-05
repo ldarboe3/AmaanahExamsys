@@ -855,6 +855,38 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSchool(id: number): Promise<boolean> {
+    // Get all student IDs for this school first
+    const schoolStudents = await db.select({ id: students.id }).from(students).where(eq(students.schoolId, id));
+    const studentIds = schoolStudents.map(s => s.id);
+
+    if (studentIds.length > 0) {
+      // Delete records that reference students
+      await db.delete(attendanceRecords).where(inArray(attendanceRecords.studentId, studentIds));
+      await db.delete(studentResults).where(inArray(studentResults.studentId, studentIds));
+      await db.delete(certificates).where(inArray(certificates.studentId, studentIds));
+      await db.delete(transcripts).where(inArray(transcripts.studentId, studentIds));
+      await db.delete(malpracticeReports).where(inArray(malpracticeReports.studentId, studentIds));
+      await db.delete(examCards).where(inArray(examCards.studentId, studentIds));
+      // Delete the students themselves
+      await db.delete(students).where(eq(students.schoolId, id));
+    }
+
+    // Delete records that directly reference the school
+    await db.delete(centerAssignments).where(eq(centerAssignments.schoolId, id));
+    await db.delete(schoolExamRegistrations).where(eq(schoolExamRegistrations.schoolId, id));
+    await db.delete(schoolInvitations).where(eq(schoolInvitations.schoolId, id));
+    await db.delete(examCardBatches).where(eq(examCardBatches.schoolId, id));
+    await db.delete(bulkUploads).where(eq(bulkUploads.schoolId, id));
+
+    // Delete invoice items then invoices
+    const schoolInvoices = await db.select({ id: invoices.id }).from(invoices).where(eq(invoices.schoolId, id));
+    const invoiceIds = schoolInvoices.map(i => i.id);
+    if (invoiceIds.length > 0) {
+      await db.delete(invoiceItems).where(inArray(invoiceItems.invoiceId, invoiceIds));
+    }
+    await db.delete(invoices).where(eq(invoices.schoolId, id));
+
+    // Finally delete the school
     await db.delete(schools).where(eq(schools.id, id));
     return true;
   }
