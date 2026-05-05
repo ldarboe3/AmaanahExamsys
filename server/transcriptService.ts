@@ -363,16 +363,19 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
   const schoolNameAr = school.address ? `${school.name} - ${school.address}` : school.name;
   const transcriptNumber = data.transcriptNumber || '';
   
+  // Convert Western digits to Arabic-Indic numerals for authentic Arabic document rendering
+  const ar = (v: string | number) => String(v).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[parseInt(d)]);
+
   // Build subject rows - RTL table with columns: م | المادة | الدرجات الكبرى | الدرجات الصغرى | الدرجة المحققة
   const subjectRows = subjectMarks.map((subject, index) => {
-    const markValue = subject.mark !== null && subject.mark !== undefined ? subject.mark : '-';
+    const markValue = subject.mark !== null && subject.mark !== undefined ? ar(subject.mark) : '-';
     const hasYellowHighlight = typeof subject.mark === 'number' && subject.mark >= 50;
     return `
     <tr>
-      <td class="col-index">${index + 1}</td>
+      <td class="col-index">${ar(index + 1)}</td>
       <td class="col-subject">${subject.arabicName}</td>
-      <td class="col-max">${subject.maxScore}</td>
-      <td class="col-min">${subject.minScore}</td>
+      <td class="col-max">${ar(subject.maxScore)}</td>
+      <td class="col-min">${ar(subject.minScore)}</td>
       <td class="col-score ${hasYellowHighlight ? 'highlight' : ''}">${markValue}</td>
     </tr>`;
   }).join('');
@@ -700,11 +703,11 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
           ${subjectRows}
           <tr class="summary-row">
             <td colspan="4" class="summary-label">مجموع الدرجات</td>
-            <td class="summary-value">${totalMarks}</td>
+            <td class="summary-value">${ar(totalMarks)}</td>
           </tr>
           <tr class="percentage-row">
             <td colspan="4" class="summary-label">النسبة</td>
-            <td class="summary-value">${percentage.toFixed(1)}%</td>
+            <td class="summary-value">${ar(percentage.toFixed(1))}%</td>
           </tr>
           <tr class="grade-row">
             <td colspan="4" class="summary-label">التقدير</td>

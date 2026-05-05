@@ -95,7 +95,7 @@ interface ResultData {
 
 export default function ResultChecker() {
   const { toast } = useToast();
-  const { t, language, isRTL } = useLanguage();
+  const { t, language, isRTL, toAr } = useLanguage();
   const [indexNumber, setIndexNumber] = useState("");
   const [selectedExamYear, setSelectedExamYear] = useState<string>("");
   const [selectedGrade, setSelectedGrade] = useState<string>("");
@@ -215,11 +215,14 @@ export default function ResultChecker() {
         day: 'numeric'
       });
       
+      // Helper for Arabic-Indic numerals in print template
+      const pn = (v: string | number) => language === 'ar' ? String(v).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[parseInt(d)]) : String(v);
+
       // Build result rows HTML
       const resultRowsHtml = resultData.results.map(result => `
         <tr>
           <td style="padding: 4px 5px; border-bottom: 1px solid #e5e7eb; font-size: 11px;">${getSubjectName(result)}</td>
-          <td style="padding: 4px 5px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 500; font-size: 11px;">${result.score}/${result.maxScore}</td>
+          <td style="padding: 4px 5px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 500; font-size: 11px;">${pn(result.score)}/${pn(result.maxScore)}</td>
           <td style="padding: 4px 5px; text-align: center; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: ${result.score < 50 ? '#dc2626' : '#059669'}; font-size: 11px;">${result.grade}</td>
           <td style="padding: 4px 5px; text-align: center; border-bottom: 1px solid #e5e7eb; font-size: 10px; color: ${result.score < 50 ? '#dc2626' : '#059669'};">${language === 'ar' ? getGradeStatusByScore(result.score).ar : getGradeStatusByScore(result.score).en}</td>
         </tr>
@@ -341,15 +344,15 @@ export default function ResultChecker() {
             <div class="summary">
               <div class="summary-item">
                 <div class="summary-label">Total Score</div>
-                <div class="summary-value">${resultData.summary.totalScore}</div>
+                <div class="summary-value">${pn(resultData.summary.totalScore)}</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Average Score</div>
-                <div class="summary-value">${resultData.summary.averageScore.toFixed(1)}</div>
+                <div class="summary-label">${language === 'ar' ? 'المعدل' : 'Average Score'}</div>
+                <div class="summary-value">${pn(resultData.summary.averageScore.toFixed(1))}</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Passed Subjects</div>
-                <div class="summary-value">${resultData.summary.passedCount}/${resultData.summary.subjectCount}</div>
+                <div class="summary-label">${language === 'ar' ? 'المواد الناجحة' : 'Passed Subjects'}</div>
+                <div class="summary-value">${pn(resultData.summary.passedCount)}/${pn(resultData.summary.subjectCount)}</div>
               </div>
             </div>
             
@@ -700,7 +703,7 @@ export default function ResultChecker() {
                       <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
                         <BarChart3 className="w-6 h-6 text-primary" />
                       </div>
-                      <p className="text-2xl font-bold text-primary">{resultData.summary.averageScore}%</p>
+                      <p className="text-2xl font-bold text-primary">{toAr(resultData.summary.averageScore)}%</p>
                       <p className="text-sm text-muted-foreground">{language === 'ar' ? 'المعدل' : 'Average'}</p>
                     </CardContent>
                   </Card>
@@ -709,7 +712,7 @@ export default function ResultChecker() {
                       <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-2">
                         <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
                       </div>
-                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">{resultData.summary.passedCount}</p>
+                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">{toAr(resultData.summary.passedCount)}</p>
                       <p className="text-sm text-muted-foreground">{language === 'ar' ? 'ناجح' : 'Passed'}</p>
                     </CardContent>
                   </Card>
@@ -718,7 +721,7 @@ export default function ResultChecker() {
                       <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-2">
                         <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
                       </div>
-                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">{resultData.summary.failedCount}</p>
+                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">{toAr(resultData.summary.failedCount)}</p>
                       <p className="text-sm text-muted-foreground">{language === 'ar' ? 'راسب' : 'Failed'}</p>
                     </CardContent>
                   </Card>
@@ -727,7 +730,7 @@ export default function ResultChecker() {
                       <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-2">
                         <BookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{resultData.summary.subjectCount}</p>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{toAr(resultData.summary.subjectCount)}</p>
                       <p className="text-sm text-muted-foreground">{language === 'ar' ? 'المواد' : 'Subjects'}</p>
                     </CardContent>
                   </Card>
@@ -744,7 +747,7 @@ export default function ResultChecker() {
                       <div className={`text-${isRTL ? 'left' : 'right'}`}>
                         <p className="text-sm text-muted-foreground">{language === 'ar' ? 'المجموع' : 'Total Score'}</p>
                         <p className="text-2xl font-bold text-primary">
-                          {resultData.summary.totalScore}/{resultData.summary.maxPossibleScore}
+                          {toAr(resultData.summary.totalScore)}/{toAr(resultData.summary.maxPossibleScore)}
                         </p>
                       </div>
                     </div>
@@ -766,8 +769,8 @@ export default function ResultChecker() {
                               {getSubjectName(result)}
                             </TableCell>
                             <TableCell className="text-center">
-                              <span className={`font-mono font-semibold ${result.score < 50 ? 'text-red-600 dark:text-red-400' : ''}`}>{result.score}</span>
-                              <span className="text-muted-foreground text-xs">/{result.maxScore}</span>
+                              <span className={`font-mono font-semibold ${result.score < 50 ? 'text-red-600 dark:text-red-400' : ''}`}>{toAr(result.score)}</span>
+                              <span className="text-muted-foreground text-xs">/{toAr(result.maxScore)}</span>
                             </TableCell>
                             <TableCell className={`text-center font-bold ${getGradeColor(result.grade)}`}>
                               {result.grade}
