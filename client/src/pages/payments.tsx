@@ -152,7 +152,7 @@ function PaymentsTableSkeleton() {
 
 export default function Payments() {
   const { toast } = useToast();
-  const { t, isRTL } = useLanguage();
+  const { t, isRTL, toAr } = useLanguage();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -601,7 +601,7 @@ export default function Payments() {
                           <Users className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm text-muted-foreground">{isRTL ? "إجمالي الطلاب" : "Total Students"}</span>
                         </div>
-                        <p className="text-2xl font-semibold">{invoice.totalStudents}</p>
+                        <p className="text-2xl font-semibold">{toAr(invoice.totalStudents)}</p>
                       </div>
                       <div className="bg-primary/10 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-1">
@@ -968,7 +968,7 @@ export default function Payments() {
               <div>
                 <p className="text-sm text-muted-foreground">{isRTL ? "إجمالي الإيرادات" : "Total Revenue"}</p>
                 <p className="text-2xl font-semibold">{formatCurrency(totalRevenue)}</p>
-                <p className="text-xs text-muted-foreground mt-1">{invoices?.length || 0} {isRTL ? "فاتورة" : "invoices"}</p>
+                <p className="text-xs text-muted-foreground mt-1">{toAr(invoices?.length || 0)} {isRTL ? "فاتورة" : "invoices"}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
                 <DollarSign className="w-5 h-5 text-chart-3" />
@@ -981,7 +981,7 @@ export default function Payments() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">{isRTL ? "مدفوع" : "Paid"}</p>
-                <p className="text-2xl font-semibold">{paidCount}</p>
+                <p className="text-2xl font-semibold">{toAr(paidCount)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{formatCurrency(totalRevenue)}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
@@ -995,7 +995,7 @@ export default function Payments() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">{isRTL ? "قيد المراجعة" : "Under Review"}</p>
-                <p className="text-2xl font-semibold">{processingCount}</p>
+                <p className="text-2xl font-semibold">{toAr(processingCount)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{isRTL ? "تحتاج مراجعة" : "awaiting confirmation"}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-4/10 flex items-center justify-center">
@@ -1009,7 +1009,7 @@ export default function Payments() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">{isRTL ? "قيد الانتظار" : "Pending"}</p>
-                <p className="text-2xl font-semibold">{pendingCount}</p>
+                <p className="text-2xl font-semibold">{toAr(pendingCount)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{formatCurrency(pendingAmount)}</p>
               </div>
               <div className="w-10 h-10 rounded-md bg-chart-5/10 flex items-center justify-center">
@@ -1090,7 +1090,7 @@ export default function Payments() {
             <div>
               <CardTitle className="text-lg">{isRTL ? "قائمة الفواتير" : "Invoice List"}</CardTitle>
               <CardDescription>
-                {filteredInvoices?.length || 0} {isRTL ? "فاتورة" : "invoices found"}
+                {toAr(filteredInvoices?.length || 0)} {isRTL ? "فاتورة" : "invoices found"}
               </CardDescription>
             </div>
           </div>
@@ -1137,7 +1137,7 @@ export default function Payments() {
                           <span className="text-sm">{invoice.school?.name || (isRTL ? "غير معروف" : "Unknown")}</span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm">{invoice.totalStudents}</span>
+                          <span className="text-sm">{toAr(invoice.totalStudents)}</span>
                         </TableCell>
                         <TableCell>
                           <div>
@@ -1272,11 +1272,11 @@ export default function Payments() {
                     const noStudents = schoolPaymentStatus.filter(s => s.invoiceStatus === 'no_students').length;
                     return (
                       <>
-                        <Badge variant="outline" className="text-chart-3 border-chart-3/40 bg-chart-3/10">{isRTL ? `مدفوع: ${paid}` : `Paid: ${paid}`}</Badge>
-                        {processing > 0 && <Badge variant="outline" className="text-chart-4 border-chart-4/40 bg-chart-4/10">{isRTL ? `قيد المراجعة: ${processing}` : `Under Review: ${processing}`}</Badge>}
-                        {pending > 0 && <Badge variant="outline" className="text-chart-5 border-chart-5/40 bg-chart-5/10">{isRTL ? `قيد الانتظار: ${pending}` : `Pending: ${pending}`}</Badge>}
-                        {notInvoiced > 0 && <Badge variant="outline" className="text-destructive border-destructive/40 bg-destructive/10">{isRTL ? `بدون فاتورة: ${notInvoiced}` : `Not Invoiced: ${notInvoiced}`}</Badge>}
-                        {noStudents > 0 && <Badge variant="outline">{isRTL ? `بدون طلاب: ${noStudents}` : `No Students: ${noStudents}`}</Badge>}
+                        <Badge variant="outline" className="text-chart-3 border-chart-3/40 bg-chart-3/10">{isRTL ? `مدفوع: ${toAr(paid)}` : `Paid: ${paid}`}</Badge>
+                        {processing > 0 && <Badge variant="outline" className="text-chart-4 border-chart-4/40 bg-chart-4/10">{isRTL ? `قيد المراجعة: ${toAr(processing)}` : `Under Review: ${processing}`}</Badge>}
+                        {pending > 0 && <Badge variant="outline" className="text-chart-5 border-chart-5/40 bg-chart-5/10">{isRTL ? `قيد الانتظار: ${toAr(pending)}` : `Pending: ${pending}`}</Badge>}
+                        {notInvoiced > 0 && <Badge variant="outline" className="text-destructive border-destructive/40 bg-destructive/10">{isRTL ? `بدون فاتورة: ${toAr(notInvoiced)}` : `Not Invoiced: ${notInvoiced}`}</Badge>}
+                        {noStudents > 0 && <Badge variant="outline">{isRTL ? `بدون طلاب: ${toAr(noStudents)}` : `No Students: ${noStudents}`}</Badge>}
                       </>
                     );
                   })()}
@@ -1311,7 +1311,7 @@ export default function Payments() {
                         return (
                           <TableRow key={row.schoolId} data-testid={`row-school-payment-${row.schoolId}`}>
                             <TableCell className="font-medium">{row.schoolName}</TableCell>
-                            <TableCell>{row.studentCount}</TableCell>
+                            <TableCell>{toAr(row.studentCount)}</TableCell>
                             <TableCell className="text-muted-foreground text-sm">{row.invoiceNumber || "—"}</TableCell>
                             <TableCell>{row.totalAmount ? formatCurrency(row.totalAmount) : "—"}</TableCell>
                             <TableCell>
@@ -1372,7 +1372,7 @@ export default function Payments() {
 
                 <div>
                   <p className="text-xs text-muted-foreground">{isRTL ? "إجمالي الطلاب" : "Total Students"}</p>
-                  <p className="font-medium">{selectedInvoice.totalStudents}</p>
+                  <p className="font-medium">{toAr(selectedInvoice.totalStudents)}</p>
                 </div>
 
                 {/* Fee Breakdown per Student */}
@@ -1552,7 +1552,7 @@ export default function Payments() {
               <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
                 <div>
                   <p className="text-xs text-muted-foreground">{isRTL ? "إجمالي الطلاب" : "Total Students"}</p>
-                  <p className="font-medium">{selectedInvoice.totalStudents}</p>
+                  <p className="font-medium">{toAr(selectedInvoice.totalStudents)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">{isRTL ? "المبلغ الإجمالي" : "Total Amount"}</p>
