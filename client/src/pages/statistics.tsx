@@ -1016,13 +1016,7 @@ export default function Statistics() {
             </div>
             <div className="text-center">
               <h1 className="text-white font-bold text-xl md:text-2xl leading-tight">Education Statistics — The Gambia</h1>
-              {summary?.currentYear && (
-                <span className="inline-block mt-1 px-3 py-0.5 rounded-full text-xs font-semibold" style={{ background: GREEN2, color: "white" }}>
-                  {summary.currentYear.name.replace(/^["'\u201C\u201D]+/, "")}
-                </span>
-              )}
             </div>
-            <a href="/login" className="text-white/80 hover:text-white text-sm underline underline-offset-2 flex-shrink-0">Sign In</a>
           </div>
         </div>
         <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, ${RED} 0%, ${RED}00 100%)` }} />
@@ -1300,7 +1294,6 @@ export default function Statistics() {
                 <span className="text-white/90 text-xs">General Secretariat for Islamic &amp; Arabic Education, Republic of The Gambia</span>
               </div>
               <p className="text-white/70 text-xs">Data as of: {new Date(summary.dataAsOf).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</p>
-              <a href="/login" className="text-white/80 hover:text-white text-xs underline underline-offset-2">Sign In for Full Access</a>
             </div>
           )}
 
