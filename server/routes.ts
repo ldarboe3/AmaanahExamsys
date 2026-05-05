@@ -13169,165 +13169,281 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
   // Public statistics query endpoint
   app.get("/api/public/statistics", async (req, res) => {
     try {
-      const category = req.query.category as string || 'students';
-      const groupBy = req.query.groupBy as string || 'region';
-      const regionId = req.query.regionId as string;
+      const category  = (req.query.category  as string) || 'students';
+      const groupBy   = (req.query.groupBy   as string) || 'region';
+      const regionId  = req.query.regionId  as string | undefined;
+      const clusterId = req.query.clusterId as string | undefined;
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      const grade      = req.query.grade ? parseInt(req.query.grade as string) : undefined;
+      const statusFilter = req.query.status as string | undefined;
 
-      interface StatResult {
-        label: string;
-        count: number;
-      }
+      interface StatResult { label: string; count: number; extra?: Record<string, any> }
 
       let results: StatResult[] = [];
       let total = 0;
       let availableInEmis = true;
+      let meta: Record<string, any> = {};
 
-      // Check if this is data that needs to come from EMIS
-      const emisRequiredData = ['ethnicity', 'shift', 'qualification'];
-      if (emisRequiredData.includes(groupBy)) {
-        availableInEmis = false;
-        return res.json({
-          results: [],
-          total: 0,
-          groupBy: groupBy,
-          category: category,
-          availableInEmis: false
-        });
-      }
+      // Load shared reference data
+      const [allRegions, allClusters, allExamYears, allSchools] = await Promise.all([
+        storage.getAllRegions(),
+        storage.getAllClusters(),
+        storage.getAllExamYears(),
+        storage.getAllSchools(),
+      ]);
 
+      const regionMap  = new Map(allRegions.map((r: any) => [r.id, r.name]));
+      const clusterMap = new Map(allClusters.map((c: any) => [c.id, c.name]));
+      const schoolMap  = new Map(allSchools.map((s: any) => [s.id, s]));
+
+      meta.examYears = allExamYears.map((y: any) => ({ id: y.id, name: y.name, status: y.status }));
+      meta.grades = [3, 6, 9, 12];
+
+      // Helper: filter schools by region/cluster
+      const filterSchools = (schools: any[]) => {
+        let s = schools;
+        if (regionId && regionId !== 'all') s = s.filter((sc: any) => sc.regionId === parseInt(regionId));
+        if (clusterId && clusterId !== 'all') s = s.filter((sc: any) => sc.clusterId === parseInt(clusterId));
+        return s;
+      };
+
+      // ── STUDENTS ────────────────────────────────────────────────────────────
       if (category === 'students') {
-        const students = await storage.getAllStudents();
-        const approvedStudents = students.filter(s => s.status === 'approved');
-        total = approvedStudents.length;
+        const allStudents = await storage.getAllStudents();
+        let students = allStudents.filter((s: any) => s.status === 'approved');
+        if (examYearId) students = students.filter((s: any) => s.examYearId === examYearId);
+        if (grade)      students = students.filter((s: any) => s.grade === grade);
+        if (regionId && regionId !== 'all') {
+          const schoolIds = new Set(allSchools.filter((sc: any) => sc.regionId === parseInt(regionId)).map((sc: any) => sc.id));
+          students = students.filter((s: any) => schoolIds.has(s.schoolId));
+        }
+        if (clusterId && clusterId !== 'all') {
+          const schoolIds = new Set(allSchools.filter((sc: any) => sc.clusterId === parseInt(clusterId)).map((sc: any) => sc.id));
+          students = students.filter((s: any) => schoolIds.has(s.schoolId));
+        }
+        total = students.length;
 
         if (groupBy === 'region') {
-          const regions = await storage.getAllRegions();
-          const schools = await storage.getAllSchools();
-          
-          const regionCounts: Record<number, number> = {};
-          approvedStudents.forEach(student => {
-            const school = schools.find(s => s.id === student.schoolId);
-            if (school?.regionId) {
-              regionCounts[school.regionId] = (regionCounts[school.regionId] || 0) + 1;
-            }
+          const counts: Record<number, number> = {};
+          students.forEach((s: any) => {
+            const school = schoolMap.get(s.schoolId);
+            if (school?.regionId) counts[school.regionId] = (counts[school.regionId] || 0) + 1;
           });
+          results = allRegions.map((r: any) => ({ label: r.name, count: counts[r.id] || 0 })).filter(r => r.count > 0);
 
-          results = regions.map(region => ({
-            label: region.name,
-            count: regionCounts[region.id] || 0
-          })).filter(r => r.count > 0);
         } else if (groupBy === 'cluster') {
-          const clusters = await storage.getAllClusters();
-          const schools = await storage.getAllSchools();
-          
-          let filteredClusters = clusters;
-          if (regionId && regionId !== 'all') {
-            filteredClusters = clusters.filter(c => c.regionId === parseInt(regionId));
-          }
-          
-          const clusterCounts: Record<number, number> = {};
-          approvedStudents.forEach(student => {
-            const school = schools.find(s => s.id === student.schoolId);
-            if (school?.clusterId) {
-              clusterCounts[school.clusterId] = (clusterCounts[school.clusterId] || 0) + 1;
-            }
+          let targetClusters = allClusters;
+          if (regionId && regionId !== 'all') targetClusters = targetClusters.filter((c: any) => c.regionId === parseInt(regionId));
+          const counts: Record<number, number> = {};
+          students.forEach((s: any) => {
+            const school = schoolMap.get(s.schoolId);
+            if (school?.clusterId) counts[school.clusterId] = (counts[school.clusterId] || 0) + 1;
           });
+          results = targetClusters.map((c: any) => ({ label: c.name, count: counts[c.id] || 0 })).filter(r => r.count > 0);
 
-          results = filteredClusters.map(cluster => ({
-            label: cluster.name,
-            count: clusterCounts[cluster.id] || 0
-          })).filter(r => r.count > 0);
         } else if (groupBy === 'school') {
-          const schools = await storage.getAllSchools();
-          
-          let filteredSchools = schools;
-          if (regionId && regionId !== 'all') {
-            filteredSchools = schools.filter(s => s.regionId === parseInt(regionId));
-          }
-          
-          const schoolCounts: Record<number, number> = {};
-          approvedStudents.forEach(student => {
-            schoolCounts[student.schoolId] = (schoolCounts[student.schoolId] || 0) + 1;
-          });
-
-          results = filteredSchools
-            .filter(school => schoolCounts[school.id])
-            .map(school => ({
-              label: school.name,
-              count: schoolCounts[school.id] || 0
-            }))
+          let targetSchools = filterSchools(allSchools);
+          const counts: Record<number, number> = {};
+          students.forEach((s: any) => { counts[s.schoolId] = (counts[s.schoolId] || 0) + 1; });
+          results = targetSchools
+            .filter((sc: any) => counts[sc.id])
+            .map((sc: any) => ({ label: sc.name, count: counts[sc.id] || 0 }))
             .sort((a, b) => b.count - a.count)
-            .slice(0, 20);
-        } else if (groupBy === 'gender') {
-          const genderCounts: Record<string, number> = { male: 0, female: 0 };
-          approvedStudents.forEach(student => {
-            if (student.gender) {
-              genderCounts[student.gender] = (genderCounts[student.gender] || 0) + 1;
-            }
-          });
+            .slice(0, 50);
 
+        } else if (groupBy === 'grade') {
+          const counts: Record<number, number> = {};
+          students.forEach((s: any) => { counts[s.grade] = (counts[s.grade] || 0) + 1; });
+          const gradeLabels: Record<number, string> = { 3: 'Grade 3 (LBS)', 6: 'Grade 6 (UBS)', 9: 'Grade 9 (BCS)', 12: 'Grade 12 (SSS)' };
+          results = Object.entries(counts)
+            .map(([g, cnt]) => ({ label: gradeLabels[parseInt(g)] || `Grade ${g}`, count: cnt }))
+            .sort((a, b) => parseInt(Object.keys(counts).find(k => gradeLabels[parseInt(k)] === a.label || `Grade ${k}` === a.label) || '0')
+              - parseInt(Object.keys(counts).find(k => gradeLabels[parseInt(k)] === b.label || `Grade ${k}` === b.label) || '0'));
+
+        } else if (groupBy === 'gender') {
+          const counts: Record<string, number> = { male: 0, female: 0 };
+          students.forEach((s: any) => { if (s.gender) counts[s.gender] = (counts[s.gender] || 0) + 1; });
           results = [
-            { label: 'Male', count: genderCounts.male },
-            { label: 'Female', count: genderCounts.female }
+            { label: 'Male',   count: counts.male   || 0 },
+            { label: 'Female', count: counts.female || 0 },
           ];
+
+        } else if (groupBy === 'examYear') {
+          const counts: Record<number, number> = {};
+          students.forEach((s: any) => { counts[s.examYearId] = (counts[s.examYearId] || 0) + 1; });
+          results = allExamYears.map((y: any) => ({ label: y.name, count: counts[y.id] || 0 })).filter(r => r.count > 0);
+
+        } else if (groupBy === 'status') {
+          const counts: Record<string, number> = {};
+          allStudents.forEach((s: any) => {
+            if (examYearId && s.examYearId !== examYearId) return;
+            counts[s.status] = (counts[s.status] || 0) + 1;
+          });
+          results = Object.entries(counts).map(([label, count]) => ({ label: label.charAt(0).toUpperCase() + label.slice(1), count }));
         }
-      } else if (category === 'teachers') {
-        // Teachers data - will be fetched from EMIS later
-        availableInEmis = false;
-        return res.json({
-          results: [],
-          total: 0,
-          groupBy: groupBy,
-          category: category,
-          availableInEmis: false
-        });
+
+      // ── SCHOOLS ─────────────────────────────────────────────────────────────
       } else if (category === 'schools') {
-        const schools = await storage.getAllSchools();
-        const approvedSchools = schools.filter(s => s.status === 'approved');
-        total = approvedSchools.length;
+        let schools = statusFilter ? allSchools.filter((s: any) => s.status === statusFilter) : allSchools.filter((s: any) => s.status === 'approved');
+        total = schools.length;
 
         if (groupBy === 'region') {
-          const regions = await storage.getAllRegions();
-          
-          const regionCounts: Record<number, number> = {};
-          approvedSchools.forEach(school => {
-            if (school.regionId) {
-              regionCounts[school.regionId] = (regionCounts[school.regionId] || 0) + 1;
-            }
-          });
+          const counts: Record<number, number> = {};
+          schools.forEach((s: any) => { if (s.regionId) counts[s.regionId] = (counts[s.regionId] || 0) + 1; });
+          results = allRegions.map((r: any) => ({ label: r.name, count: counts[r.id] || 0 })).filter(r => r.count > 0);
 
-          results = regions.map(region => ({
-            label: region.name,
-            count: regionCounts[region.id] || 0
-          })).filter(r => r.count > 0);
         } else if (groupBy === 'cluster') {
-          const clusters = await storage.getAllClusters();
-          
-          let filteredClusters = clusters;
-          if (regionId && regionId !== 'all') {
-            filteredClusters = clusters.filter(c => c.regionId === parseInt(regionId));
-          }
-          
-          const clusterCounts: Record<number, number> = {};
-          approvedSchools.forEach(school => {
-            if (school.clusterId) {
-              clusterCounts[school.clusterId] = (clusterCounts[school.clusterId] || 0) + 1;
-            }
-          });
+          let targetClusters = allClusters;
+          if (regionId && regionId !== 'all') targetClusters = targetClusters.filter((c: any) => c.regionId === parseInt(regionId));
+          const counts: Record<number, number> = {};
+          schools.forEach((s: any) => { if (s.clusterId) counts[s.clusterId] = (counts[s.clusterId] || 0) + 1; });
+          results = targetClusters.map((c: any) => ({ label: c.name, count: counts[c.id] || 0 })).filter(r => r.count > 0);
 
-          results = filteredClusters.map(cluster => ({
-            label: cluster.name,
-            count: clusterCounts[cluster.id] || 0
-          })).filter(r => r.count > 0);
+        } else if (groupBy === 'type') {
+          const counts: Record<string, number> = {};
+          schools.forEach((s: any) => {
+            const t = s.schoolType || 'other';
+            counts[t] = (counts[t] || 0) + 1;
+          });
+          const typeLabels: Record<string, string> = { arabic: 'Arabic', franco_arabic: 'Franco-Arabic', mixed: 'Mixed', other: 'Other' };
+          results = Object.entries(counts).map(([t, count]) => ({ label: typeLabels[t] || t, count })).sort((a, b) => b.count - a.count);
+
+        } else if (groupBy === 'status') {
+          total = allSchools.length;
+          const counts: Record<string, number> = {};
+          allSchools.forEach((s: any) => { counts[s.status] = (counts[s.status] || 0) + 1; });
+          results = Object.entries(counts).map(([label, count]) => ({ label: label.charAt(0).toUpperCase() + label.slice(1), count })).sort((a, b) => b.count - a.count);
         }
+
+      // ── RESULTS (pass/fail) ──────────────────────────────────────────────────
+      } else if (category === 'results') {
+        if (!examYearId) {
+          const activeYear = allExamYears.find((y: any) => y.status === 'active') || allExamYears[0];
+          if (!activeYear) return res.json({ results: [], total: 0, groupBy, category, availableInEmis: true, meta });
+          // Redirect with active year
+        }
+
+        const { pool } = await import('./db');
+        const yearFilter = examYearId || (allExamYears.find((y: any) => y.status === 'active') || allExamYears[0])?.id;
+        if (!yearFilter) return res.json({ results: [], total: 0, groupBy, category, availableInEmis: true, meta });
+
+        if (groupBy === 'region') {
+          const qr = await pool.query(`
+            SELECT r.name AS label,
+                   COUNT(DISTINCT sr.student_id) AS total,
+                   COUNT(DISTINCT CASE WHEN sr.total_score::numeric >= 50 THEN sr.student_id END) AS passed
+            FROM student_results sr
+            JOIN students st ON sr.student_id = st.id
+            JOIN schools sc ON st.school_id = sc.id
+            JOIN regions r ON sc.region_id = r.id
+            WHERE sr.exam_year_id = $1 ${grade ? 'AND st.grade = ' + grade : ''}
+            GROUP BY r.id, r.name ORDER BY r.name
+          `, [yearFilter]);
+          results = qr.rows.map((row: any) => ({
+            label: row.label,
+            count: parseInt(row.passed),
+            extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((row.passed / row.total) * 100).toFixed(1) + '%' : '–' }
+          }));
+          total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
+
+        } else if (groupBy === 'cluster') {
+          const qr = await pool.query(`
+            SELECT cl.name AS label,
+                   COUNT(DISTINCT sr.student_id) AS total,
+                   COUNT(DISTINCT CASE WHEN sr.total_score::numeric >= 50 THEN sr.student_id END) AS passed
+            FROM student_results sr
+            JOIN students st ON sr.student_id = st.id
+            JOIN schools sc ON st.school_id = sc.id
+            JOIN clusters cl ON sc.cluster_id = cl.id
+            WHERE sr.exam_year_id = $1 ${grade ? 'AND st.grade = ' + grade : ''}
+              ${regionId && regionId !== 'all' ? 'AND cl.region_id = ' + parseInt(regionId) : ''}
+            GROUP BY cl.id, cl.name ORDER BY cl.name
+          `, [yearFilter]);
+          results = qr.rows.map((row: any) => ({
+            label: row.label,
+            count: parseInt(row.passed),
+            extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((row.passed / row.total) * 100).toFixed(1) + '%' : '–' }
+          }));
+          total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
+
+        } else if (groupBy === 'school') {
+          const qr = await pool.query(`
+            SELECT sc.name AS label,
+                   COUNT(DISTINCT sr.student_id) AS total,
+                   COUNT(DISTINCT CASE WHEN sr.total_score::numeric >= 50 THEN sr.student_id END) AS passed
+            FROM student_results sr
+            JOIN students st ON sr.student_id = st.id
+            JOIN schools sc ON st.school_id = sc.id
+            WHERE sr.exam_year_id = $1 ${grade ? 'AND st.grade = ' + grade : ''}
+              ${regionId && regionId !== 'all' ? 'AND sc.region_id = ' + parseInt(regionId) : ''}
+              ${clusterId && clusterId !== 'all' ? 'AND sc.cluster_id = ' + parseInt(clusterId) : ''}
+            GROUP BY sc.id, sc.name ORDER BY passed DESC LIMIT 50
+          `, [yearFilter]);
+          results = qr.rows.map((row: any) => ({
+            label: row.label,
+            count: parseInt(row.passed),
+            extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((row.passed / row.total) * 100).toFixed(1) + '%' : '–' }
+          }));
+          total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
+
+        } else if (groupBy === 'grade') {
+          const qr = await pool.query(`
+            SELECT st.grade,
+                   COUNT(DISTINCT sr.student_id) AS total,
+                   COUNT(DISTINCT CASE WHEN sr.total_score::numeric >= 50 THEN sr.student_id END) AS passed
+            FROM student_results sr
+            JOIN students st ON sr.student_id = st.id
+            WHERE sr.exam_year_id = $1
+            GROUP BY st.grade ORDER BY st.grade
+          `, [yearFilter]);
+          const gradeLabels: Record<number, string> = { 3: 'Grade 3 (LBS)', 6: 'Grade 6 (UBS)', 9: 'Grade 9 (BCS)', 12: 'Grade 12 (SSS)' };
+          results = qr.rows.map((row: any) => ({
+            label: gradeLabels[row.grade] || `Grade ${row.grade}`,
+            count: parseInt(row.passed),
+            extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((row.passed / row.total) * 100).toFixed(1) + '%' : '–' }
+          }));
+          total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
+        }
+        meta.isResultsMode = true;
+
+      // ── EXAMINERS (staff) ────────────────────────────────────────────────────
+      } else if (category === 'examiners') {
+        const allExaminers = await storage.getAllExaminers();
+        total = allExaminers.length;
+
+        if (groupBy === 'region') {
+          const counts: Record<number, number> = {};
+          allExaminers.forEach((e: any) => {
+            if (e.regionId) counts[e.regionId] = (counts[e.regionId] || 0) + 1;
+          });
+          results = allRegions.map((r: any) => ({ label: r.name, count: counts[r.id] || 0 })).filter(r => r.count > 0);
+
+        } else if (groupBy === 'cluster') {
+          const counts: Record<number, number> = {};
+          allExaminers.forEach((e: any) => {
+            if (e.clusterId) counts[e.clusterId] = (counts[e.clusterId] || 0) + 1;
+          });
+          results = allClusters.map((c: any) => ({ label: c.name, count: counts[c.id] || 0 })).filter(r => r.count > 0);
+
+        } else if (groupBy === 'status') {
+          const counts: Record<string, number> = {};
+          allExaminers.forEach((e: any) => { const s = e.status || 'unknown'; counts[s] = (counts[s] || 0) + 1; });
+          results = Object.entries(counts).map(([label, count]) => ({ label: label.charAt(0).toUpperCase() + label.slice(1), count }));
+        }
+
+      } else {
+        availableInEmis = false;
       }
+
+      results.sort((a, b) => b.count - a.count);
 
       res.json({
         results,
         total,
-        groupBy: `by ${groupBy}`,
-        category: category.charAt(0).toUpperCase() + category.slice(1),
-        availableInEmis
+        groupBy: groupBy,
+        category,
+        availableInEmis,
+        meta,
       });
     } catch (error: any) {
       console.error("Statistics query error:", error);

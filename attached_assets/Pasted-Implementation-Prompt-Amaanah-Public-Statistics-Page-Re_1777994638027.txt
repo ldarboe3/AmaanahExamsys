@@ -1,0 +1,113 @@
+Implementation Prompt: Amaanah Public Statistics Page — Rebuild & Compliance
+Context
+The file artifacts/amaanah-portal/src/pages/public-statistics.tsx (1 145 lines) and artifacts/api-server/src/routes/publicStats.ts contain the existing public statistics page and its backend endpoint. The page works but needs a significant visual upgrade and must be brought into strict compliance with the public/gated data boundary defined below.
+
+The Boundary Rule (enforce this throughout)
+PUBLIC — no login, freely displayed:
+
+Total enrolled students (nationwide) with gender split and GPI
+Total schools registered and active
+Total teaching staff (count + gender ratio)
+Number of regions and clusters covered
+School type breakdown (primary, secondary, madrassa, etc.)
+Overall national QA compliance rate (e.g. "74% compliant")
+% of schools inspected this academic year
+Compliance distribution: Fully / Partially / Non-compliant as percentages and counts — national totals only
+National trend direction: Improving / Stable / Declining — a single word/icon, no per-term data
+Current academic year name
+Disability inclusion aggregate % (no school identifiers)
+GATED — shown as a locked teaser card that leads to the "Request Data Access" modal:
+
+Regional or cluster compliance breakdowns
+School-level QA scores or rankings
+Per-term or per-inspection detail
+Infrastructure data
+Exam results
+Individual teacher/student records
+Attendance data
+The current code violates the boundary in one place: qaCompliance.byRegion is returned by the API and rendered as a public table. This must be moved behind the gated wall.
+
+Backend changes (publicStats.ts)
+Remove qaCompliance.byRegion from the public response — do not return it at all from GET /api/public/statistics. Remove it from the SQL query too.
+
+Add currentAcademicYear to the response: the year whose status = 'active', or if none, the most recently started year. Return { id, name, startDate }.
+
+Add totalClusters to the summary: count of cluster rows in the DB.
+
+Add qaCompliance.trend — a single string: "improving" | "stable" | "declining". Compute it by comparing the average compliance of the two most recent academic years that have finalized inspections. If only one year has data, return "stable". No per-year scores exposed — just the direction string.
+
+Add qaCompliance.inspectedThisYear — count of schools inspected in the current academic year (the year identified in step 2), not all time. Add coveragePctThisYear accordingly.
+
+Frontend redesign (public-statistics.tsx)
+Completely redesign the page visually. Keep all existing logic; replace the layout and styling. Use only React, Recharts, Tailwind, and lucide-react (already installed). Do not add new packages.
+
+Brand colours: GREEN=#006633, GREEN2=#009A44, RED=#CE1126, AMBER=#f59e0b. Use Amaanah logo asset (@assets/Amana_Logo_1775303670728.jpeg).
+
+1. Hero / Header strip
+Full-width dark-green (#006633) banner at the top:
+
+Left: Amaanah logo (small, 36 px tall) + organisation name + tagline "أمانة — A Trust We Uphold"
+Centre: large headline "Education Statistics — The Gambia" with the current academic year name underneath in a green pill badge
+Right: "Sign In" link (route /sign-in) and a "Request Data" button (opens the existing RequestAccessModal)
+Below the banner: a thin red gradient divider (#CE1126 → transparent) matching the letterhead style
+2. National KPI row (6 cards, full width)
+Animated count-up on first visible render (use useEffect + requestAnimationFrame incrementing over ~1 s). Cards:
+
+Icon	Label	Value
+School	Total Schools	totalSchools
+Users	Enrolled Students	totalStudents
+GraduationCap	Teaching Staff	totalTeachers
+MapPin	Regions	totalRegions
+Grid	Clusters	totalClusters
+BarChart2	Student : Teacher	studentTeacherRatio : 1
+Each card: white background, subtle green-left border accent, icon in green circle, bold black number, grey label underneath.
+
+3. Tabs — 4 tabs with pill style
+Replace the existing plain tab bar with a polished pill-style row: Enrolment · Schools · Teachers · Quality Assurance. Active tab: solid green (#006633) white text. Inactive: white with green text, green border.
+
+4. Enrolment tab
+Sub-KPI row: Total enrolled · Male · Female · GPI (Gender Parity Index — shown as a coloured badge: green if ≥ 0.95, amber if 0.80–0.94, red if <0.80)
+Full-width animated horizontal gender bar (existing GenderBar component, make it taller: 12 px, rounded)
+Trend chart: LineChart from Recharts — two lines (male, female) over academic years. X-axis = year name. Y-axis starts at 0. No gridlines on X. Legend bottom-centre. Tooltip shows "Year · Male N · Female N · Total N". Title: "Enrolment Trend by Academic Year".
+Disability inclusion row: a single stat bar showing disabilityInclusionPct% with a friendly label "Students with Disabilities included in mainstream schools"
+5. Schools tab
+Sub-KPI: Total schools
+Two side-by-side charts (stack on mobile):
+Left: PieChart — Schools by Type (use CHART_COLORS array, show legend below)
+Right: BarChart — Schools by Region (horizontal bars, green fill, value label on each bar)
+Below charts: Schools by ownership type as a simple ranked list with progress bars
+6. Teachers tab
+Large gender split card at top: total count, Male N (X%), Female N (X%), with a horizontal GenderBar
+Student-teacher ratio visualised as a simple icon-grid: one teacher icon followed by N student icons (cap at 30 for display, show actual ratio as text)
+Note: "Teacher data is aggregate only. Individual qualifications and assignments are available via data request." with a small lock icon
+7. Quality Assurance tab — redesign carefully per the privacy boundary
+Top section — 3 large stat cards side by side:
+
+National Compliance Rate: big avgCompliancePct% number in colour (green/amber/red per threshold 80/60), label "Network Average"
+Schools Inspected This Year: inspectedThisYear of totalSchools — show as X of Y (Z%), label "Coverage — Current Academic Year"
+Trend Direction: a large directional arrow icon + word "Improving" / "Stable" / "Declining" in appropriate colour, label "Year-on-Year Direction"
+Compliance distribution — a full-width horizontal stacked bar (not a pie) showing three segments: Fully (green), Partially (amber), Non-compliant (red). Each segment labelled with count + %. Below the bar, three matching count cards.
+
+Gated data teaser — a visually distinct locked section below the public data. Use a slightly blurred/greyed overlay effect (CSS filter: blur(4px) on mock content behind a white overlay):
+
+Title: "Regional & School-Level Detail" with a Lock icon
+Mock content behind the blur: a fake table with 3–4 rows of placeholder region names and fake compliance percentages (clearly fake — "Region A", "Region B" etc.)
+Overlay card on top of the blur: green lock icon, heading "Detailed data is available on request", subtext "Regional compliance rankings, school-level QA scores, per-term data, and inspection findings are available to approved researchers, policy bodies, and donors.", green "Request Data Access" button (opens modal)
+8. Footer strip
+Dark green footer:
+
+Left: Amaanah logo + "General Secretariat for Islamic & Arabic Education, Republic of The Gambia"
+Centre: dataAsOf timestamp: "Data last updated: DD Month YYYY"
+Right: Export buttons — "Download PDF" and "Download Excel" (wire to existing exportPDF / exportExcel functions; update exportPDF to remove the byRegion QA table since that data no longer exists in the response)
+Privacy audit checklist (verify before shipping)
+ GET /api/public/statistics returns no qaCompliance.byRegion field
+ No individual school name, score, or ranking appears anywhere on the page without login
+ No region-vs-region compliance comparison is visible on the public page
+ The "trend" shown is only a direction word, not a chart of per-year scores
+ The exportPDF and exportExcel functions do not include any per-region QA data in their output
+ The gated teaser section uses obviously fake data (not real region names or real scores)
+Existing code to preserve unchanged
+RequestAccessModal component (already complete and functional — do not touch)
+POST /api/public/data-request backend route
+exportPDF and exportExcel functions (update only to remove the QA-by-region table)
+All TypeScript types (update PublicStats to remove qaCompliance.byRegion, add currentAcademicYear, totalClusters, qaCompliance.trend, qaCompliance.inspectedThisYear, qaCompliance.coveragePctThisYear)
