@@ -11,6 +11,7 @@ import {
   schoolExamRegistrations,
   staffProfiles, staffIdEvents,
   examCardBatches, integrityFlags, integrityFlagEvents,
+  bulkUploads,
   deviceSyncSessions, syncErrorLogs,
   type User, type UpsertUser, type Region, type InsertRegion,
   type Cluster, type InsertCluster, type ExamYear, type InsertExamYear,
