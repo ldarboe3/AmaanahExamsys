@@ -13441,15 +13441,16 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
 
       // ── RESULTS (pass/fail) ──────────────────────────────────────────────────
       } else if (category === 'results') {
-        if (!examYearId) {
-          const activeYear = allExamYears.find((y: any) => y.status === 'active') || allExamYears[0];
-          if (!activeYear) return res.json({ results: [], total: 0, groupBy, category, availableInEmis: true, meta });
-          // Redirect with active year
-        }
-
         const { pool } = await import('./db');
-        const yearFilter = examYearId || (allExamYears.find((y: any) => y.status === 'active') || allExamYears[0])?.id;
-        if (!yearFilter) return res.json({ results: [], total: 0, groupBy, category, availableInEmis: true, meta });
+
+        // yearFilter: use the explicitly requested year, or null (= all years)
+        const yearFilter: number | null = examYearId ?? null;
+
+        // Build reusable SQL clauses
+        const yearClause   = yearFilter   ? `AND sr.exam_year_id = ${yearFilter}` : '';
+        const gradeClause  = grade        ? `AND st.grade = ${grade}` : '';
+        const regionClause = regionId && regionId !== 'all' ? `AND sc.region_id = ${parseInt(regionId)}` : '';
+        const clusterClause = clusterId && clusterId !== 'all' ? `AND sc.cluster_id = ${parseInt(clusterId)}` : '';
 
         if (groupBy === 'region') {
           const qr = await pool.query(`
@@ -13460,13 +13461,13 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
             JOIN students st ON sr.student_id = st.id
             JOIN schools sc ON st.school_id = sc.id
             JOIN regions r ON sc.region_id = r.id
-            WHERE sr.exam_year_id = $1 ${grade ? 'AND st.grade = ' + grade : ''}
+            WHERE 1=1 ${yearClause} ${gradeClause} ${regionClause}
             GROUP BY r.id, r.name ORDER BY r.name
-          `, [yearFilter]);
+          `);
           results = qr.rows.map((row: any) => ({
             label: row.label,
             count: parseInt(row.passed),
-            extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((row.passed / row.total) * 100).toFixed(1) + '%' : '–' }
+            extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((parseInt(row.passed) / parseInt(row.total)) * 100).toFixed(1) + '%' : '–' }
           }));
           total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
 
@@ -13479,14 +13480,13 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
             JOIN students st ON sr.student_id = st.id
             JOIN schools sc ON st.school_id = sc.id
             JOIN clusters cl ON sc.cluster_id = cl.id
-            WHERE sr.exam_year_id = $1 ${grade ? 'AND st.grade = ' + grade : ''}
-              ${regionId && regionId !== 'all' ? 'AND cl.region_id = ' + parseInt(regionId) : ''}
+            WHERE 1=1 ${yearClause} ${gradeClause} ${regionClause} ${clusterClause}
             GROUP BY cl.id, cl.name ORDER BY cl.name
-          `, [yearFilter]);
+          `);
           results = qr.rows.map((row: any) => ({
             label: row.label,
             count: parseInt(row.passed),
-            extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((row.passed / row.total) * 100).toFixed(1) + '%' : '–' }
+            extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((parseInt(row.passed) / parseInt(row.total)) * 100).toFixed(1) + '%' : '–' }
           }));
           total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
 
@@ -13501,17 +13501,15 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
             JOIN schools sc ON st.school_id = sc.id
             LEFT JOIN regions r ON sc.region_id = r.id
             LEFT JOIN clusters cl ON sc.cluster_id = cl.id
-            WHERE sr.exam_year_id = $1 ${grade ? 'AND st.grade = ' + grade : ''}
-              ${regionId && regionId !== 'all' ? 'AND sc.region_id = ' + parseInt(regionId) : ''}
-              ${clusterId && clusterId !== 'all' ? 'AND sc.cluster_id = ' + parseInt(clusterId) : ''}
+            WHERE 1=1 ${yearClause} ${gradeClause} ${regionClause} ${clusterClause}
             GROUP BY sc.id, sc.name, sc.school_type, r.name, cl.name ORDER BY passed DESC LIMIT 100
-          `, [yearFilter]);
+          `);
           results = qr.rows
             .filter((row: any) => !schoolNameSearch || (row.label || '').toLowerCase().includes(schoolNameSearch))
             .map((row: any) => ({
               label: row.label,
               count: parseInt(row.passed),
-              extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((row.passed / row.total) * 100).toFixed(1) + '%' : '–', region: row.region_name || '', cluster: row.cluster_name || '', schoolType: row.school_type || '' }
+              extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((parseInt(row.passed) / parseInt(row.total)) * 100).toFixed(1) + '%' : '–', region: row.region_name || '', cluster: row.cluster_name || '', schoolType: row.school_type || '' }
             }));
           total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
 
@@ -13522,14 +13520,32 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
                    COUNT(DISTINCT CASE WHEN sr.total_score::numeric >= 50 THEN sr.student_id END) AS passed
             FROM student_results sr
             JOIN students st ON sr.student_id = st.id
-            WHERE sr.exam_year_id = $1
+            WHERE 1=1 ${yearClause} ${gradeClause}
             GROUP BY st.grade ORDER BY st.grade
-          `, [yearFilter]);
+          `);
           const gradeLabels: Record<number, string> = { 3: 'Grade 3 (LBS)', 6: 'Grade 6 (UBS)', 9: 'Grade 9 (BCS)', 12: 'Grade 12 (SSS)' };
           results = qr.rows.map((row: any) => ({
-            label: gradeLabels[row.grade] || `Grade ${row.grade}`,
+            label: gradeLabels[parseInt(row.grade)] || `Grade ${row.grade}`,
             count: parseInt(row.passed),
-            extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((row.passed / row.total) * 100).toFixed(1) + '%' : '–' }
+            extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((parseInt(row.passed) / parseInt(row.total)) * 100).toFixed(1) + '%' : '–' }
+          }));
+          total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
+
+        } else if (groupBy === 'examYear') {
+          const qr = await pool.query(`
+            SELECT ey.id, ey.name AS label,
+                   COUNT(DISTINCT sr.student_id) AS total,
+                   COUNT(DISTINCT CASE WHEN sr.total_score::numeric >= 50 THEN sr.student_id END) AS passed
+            FROM student_results sr
+            JOIN students st ON sr.student_id = st.id
+            JOIN exam_years ey ON sr.exam_year_id = ey.id
+            WHERE 1=1 ${gradeClause}
+            GROUP BY ey.id, ey.name ORDER BY ey.id DESC
+          `);
+          results = qr.rows.map((row: any) => ({
+            label: row.label,
+            count: parseInt(row.passed),
+            extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((parseInt(row.passed) / parseInt(row.total)) * 100).toFixed(1) + '%' : '–' }
           }));
           total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
         }
