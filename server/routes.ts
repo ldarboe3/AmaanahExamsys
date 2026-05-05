@@ -19691,6 +19691,268 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
     }
   });
 
+  // ── GET /api/sync/schools/:id/exam-data ──────────────────────────────────
+  // Full examination data for a single school across all (or a specific) exam year.
+  // Optional query: ?examYearId=1
+  app.get("/api/sync/schools/:id/exam-data", requireSyncKey, async (req, res) => {
+    try {
+      const schoolId = parseInt(req.params.id);
+      if (isNaN(schoolId)) return res.status(400).json({ message: "Invalid school ID" });
+
+      const school = await storage.getSchool(schoolId);
+      if (!school) return res.status(404).json({ message: "School not found" });
+
+      const allExamYears = await storage.getAllExamYears();
+      const allRegions = await storage.getAllRegions();
+      const allClusters = await storage.getAllClusters();
+      const regionMap = new Map(allRegions.map((r: any) => [r.id, r]));
+      const clusterMap = new Map(allClusters.map((c: any) => [c.id, c]));
+
+      const examYearIdFilter = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      const targetYears = examYearIdFilter
+        ? allExamYears.filter((y: any) => y.id === examYearIdFilter)
+        : allExamYears;
+
+      // Fetch all data in parallel
+      const [allStudents, allInvoices, allResults] = await Promise.all([
+        storage.getStudentsBySchool(schoolId),
+        storage.getInvoicesBySchool(schoolId),
+        storage.getResultsBySchool(schoolId),
+      ]);
+
+      // Build per-exam-year breakdown
+      const examYearData = await Promise.all(targetYears.map(async (year: any) => {
+        const yearStudents = allStudents.filter((s: any) => s.examYearId === year.id);
+        const yearInvoices = allInvoices.filter((inv: any) => inv.examYearId === year.id);
+        const yearResults = allResults.filter((r: any) => r.examYearId === year.id);
+        const registration = await storage.getSchoolExamRegistration(schoolId, year.id);
+
+        // Students grouped by grade
+        const studentsByGrade = yearStudents.reduce((acc: any, s: any) => {
+          const g = s.grade;
+          if (!acc[g]) acc[g] = [];
+          acc[g].push({
+            id: s.id,
+            indexNumber: s.indexNumber ?? null,
+            firstName: s.firstName,
+            middleName: s.middleName ?? null,
+            lastName: s.lastName,
+            gender: s.gender,
+            grade: s.grade,
+            status: s.status,
+            dateOfBirth: s.dateOfBirth ?? null,
+            nationality: s.nationality ?? null,
+            createdAt: s.createdAt,
+          });
+          return acc;
+        }, {});
+
+        // Student counts by status
+        const studentStatusCounts = yearStudents.reduce((acc: any, s: any) => {
+          acc[s.status] = (acc[s.status] || 0) + 1;
+          return acc;
+        }, {});
+
+        // Results summary: pass/fail counts, average score
+        const resultsWithScore = yearResults.filter((r: any) => r.totalScore !== null);
+        const passCount = resultsWithScore.filter((r: any) => parseFloat(r.totalScore) >= 50).length;
+        const avgScore = resultsWithScore.length
+          ? (resultsWithScore.reduce((sum: number, r: any) => sum + parseFloat(r.totalScore), 0) / resultsWithScore.length).toFixed(2)
+          : null;
+
+        const resultsBySubject = yearResults.reduce((acc: any, r: any) => {
+          if (!acc[r.subjectId]) acc[r.subjectId] = { subjectId: r.subjectId, count: 0, passed: 0, totalScore: 0 };
+          acc[r.subjectId].count++;
+          if (r.totalScore !== null && parseFloat(r.totalScore) >= 50) acc[r.subjectId].passed++;
+          if (r.totalScore !== null) acc[r.subjectId].totalScore += parseFloat(r.totalScore);
+          return acc;
+        }, {});
+
+        // Invoices summary
+        const invoiceSummary = yearInvoices.map((inv: any) => ({
+          id: inv.id,
+          invoiceNumber: inv.invoiceNumber,
+          invoiceType: inv.invoiceType,
+          totalStudents: inv.totalStudents,
+          totalAmount: inv.totalAmount,
+          paidAmount: inv.paidAmount ?? '0',
+          status: inv.status,
+          paymentDate: inv.paymentDate ?? null,
+          paymentMethod: inv.paymentMethod ?? null,
+          createdAt: inv.createdAt,
+        }));
+
+        const totalInvoiced = yearInvoices.reduce((sum: number, inv: any) => sum + parseFloat(inv.totalAmount ?? '0'), 0);
+        const totalPaid = yearInvoices.reduce((sum: number, inv: any) => sum + parseFloat(inv.paidAmount ?? '0'), 0);
+
+        return {
+          examYear: { id: year.id, name: year.name, status: year.status, isActive: year.isActive },
+          registration: registration ? {
+            stage: registration.stage,
+            studentUploadedAt: registration.studentUploadedAt ?? null,
+            paymentReceiptUploadedAt: registration.paymentReceiptUploadedAt ?? null,
+            paymentApprovedAt: registration.paymentApprovedAt ?? null,
+            createdAt: registration.createdAt,
+            updatedAt: registration.updatedAt,
+          } : null,
+          students: {
+            total: yearStudents.length,
+            byStatus: studentStatusCounts,
+            byGrade: Object.fromEntries(
+              Object.entries(studentsByGrade).map(([g, list]) => [g, { count: (list as any[]).length, students: list }])
+            ),
+          },
+          results: {
+            total: yearResults.length,
+            graded: resultsWithScore.length,
+            passed: passCount,
+            failed: resultsWithScore.length - passCount,
+            averageScore: avgScore,
+            bySubject: Object.values(resultsBySubject),
+          },
+          invoices: {
+            totalInvoiced: totalInvoiced.toFixed(2),
+            totalPaid: totalPaid.toFixed(2),
+            outstanding: (totalInvoiced - totalPaid).toFixed(2),
+            items: invoiceSummary,
+          },
+        };
+      }));
+
+      res.json({
+        school: {
+          id: school.id,
+          name: school.name,
+          nameEn: (school as any).nameEn ?? null,
+          email: school.email,
+          phone: school.phone ?? null,
+          status: school.status,
+          region: school.regionId ? { id: school.regionId, name: (regionMap.get(school.regionId) as any)?.name ?? null } : null,
+          cluster: school.clusterId ? { id: school.clusterId, name: (clusterMap.get(school.clusterId) as any)?.name ?? null } : null,
+        },
+        examYears: examYearData,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── GET /api/sync/exam-data ───────────────────────────────────────────────
+  // Summary examination data for ALL schools in a given exam year.
+  // Required query: ?examYearId=1
+  // Returns one record per school with student counts, registration stage, payment status.
+  app.get("/api/sync/exam-data", requireSyncKey, async (req, res) => {
+    try {
+      const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
+      if (!examYearId) return res.status(400).json({ message: "examYearId query parameter is required" });
+
+      const examYear = await storage.getExamYear(examYearId);
+      if (!examYear) return res.status(404).json({ message: "Exam year not found" });
+
+      const [allSchools, allRegions, allClusters, allRegistrations] = await Promise.all([
+        storage.getAllSchools(),
+        storage.getAllRegions(),
+        storage.getAllClusters(),
+        storage.getSchoolExamRegistrationsByExamYear(examYearId),
+      ]);
+
+      const regionMap = new Map(allRegions.map((r: any) => [r.id, r]));
+      const clusterMap = new Map(allClusters.map((c: any) => [c.id, c]));
+      const regMap = new Map(allRegistrations.map((r: any) => [r.schoolId, r]));
+
+      // Filter: only schools with a registration for this year (or all schools if ?allSchools=1)
+      const includeAll = req.query.allSchools === '1';
+      const targetSchools = includeAll
+        ? allSchools
+        : allSchools.filter((s: any) => regMap.has(s.id));
+
+      // Fetch students for all target schools in one pool query via raw SQL
+      const { pool } = await import('./db');
+      const schoolIds = targetSchools.map((s: any) => s.id);
+
+      if (schoolIds.length === 0) return res.json({ examYear: { id: examYear.id, name: (examYear as any).name }, total: 0, data: [] });
+
+      const studentsResult = await pool.query(
+        `SELECT school_id, grade, status, COUNT(*) AS cnt
+         FROM students
+         WHERE school_id = ANY($1) AND exam_year_id = $2
+         GROUP BY school_id, grade, status`,
+        [schoolIds, examYearId]
+      );
+
+      const invoicesResult = await pool.query(
+        `SELECT school_id, status, SUM(total_amount::numeric) AS invoiced, SUM(paid_amount::numeric) AS paid
+         FROM invoices
+         WHERE school_id = ANY($1) AND exam_year_id = $2
+         GROUP BY school_id, status`,
+        [schoolIds, examYearId]
+      );
+
+      // Build lookup maps
+      type GradeStatus = { grade: number; status: string; count: number };
+      const studentDataBySchool = studentsResult.rows.reduce((acc: any, row: any) => {
+        if (!acc[row.school_id]) acc[row.school_id] = [];
+        acc[row.school_id].push({ grade: row.grade, status: row.status, count: parseInt(row.cnt) });
+        return acc;
+      }, {} as Record<number, GradeStatus[]>);
+
+      const invoiceDataBySchool = invoicesResult.rows.reduce((acc: any, row: any) => {
+        if (!acc[row.school_id]) acc[row.school_id] = { invoiced: 0, paid: 0, byStatus: {} };
+        acc[row.school_id].invoiced += parseFloat(row.invoiced ?? '0');
+        acc[row.school_id].paid += parseFloat(row.paid ?? '0');
+        acc[row.school_id].byStatus[row.status] = (acc[row.school_id].byStatus[row.status] || 0) + 1;
+        return acc;
+      }, {});
+
+      const data = targetSchools.map((s: any) => {
+        const reg = regMap.get(s.id);
+        const students: GradeStatus[] = studentDataBySchool[s.id] || [];
+        const totalStudents = students.reduce((sum: number, r: GradeStatus) => sum + r.count, 0);
+        const approvedStudents = students.filter((r: GradeStatus) => r.status === 'approved').reduce((sum: number, r: GradeStatus) => sum + r.count, 0);
+        const gradeBreakdown = students.reduce((acc: any, r: GradeStatus) => {
+          if (!acc[r.grade]) acc[r.grade] = { total: 0, byStatus: {} };
+          acc[r.grade].total += r.count;
+          acc[r.grade].byStatus[r.status] = (acc[r.grade].byStatus[r.status] || 0) + r.count;
+          return acc;
+        }, {});
+        const inv = invoiceDataBySchool[s.id];
+
+        return {
+          schoolId: s.id,
+          name: s.name,
+          nameEn: (s as any).nameEn ?? null,
+          email: s.email,
+          status: s.status,
+          region: s.regionId ? { id: s.regionId, name: (regionMap.get(s.regionId) as any)?.name ?? null } : null,
+          cluster: s.clusterId ? { id: s.clusterId, name: (clusterMap.get(s.clusterId) as any)?.name ?? null } : null,
+          registration: reg ? {
+            stage: reg.stage,
+            studentUploadedAt: reg.studentUploadedAt ?? null,
+            paymentApprovedAt: reg.paymentApprovedAt ?? null,
+          } : null,
+          students: {
+            total: totalStudents,
+            approved: approvedStudents,
+            byGrade: gradeBreakdown,
+          },
+          payment: inv ? {
+            totalInvoiced: inv.invoiced.toFixed(2),
+            totalPaid: inv.paid.toFixed(2),
+            outstanding: (inv.invoiced - inv.paid).toFixed(2),
+          } : null,
+        };
+      });
+
+      res.json({
+        examYear: { id: examYear.id, name: (examYear as any).name, status: (examYear as any).status },
+        total: data.length,
+        data,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── GET /api/sync/status ──────────────────────────────────────────────────
   // Health check endpoint — confirms API key is valid and returns summary counts.
   app.get("/api/sync/status", requireSyncKey, async (req, res) => {
