@@ -873,79 +873,7 @@ export default function Statistics() {
           ══════════════════════════════════════════════════════════════ */}
           {tab === "qa" && (
             <div className="space-y-4">
-              {/* QA summary cards — always visible */}
-              {qa && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card>
-                    <CardContent className="pt-6 pb-5 text-center">
-                      <p className="text-5xl font-extrabold" style={{ color: complianceColor }}>{qa.avgCompliancePct}%</p>
-                      <p className="text-sm font-semibold mt-2">National Compliance Rate</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Network Average</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-6 pb-5 text-center">
-                      <p className="text-3xl font-extrabold" style={{ color: GREEN }}>
-                        {qa.inspectedThisYear}<span className="text-xl text-muted-foreground mx-1">of</span>{summary?.totalSchools ?? 0}
-                      </p>
-                      <p className="text-sm font-semibold mt-2">Schools with Multi-Grade Programmes</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Coverage {qa.coveragePctThisYear}% — Current Year</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-6 pb-5 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <TrendIcon className="w-9 h-9" style={{ color: trendColor }} />
-                        <p className="text-3xl font-extrabold capitalize" style={{ color: trendColor }}>{qa.trend}</p>
-                      </div>
-                      <p className="text-sm font-semibold mt-2">Year-on-Year Direction</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Trend</p>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* Compliance distribution bar */}
-              {qa && ((() => {
-                const t = qa.fullyCompliant + qa.partiallyCompliant + qa.nonCompliant;
-                if (!t) return null;
-                return (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Activity className="w-4 h-4" style={{ color: GREEN }} /> Compliance Distribution
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="w-full h-7 rounded-full overflow-hidden flex">
-                        <div style={{ width: `${(qa.fullyCompliant / t) * 100}%`, background: GREEN }} className="flex items-center justify-center text-white text-xs font-semibold">
-                          {Math.round((qa.fullyCompliant / t) * 100)}%
-                        </div>
-                        <div style={{ width: `${(qa.partiallyCompliant / t) * 100}%`, background: AMBER }} className="flex items-center justify-center text-white text-xs font-semibold">
-                          {Math.round((qa.partiallyCompliant / t) * 100)}%
-                        </div>
-                        <div style={{ width: `${(qa.nonCompliant / t) * 100}%`, background: RED }} className="flex items-center justify-center text-white text-xs font-semibold">
-                          {Math.round((qa.nonCompliant / t) * 100)}%
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        {[
-                          { label: "Fully Compliant",     count: qa.fullyCompliant,     color: GREEN },
-                          { label: "Partially Compliant", count: qa.partiallyCompliant, color: AMBER },
-                          { label: "Non-Compliant",        count: qa.nonCompliant,       color: RED },
-                        ].map(({ label, count, color }) => (
-                          <div key={label} className="p-3 rounded-md border text-center" style={{ borderColor: `${color}40` }}>
-                            <p className="text-2xl font-bold" style={{ color }}>{count.toLocaleString()}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })())}
-
-              {/* Query filter for school distribution by region/cluster/type */}
+              {/* Filter bar — always shown first */}
               <FilterBar
                 f={qaF}
                 onChange={patch => { setQaF(prev => ({ ...prev, ...patch })); setQaUrl(null); }}
@@ -957,13 +885,89 @@ export default function Statistics() {
                 groupOptions={GROUP_OPTIONS["qa"]}
               />
 
+              {/* Results only appear after Run Query */}
               {qaLoading ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <Loader2 className="w-8 h-8 animate-spin" style={{ color: GREEN }} />
                   <p className="text-sm text-muted-foreground">Running query…</p>
                 </div>
               ) : qaStats ? (
-                <ResultsPanel stats={qaStats} tabLabel="Quality Assurance" f={{ ...qaF, category: "schools" }} regions={regions} clusters={clusters} examYears={examYears} />
+                <div className="space-y-4">
+                  {/* QA summary cards */}
+                  {qa && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Card>
+                        <CardContent className="pt-6 pb-5 text-center">
+                          <p className="text-5xl font-extrabold" style={{ color: complianceColor }}>{qa.avgCompliancePct}%</p>
+                          <p className="text-sm font-semibold mt-2">National Compliance Rate</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Network Average</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6 pb-5 text-center">
+                          <p className="text-3xl font-extrabold" style={{ color: GREEN }}>
+                            {qa.inspectedThisYear}<span className="text-xl text-muted-foreground mx-1">of</span>{summary?.totalSchools ?? 0}
+                          </p>
+                          <p className="text-sm font-semibold mt-2">Schools with Multi-Grade Programmes</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Coverage {qa.coveragePctThisYear}% — Current Year</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6 pb-5 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <TrendIcon className="w-9 h-9" style={{ color: trendColor }} />
+                            <p className="text-3xl font-extrabold capitalize" style={{ color: trendColor }}>{qa.trend}</p>
+                          </div>
+                          <p className="text-sm font-semibold mt-2">Year-on-Year Direction</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Trend</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* Compliance distribution bar */}
+                  {qa && (() => {
+                    const t = qa.fullyCompliant + qa.partiallyCompliant + qa.nonCompliant;
+                    if (!t) return null;
+                    return (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <Activity className="w-4 h-4" style={{ color: GREEN }} /> Compliance Distribution
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="w-full h-7 rounded-full overflow-hidden flex">
+                            <div style={{ width: `${(qa.fullyCompliant / t) * 100}%`, background: GREEN }} className="flex items-center justify-center text-white text-xs font-semibold">
+                              {Math.round((qa.fullyCompliant / t) * 100)}%
+                            </div>
+                            <div style={{ width: `${(qa.partiallyCompliant / t) * 100}%`, background: AMBER }} className="flex items-center justify-center text-white text-xs font-semibold">
+                              {Math.round((qa.partiallyCompliant / t) * 100)}%
+                            </div>
+                            <div style={{ width: `${(qa.nonCompliant / t) * 100}%`, background: RED }} className="flex items-center justify-center text-white text-xs font-semibold">
+                              {Math.round((qa.nonCompliant / t) * 100)}%
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3">
+                            {[
+                              { label: "Fully Compliant",     count: qa.fullyCompliant,     color: GREEN },
+                              { label: "Partially Compliant", count: qa.partiallyCompliant, color: AMBER },
+                              { label: "Non-Compliant",        count: qa.nonCompliant,       color: RED },
+                            ].map(({ label, count, color }) => (
+                              <div key={label} className="p-3 rounded-md border text-center" style={{ borderColor: `${color}40` }}>
+                                <p className="text-2xl font-bold" style={{ color }}>{count.toLocaleString()}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
+
+                  {/* School distribution table */}
+                  <ResultsPanel stats={qaStats} tabLabel="Quality Assurance" f={{ ...qaF, category: "schools" }} regions={regions} clusters={clusters} examYears={examYears} />
+                </div>
               ) : (
                 <Card className="border-dashed">
                   <CardContent className="py-12 text-center space-y-3">
