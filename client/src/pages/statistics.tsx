@@ -220,57 +220,309 @@ function exportCSV(
   a.click(); URL.revokeObjectURL(a.href);
 }
 
-function exportPDF(
+async function exportPDF(
   results: StatResult[], total: number, category: StatCategory,
   groupBy: GroupBy, isRes: boolean,
-  meta: { year?: string; region?: string; cluster?: string; grade?: string; school?: string; tabLabel: string }
+  meta: { year?: string; region?: string; cluster?: string; grade?: string; school?: string; tabLabel: string },
+  summary?: NationalSummary,
+  qa?: NationalSummary["qaCompliance"],
+  queryMeta?: { totalExamined: number; totalPassed: number; overallPassRate: string | null }
 ) {
   if (!results.length) return;
   const bySchool = groupBy === "school";
-  const doc = new jsPDF({ orientation: bySchool ? "landscape" : "portrait" });
+  const doc = new jsPDF({ orientation: bySchool ? "landscape" : "portrait", unit: "mm", format: "a4" });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
 
-  // Header
-  doc.setFillColor(0, 102, 51);
-  doc.rect(0, 0, doc.internal.pageSize.width, 22, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.text("Amaanah Education Statistics", 14, 10);
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text(`${meta.tabLabel} — ${CAT_LABELS[category]}`, 14, 17);
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const rgb = (hex: string): [number, number, number] => [
+    parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16),
+  ];
+  const fill   = (hex: string) => { const [r,g,b] = rgb(hex); doc.setFillColor(r,g,b); };
+  const stroke = (hex: string) => { const [r,g,b] = rgb(hex); doc.setDrawColor(r,g,b); };
+  const tColor = (hex: string) => { const [r,g,b] = rgb(hex); doc.setTextColor(r,g,b); };
 
-  // Meta info
-  doc.setTextColor(50, 50, 50);
-  doc.setFontSize(8);
-  let metaY = 28;
-  const metaItems: string[] = [];
-  if (meta.year)    metaItems.push(`Academic Year: ${meta.year}`);
-  if (meta.region)  metaItems.push(`Region: ${meta.region}`);
-  if (meta.cluster) metaItems.push(`Cluster: ${meta.cluster}`);
-  if (meta.grade)   metaItems.push(`Grade: ${meta.grade}`);
-  if (meta.school)  metaItems.push(`School Search: "${meta.school}"`);
-  metaItems.push(`Total: ${total.toLocaleString()}`);
-  metaItems.push(`Generated: ${new Date().toLocaleString()}`);
-  if (metaItems.length) {
-    doc.text(metaItems.join("   |   "), 14, metaY);
-    metaY += 6;
+  // Load logo
+  let logoB64: string | null = null;
+  try {
+    const resp = await fetch(logoPath);
+    const blob = await resp.blob();
+    logoB64 = await new Promise<string>((res, rej) => {
+      const reader = new FileReader();
+      reader.onloadend = () => res(reader.result as string);
+      reader.onerror = rej;
+      reader.readAsDataURL(blob);
+    });
+  } catch { /* skip logo if fails */ }
+
+  // ── Footer renderer ────────────────────────────────────────────────────────
+  const drawFooter = (page: number, total: number) => {
+    fill(GREEN); doc.rect(0, H - 9, W, 9, "F");
+    doc.setTextColor(255, 255, 255); doc.setFontSize(6.5); doc.setFont("helvetica", "normal");
+    doc.text("General Secretariat for Islamic & Arabic Education — Republic of The Gambia", 12, H - 3.5);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, W / 2, H - 3.5, { align: "center" });
+    doc.text(`Page ${page} of ${total}`, W - 12, H - 3.5, { align: "right" });
+  };
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 1. HEADER
+  // ══════════════════════════════════════════════════════════════════════════
+  fill(GREEN); doc.rect(0, 0, W, 30, "F");
+
+  if (logoB64) {
+    try { doc.addImage(logoB64, "JPEG", 10, 5, 18, 18); } catch { /* skip */ }
   }
+  const logoOffset = logoB64 ? 32 : 12;
+
+  // Org name (left)
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13); doc.setFont("helvetica", "bold");
+  doc.text("AMAANAH", logoOffset, 12);
+  doc.setFontSize(7.5); doc.setFont("helvetica", "normal");
+  doc.text("General Secretariat for Islamic & Arabic Education", logoOffset, 18);
+  doc.text("Republic of The Gambia", logoOffset, 23);
+
+  // Report title (right)
+  doc.setFontSize(11); doc.setFont("helvetica", "bold");
+  doc.text("EDUCATION STATISTICS REPORT", W - 12, 11, { align: "right" });
+  doc.setFontSize(8); doc.setFont("helvetica", "normal");
+  doc.text(meta.tabLabel + " — " + CAT_LABELS[category], W - 12, 18, { align: "right" });
+  doc.text(new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }), W - 12, 25, { align: "right" });
+
+  // Red accent line
+  fill(RED); doc.rect(0, 30, W, 2, "F");
+
+  let curY = 36;
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 2. FILTER SUMMARY BAND
+  // ══════════════════════════════════════════════════════════════════════════
+  const breakdownLabel = GROUP_OPTIONS[category]?.find(g => g.value === groupBy)?.label ?? groupBy;
+  const filters: string[] = [];
+  if (meta.year)    filters.push(`Academic Year: ${meta.year}`);
+  if (meta.region)  filters.push(`Region: ${meta.region}`);
+  if (meta.cluster) filters.push(`Cluster: ${meta.cluster}`);
+  if (meta.grade)   filters.push(`Grade: ${meta.grade}`);
+  if (meta.school)  filters.push(`School: "${meta.school}"`);
+  const filterText = filters.length ? filters.join("   •   ") : "All data — no filters applied";
+
+  doc.setFillColor(245, 252, 247); doc.rect(0, curY - 2, W, 16, "F");
+  fill(GREEN); doc.rect(0, curY - 2, 3, 16, "F"); // green left bar
+  doc.setFontSize(7); doc.setFont("helvetica", "bold"); tColor(GREEN);
+  doc.text("QUERY FILTERS", 12, curY + 3);
+  doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(40, 40, 40);
+  doc.text(`Breakdown: ${breakdownLabel}`, 12, curY + 8.5);
+  doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80);
+  doc.text(filterText, 12, curY + 13);
+  curY += 20;
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 3. NATIONAL OVERVIEW KPI STRIP
+  // ══════════════════════════════════════════════════════════════════════════
+  if (summary) {
+    doc.setFontSize(8); doc.setFont("helvetica", "bold"); tColor(GREEN);
+    doc.text("NATIONAL OVERVIEW", 12, curY);
+    stroke(GREEN); doc.setLineWidth(0.3);
+    doc.line(12, curY + 1.5, W - 12, curY + 1.5);
+    curY += 5;
+
+    const kpis = [
+      { label: "Schools",         value: summary.totalSchools.toLocaleString() },
+      { label: "Students",        value: summary.totalStudents.toLocaleString() },
+      { label: "Teaching Staff",  value: summary.totalExaminers.toLocaleString() },
+      { label: "Regions",         value: summary.totalRegions.toLocaleString() },
+      { label: "Clusters",        value: summary.totalClusters.toLocaleString() },
+      { label: "Student:Teacher", value: `1:${summary.studentTeacherRatio.toLocaleString()}` },
+    ];
+    const bW = (W - 24) / 6;
+    const bH = 17;
+    kpis.forEach((kpi, i) => {
+      const bx = 12 + i * bW; const by = curY;
+      doc.setFillColor(248, 253, 249); stroke("#c8e6d0"); doc.setLineWidth(0.3);
+      doc.roundedRect(bx, by, bW - 2, bH, 1.5, 1.5, "FD");
+      fill(GREEN); doc.roundedRect(bx, by, 2.5, bH, 0.5, 0.5, "F");
+      tColor(GREEN); doc.setFontSize(11); doc.setFont("helvetica", "bold");
+      doc.text(kpi.value, bx + bW / 2, by + 9.5, { align: "center" });
+      doc.setTextColor(90, 90, 90); doc.setFontSize(6); doc.setFont("helvetica", "normal");
+      doc.text(kpi.label, bx + bW / 2, by + 14.5, { align: "center" });
+    });
+    curY += bH + 5;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 4. QUERY RESULTS SUMMARY STRIP
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    const tEx = queryMeta?.totalExamined ?? (isRes ? results.reduce((s, r) => s + (r.extra?.total ?? 0), 0) : total);
+    const tPa = queryMeta?.totalPassed   ?? (isRes ? results.reduce((s, r) => s + r.count, 0) : 0);
+    const maxV = results.length ? Math.max(...results.map(r => isRes ? (r.extra?.total ?? r.count) : r.count)) : 0;
+    const opr  = queryMeta?.overallPassRate ?? (isRes && tEx > 0 ? ((tPa / tEx) * 100).toFixed(1) + "%" : null);
+    const oprColor = opr ? (parseFloat(opr) >= 75 ? GREEN : parseFloat(opr) >= 50 ? AMBER : RED) : GREEN;
+
+    doc.setFontSize(8); doc.setFont("helvetica", "bold"); tColor(GREEN);
+    doc.text("QUERY RESULTS SUMMARY", 12, curY);
+    stroke(GREEN); doc.setLineWidth(0.3); doc.line(12, curY + 1.5, W - 12, curY + 1.5);
+    curY += 5;
+
+    const cards = [
+      { label: isRes ? "Total Examined" : "Grand Total", value: (isRes ? tEx : total).toLocaleString(), color: GREEN },
+      { label: "Breakdown Rows",                          value: results.length.toString(),              color: GREEN },
+      { label: isRes ? "Total Passed" : "Highest Count",  value: (isRes ? tPa : maxV).toLocaleString(), color: GREEN },
+      { label: isRes ? "Overall Pass Rate" : "Avg / Row", value: opr ?? (results.length > 0 ? Math.round(total / results.length).toLocaleString() : "–"), color: oprColor },
+    ];
+    const cW = (W - 24) / 4; const cH = 17;
+    cards.forEach((card, i) => {
+      const bx = 12 + i * cW; const by = curY;
+      doc.setFillColor(248, 253, 249); stroke("#c8e6d0"); doc.setLineWidth(0.3);
+      doc.roundedRect(bx, by, cW - 2, cH, 1.5, 1.5, "FD");
+      const [cr, cg, cb] = rgb(card.color); doc.setTextColor(cr, cg, cb);
+      doc.setFontSize(13); doc.setFont("helvetica", "bold");
+      doc.text(card.value, bx + cW / 2, by + 9.5, { align: "center" });
+      doc.setTextColor(90, 90, 90); doc.setFontSize(6.5); doc.setFont("helvetica", "normal");
+      doc.text(card.label, bx + cW / 2, by + 14.5, { align: "center" });
+    });
+    curY += cH + 5;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 5. QA COMPLIANCE SECTION (Quality Assurance tab only)
+  // ══════════════════════════════════════════════════════════════════════════
+  if (qa && meta.tabLabel === "Quality Assurance") {
+    doc.setFontSize(8); doc.setFont("helvetica", "bold"); tColor(GREEN);
+    doc.text("QUALITY ASSURANCE METRICS", 12, curY);
+    stroke(GREEN); doc.setLineWidth(0.3); doc.line(12, curY + 1.5, W - 12, curY + 1.5);
+    curY += 5;
+
+    const compColor = qa.avgCompliancePct >= 80 ? GREEN : qa.avgCompliancePct >= 60 ? AMBER : RED;
+    const trendColor2 = qa.trend === "improving" ? GREEN : qa.trend === "declining" ? RED : AMBER;
+    const qaW = (W - 24) / 3; const qaH = 22;
+
+    [[qa.avgCompliancePct + "%", "National Compliance Rate", "Network Average", compColor],
+     [`${qa.inspectedThisYear} / ${summary?.totalSchools ?? 0}`, "Schools Inspected", `${qa.coveragePctThisYear}% coverage this year`, GREEN],
+     [qa.trend.toUpperCase(), "Year-on-Year Trend", "Quality Direction", trendColor2],
+    ].forEach(([val, title, sub, color], i) => {
+      const bx = 12 + i * qaW; const by = curY;
+      doc.setFillColor(248, 253, 249); stroke("#c8e6d0"); doc.setLineWidth(0.3);
+      doc.roundedRect(bx, by, qaW - 2, qaH, 1.5, 1.5, "FD");
+      const [cr, cg, cb] = rgb(color as string); doc.setTextColor(cr, cg, cb);
+      doc.setFontSize(i === 0 ? 16 : 13); doc.setFont("helvetica", "bold");
+      doc.text(val as string, bx + qaW / 2, by + 12, { align: "center" });
+      doc.setTextColor(50, 50, 50); doc.setFontSize(7); doc.setFont("helvetica", "bold");
+      doc.text(title as string, bx + qaW / 2, by + 17, { align: "center" });
+      doc.setTextColor(100, 100, 100); doc.setFontSize(6); doc.setFont("helvetica", "normal");
+      doc.text(sub as string, bx + qaW / 2, by + 21, { align: "center" });
+    });
+    curY += qaH + 4;
+
+    // Compliance distribution bar
+    const t = qa.fullyCompliant + qa.partiallyCompliant + qa.nonCompliant;
+    if (t > 0) {
+      const barW = W - 24; const barH = 8; const bX = 12;
+      const fc = (qa.fullyCompliant / t) * barW;
+      const pc = (qa.partiallyCompliant / t) * barW;
+      const nc = barW - fc - pc;
+      fill(GREEN);  doc.rect(bX,          curY, fc, barH, "F");
+      fill(AMBER);  doc.rect(bX + fc,     curY, pc, barH, "F");
+      fill(RED);    doc.rect(bX + fc + pc, curY, nc, barH, "F");
+      doc.setTextColor(255, 255, 255); doc.setFontSize(7); doc.setFont("helvetica", "bold");
+      if (fc > 12) doc.text(`${Math.round((qa.fullyCompliant / t) * 100)}%`,       bX + fc / 2,          curY + 5.5, { align: "center" });
+      if (pc > 12) doc.text(`${Math.round((qa.partiallyCompliant / t) * 100)}%`,   bX + fc + pc / 2,     curY + 5.5, { align: "center" });
+      if (nc > 12) doc.text(`${Math.round((qa.nonCompliant / t) * 100)}%`,         bX + fc + pc + nc / 2, curY + 5.5, { align: "center" });
+      curY += barH + 3;
+
+      const legW = (W - 24) / 3;
+      [{ label: `Fully Compliant: ${qa.fullyCompliant.toLocaleString()}`, color: GREEN },
+       { label: `Partially Compliant: ${qa.partiallyCompliant.toLocaleString()}`, color: AMBER },
+       { label: `Non-Compliant: ${qa.nonCompliant.toLocaleString()}`, color: RED },
+      ].forEach((l, i) => {
+        fill(l.color); doc.rect(12 + i * legW, curY, 4, 3, "F");
+        doc.setTextColor(60, 60, 60); doc.setFontSize(6.5); doc.setFont("helvetica", "normal");
+        doc.text(l.label, 12 + i * legW + 6, curY + 2.5);
+      });
+      curY += 8;
+    }
+    curY += 3;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 6. HORIZONTAL BAR CHART (≤20 rows, not by school)
+  // ══════════════════════════════════════════════════════════════════════════
+  if (!bySchool && results.length <= 20) {
+    doc.setFontSize(8); doc.setFont("helvetica", "bold"); tColor(GREEN);
+    doc.text("DISTRIBUTION CHART", 12, curY);
+    stroke(GREEN); doc.setLineWidth(0.3); doc.line(12, curY + 1.5, W - 12, curY + 1.5);
+    curY += 5;
+
+    const chartColors = [GREEN, GREEN2, AMBER, "#3B82F6", "#8B5CF6", RED, "#06B6D4", "#F97316"];
+    const maxVal = Math.max(...results.map(r => isRes ? (r.extra?.total ?? r.count) : r.count), 1);
+    const rowH = 5.5; const gap = 1.5;
+    const labelW = 48; const valueW = 22;
+    const chartW = W - 24 - labelW - valueW;
+
+    results.forEach((r, i) => {
+      const val = isRes ? (r.extra?.total ?? r.count) : r.count;
+      const barW = (val / maxVal) * chartW;
+      const rowY = curY + i * (rowH + gap);
+      const [cr, cg, cb] = rgb(chartColors[i % chartColors.length]);
+
+      // Label
+      doc.setFontSize(6.5); doc.setFont("helvetica", "normal"); doc.setTextColor(50, 50, 50);
+      const label = r.label.length > 22 ? r.label.slice(0, 21) + "…" : r.label;
+      doc.text(label, 12 + labelW - 2, rowY + rowH - 1, { align: "right" });
+
+      // Background track
+      doc.setFillColor(238, 245, 240);
+      doc.roundedRect(12 + labelW, rowY, chartW, rowH, 0.5, 0.5, "F");
+
+      // Bar fill
+      doc.setFillColor(cr, cg, cb);
+      if (barW > 0.5) doc.roundedRect(12 + labelW, rowY, barW, rowH, 0.5, 0.5, "F");
+
+      // Value text
+      doc.setTextColor(50, 50, 50); doc.setFontSize(6);
+      doc.text(val.toLocaleString(), 12 + labelW + chartW + 2, rowY + rowH - 1);
+
+      // Pass rate for results mode
+      if (isRes && r.extra?.passRate) {
+        const pr = r.extra.passRate as string;
+        const prColor = parseFloat(pr) >= 75 ? GREEN : parseFloat(pr) >= 50 ? AMBER : RED;
+        tColor(prColor); doc.setFontSize(5.5); doc.setFont("helvetica", "bold");
+        doc.text(pr, 12 + labelW + chartW + valueW - 1, rowY + rowH - 1, { align: "right" });
+      }
+    });
+    curY += results.length * (rowH + gap) + 7;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 7. DATA TABLE
+  // ══════════════════════════════════════════════════════════════════════════
+  doc.setFontSize(8); doc.setFont("helvetica", "bold"); tColor(GREEN);
+  doc.text("DETAILED DATA TABLE", 12, curY);
+  stroke(GREEN); doc.setLineWidth(0.3); doc.line(12, curY + 1.5, W - 12, curY + 1.5);
+  curY += 5;
 
   const headers = getHeaders(isRes, bySchool);
   const rows = buildRows(results, total, isRes, bySchool);
 
   autoTable(doc, {
-    startY: metaY + 2,
+    startY: curY,
     head: [headers],
     body: rows.map(r => r.map(String)),
-    styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: { fillColor: [0, 102, 51], textColor: 255, fontStyle: "bold" },
-    alternateRowStyles: { fillColor: [245, 250, 245] },
-    columnStyles: { 0: { cellWidth: 8 } },
+    styles: { fontSize: 7.5, cellPadding: 2.8, textColor: [40, 40, 40] },
+    headStyles: { fillColor: rgb(GREEN), textColor: 255, fontStyle: "bold", fontSize: 8 },
+    alternateRowStyles: { fillColor: [245, 251, 247] },
+    columnStyles: { 0: { cellWidth: 9, halign: "center", textColor: [140, 140, 140] } },
+    margin: { left: 12, right: 12, bottom: 14 },
+    didDrawPage: () => { /* footer added after */ },
   });
 
-  doc.save(`amaanah-${category}-${groupBy}-${new Date().toISOString().slice(0, 10)}.pdf`);
+  // ══════════════════════════════════════════════════════════════════════════
+  // Add footers to all pages
+  // ══════════════════════════════════════════════════════════════════════════
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) { doc.setPage(p); drawFooter(p, totalPages); }
+
+  doc.save(`amaanah-${meta.tabLabel.replace(/\s+/g, "-").toLowerCase()}-${groupBy}-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 // ── Query Filter Bar component ────────────────────────────────────────────────
@@ -456,9 +708,11 @@ interface ResultsPanelProps {
   regions: Region[];
   clusters: Cluster[];
   examYears: { id: number; name: string; isActive: boolean }[];
+  summary?: NationalSummary;
+  qa?: NationalSummary["qaCompliance"];
 }
 
-function ResultsPanel({ stats, tabLabel, f, regions, clusters, examYears }: ResultsPanelProps) {
+function ResultsPanel({ stats, tabLabel, f, regions, clusters, examYears, summary, qa }: ResultsPanelProps) {
   const isRes = !!stats.meta?.isResultsMode;
   const bySchool = f.groupBy === "school";
   const results = stats.results ?? [];
@@ -561,7 +815,7 @@ function ResultsPanel({ stats, tabLabel, f, regions, clusters, examYears }: Resu
               </Button>
               <Button
                 variant="outline" size="sm"
-                onClick={() => exportPDF(results, total, f.category, f.groupBy, isRes, meta)}
+                onClick={() => exportPDF(results, total, f.category, f.groupBy, isRes, meta, summary, qa, { totalExamined, totalPassed, overallPassRate })}
                 data-testid="button-export-pdf"
                 style={{ borderColor: RED, color: RED }}
               >
@@ -858,7 +1112,7 @@ export default function Statistics() {
                       <KpiCard icon={BarChart2}     label="Student:Teacher" value={summary.studentTeacherRatio} sub="ratio" />
                     </div>
                   )}
-                  <ResultsPanel stats={enrolStats} tabLabel="Enrolment & Schools" f={{ ...enrolF, category: enrolCat }} regions={regions} clusters={clusters} examYears={examYears} />
+                  <ResultsPanel stats={enrolStats} tabLabel="Enrolment & Schools" f={{ ...enrolF, category: enrolCat }} regions={regions} clusters={clusters} examYears={examYears} summary={summary} />
                 </div>
               ) : (
                 <EmptyState label="enrolment and schools" />
@@ -975,7 +1229,7 @@ export default function Statistics() {
                   })()}
 
                   {/* School distribution table */}
-                  <ResultsPanel stats={qaStats} tabLabel="Quality Assurance" f={{ ...qaF, category: "schools" }} regions={regions} clusters={clusters} examYears={examYears} />
+                  <ResultsPanel stats={qaStats} tabLabel="Quality Assurance" f={{ ...qaF, category: "schools" }} regions={regions} clusters={clusters} examYears={examYears} summary={summary} qa={qa} />
                 </div>
               ) : (
                 <Card className="border-dashed">
@@ -1028,7 +1282,7 @@ export default function Statistics() {
                       <KpiCard icon={BarChart2}     label="Student:Teacher" value={summary.studentTeacherRatio} sub="ratio" />
                     </div>
                   )}
-                  <ResultsPanel stats={examStats} tabLabel="Examination" f={{ ...examF, category: "results" }} regions={regions} clusters={clusters} examYears={examYears} />
+                  <ResultsPanel stats={examStats} tabLabel="Examination" f={{ ...examF, category: "results" }} regions={regions} clusters={clusters} examYears={examYears} summary={summary} />
                 </div>
               ) : (
                 <EmptyState label="examination results" />
