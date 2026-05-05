@@ -99,16 +99,13 @@ export function PublicHeader() {
           <div className="flex items-center gap-3">
             <LanguageToggle />
             <span className="text-white/30">|</span>
-            <a
-              href="https://edu-authority-design.replit.app/amaanah-portal/sign-in"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-white/70 hover:text-white transition-colors"
+            <span
+              className="flex items-center gap-1 text-white/70 cursor-default"
               data-testid="topbar-new-portal"
             >
               <ExternalLink className="w-3 h-3" />
               Monitoring & QA Portal
-            </a>
+            </span>
             <span className="text-white/30">|</span>
             <Link href="/login">
               <span className="flex items-center gap-1 text-amber-400 font-semibold hover:text-amber-300 transition-colors cursor-pointer" data-testid="topbar-portal-login">
