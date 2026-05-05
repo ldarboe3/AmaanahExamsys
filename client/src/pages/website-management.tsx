@@ -586,8 +586,8 @@ function ResourcesTab() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-semibold">Resources</h3>
-          <p className="text-sm text-muted-foreground">Manage downloadable resources for schools and students</p>
+          <h3 className="text-lg font-semibold">Publications</h3>
+          <p className="text-sm text-muted-foreground">Manage publications and downloadable materials for the public centre</p>
         </div>
         <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} data-testid="button-add-resource">
           <Plus className="h-4 w-4 mr-2" />
@@ -1753,7 +1753,7 @@ export default function WebsiteManagement() {
               </TabsTrigger>
               <TabsTrigger value="resources" className="gap-2" data-testid="tab-resources">
                 <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline">Resources</span>
+                <span className="hidden sm:inline">Publications</span>
               </TabsTrigger>
               <TabsTrigger value="announcements" className="gap-2" data-testid="tab-announcements">
                 <Bell className="h-4 w-4" />

@@ -13138,9 +13138,21 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       if (!resource || !resource.isPublished) {
         return res.status(404).json({ message: "Resource not found" });
       }
-      // Increment download count
       await storage.incrementResourceDownloadCount(resource.id);
-      res.json({ fileUrl: resource.fileUrl });
+      if (!resource.fileUrl) {
+        return res.status(404).json({ message: "File not available" });
+      }
+      const filename = resource.title
+        ? `${resource.title}.${resource.fileType?.toLowerCase() || 'pdf'}`
+        : undefined;
+      const qs = filename ? `?filename=${encodeURIComponent(filename)}` : '';
+      if (resource.fileUrl.startsWith('/objects/')) {
+        return res.redirect(`${resource.fileUrl}${qs}`);
+      }
+      if (resource.fileUrl.startsWith('http')) {
+        return res.redirect(resource.fileUrl);
+      }
+      return res.redirect(`/objects${resource.fileUrl}${qs}`);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -13976,44 +13988,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
     }
   });
 
-  // Public Resources API
-  app.get("/api/public/resources", async (_req, res) => {
-    try {
-      const resources = await storage.getPublishedResources();
-      const categories = await storage.getAllResourceCategories();
-      res.json({ resources, categories });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Public resource download - increments download count
-  app.get("/api/public/resources/:id/download", async (req, res) => {
-    try {
-      const resource = await storage.getResource(parseInt(req.params.id));
-      if (!resource || !resource.isPublished) {
-        return res.status(404).json({ message: "Resource not found" });
-      }
-
-      // Increment download count
-      await storage.incrementResourceDownloadCount(parseInt(req.params.id));
-
-      // If fileUrl is an object path, redirect to the object
-      if (resource.fileUrl?.startsWith("/objects/")) {
-        const filename = resource.title ? `${resource.title}.${resource.fileType?.toLowerCase() || 'pdf'}` : undefined;
-        return res.redirect(`${resource.fileUrl}${filename ? `?filename=${encodeURIComponent(filename)}` : ''}`);
-      }
-
-      // Otherwise redirect to external URL
-      if (resource.fileUrl) {
-        return res.redirect(resource.fileUrl);
-      }
-
-      res.status(404).json({ message: "File not available" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
+  // (Public Resources API defined above — no duplicate)
 
   // ============ LOGISTICS MANAGEMENT API ============
 
