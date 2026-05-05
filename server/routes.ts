@@ -13286,6 +13286,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
       const grade      = req.query.grade ? parseInt(req.query.grade as string) : undefined;
       const statusFilter = req.query.status as string | undefined;
+      const schoolNameSearch = (req.query.schoolName as string || '').trim().toLowerCase();
 
       interface StatResult { label: string; count: number; extra?: Record<string, any> }
 
@@ -13353,13 +13354,14 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
 
         } else if (groupBy === 'school') {
           let targetSchools = filterSchools(allSchools);
+          if (schoolNameSearch) targetSchools = targetSchools.filter((sc: any) => (sc.name || '').toLowerCase().includes(schoolNameSearch));
           const counts: Record<number, number> = {};
           students.forEach((s: any) => { counts[s.schoolId] = (counts[s.schoolId] || 0) + 1; });
           results = targetSchools
             .filter((sc: any) => counts[sc.id])
-            .map((sc: any) => ({ label: sc.name, count: counts[sc.id] || 0 }))
+            .map((sc: any) => ({ label: sc.name, count: counts[sc.id] || 0, extra: { region: regionMap.get(sc.regionId) || '', cluster: clusterMap.get(sc.clusterId) || '', schoolType: sc.schoolType || '' } }))
             .sort((a, b) => b.count - a.count)
-            .slice(0, 50);
+            .slice(0, 100);
 
         } else if (groupBy === 'grade') {
           const counts: Record<number, number> = {};
@@ -13478,22 +13480,27 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
 
         } else if (groupBy === 'school') {
           const qr = await pool.query(`
-            SELECT sc.name AS label,
+            SELECT sc.id AS school_id, sc.name AS label, sc.school_type,
+                   r.name AS region_name, cl.name AS cluster_name,
                    COUNT(DISTINCT sr.student_id) AS total,
                    COUNT(DISTINCT CASE WHEN sr.total_score::numeric >= 50 THEN sr.student_id END) AS passed
             FROM student_results sr
             JOIN students st ON sr.student_id = st.id
             JOIN schools sc ON st.school_id = sc.id
+            LEFT JOIN regions r ON sc.region_id = r.id
+            LEFT JOIN clusters cl ON sc.cluster_id = cl.id
             WHERE sr.exam_year_id = $1 ${grade ? 'AND st.grade = ' + grade : ''}
               ${regionId && regionId !== 'all' ? 'AND sc.region_id = ' + parseInt(regionId) : ''}
               ${clusterId && clusterId !== 'all' ? 'AND sc.cluster_id = ' + parseInt(clusterId) : ''}
-            GROUP BY sc.id, sc.name ORDER BY passed DESC LIMIT 50
+            GROUP BY sc.id, sc.name, sc.school_type, r.name, cl.name ORDER BY passed DESC LIMIT 100
           `, [yearFilter]);
-          results = qr.rows.map((row: any) => ({
-            label: row.label,
-            count: parseInt(row.passed),
-            extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((row.passed / row.total) * 100).toFixed(1) + '%' : '–' }
-          }));
+          results = qr.rows
+            .filter((row: any) => !schoolNameSearch || (row.label || '').toLowerCase().includes(schoolNameSearch))
+            .map((row: any) => ({
+              label: row.label,
+              count: parseInt(row.passed),
+              extra: { total: parseInt(row.total), passRate: row.total > 0 ? ((row.passed / row.total) * 100).toFixed(1) + '%' : '–', region: row.region_name || '', cluster: row.cluster_name || '', schoolType: row.school_type || '' }
+            }));
           total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
 
         } else if (groupBy === 'grade') {
