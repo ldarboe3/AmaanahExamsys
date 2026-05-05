@@ -1,82 +1,58 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { PublicLayout } from "@/components/public-layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  BarChart3,
-  Users,
-  GraduationCap,
-  School,
-  Filter,
-  Download,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Loader2,
-  X,
-  BarChart2,
-  MapPin,
-  Grid3x3,
-  Lock,
-  ShieldCheck,
-  Activity,
-  Search,
-  RefreshCw,
-  ChevronDown,
+  BarChart3, Users, GraduationCap, School, Download, TrendingUp, TrendingDown,
+  Minus, Loader2, BarChart2, MapPin, Grid3x3, Lock, ShieldCheck, Activity,
+  Search, X, Play,
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useQuery } from "@tanstack/react-query";
 import {
-  LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  BarChart, Bar,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer,
+  PieChart, Pie, LineChart, Line, Legend,
 } from "recharts";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import logoPath from "@assets/Amana_Logo_1770390631299.jpeg";
 
+// ── Brand colours ─────────────────────────────────────────────────────────────
 const GREEN  = "#006633";
 const GREEN2 = "#009A44";
 const RED    = "#CE1126";
 const AMBER  = "#f59e0b";
 const CHART_COLORS = [GREEN, GREEN2, AMBER, "#3B82F6", "#8B5CF6", RED, "#06B6D4", "#F97316"];
 
-// ── Animated count-up ───────────────────────────────────────────────────────
+// ── Animated count-up ─────────────────────────────────────────────────────────
 function useCountUp(target: number, duration = 900) {
   const [value, setValue] = useState(0);
-  const frameRef = useRef<number>(0);
+  const frame = useRef<number>(0);
   useEffect(() => {
     if (!target) { setValue(0); return; }
-    const start = performance.now();
-    const animate = (now: number) => {
-      const t = Math.min((now - start) / duration, 1);
-      setValue(Math.round((1 - Math.pow(1 - t, 3)) * target));
-      if (t < 1) frameRef.current = requestAnimationFrame(animate);
+    const t0 = performance.now();
+    const go = (now: number) => {
+      const t = Math.min((now - t0) / duration, 1);
+      setValue(Math.round((1 - (1 - t) ** 3) * target));
+      if (t < 1) frame.current = requestAnimationFrame(go);
     };
-    frameRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frameRef.current);
+    frame.current = requestAnimationFrame(go);
+    return () => cancelAnimationFrame(frame.current);
   }, [target, duration]);
   return value;
 }
-
 function AnimatedNumber({ value }: { value: number }) {
   return <>{useCountUp(value).toLocaleString()}</>;
 }
 
+// ── KPI Card ─────────────────────────────────────────────────────────────────
 function KpiCard({ icon: Icon, label, value, sub }: { icon: React.ElementType; label: string; value: number; sub?: string }) {
   return (
     <Card className="border-l-4" style={{ borderLeftColor: GREEN }}>
@@ -96,42 +72,22 @@ function KpiCard({ icon: Icon, label, value, sub }: { icon: React.ElementType; l
   );
 }
 
-function GenderBar({ male, female }: { male: number; female: number }) {
-  const total = male + female;
-  if (!total) return null;
-  const mp = (male / total) * 100, fp = (female / total) * 100;
+function MiniBar({ value, max }: { value: number; max: number }) {
   return (
-    <div className="space-y-1">
-      <div className="flex h-2.5 rounded-full overflow-hidden w-full">
-        <div style={{ width: `${mp}%`, background: GREEN }} />
-        <div style={{ width: `${fp}%`, background: "#3B82F6" }} />
-      </div>
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span style={{ color: GREEN }}>Male {mp.toFixed(1)}%</span>
-        <span style={{ color: "#3B82F6" }}>Female {fp.toFixed(1)}%</span>
-      </div>
+    <div className="w-20 bg-muted rounded-full h-1.5 flex-shrink-0">
+      <div className="h-1.5 rounded-full" style={{ width: `${max > 0 ? (value / max) * 100 : 0}%`, background: GREEN }} />
     </div>
   );
 }
 
-// ── Types ───────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 type StatCategory = "students" | "schools" | "results" | "examiners";
-type GroupBy = "region" | "cluster" | "school" | "grade" | "gender" | "examYear" | "status" | "type";
+type GroupBy = "region" | "cluster" | "school" | "grade" | "gender" | "examYear" | "type";
 
-interface StatResult {
-  label: string; count: number; extra?: Record<string, any>;
-}
+interface StatResult { label: string; count: number; extra?: Record<string, any>; }
 interface StatsResponse {
-  results: StatResult[];
-  total: number;
-  groupBy: string;
-  category: string;
-  availableInEmis: boolean;
-  meta: {
-    examYears?: { id: number; name: string; status: string }[];
-    grades?: number[];
-    isResultsMode?: boolean;
-  };
+  results: StatResult[]; total: number; groupBy: string; category: string;
+  meta: { examYears?: { id: number; name: string; status?: string }[]; isResultsMode?: boolean; };
 }
 interface NationalSummary {
   totalStudents: number; maleStudents: number; femaleStudents: number; gpi: number;
@@ -139,25 +95,29 @@ interface NationalSummary {
   totalRegions: number; totalClusters: number; studentTeacherRatio: number;
   currentYear: { id: number; name: string } | null;
   schoolTypeBreakdown: { type: string; count: number }[];
-  enrolmentTrend: { yearName: string; yearId: number; male: number; female: number; total: number }[];
+  enrolmentTrend: { yearName: string; male: number; female: number; total: number }[];
   qaCompliance: {
     avgCompliancePct: number; inspectedThisYear: number; coveragePctThisYear: number;
     trend: "improving" | "stable" | "declining";
-    fullyCompliant: number; partiallyCompliant: number; nonCompliant: number; totalInspected: number;
+    fullyCompliant: number; partiallyCompliant: number; nonCompliant: number;
   };
   dataAsOf: string;
 }
 interface ExamYear { id: number; name: string; isActive: boolean; }
-interface Region    { id: number; name: string; }
-interface Cluster   { id: number; name: string; regionId: number; }
+interface Region  { id: number; name: string; }
+interface Cluster { id: number; name: string; regionId: number; }
 
-const GRADE_LABELS: Record<number, string> = { 3: "Grade 3 — LBS", 6: "Grade 6 — UBS", 9: "Grade 9 — BCS", 12: "Grade 12 — SSS" };
-const SCHOOL_TYPE_LABELS: Record<string, string> = { LBS: "Lower Basic (LBS)", UBS: "Upper Basic (UBS)", BCS: "Basic Cycle (BCS)", SSS: "Senior Secondary (SSS)", other: "Other" };
+const GRADE_LABELS: Record<number, string> = {
+  3: "Grade 3 — LBS", 6: "Grade 6 — UBS", 9: "Grade 9 — BCS", 12: "Grade 12 — SSS",
+};
+const TYPE_LABELS: Record<string, string> = {
+  LBS: "Lower Basic (LBS)", UBS: "Upper Basic (UBS)", BCS: "Basic Cycle (BCS)", SSS: "Senior Secondary (SSS)",
+};
+const CAT_LABELS: Record<StatCategory, string> = {
+  students: "Students", schools: "Schools", results: "Exam Results", examiners: "Teaching Staff",
+};
 
-const CAT_LABELS: Record<StatCategory, string> = { students: "Students", schools: "Schools", results: "Exam Results", examiners: "Teaching Staff" };
-const CAT_ICONS: Record<StatCategory, React.ElementType> = { students: GraduationCap, schools: School, results: BarChart2, examiners: Users };
-
-const GROUP_OPTIONS: Record<StatCategory, { value: GroupBy; label: string }[]> = {
+const GROUP_OPTIONS: Record<string, { value: GroupBy; label: string }[]> = {
   students:  [
     { value: "region",   label: "Nationwide — by Region" },
     { value: "cluster",  label: "By Cluster" },
@@ -166,196 +126,627 @@ const GROUP_OPTIONS: Record<StatCategory, { value: GroupBy; label: string }[]> =
     { value: "gender",   label: "By Gender" },
     { value: "examYear", label: "By Academic Year" },
   ],
-  schools:   [
+  schools: [
     { value: "region",  label: "Nationwide — by Region" },
     { value: "cluster", label: "By Cluster" },
     { value: "type",    label: "By School Type" },
-  ],
-  results:   [
-    { value: "region",  label: "Nationwide — by Region" },
-    { value: "cluster", label: "By Cluster" },
-    { value: "school",  label: "By School" },
-    { value: "grade",   label: "By Grade" },
   ],
   examiners: [
     { value: "region",  label: "Nationwide — by Region" },
     { value: "cluster", label: "By Cluster" },
   ],
+  results: [
+    { value: "region",  label: "Nationwide — by Region" },
+    { value: "cluster", label: "By Cluster" },
+    { value: "school",  label: "By School" },
+    { value: "grade",   label: "By Grade" },
+  ],
+  qa: [
+    { value: "region",  label: "Nationwide — by Region" },
+    { value: "cluster", label: "By Cluster" },
+    { value: "type",    label: "By School Type" },
+  ],
 };
 
-// ── CSV export ─────────────────────────────────────────────────────────────
-function exportToCsv(
-  results: StatResult[],
-  total: number,
-  category: StatCategory,
-  groupBy: GroupBy,
-  isResultsMode: boolean,
-  filters: { year?: string; region?: string; cluster?: string; grade?: string; school?: string }
+// ── Shared filter state type ──────────────────────────────────────────────────
+interface FilterState {
+  groupBy: GroupBy;
+  examYearId: string;
+  regionId: string;
+  clusterId: string;
+  grade: string;
+  schoolSearch: string;
+  schoolSearchInput: string;
+  category: StatCategory;
+}
+
+function defaultFilter(cat: StatCategory): FilterState {
+  return { groupBy: "region", examYearId: "all", regionId: "all", clusterId: "all", grade: "all", schoolSearch: "", schoolSearchInput: "", category: cat };
+}
+
+// ── CSV Export ────────────────────────────────────────────────────────────────
+function buildRows(results: StatResult[], total: number, isRes: boolean, bySchool: boolean) {
+  const totalExamined = isRes ? results.reduce((s, r) => s + (r.extra?.total ?? 0), 0) : total;
+  return results.map((r, i) => {
+    const rowBase = isRes ? (r.extra?.total ?? r.count) : r.count;
+    const share = totalExamined > 0 ? ((rowBase / totalExamined) * 100).toFixed(1) + "%" : "0%";
+    if (isRes && bySchool) return [i + 1, r.label, r.extra?.region ?? "", r.extra?.cluster ?? "", r.extra?.schoolType ?? "", r.extra?.total ?? 0, r.count, r.extra?.passRate ?? "–"];
+    if (isRes) return [i + 1, r.label, r.extra?.total ?? 0, r.count, r.extra?.passRate ?? "–"];
+    if (bySchool) return [i + 1, r.label, r.extra?.region ?? "", r.extra?.cluster ?? "", r.extra?.schoolType ?? "", r.count, share];
+    return [i + 1, r.label, r.count, share];
+  });
+}
+
+function getHeaders(isRes: boolean, bySchool: boolean): string[] {
+  if (isRes && bySchool) return ["#", "School", "Region", "Cluster", "Type", "Examined", "Passed", "Pass Rate"];
+  if (isRes) return ["#", "Category", "Examined", "Passed", "Pass Rate"];
+  if (bySchool) return ["#", "School", "Region", "Cluster", "Type", "Count", "Share %"];
+  return ["#", "Category", "Count", "Share %"];
+}
+
+function exportCSV(
+  results: StatResult[], total: number, category: StatCategory,
+  groupBy: GroupBy, isRes: boolean,
+  meta: { year?: string; region?: string; cluster?: string; grade?: string; school?: string; tabLabel: string }
 ) {
   if (!results.length) return;
-
+  const bySchool = groupBy === "school";
+  const headers = getHeaders(isRes, bySchool);
+  const rows = buildRows(results, total, isRes, bySchool);
   const metaLines = [
-    `"Amaanah Education Statistics Export"`,
+    `"Amaanah Education Statistics — ${meta.tabLabel}"`,
     `"Category","${CAT_LABELS[category]}"`,
-    `"Breakdown","${GROUP_OPTIONS[category].find(o => o.value === groupBy)?.label ?? groupBy}"`,
-    filters.year    ? `"Academic Year","${filters.year}"`    : null,
-    filters.region  ? `"Region","${filters.region}"`         : null,
-    filters.cluster ? `"Cluster","${filters.cluster}"`       : null,
-    filters.grade   ? `"Grade","${filters.grade}"`           : null,
-    filters.school  ? `"School Search","${filters.school}"`  : null,
+    meta.year    ? `"Academic Year","${meta.year}"` : null,
+    meta.region  ? `"Region","${meta.region}"`      : null,
+    meta.cluster ? `"Cluster","${meta.cluster}"`    : null,
+    meta.grade   ? `"Grade","${meta.grade}"`        : null,
+    meta.school  ? `"School Search","${meta.school}"` : null,
     `"Total","${total.toLocaleString()}"`,
     `"Generated","${new Date().toLocaleString()}"`,
     ``,
-  ].filter(l => l !== null);
+  ].filter(Boolean);
 
-  const bySchool = groupBy === "school";
-  const headers = isResultsMode
-    ? bySchool
-      ? ["#", "School", "Region", "Cluster", "Type", "Examined", "Passed", "Pass Rate"]
-      : ["#", "Category", "Examined", "Passed", "Pass Rate"]
-    : bySchool
-      ? ["#", "School", "Region", "Cluster", "Type", "Count", "Share %"]
-      : ["#", "Category", "Count", "Share %"];
+  const csv = [
+    ...metaLines,
+    headers.join(","),
+    ...rows.map(r => r.map(v => typeof v === "string" && (v.includes(",") || v.includes('"')) ? `"${v.replace(/"/g, '""')}"` : v).join(",")),
+  ].join("\n");
 
-  const rows = results.map((r, i) => {
-    const shareNum  = total > 0 ? ((isResultsMode ? (r.extra?.total ?? r.count) : r.count) / (isResultsMode ? (results.reduce((s, x) => s + (x.extra?.total ?? 0), 0) || 1) : total) * 100) : 0;
-    const share = shareNum.toFixed(1) + "%";
-    const safeLabel = `"${(r.label || "").replace(/"/g, '""')}"`;
-
-    if (isResultsMode && bySchool) return [i + 1, safeLabel, `"${r.extra?.region ?? ""}"`, `"${r.extra?.cluster ?? ""}"`, `"${r.extra?.schoolType ?? ""}"`, r.extra?.total ?? 0, r.count, r.extra?.passRate ?? "–"];
-    if (isResultsMode) return [i + 1, safeLabel, r.extra?.total ?? 0, r.count, r.extra?.passRate ?? "–"];
-    if (bySchool) return [i + 1, safeLabel, `"${r.extra?.region ?? ""}"`, `"${r.extra?.cluster ?? ""}"`, `"${r.extra?.schoolType ?? ""}"`, r.count, share];
-    return [i + 1, safeLabel, r.count, share];
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(blob),
+    download: `amaanah-${category}-${groupBy}-${new Date().toISOString().slice(0, 10)}.csv`,
   });
-
-  const csv = [...metaLines, headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-  const blob = new Blob(["\uFEFF" + csv, { type: "text/csv;charset=utf-8;" }] as any, { type: "text/csv;charset=utf-8;" });
-  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `amaanah-${category}-${groupBy}-${new Date().toISOString().slice(0, 10)}.csv` });
   a.click(); URL.revokeObjectURL(a.href);
 }
 
-// ── Progress bar mini ───────────────────────────────────────────────────────
-function MiniBar({ value, max }: { value: number; max: number }) {
+function exportPDF(
+  results: StatResult[], total: number, category: StatCategory,
+  groupBy: GroupBy, isRes: boolean,
+  meta: { year?: string; region?: string; cluster?: string; grade?: string; school?: string; tabLabel: string }
+) {
+  if (!results.length) return;
+  const bySchool = groupBy === "school";
+  const doc = new jsPDF({ orientation: bySchool ? "landscape" : "portrait" });
+
+  // Header
+  doc.setFillColor(0, 102, 51);
+  doc.rect(0, 0, doc.internal.pageSize.width, 22, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("Amaanah Education Statistics", 14, 10);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${meta.tabLabel} — ${CAT_LABELS[category]}`, 14, 17);
+
+  // Meta info
+  doc.setTextColor(50, 50, 50);
+  doc.setFontSize(8);
+  let metaY = 28;
+  const metaItems: string[] = [];
+  if (meta.year)    metaItems.push(`Academic Year: ${meta.year}`);
+  if (meta.region)  metaItems.push(`Region: ${meta.region}`);
+  if (meta.cluster) metaItems.push(`Cluster: ${meta.cluster}`);
+  if (meta.grade)   metaItems.push(`Grade: ${meta.grade}`);
+  if (meta.school)  metaItems.push(`School Search: "${meta.school}"`);
+  metaItems.push(`Total: ${total.toLocaleString()}`);
+  metaItems.push(`Generated: ${new Date().toLocaleString()}`);
+  if (metaItems.length) {
+    doc.text(metaItems.join("   |   "), 14, metaY);
+    metaY += 6;
+  }
+
+  const headers = getHeaders(isRes, bySchool);
+  const rows = buildRows(results, total, isRes, bySchool);
+
+  autoTable(doc, {
+    startY: metaY + 2,
+    head: [headers],
+    body: rows.map(r => r.map(String)),
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [0, 102, 51], textColor: 255, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [245, 250, 245] },
+    columnStyles: { 0: { cellWidth: 8 } },
+  });
+
+  doc.save(`amaanah-${category}-${groupBy}-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+// ── Query Filter Bar component ────────────────────────────────────────────────
+interface FilterBarProps {
+  f: FilterState;
+  onChange: (patch: Partial<FilterState>) => void;
+  onRun: () => void;
+  isLoading: boolean;
+  examYears: { id: number; name: string; isActive: boolean }[];
+  regions: Region[];
+  clusters: Cluster[];
+  groupOptions: { value: GroupBy; label: string }[];
+  showGrade?: boolean;
+  showSchoolSearch?: boolean;
+}
+
+function FilterBar({ f, onChange, onRun, isLoading, examYears, regions, clusters, groupOptions, showGrade, showSchoolSearch }: FilterBarProps) {
+  const visibleClusters = f.regionId === "all" ? clusters : clusters.filter(c => c.regionId === parseInt(f.regionId));
+
+  const handleRegion = (v: string) => onChange({ regionId: v, clusterId: "all" });
+  const handleGroup  = (v: string) => {
+    onChange({ groupBy: v as GroupBy, schoolSearch: "", schoolSearchInput: "" });
+  };
+
   return (
-    <div className="w-24 bg-muted rounded-full h-1.5 flex-shrink-0">
-      <div className="h-1.5 rounded-full" style={{ width: `${max > 0 ? (value / max) * 100 : 0}%`, background: GREEN }} />
+    <Card>
+      <CardContent className="p-5 space-y-4">
+        {/* Filter row matching screenshot */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Breakdown</label>
+            <Select value={f.groupBy} onValueChange={handleGroup}>
+              <SelectTrigger data-testid="select-breakdown">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {groupOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Academic Year</label>
+            <Select value={f.examYearId} onValueChange={v => onChange({ examYearId: v })}>
+              <SelectTrigger data-testid="select-year">
+                <SelectValue placeholder="All Academic Years" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Academic Years</SelectItem>
+                {examYears.map(y => (
+                  <SelectItem key={y.id} value={y.id.toString()}>
+                    {y.name.replace(/^["'\u201C\u201D]+/, "")}{y.isActive ? " (Active)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Region</label>
+            <Select value={f.regionId} onValueChange={handleRegion}>
+              <SelectTrigger data-testid="select-region">
+                <SelectValue placeholder="All Regions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Regions</SelectItem>
+                {regions.map(r => <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Cluster</label>
+            <Select value={f.clusterId} onValueChange={v => onChange({ clusterId: v })} disabled={!visibleClusters.length}>
+              <SelectTrigger data-testid="select-cluster">
+                <SelectValue placeholder="All Clusters" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Clusters</SelectItem>
+                {visibleClusters.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Optional secondary row: grade + school search */}
+        {(showGrade || showSchoolSearch) && (
+          <div className="flex flex-wrap items-end gap-3 pt-1 border-t">
+            {showGrade && f.groupBy !== "grade" && (
+              <div className="space-y-1.5 w-52">
+                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Grade</label>
+                <Select value={f.grade} onValueChange={v => onChange({ grade: v })}>
+                  <SelectTrigger data-testid="select-grade">
+                    <SelectValue placeholder="All Grades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Grades</SelectItem>
+                    {[3, 6, 9, 12].map(g => <SelectItem key={g} value={g.toString()}>{GRADE_LABELS[g]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {showSchoolSearch && f.groupBy === "school" && (
+              <div className="space-y-1.5 flex-1 min-w-[200px]">
+                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Search School Name</label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <Input
+                      value={f.schoolSearchInput}
+                      onChange={e => onChange({ schoolSearchInput: e.target.value })}
+                      onKeyDown={e => { if (e.key === "Enter") onChange({ schoolSearch: f.schoolSearchInput }); }}
+                      placeholder="Type school name and press Enter…"
+                      className="pl-8"
+                      data-testid="input-school-search"
+                    />
+                  </div>
+                  <Button variant="outline" onClick={() => onChange({ schoolSearch: f.schoolSearchInput })} data-testid="button-school-search">
+                    <Search className="w-4 h-4" />
+                  </Button>
+                  {f.schoolSearch && (
+                    <Button variant="ghost" onClick={() => onChange({ schoolSearch: "", schoolSearchInput: "" })}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Run Query button */}
+        <div className="flex items-center justify-between pt-1 border-t gap-3 flex-wrap">
+          <div className="flex flex-wrap gap-1.5">
+            {f.examYearId !== "all" && (
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: `${GREEN}18`, color: GREEN }}>
+                {examYears.find(y => y.id.toString() === f.examYearId)?.name?.replace(/^["'\u201C\u201D]+/, "") ?? f.examYearId}
+              </span>
+            )}
+            {f.regionId !== "all" && (
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: `${GREEN}18`, color: GREEN }}>
+                {regions.find(r => r.id.toString() === f.regionId)?.name}
+              </span>
+            )}
+            {f.clusterId !== "all" && (
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: `${GREEN}18`, color: GREEN }}>
+                {[...clusters].find(c => c.id.toString() === f.clusterId)?.name}
+              </span>
+            )}
+            {f.grade !== "all" && (
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: `${GREEN}18`, color: GREEN }}>
+                {GRADE_LABELS[parseInt(f.grade)]}
+              </span>
+            )}
+            {f.schoolSearch && (
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: `${GREEN}18`, color: GREEN }}>
+                School: "{f.schoolSearch}"
+              </span>
+            )}
+          </div>
+
+          <Button
+            onClick={onRun}
+            disabled={isLoading}
+            data-testid="button-run-query"
+            style={{ background: GREEN, color: "white" }}
+          >
+            {isLoading ? <Loader2 className="w-4 h-4 me-2 animate-spin" /> : <Play className="w-4 h-4 me-2" />}
+            Run Query
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Results Table + Chart ────────────────────────────────────────────────────
+interface ResultsPanelProps {
+  stats: StatsResponse;
+  tabLabel: string;
+  f: FilterState;
+  regions: Region[];
+  clusters: Cluster[];
+  examYears: { id: number; name: string; isActive: boolean }[];
+}
+
+function ResultsPanel({ stats, tabLabel, f, regions, clusters, examYears }: ResultsPanelProps) {
+  const isRes = !!stats.meta?.isResultsMode;
+  const bySchool = f.groupBy === "school";
+  const results = stats.results ?? [];
+  const total = stats.total ?? 0;
+  const totalExamined = isRes ? results.reduce((s, r) => s + (r.extra?.total ?? 0), 0) : total;
+  const totalPassed   = isRes ? results.reduce((s, r) => s + r.count, 0) : 0;
+  const maxVal = results.length ? Math.max(...results.map(r => isRes ? (r.extra?.total ?? r.count) : r.count)) : 1;
+
+  const yearName    = f.examYearId !== "all" ? examYears.find(y => y.id.toString() === f.examYearId)?.name?.replace(/^["'\u201C\u201D]+/, "") : undefined;
+  const regionName  = f.regionId  !== "all" ? regions.find(r => r.id.toString() === f.regionId)?.name   : undefined;
+  const clusterName = f.clusterId !== "all" ? clusters.find(c => c.id.toString() === f.clusterId)?.name : undefined;
+  const gradeName   = f.grade     !== "all" ? GRADE_LABELS[parseInt(f.grade)] : undefined;
+
+  const meta = { year: yearName, region: regionName, cluster: clusterName, grade: gradeName, school: f.schoolSearch || undefined, tabLabel };
+
+  const overallPassRate = isRes && totalExamined > 0 ? ((totalPassed / totalExamined) * 100).toFixed(1) + "%" : null;
+  const passColor = isRes && overallPassRate ? (parseFloat(overallPassRate) >= 75 ? GREEN : parseFloat(overallPassRate) >= 50 ? AMBER : RED) : GREEN;
+
+  if (!results.length) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="py-14 text-center">
+          <Search className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
+          <p className="font-medium">No results for the selected filters</p>
+          <p className="text-sm text-muted-foreground mt-1">Try adjusting your breakdown or filter criteria.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Summary strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xl font-bold" style={{ color: GREEN }}>{(isRes ? totalExamined : total).toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{isRes ? "Total Examined" : "Grand Total"}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xl font-bold" style={{ color: GREEN }}>{results.length}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Rows</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xl font-bold" style={{ color: GREEN }}>{isRes ? totalPassed.toLocaleString() : maxVal.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{isRes ? "Total Passed" : "Highest Count"}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xl font-bold" style={{ color: passColor }}>{overallPassRate ?? (results.length > 0 ? Math.round(total / results.length).toLocaleString() : "–")}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{isRes ? "Overall Pass Rate" : "Avg / Row"}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Bar chart for small result sets */}
+      {!bySchool && results.length <= 20 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" style={{ color: GREEN }} />
+              {CAT_LABELS[f.category]} — {results.length} groups
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={Math.max(160, results.length * 30)}>
+              <BarChart data={results} layout="vertical" margin={{ top: 0, right: 60, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} width={110} />
+                <Tooltip formatter={(v: any) => [Number(v).toLocaleString(), isRes ? "Passed" : "Count"]} />
+                <Bar dataKey="count" radius={[0, 3, 3, 0]}>
+                  {results.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Table */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-sm">
+              {results.length} {bySchool ? "schools" : "entries"} — {isRes ? `${totalExamined.toLocaleString()} examined` : `${total.toLocaleString()} total`}
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button
+                variant="outline" size="sm"
+                onClick={() => exportCSV(results, total, f.category, f.groupBy, isRes, meta)}
+                data-testid="button-export-csv"
+              >
+                <Download className="w-3.5 h-3.5 me-1.5" /> CSV
+              </Button>
+              <Button
+                variant="outline" size="sm"
+                onClick={() => exportPDF(results, total, f.category, f.groupBy, isRes, meta)}
+                data-testid="button-export-pdf"
+                style={{ borderColor: RED, color: RED }}
+              >
+                <Download className="w-3.5 h-3.5 me-1.5" /> PDF
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="rounded-md border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-8 text-xs text-muted-foreground font-normal">#</TableHead>
+                  <TableHead>{bySchool ? "School" : "Category"}</TableHead>
+                  {bySchool && <TableHead className="hidden md:table-cell">Region</TableHead>}
+                  {bySchool && <TableHead className="hidden lg:table-cell">Cluster</TableHead>}
+                  {bySchool && <TableHead className="hidden lg:table-cell">Type</TableHead>}
+                  <TableHead className="text-right">{isRes ? "Examined" : "Count"}</TableHead>
+                  {isRes && <TableHead className="text-right">Passed</TableHead>}
+                  <TableHead className="text-right">{isRes ? "Pass Rate" : "Share %"}</TableHead>
+                  {!bySchool && <TableHead className="hidden sm:table-cell w-24">Bar</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {results.map((r, i) => {
+                  const rowCount = isRes ? (r.extra?.total ?? r.count) : r.count;
+                  const denom    = isRes ? totalExamined : total;
+                  const share    = denom > 0 ? ((rowCount / denom) * 100).toFixed(1) + "%" : "0%";
+                  const pr       = r.extra?.passRate as string | undefined;
+                  const prNum    = pr ? parseFloat(pr) : 0;
+                  const prColor  = isRes ? (prNum >= 75 ? GREEN : prNum >= 50 ? AMBER : RED) : undefined;
+
+                  return (
+                    <TableRow key={i} data-testid={`row-result-${i}`} className="hover:bg-muted/40">
+                      <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
+                      <TableCell className="font-medium max-w-[200px] truncate" title={r.label}>{r.label}</TableCell>
+                      {bySchool && <TableCell className="hidden md:table-cell text-xs text-muted-foreground">{r.extra?.region ?? ""}</TableCell>}
+                      {bySchool && <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">{r.extra?.cluster ?? ""}</TableCell>}
+                      {bySchool && <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">{r.extra?.schoolType ? (TYPE_LABELS[r.extra.schoolType] || r.extra.schoolType) : ""}</TableCell>}
+                      <TableCell className="text-right tabular-nums">{rowCount.toLocaleString()}</TableCell>
+                      {isRes && <TableCell className="text-right tabular-nums">{r.count.toLocaleString()}</TableCell>}
+                      <TableCell className="text-right">
+                        <span className="text-sm font-semibold" style={{ color: prColor }}>{isRes ? (pr ?? "–") : share}</span>
+                      </TableCell>
+                      {!bySchool && (
+                        <TableCell className="hidden sm:table-cell">
+                          <MiniBar value={rowCount} max={maxVal} />
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-export default function Statistics() {
-  const { isRTL } = useLanguage();
+// ── Empty state ───────────────────────────────────────────────────────────────
+function EmptyState({ label }: { label: string }) {
+  return (
+    <Card className="border-dashed">
+      <CardContent className="py-16 text-center space-y-3">
+        <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto" style={{ background: `${GREEN}12` }}>
+          <Play className="w-6 h-6" style={{ color: GREEN }} />
+        </div>
+        <p className="font-semibold text-foreground">Select your filters and click "Run Query"</p>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+          Choose a breakdown, academic year, region, and cluster, then run the query to view {label} data with CSV and PDF export.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
 
-  // National summary
-  const { data: summary, isLoading: isSummaryLoading } = useQuery<NationalSummary>({
-    queryKey: ["/api/public/national-summary"],
-  });
-
-  // Exam years — loaded independently so filters are always available
-  const { data: examYearsData } = useQuery<ExamYear[]>({
-    queryKey: ["/api/public/exam-years"],
-  });
-
-  const { data: regions }  = useQuery<Region[]>({ queryKey: ["/api/regions"] });
-  const { data: clusters } = useQuery<Cluster[]>({ queryKey: ["/api/clusters"] });
-
-  // Main nav tab
-  const [mainTab, setMainTab] = useState<"overview" | "qa" | "query">("overview");
-
-  // Data Query state
-  const [category,       setCategory]       = useState<StatCategory>("students");
-  const [groupBy,        setGroupBy]        = useState<GroupBy>("region");
-  const [selectedYear,   setSelectedYear]   = useState("all");
-  const [selectedRegion, setSelectedRegion] = useState("all");
-  const [selectedCluster,setSelectedCluster]= useState("all");
-  const [selectedGrade,  setSelectedGrade]  = useState("all");
-  const [schoolSearch,   setSchoolSearch]   = useState("");
-  const [schoolSearchInput, setSchoolSearchInput] = useState("");
-
-  const visibleClusters = useMemo(() => {
-    if (!clusters) return [];
-    if (selectedRegion === "all") return clusters;
-    return clusters.filter(c => c.regionId === parseInt(selectedRegion));
-  }, [clusters, selectedRegion]);
-
-  const activeYear = examYearsData?.find(y => y.isActive) ?? examYearsData?.[0];
-
-  const handleCategoryChange = (cat: StatCategory) => {
-    setCategory(cat);
-    const opts = GROUP_OPTIONS[cat];
-    setGroupBy(opts[0].value);
-    setSchoolSearch(""); setSchoolSearchInput("");
-  };
-
-  const handleGroupByChange = (gb: GroupBy) => {
-    setGroupBy(gb);
-    if (gb !== "school") { setSchoolSearch(""); setSchoolSearchInput(""); }
-  };
-
-  const handleRegionChange = (rid: string) => {
-    setSelectedRegion(rid);
-    setSelectedCluster("all");
-  };
-
-  const queryUrl = useMemo(() => {
-    const p = new URLSearchParams({ category, groupBy });
-    if (selectedYear    !== "all") p.set("examYearId", selectedYear);
-    if (selectedRegion  !== "all") p.set("regionId",   selectedRegion);
-    if (selectedCluster !== "all") p.set("clusterId",  selectedCluster);
-    if (selectedGrade   !== "all") p.set("grade",      selectedGrade);
-    if (schoolSearch)               p.set("schoolName", schoolSearch);
+// ── Shared query hook that only fetches when triggered ────────────────────────
+function useTriggeredQuery(category: StatCategory, f: FilterState, enabled: boolean) {
+  const url = useMemo(() => {
+    const p = new URLSearchParams({ category, groupBy: f.groupBy });
+    if (f.examYearId !== "all") p.set("examYearId", f.examYearId);
+    if (f.regionId   !== "all") p.set("regionId",   f.regionId);
+    if (f.clusterId  !== "all") p.set("clusterId",  f.clusterId);
+    if (f.grade      !== "all") p.set("grade",       f.grade);
+    if (f.schoolSearch)          p.set("schoolName",  f.schoolSearch);
     return `/api/public/statistics?${p.toString()}`;
-  }, [category, groupBy, selectedYear, selectedRegion, selectedCluster, selectedGrade, schoolSearch]);
+  }, [category, f]);
 
-  const { data: stats, isLoading: isStatsLoading, isFetching } = useQuery<StatsResponse>({
-    queryKey: [queryUrl],
-    enabled: mainTab === "query",
+  return useQuery<StatsResponse>({ queryKey: [url], enabled });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Main page ─────────────────────────────────────────────────────────────────
+export default function Statistics() {
+  useLanguage();
+
+  // Shared reference data
+  const { data: summary, isLoading: isSummaryLoading } = useQuery<NationalSummary>({ queryKey: ["/api/public/national-summary"] });
+  const { data: examYearsData = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/public/exam-years"] });
+  const { data: regions  = [] } = useQuery<Region[]>({ queryKey: ["/api/regions"] });
+  const { data: clusters = [] } = useQuery<Cluster[]>({ queryKey: ["/api/clusters"] });
+
+  const examYears = examYearsData ?? [];
+
+  // Active tab
+  const [tab, setTab] = useState<"enrolment" | "qa" | "examination">("enrolment");
+
+  // ── Enrolment & Schools tab state ─────────────────────────────────────────
+  const [enrolCat,   setEnrolCat]   = useState<"students" | "schools" | "examiners">("students");
+  const [enrolF,     setEnrolF]     = useState<FilterState>(defaultFilter("students"));
+  const [enrolUrl,   setEnrolUrl]   = useState<string | null>(null);
+  const { data: enrolStats, isLoading: enrolLoading } = useQuery<StatsResponse>({
+    queryKey: [enrolUrl ?? "__disabled__enrol"],
+    enabled: !!enrolUrl,
   });
 
-  const examYears = stats?.meta?.examYears ?? examYearsData?.map(y => ({ id: y.id, name: y.name, status: y.isActive ? "active" : "" })) ?? [];
-
-  const hasFilters = selectedYear !== "all" || selectedRegion !== "all" || selectedCluster !== "all" || selectedGrade !== "all" || !!schoolSearch;
-
-  const clearFilters = () => {
-    setSelectedYear("all"); setSelectedRegion("all"); setSelectedCluster("all");
-    setSelectedGrade("all"); setSchoolSearch(""); setSchoolSearchInput("");
+  const runEnrol = () => {
+    const p = new URLSearchParams({ category: enrolCat, groupBy: enrolF.groupBy });
+    if (enrolF.examYearId !== "all") p.set("examYearId", enrolF.examYearId);
+    if (enrolF.regionId   !== "all") p.set("regionId",   enrolF.regionId);
+    if (enrolF.clusterId  !== "all") p.set("clusterId",  enrolF.clusterId);
+    if (enrolF.grade      !== "all") p.set("grade",       enrolF.grade);
+    if (enrolF.schoolSearch)          p.set("schoolName",  enrolF.schoolSearch);
+    setEnrolUrl(`/api/public/statistics?${p.toString()}`);
   };
 
-  // QA
+  // Reset query when category changes
+  const handleEnrolCat = (cat: "students" | "schools" | "examiners") => {
+    setEnrolCat(cat);
+    setEnrolF(prev => ({ ...prev, groupBy: GROUP_OPTIONS[cat][0].value, grade: "all", schoolSearch: "", schoolSearchInput: "" }));
+    setEnrolUrl(null);
+  };
+
+  // ── QA tab state ──────────────────────────────────────────────────────────
+  const [qaF,   setQaF]   = useState<FilterState>(defaultFilter("schools"));
+  const [qaUrl, setQaUrl] = useState<string | null>(null);
+  const { data: qaStats, isLoading: qaLoading } = useQuery<StatsResponse>({
+    queryKey: [qaUrl ?? "__disabled__qa"],
+    enabled: !!qaUrl,
+  });
+
+  const runQa = () => {
+    const p = new URLSearchParams({ category: "schools", groupBy: qaF.groupBy });
+    if (qaF.examYearId !== "all") p.set("examYearId", qaF.examYearId);
+    if (qaF.regionId   !== "all") p.set("regionId",   qaF.regionId);
+    if (qaF.clusterId  !== "all") p.set("clusterId",  qaF.clusterId);
+    setQaUrl(`/api/public/statistics?${p.toString()}`);
+  };
+
+  // ── Examination tab state ─────────────────────────────────────────────────
+  const [examF,   setExamF]   = useState<FilterState>(defaultFilter("results"));
+  const [examUrl, setExamUrl] = useState<string | null>(null);
+  const { data: examStats, isLoading: examLoading } = useQuery<StatsResponse>({
+    queryKey: [examUrl ?? "__disabled__exam"],
+    enabled: !!examUrl,
+  });
+
+  const runExam = () => {
+    const p = new URLSearchParams({ category: "results", groupBy: examF.groupBy });
+    if (examF.examYearId !== "all") p.set("examYearId", examF.examYearId);
+    if (examF.regionId   !== "all") p.set("regionId",   examF.regionId);
+    if (examF.clusterId  !== "all") p.set("clusterId",  examF.clusterId);
+    if (examF.grade      !== "all") p.set("grade",       examF.grade);
+    if (examF.schoolSearch)          p.set("schoolName",  examF.schoolSearch);
+    setExamUrl(`/api/public/statistics?${p.toString()}`);
+  };
+
   const qa = summary?.qaCompliance;
   const TrendIcon = qa?.trend === "improving" ? TrendingUp : qa?.trend === "declining" ? TrendingDown : Minus;
   const trendColor = qa?.trend === "improving" ? GREEN : qa?.trend === "declining" ? RED : AMBER;
   const complianceColor = qa ? (qa.avgCompliancePct >= 80 ? GREEN : qa.avgCompliancePct >= 60 ? AMBER : RED) : GREEN;
 
-  const formatDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const TAB_CONFIG = [
+    { key: "enrolment",  label: "Enrolment & Schools",  icon: BarChart3 },
+    { key: "qa",         label: "Quality Assurance",     icon: ShieldCheck },
+    { key: "examination",label: "Examination",           icon: BarChart2 },
+  ] as const;
 
-  const isRes = !!stats?.meta?.isResultsMode;
-  const maxVal = stats?.results?.length
-    ? Math.max(...stats.results.map(r => isRes ? (r.extra?.total ?? r.count) : r.count))
-    : 1;
-
-  const regionName  = regions?.find(r => r.id.toString() === selectedRegion)?.name;
-  const clusterName = clusters?.find(c => c.id.toString() === selectedCluster)?.name;
-  const yearName    = examYears.find(y => y.id.toString() === selectedYear)?.name;
-  const gradeName   = selectedGrade !== "all" ? GRADE_LABELS[parseInt(selectedGrade)] : undefined;
-
-  const handleExport = () => {
-    if (!stats?.results?.length) return;
-    exportToCsv(stats.results, stats.total, category, groupBy, isRes, {
-      year:    yearName,
-      region:  regionName,
-      cluster: clusterName,
-      grade:   gradeName,
-      school:  schoolSearch || undefined,
-    });
-  };
-
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <PublicLayout>
 
-      {/* ── Dark-green hero ───────────────────────────────────────── */}
+      {/* ── Hero banner ─────────────────────────────────────────────── */}
       <div style={{ background: GREEN }} className="w-full">
         <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, ${RED} 0%, ${RED}00 100%)` }} />
         <div className="container mx-auto px-4 py-5">
@@ -371,7 +762,7 @@ export default function Statistics() {
               <h1 className="text-white font-bold text-xl md:text-2xl leading-tight">Education Statistics — The Gambia</h1>
               {summary?.currentYear && (
                 <span className="inline-block mt-1 px-3 py-0.5 rounded-full text-xs font-semibold" style={{ background: GREEN2, color: "white" }}>
-                  {summary.currentYear.name.replace(/^["'"\u201C\u201D]+/, "")}
+                  {summary.currentYear.name.replace(/^["'\u201C\u201D]+/, "")}
                 </span>
               )}
             </div>
@@ -381,27 +772,24 @@ export default function Statistics() {
         <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, ${RED} 0%, ${RED}00 100%)` }} />
       </div>
 
-      {/* ── Sticky tab nav ────────────────────────────────────────── */}
+      {/* ── Sticky tab nav ──────────────────────────────────────────── */}
       <div className="border-b bg-background sticky top-0 z-40">
         <div className="container mx-auto px-4">
-          <div className="flex gap-1.5 py-2 overflow-x-auto no-scrollbar">
-            {(["overview", "qa", "query"] as const).map(tab => {
-              const labels = { overview: "Enrolment & Schools", qa: "Quality Assurance", query: "Data Query" };
-              const icons  = { overview: BarChart3, qa: ShieldCheck, query: Filter };
-              const Icon   = icons[tab];
-              const active = mainTab === tab;
+          <div className="flex gap-1.5 py-2 overflow-x-auto">
+            {TAB_CONFIG.map(({ key, label, icon: Icon }) => {
+              const active = tab === key;
               return (
                 <button
-                  key={tab}
-                  onClick={() => setMainTab(tab)}
-                  data-testid={`tab-main-${tab}`}
+                  key={key}
+                  onClick={() => setTab(key)}
+                  data-testid={`tab-${key}`}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0"
                   style={active
                     ? { background: GREEN, color: "white" }
                     : { background: "transparent", color: GREEN, border: `1px solid ${GREEN}` }
                   }
                 >
-                  <Icon className="w-3.5 h-3.5" />{labels[tab]}
+                  <Icon className="w-3.5 h-3.5" />{label}
                 </button>
               );
             })}
@@ -410,9 +798,9 @@ export default function Statistics() {
       </div>
 
       <div className="container mx-auto px-4 py-6">
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-5">
 
-          {/* ── National KPI strip (always shown) ─────────────────── */}
+          {/* ── National KPI strip ──────────────────────────────────── */}
           {isSummaryLoading ? (
             <div className="flex justify-center py-6"><Loader2 className="w-8 h-8 animate-spin" style={{ color: GREEN }} /></div>
           ) : summary && (
@@ -426,189 +814,125 @@ export default function Statistics() {
             </div>
           )}
 
-          {/* ══ OVERVIEW TAB ════════════════════════════════════════ */}
-          {mainTab === "overview" && summary && (
-            <div className="space-y-5">
-              {/* Enrolment card */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <GraduationCap className="w-4 h-4" style={{ color: GREEN }} /> Enrolment Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold" style={{ color: GREEN }}>{summary.totalStudents.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Total Enrolled</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold" style={{ color: GREEN }}>{summary.maleStudents.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Male</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-blue-600">{summary.femaleStudents.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Female</p>
-                    </div>
-                    <div className="text-center">
-                      <span className="inline-block px-3 py-1 rounded-full text-lg font-bold"
-                        style={{ background: summary.gpi >= 0.95 ? `${GREEN}18` : summary.gpi >= 0.80 ? `${AMBER}18` : `${RED}18`, color: summary.gpi >= 0.95 ? GREEN : summary.gpi >= 0.80 ? AMBER : RED }}>
-                        {summary.gpi.toFixed(2)}
-                      </span>
-                      <p className="text-xs text-muted-foreground mt-1">GPI</p>
-                    </div>
-                  </div>
-                  <GenderBar male={summary.maleStudents} female={summary.femaleStudents} />
-                </CardContent>
-              </Card>
-
-              {/* Enrolment trend */}
-              {summary.enrolmentTrend.length > 1 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4" style={{ color: GREEN }} /> Enrolment Trend by Academic Year
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <LineChart data={summary.enrolmentTrend} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis dataKey="yearName" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} />
-                        <Tooltip formatter={(v: any, n: string) => [Number(v).toLocaleString(), n === "male" ? "Male" : n === "female" ? "Female" : "Total"]} />
-                        <Legend />
-                        <Line type="monotone" dataKey="male"   name="Male"   stroke={GREEN}   strokeWidth={2} dot={{ r: 3 }} />
-                        <Line type="monotone" dataKey="female" name="Female" stroke="#3B82F6" strokeWidth={2} dot={{ r: 3 }} />
-                        <Line type="monotone" dataKey="total"  name="Total"  stroke={AMBER}   strokeWidth={2} strokeDasharray="4 2" dot={{ r: 3 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Schools + Staff row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <School className="w-4 h-4" style={{ color: GREEN }} /> Schools by Type
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {summary.schoolTypeBreakdown.length > 0 ? (
-                      <>
-                        <ResponsiveContainer width="100%" height={160}>
-                          <PieChart>
-                            <Pie data={summary.schoolTypeBreakdown} dataKey="count" nameKey="type" cx="50%" cy="50%" outerRadius={65} innerRadius={28}>
-                              {summary.schoolTypeBreakdown.map((_, i) => (
-                                <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(v: any, n: string) => [Number(v).toLocaleString(), SCHOOL_TYPE_LABELS[n] || n]} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="flex flex-wrap gap-2 justify-center mt-1">
-                          {summary.schoolTypeBreakdown.map((item, i) => (
-                            <span key={i} className="flex items-center gap-1 text-xs">
-                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
-                              {SCHOOL_TYPE_LABELS[item.type] || item.type}: {item.count}
-                            </span>
-                          ))}
-                        </div>
-                      </>
-                    ) : <p className="text-muted-foreground text-sm text-center py-8">No data available</p>}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Users className="w-4 h-4" style={{ color: GREEN }} /> Teaching Staff Overview
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="text-center">
-                      <p className="text-4xl font-bold" style={{ color: GREEN }}>{summary.totalExaminers.toLocaleString()}</p>
-                      <p className="text-sm text-muted-foreground mt-1">Total Teaching Staff</p>
-                    </div>
-                    <div className="p-3 rounded-md border bg-muted/30">
-                      <p className="text-sm font-medium mb-1">Student : Teacher Ratio</p>
-                      <p className="text-2xl font-bold" style={{ color: GREEN }}>{summary.studentTeacherRatio} : 1</p>
-                      <p className="text-xs text-muted-foreground mt-1">{summary.totalStudents.toLocaleString()} students ÷ {summary.totalExaminers.toLocaleString()} staff</p>
-                    </div>
-                    <div className="flex items-start gap-2 p-2 rounded-md bg-muted/30 text-xs text-muted-foreground">
-                      <Lock className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                      Individual staff assignments available via authenticated data request.
-                    </div>
-                  </CardContent>
-                </Card>
+          {/* ══════════════════════════════════════════════════════════════
+              TAB: ENROLMENT & SCHOOLS
+          ══════════════════════════════════════════════════════════════ */}
+          {tab === "enrolment" && (
+            <div className="space-y-4">
+              {/* Category selector */}
+              <div className="flex flex-wrap gap-2">
+                {(["students", "schools", "examiners"] as const).map(cat => {
+                  const icons: Record<string, React.ElementType> = { students: GraduationCap, schools: School, examiners: Users };
+                  const Icon = icons[cat];
+                  const active = enrolCat === cat;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => handleEnrolCat(cat)}
+                      data-testid={`cat-${cat}`}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors"
+                      style={active
+                        ? { background: GREEN, color: "white", borderColor: GREEN }
+                        : { background: "transparent", color: GREEN, borderColor: GREEN }
+                      }
+                    >
+                      <Icon className="w-3.5 h-3.5" />{CAT_LABELS[cat]}
+                    </button>
+                  );
+                })}
               </div>
+
+              <FilterBar
+                f={enrolF}
+                onChange={patch => setEnrolF(prev => ({ ...prev, ...patch }))}
+                onRun={runEnrol}
+                isLoading={enrolLoading}
+                examYears={examYears}
+                regions={regions}
+                clusters={clusters}
+                groupOptions={GROUP_OPTIONS[enrolCat]}
+                showGrade={enrolCat === "students"}
+                showSchoolSearch={enrolCat === "students"}
+              />
+
+              {enrolLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin" style={{ color: GREEN }} />
+                  <p className="text-sm text-muted-foreground">Running query…</p>
+                </div>
+              ) : enrolStats ? (
+                <ResultsPanel stats={enrolStats} tabLabel="Enrolment & Schools" f={{ ...enrolF, category: enrolCat }} regions={regions} clusters={clusters} examYears={examYears} />
+              ) : (
+                <EmptyState label="enrolment and schools" />
+              )}
             </div>
           )}
 
-          {/* ══ QA TAB ══════════════════════════════════════════════ */}
-          {mainTab === "qa" && (
-            <div className="space-y-5">
-              {isSummaryLoading ? (
-                <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin" style={{ color: GREEN }} /></div>
-              ) : qa && (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card>
-                      <CardContent className="pt-6 pb-5 text-center">
-                        <p className="text-5xl font-extrabold" style={{ color: complianceColor }}>{qa.avgCompliancePct}%</p>
-                        <p className="text-sm font-semibold mt-2">National Compliance Rate</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">Network Average</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-6 pb-5 text-center">
-                        <p className="text-3xl font-extrabold" style={{ color: GREEN }}>
-                          {qa.inspectedThisYear} <span className="text-xl text-muted-foreground">of</span> {summary?.totalSchools ?? 0}
-                        </p>
-                        <p className="text-sm font-semibold mt-2">Schools with Multi-Grade Programmes</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">Coverage {qa.coveragePctThisYear}% — Current Year</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-6 pb-5 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <TrendIcon className="w-9 h-9" style={{ color: trendColor }} />
-                          <p className="text-3xl font-extrabold capitalize" style={{ color: trendColor }}>{qa.trend}</p>
-                        </div>
-                        <p className="text-sm font-semibold mt-2">Year-on-Year Direction</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">Trend</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-
+          {/* ══════════════════════════════════════════════════════════════
+              TAB: QUALITY ASSURANCE
+          ══════════════════════════════════════════════════════════════ */}
+          {tab === "qa" && (
+            <div className="space-y-4">
+              {/* QA summary cards — always visible */}
+              {qa && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Card>
-                    <CardHeader className="pb-3">
+                    <CardContent className="pt-6 pb-5 text-center">
+                      <p className="text-5xl font-extrabold" style={{ color: complianceColor }}>{qa.avgCompliancePct}%</p>
+                      <p className="text-sm font-semibold mt-2">National Compliance Rate</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Network Average</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6 pb-5 text-center">
+                      <p className="text-3xl font-extrabold" style={{ color: GREEN }}>
+                        {qa.inspectedThisYear}<span className="text-xl text-muted-foreground mx-1">of</span>{summary?.totalSchools ?? 0}
+                      </p>
+                      <p className="text-sm font-semibold mt-2">Schools with Multi-Grade Programmes</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Coverage {qa.coveragePctThisYear}% — Current Year</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6 pb-5 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <TrendIcon className="w-9 h-9" style={{ color: trendColor }} />
+                        <p className="text-3xl font-extrabold capitalize" style={{ color: trendColor }}>{qa.trend}</p>
+                      </div>
+                      <p className="text-sm font-semibold mt-2">Year-on-Year Direction</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Trend</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Compliance distribution bar */}
+              {qa && ((() => {
+                const t = qa.fullyCompliant + qa.partiallyCompliant + qa.nonCompliant;
+                if (!t) return null;
+                return (
+                  <Card>
+                    <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-center gap-2">
                         <Activity className="w-4 h-4" style={{ color: GREEN }} /> Compliance Distribution
                       </CardTitle>
-                      <CardDescription>All approved schools — current academic year</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="w-full h-7 rounded-full overflow-hidden flex">
-                        {(() => {
-                          const t = qa.fullyCompliant + qa.partiallyCompliant + qa.nonCompliant;
-                          if (!t) return null;
-                          return (
-                            <>
-                              <div style={{ width: `${(qa.fullyCompliant / t) * 100}%`, background: GREEN }} className="flex items-center justify-center text-white text-xs font-semibold">{Math.round((qa.fullyCompliant / t) * 100)}%</div>
-                              <div style={{ width: `${(qa.partiallyCompliant / t) * 100}%`, background: AMBER }} className="flex items-center justify-center text-white text-xs font-semibold">{Math.round((qa.partiallyCompliant / t) * 100)}%</div>
-                              <div style={{ width: `${(qa.nonCompliant / t) * 100}%`, background: RED }} className="flex items-center justify-center text-white text-xs font-semibold">{Math.round((qa.nonCompliant / t) * 100)}%</div>
-                            </>
-                          );
-                        })()}
+                        <div style={{ width: `${(qa.fullyCompliant / t) * 100}%`, background: GREEN }} className="flex items-center justify-center text-white text-xs font-semibold">
+                          {Math.round((qa.fullyCompliant / t) * 100)}%
+                        </div>
+                        <div style={{ width: `${(qa.partiallyCompliant / t) * 100}%`, background: AMBER }} className="flex items-center justify-center text-white text-xs font-semibold">
+                          {Math.round((qa.partiallyCompliant / t) * 100)}%
+                        </div>
+                        <div style={{ width: `${(qa.nonCompliant / t) * 100}%`, background: RED }} className="flex items-center justify-center text-white text-xs font-semibold">
+                          {Math.round((qa.nonCompliant / t) * 100)}%
+                        </div>
                       </div>
                       <div className="grid grid-cols-3 gap-3">
                         {[
-                          { label: "Fully Compliant",    count: qa.fullyCompliant,    color: GREEN },
-                          { label: "Partially Compliant",count: qa.partiallyCompliant,color: AMBER },
-                          { label: "Non-Compliant",       count: qa.nonCompliant,      color: RED   },
+                          { label: "Fully Compliant",     count: qa.fullyCompliant,     color: GREEN },
+                          { label: "Partially Compliant", count: qa.partiallyCompliant, color: AMBER },
+                          { label: "Non-Compliant",        count: qa.nonCompliant,       color: RED },
                         ].map(({ label, count, color }) => (
                           <div key={label} className="p-3 rounded-md border text-center" style={{ borderColor: `${color}40` }}>
                             <p className="text-2xl font-bold" style={{ color }}>{count.toLocaleString()}</p>
@@ -618,381 +942,84 @@ export default function Statistics() {
                       </div>
                     </CardContent>
                   </Card>
+                );
+              })())}
 
-                  {/* Gated teaser */}
-                  <div className="relative rounded-lg overflow-hidden border">
-                    <div className="filter blur-sm pointer-events-none select-none" aria-hidden>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Region</TableHead>
-                            <TableHead className="text-right">Schools Inspected</TableHead>
-                            <TableHead className="text-right">Compliance Score</TableHead>
-                            <TableHead className="text-right">Trend</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {[["Region A", "24 / 30", "87%", "↑"], ["Region B", "18 / 22", "74%", "→"], ["Region C", "11 / 19", "58%", "↓"], ["Region D", "29 / 31", "92%", "↑"]].map(([r, s, c, t], i) => (
-                            <TableRow key={i}><TableCell>{r}</TableCell><TableCell className="text-right">{s}</TableCell><TableCell className="text-right">{c}</TableCell><TableCell className="text-right">{t}</TableCell></TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+              {/* Query filter for school distribution by region/cluster/type */}
+              <FilterBar
+                f={qaF}
+                onChange={patch => { setQaF(prev => ({ ...prev, ...patch })); setQaUrl(null); }}
+                onRun={runQa}
+                isLoading={qaLoading}
+                examYears={examYears}
+                regions={regions}
+                clusters={clusters}
+                groupOptions={GROUP_OPTIONS["qa"]}
+              />
+
+              {qaLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin" style={{ color: GREEN }} />
+                  <p className="text-sm text-muted-foreground">Running query…</p>
+                </div>
+              ) : qaStats ? (
+                <ResultsPanel stats={qaStats} tabLabel="Quality Assurance" f={{ ...qaF, category: "schools" }} regions={regions} clusters={clusters} examYears={examYears} />
+              ) : (
+                <Card className="border-dashed">
+                  <CardContent className="py-12 text-center space-y-3">
+                    <div className="flex items-center justify-center gap-2">
+                      <Lock className="w-5 h-5 text-muted-foreground" />
+                      <p className="font-semibold text-foreground">School Distribution Query</p>
                     </div>
-                    <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                      <div className="text-center p-6 max-w-sm">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: `${GREEN}18` }}>
-                          <Lock className="w-6 h-6" style={{ color: GREEN }} />
-                        </div>
-                        <h3 className="font-bold text-lg mb-1">Regional &amp; School-Level Detail</h3>
-                        <p className="text-sm text-muted-foreground mb-4">Regional compliance rankings, school-level QA scores, and inspection findings are available to approved researchers and policy bodies.</p>
-                        <a href="/login">
-                          <Button style={{ background: GREEN, color: "white" }}>
-                            <Lock className="w-4 h-4 me-2" /> Request Data Access
-                          </Button>
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                </>
+                    <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                      Select breakdown, filters, and click "Run Query" to view school distribution data by region, cluster, or type. Detailed per-school QA inspection reports require authenticated access.
+                    </p>
+                  </CardContent>
+                </Card>
               )}
             </div>
           )}
 
-          {/* ══ DATA QUERY TAB ═══════════════════════════════════════ */}
-          {mainTab === "query" && (
+          {/* ══════════════════════════════════════════════════════════════
+              TAB: EXAMINATION
+          ══════════════════════════════════════════════════════════════ */}
+          {tab === "examination" && (
             <div className="space-y-4">
+              <FilterBar
+                f={examF}
+                onChange={patch => { setExamF(prev => ({ ...prev, ...patch })); setExamUrl(null); }}
+                onRun={runExam}
+                isLoading={examLoading}
+                examYears={examYears}
+                regions={regions}
+                clusters={clusters}
+                groupOptions={GROUP_OPTIONS["results"]}
+                showGrade
+                showSchoolSearch
+              />
 
-              {/* ── Filter panel ────────────────────────────────── */}
-              <Card>
-                <CardContent className="p-4 space-y-4">
-
-                  {/* Row 1: Category selector */}
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Data Category</p>
-                    <div className="flex flex-wrap gap-2">
-                      {(["students", "schools", "results", "examiners"] as StatCategory[]).map(cat => {
-                        const Icon = CAT_ICONS[cat];
-                        const active = category === cat;
-                        return (
-                          <button
-                            key={cat}
-                            onClick={() => handleCategoryChange(cat)}
-                            data-testid={`tab-${cat}`}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors"
-                            style={active
-                              ? { background: GREEN, color: "white", borderColor: GREEN }
-                              : { background: "transparent", color: GREEN, borderColor: GREEN }
-                            }
-                          >
-                            <Icon className="w-3.5 h-3.5" />{CAT_LABELS[cat]}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Row 2: Breakdown + filters row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-
-                    {/* Breakdown / groupBy */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Breakdown</label>
-                      <Select value={groupBy} onValueChange={v => handleGroupByChange(v as GroupBy)}>
-                        <SelectTrigger data-testid="select-group-by">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {GROUP_OPTIONS[category].map(opt => (
-                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Academic Year */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Academic Year</label>
-                      <Select value={selectedYear} onValueChange={setSelectedYear}>
-                        <SelectTrigger data-testid="select-exam-year">
-                          <SelectValue placeholder="All Years" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Academic Years</SelectItem>
-                          {examYears.map(y => (
-                            <SelectItem key={y.id} value={y.id.toString()}>
-                              {y.name.replace(/^["'"\u201C\u201D]+/, "")}{y.status === "active" ? " (Active)" : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Region */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Region</label>
-                      <Select value={selectedRegion} onValueChange={handleRegionChange}>
-                        <SelectTrigger data-testid="select-region">
-                          <SelectValue placeholder="All Regions" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Regions</SelectItem>
-                          {regions?.map(r => <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Cluster */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cluster</label>
-                      <Select value={selectedCluster} onValueChange={setSelectedCluster} disabled={visibleClusters.length === 0}>
-                        <SelectTrigger data-testid="select-cluster">
-                          <SelectValue placeholder="All Clusters" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Clusters</SelectItem>
-                          {visibleClusters.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Row 3: Grade + School search (contextual) */}
-                  <div className="flex flex-wrap items-end gap-3">
-                    {(category === "students" || category === "results") && groupBy !== "grade" && (
-                      <div className="space-y-1 w-48">
-                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Grade</label>
-                        <Select value={selectedGrade} onValueChange={setSelectedGrade}>
-                          <SelectTrigger data-testid="select-grade">
-                            <SelectValue placeholder="All Grades" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Grades</SelectItem>
-                            {[3, 6, 9, 12].map(g => <SelectItem key={g} value={g.toString()}>{GRADE_LABELS[g]}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-
-                    {groupBy === "school" && (
-                      <div className="space-y-1 flex-1 min-w-[200px]">
-                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Search School Name</label>
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                            <Input
-                              value={schoolSearchInput}
-                              onChange={e => setSchoolSearchInput(e.target.value)}
-                              onKeyDown={e => { if (e.key === "Enter") setSchoolSearch(schoolSearchInput); }}
-                              placeholder="Type school name and press Enter…"
-                              className="pl-8"
-                              data-testid="input-school-search"
-                            />
-                          </div>
-                          <Button
-                            variant="outline"
-                            onClick={() => setSchoolSearch(schoolSearchInput)}
-                            data-testid="button-school-search"
-                          >
-                            <Search className="w-4 h-4" />
-                          </Button>
-                          {schoolSearch && (
-                            <Button
-                              variant="ghost"
-                              onClick={() => { setSchoolSearch(""); setSchoolSearchInput(""); }}
-                              data-testid="button-clear-school-search"
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Clear & active filter chips */}
-                    <div className="flex items-center gap-2 flex-wrap ml-auto">
-                      {hasFilters && (
-                        <button onClick={clearFilters} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-md hover-elevate border">
-                          <X className="w-3 h-3" /> Clear all filters
-                        </button>
-                      )}
-                      {isFetching && <RefreshCw className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
-                    </div>
-                  </div>
-
-                  {/* Active filter badges */}
-                  {hasFilters && (
-                    <div className="flex flex-wrap gap-1.5 pt-1 border-t">
-                      {yearName    && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: `${GREEN}18`, color: GREEN }}>Year: {yearName.replace(/^["'"\u201C\u201D]+/, "")}</span>}
-                      {regionName  && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: `${GREEN}18`, color: GREEN }}>Region: {regionName}</span>}
-                      {clusterName && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: `${GREEN}18`, color: GREEN }}>Cluster: {clusterName}</span>}
-                      {gradeName   && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: `${GREEN}18`, color: GREEN }}>{gradeName}</span>}
-                      {schoolSearch && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: `${GREEN}18`, color: GREEN }}>School: "{schoolSearch}"</span>}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* ── Results area ─────────────────────────────────── */}
-              {isStatsLoading ? (
+              {examLoading ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <Loader2 className="w-8 h-8 animate-spin" style={{ color: GREEN }} />
-                  <p className="text-sm text-muted-foreground">Loading data…</p>
+                  <p className="text-sm text-muted-foreground">Running query…</p>
                 </div>
-              ) : !stats ? (
-                <Card className="border-dashed">
-                  <CardContent className="py-14 text-center">
-                    <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="font-medium text-foreground">Select filters above to query data</p>
-                    <p className="text-sm text-muted-foreground mt-1">Choose a category and breakdown to see national education statistics.</p>
-                  </CardContent>
-                </Card>
-              ) : !stats.results?.length ? (
-                <Card className="border-dashed">
-                  <CardContent className="py-14 text-center">
-                    <Search className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
-                    <p className="font-medium text-foreground">No results found</p>
-                    <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters or search term.</p>
-                  </CardContent>
-                </Card>
-              ) : (() => {
-                const totalExamined = isRes ? stats.results.reduce((s, r) => s + (r.extra?.total ?? 0), 0) : stats.total;
-                const totalPassed   = isRes ? stats.results.reduce((s, r) => s + r.count, 0) : 0;
-                const overallPassRate = isRes && totalExamined > 0 ? ((totalPassed / totalExamined) * 100).toFixed(1) + "%" : null;
-                const bySchool = groupBy === "school";
-
-                return (
-                  <div className="space-y-4">
-                    {/* Summary strip */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {[
-                        { label: isRes ? "Total Examined" : "Total",    val: (isRes ? totalExamined : stats.total).toLocaleString() },
-                        { label: "Rows",                                  val: stats.results.length.toLocaleString() },
-                        { label: isRes ? "Passed" : "Highest",           val: isRes ? totalPassed.toLocaleString() : maxVal.toLocaleString() },
-                        { label: isRes ? "Overall Pass Rate" : "Avg / Row", val: overallPassRate ?? (stats.results.length > 0 ? Math.round(stats.total / stats.results.length).toLocaleString() : "–") },
-                      ].map(({ label, val }) => (
-                        <Card key={label}>
-                          <CardContent className="pt-4 pb-3">
-                            <p className="text-xl font-bold" style={{ color: GREEN }}>{val}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-
-                    {/* Bar chart — for non-school breakdown with ≤20 rows */}
-                    {!bySchool && stats.results.length <= 20 && (
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm flex items-center gap-2">
-                            <BarChart3 className="w-4 h-4" style={{ color: GREEN }} />
-                            {CAT_LABELS[category]} — {GROUP_OPTIONS[category].find(o => o.value === groupBy)?.label}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={Math.max(180, stats.results.length * 28)}>
-                            <BarChart data={stats.results} layout="vertical" margin={{ top: 0, right: 60, left: 0, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                              <XAxis type="number" tick={{ fontSize: 10 }} />
-                              <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} width={100} />
-                              <Tooltip formatter={(v: any) => [Number(v).toLocaleString(), isRes ? "Passed" : "Count"]} />
-                              <Bar dataKey={isRes ? "count" : "count"} name={isRes ? "Passed" : "Count"} radius={[0, 3, 3, 0]}>
-                                {stats.results.map((_, i) => (
-                                  <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Table */}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <CardTitle className="text-sm">
-                            {stats.results.length} {bySchool ? "schools" : "rows"} — {isRes ? `${totalExamined.toLocaleString()} examined` : `${stats.total.toLocaleString()} total`}
-                          </CardTitle>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleExport}
-                            data-testid="button-export-csv"
-                            disabled={!stats.results.length}
-                          >
-                            <Download className="w-3.5 h-3.5 me-1.5" /> Download CSV
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        <div className="rounded-md border overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="w-8 text-muted-foreground font-normal text-xs">#</TableHead>
-                                <TableHead>{bySchool ? "School" : "Category"}</TableHead>
-                                {bySchool && <TableHead className="hidden md:table-cell">Region</TableHead>}
-                                {bySchool && <TableHead className="hidden lg:table-cell">Cluster</TableHead>}
-                                {bySchool && <TableHead className="hidden lg:table-cell">Type</TableHead>}
-                                <TableHead className="text-right">{isRes ? "Examined" : "Count"}</TableHead>
-                                {isRes && <TableHead className="text-right">Passed</TableHead>}
-                                <TableHead className="text-right">{isRes ? "Pass Rate" : "Share"}</TableHead>
-                                {!bySchool && <TableHead className="hidden md:table-cell w-32">Bar</TableHead>}
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {stats.results.map((r, i) => {
-                                const rowTotal = isRes ? (r.extra?.total ?? r.count) : r.count;
-                                const denominator = isRes ? totalExamined : stats.total;
-                                const sharePct = denominator > 0 ? ((rowTotal / denominator) * 100).toFixed(1) + "%" : "0%";
-                                const passRate  = r.extra?.passRate as string | undefined;
-                                const passNum   = passRate ? parseFloat(passRate) : 0;
-                                const passColor = isRes ? (passNum >= 75 ? GREEN : passNum >= 50 ? AMBER : RED) : undefined;
-
-                                return (
-                                  <TableRow key={i} data-testid={`row-stat-${i}`} className="hover:bg-muted/40">
-                                    <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
-                                    <TableCell className="font-medium max-w-[180px] truncate" title={r.label}>{r.label}</TableCell>
-                                    {bySchool && <TableCell className="hidden md:table-cell text-xs text-muted-foreground">{r.extra?.region ?? ""}</TableCell>}
-                                    {bySchool && <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">{r.extra?.cluster ?? ""}</TableCell>}
-                                    {bySchool && <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">{r.extra?.schoolType ? (SCHOOL_TYPE_LABELS[r.extra.schoolType] || r.extra.schoolType) : ""}</TableCell>}
-                                    <TableCell className="text-right tabular-nums">{rowTotal.toLocaleString()}</TableCell>
-                                    {isRes && <TableCell className="text-right tabular-nums">{r.count.toLocaleString()}</TableCell>}
-                                    <TableCell className="text-right">
-                                      <span className="text-sm font-medium" style={{ color: passColor }}>{isRes ? (passRate ?? "–") : sharePct}</span>
-                                    </TableCell>
-                                    {!bySchool && (
-                                      <TableCell className="hidden md:table-cell">
-                                        <MiniBar value={rowTotal} max={maxVal} />
-                                      </TableCell>
-                                    )}
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                );
-              })()}
+              ) : examStats ? (
+                <ResultsPanel stats={examStats} tabLabel="Examination" f={{ ...examF, category: "results" }} regions={regions} clusters={clusters} examYears={examYears} />
+              ) : (
+                <EmptyState label="examination results" />
+              )}
             </div>
           )}
 
-          {/* ── Footer ────────────────────────────────────────────── */}
+          {/* ── Footer ─────────────────────────────────────────────── */}
           {summary && (
-            <div className="rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-3 mt-4" style={{ background: GREEN }}>
+            <div className="rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-3" style={{ background: GREEN }}>
               <div className="flex items-center gap-2">
                 <img src={logoPath} alt="Amaanah" className="h-6 w-6 rounded-sm object-contain bg-white p-0.5" />
                 <span className="text-white/90 text-xs">General Secretariat for Islamic &amp; Arabic Education, Republic of The Gambia</span>
               </div>
-              <p className="text-white/70 text-xs">Data as of: {formatDate(summary.dataAsOf)}</p>
-              {mainTab === "query" && stats?.results?.length ? (
-                <Button size="sm" variant="outline" onClick={handleExport} className="text-xs border-white/30 text-white" style={{ background: "transparent" }}>
-                  <Download className="w-3.5 h-3.5 me-1" /> Export Current View
-                </Button>
-              ) : null}
+              <p className="text-white/70 text-xs">Data as of: {new Date(summary.dataAsOf).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</p>
+              <a href="/login" className="text-white/80 hover:text-white text-xs underline underline-offset-2">Sign In for Full Access</a>
             </div>
           )}
 
