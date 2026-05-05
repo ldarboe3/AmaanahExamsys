@@ -13176,9 +13176,11 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       const [
         schoolsResult,
         studentsResult,
-        examinersResult,
+        schoolStaffResult,
+        candidatesResult,
         regionsResult,
         clustersResult,
+        subjectsResult,
         examYearsResult,
         genderResult,
         schoolTypeResult,
@@ -13186,9 +13188,11 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       ] = await Promise.all([
         pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status = 'approved') AS active FROM schools`),
         pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE gender = 'male') AS male, COUNT(*) FILTER (WHERE gender = 'female') AS female FROM students WHERE status = 'approved'`),
-        pool.query(`SELECT COUNT(*) AS total FROM examiners`),
+        pool.query(`SELECT COUNT(*) AS total FROM users WHERE role = 'school_admin'`),
+        pool.query(`SELECT COUNT(DISTINCT student_id) AS total FROM student_results`),
         pool.query(`SELECT COUNT(*) AS total FROM regions`),
         pool.query(`SELECT COUNT(*) AS total FROM clusters`),
+        pool.query(`SELECT COUNT(*) AS total FROM subjects`),
         pool.query(`SELECT id, name, is_active, exam_start_date FROM exam_years ORDER BY exam_start_date DESC NULLS LAST`),
         pool.query(`SELECT gender, COUNT(*) AS cnt FROM students WHERE status = 'approved' GROUP BY gender`),
         pool.query(`SELECT school_type, COUNT(*) AS cnt FROM schools WHERE status = 'approved' GROUP BY school_type ORDER BY cnt DESC`),
@@ -13211,12 +13215,14 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       const femaleStudents = parseInt(studentsResult.rows[0]?.female || '0');
       const gpi = maleStudents > 0 ? (femaleStudents / maleStudents) : 0;
 
-      const totalSchools  = parseInt(schoolsResult.rows[0]?.total  || '0');
-      const activeSchools = parseInt(schoolsResult.rows[0]?.active || '0');
-      const totalExaminers = parseInt(examinersResult.rows[0]?.total || '0');
-      const totalRegions  = parseInt(regionsResult.rows[0]?.total  || '0');
-      const totalClusters = parseInt(clustersResult.rows[0]?.total || '0');
-      const studentTeacherRatio = totalExaminers > 0 ? Math.round(totalStudents / totalExaminers) : 0;
+      const totalSchools   = parseInt(schoolsResult.rows[0]?.total  || '0');
+      const activeSchools  = parseInt(schoolsResult.rows[0]?.active || '0');
+      const totalSchoolStaff = parseInt(schoolStaffResult.rows[0]?.total || '0');
+      const totalCandidates  = parseInt(candidatesResult.rows[0]?.total || '0');
+      const totalRegions   = parseInt(regionsResult.rows[0]?.total  || '0');
+      const totalClusters  = parseInt(clustersResult.rows[0]?.total || '0');
+      const totalSubjects  = parseInt(subjectsResult.rows[0]?.total || '0');
+      const studentsPerSchool = totalSchools > 0 ? Math.round(totalStudents / totalSchools) : 0;
 
       const currentYear = examYearsResult.rows.find((y: any) => y.is_active === true)
         || examYearsResult.rows[0]
@@ -13253,10 +13259,12 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         gpi: parseFloat(gpi.toFixed(2)),
         totalSchools,
         activeSchools,
-        totalExaminers,
+        totalSchoolStaff,
+        totalCandidates,
+        totalSubjects,
+        studentsPerSchool,
         totalRegions,
         totalClusters,
-        studentTeacherRatio,
         currentYear: currentYear ? { id: currentYear.id, name: currentYear.name, startDate: currentYear.exam_start_date } : null,
         schoolTypeBreakdown,
         enrolmentTrend,
@@ -13551,29 +13559,49 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         }
         meta.isResultsMode = true;
 
-      // ── EXAMINERS (staff) ────────────────────────────────────────────────────
+      // ── SCHOOL STAFF (school_admin users — one per registered school) ─────────
       } else if (category === 'examiners') {
-        const allExaminers = await storage.getAllExaminers();
-        total = allExaminers.length;
+        const { pool: dbPool } = await import('./db');
 
         if (groupBy === 'region') {
-          const counts: Record<number, number> = {};
-          allExaminers.forEach((e: any) => {
-            if (e.regionId) counts[e.regionId] = (counts[e.regionId] || 0) + 1;
-          });
-          results = allRegions.map((r: any) => ({ label: r.name, count: counts[r.id] || 0 })).filter(r => r.count > 0);
+          const qr = await dbPool.query(`
+            SELECT r.name AS label, COUNT(DISTINCT u.id) AS count
+            FROM users u
+            JOIN schools sc ON sc.id = u.school_id
+            JOIN regions r ON r.id = sc.region_id
+            WHERE u.role = 'school_admin'
+            GROUP BY r.id, r.name ORDER BY count DESC
+          `);
+          results = qr.rows.map((r: any) => ({ label: r.label, count: parseInt(r.count) }));
+          total = results.reduce((s, r) => s + r.count, 0);
 
         } else if (groupBy === 'cluster') {
-          const counts: Record<number, number> = {};
-          allExaminers.forEach((e: any) => {
-            if (e.clusterId) counts[e.clusterId] = (counts[e.clusterId] || 0) + 1;
-          });
-          results = allClusters.map((c: any) => ({ label: c.name, count: counts[c.id] || 0 })).filter(r => r.count > 0);
+          const qr = await dbPool.query(`
+            SELECT cl.name AS label, COUNT(DISTINCT u.id) AS count
+            FROM users u
+            JOIN schools sc ON sc.id = u.school_id
+            JOIN clusters cl ON cl.id = sc.cluster_id
+            WHERE u.role = 'school_admin'
+            GROUP BY cl.id, cl.name ORDER BY count DESC
+          `);
+          results = qr.rows.map((r: any) => ({ label: r.label, count: parseInt(r.count) }));
+          total = results.reduce((s, r) => s + r.count, 0);
 
-        } else if (groupBy === 'status') {
-          const counts: Record<string, number> = {};
-          allExaminers.forEach((e: any) => { const s = e.status || 'unknown'; counts[s] = (counts[s] || 0) + 1; });
-          results = Object.entries(counts).map(([label, count]) => ({ label: label.charAt(0).toUpperCase() + label.slice(1), count }));
+        } else if (groupBy === 'type') {
+          const qr = await dbPool.query(`
+            SELECT sc.school_type AS label, COUNT(DISTINCT u.id) AS count
+            FROM users u
+            JOIN schools sc ON sc.id = u.school_id
+            WHERE u.role = 'school_admin'
+            GROUP BY sc.school_type ORDER BY count DESC
+          `);
+          results = qr.rows.map((r: any) => ({ label: r.label, count: parseInt(r.count) }));
+          total = results.reduce((s, r) => s + r.count, 0);
+
+        } else {
+          const qr = await dbPool.query(`SELECT COUNT(*) AS total FROM users WHERE role = 'school_admin'`);
+          total = parseInt(qr.rows[0]?.total || '0');
+          results = [{ label: 'School Admin Staff', count: total }];
         }
 
       } else {

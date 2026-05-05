@@ -91,8 +91,10 @@ interface StatsResponse {
 }
 interface NationalSummary {
   totalStudents: number; maleStudents: number; femaleStudents: number; gpi: number;
-  totalSchools: number; activeSchools: number; totalExaminers: number;
-  totalRegions: number; totalClusters: number; studentTeacherRatio: number;
+  totalSchools: number; activeSchools: number;
+  totalSchoolStaff: number; totalCandidates: number;
+  totalSubjects: number; studentsPerSchool: number;
+  totalRegions: number; totalClusters: number;
   currentYear: { id: number; name: string } | null;
   schoolTypeBreakdown: { type: string; count: number }[];
   enrolmentTrend: { yearName: string; male: number; female: number; total: number }[];
@@ -114,7 +116,7 @@ const TYPE_LABELS: Record<string, string> = {
   LBS: "Lower Basic (LBS)", UBS: "Upper Basic (UBS)", BCS: "Basic Cycle (BCS)", SSS: "Senior Secondary (SSS)",
 };
 const CAT_LABELS: Record<StatCategory, string> = {
-  students: "Students", schools: "Schools", results: "Exam Results", examiners: "Teaching Staff",
+  students: "Students", schools: "Schools", results: "Exam Results", examiners: "School Staff",
 };
 
 const GROUP_OPTIONS: Record<string, { value: GroupBy; label: string }[]> = {
@@ -327,12 +329,12 @@ async function exportPDF(
     curY += 5;
 
     const kpis = [
-      { label: "Schools",         value: summary.totalSchools.toLocaleString() },
-      { label: "Students",        value: summary.totalStudents.toLocaleString() },
-      { label: "Teaching Staff",  value: summary.totalExaminers.toLocaleString() },
-      { label: "Regions",         value: summary.totalRegions.toLocaleString() },
-      { label: "Clusters",        value: summary.totalClusters.toLocaleString() },
-      { label: "Student:Teacher", value: `1:${summary.studentTeacherRatio.toLocaleString()}` },
+      { label: "Schools",           value: summary.totalSchools.toLocaleString() },
+      { label: "Students Enrolled", value: summary.totalStudents.toLocaleString() },
+      { label: "Candidates Examined", value: summary.totalCandidates.toLocaleString() },
+      { label: "Regions",           value: summary.totalRegions.toLocaleString() },
+      { label: "Clusters",          value: summary.totalClusters.toLocaleString() },
+      { label: "Students/School",   value: summary.studentsPerSchool.toLocaleString() },
     ];
     const bW = (W - 24) / 6;
     const bH = 17;
@@ -1104,12 +1106,12 @@ export default function Statistics() {
                 <div className="space-y-4">
                   {summary && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                      <KpiCard icon={School}        label="Schools"         value={summary.totalSchools} />
-                      <KpiCard icon={GraduationCap} label="Students"        value={summary.totalStudents} />
-                      <KpiCard icon={Users}         label="Teaching Staff"  value={summary.totalExaminers} />
-                      <KpiCard icon={MapPin}        label="Regions"         value={summary.totalRegions} />
-                      <KpiCard icon={Grid3x3}       label="Clusters"        value={summary.totalClusters} />
-                      <KpiCard icon={BarChart2}     label="Student:Teacher" value={summary.studentTeacherRatio} sub="ratio" />
+                      <KpiCard icon={School}        label="Schools"             value={summary.totalSchools} />
+                      <KpiCard icon={GraduationCap} label="Students Enrolled"   value={summary.totalStudents} />
+                      <KpiCard icon={Users}         label="Candidates Examined"  value={summary.totalCandidates} />
+                      <KpiCard icon={MapPin}        label="Regions"              value={summary.totalRegions} />
+                      <KpiCard icon={Grid3x3}       label="Clusters"             value={summary.totalClusters} />
+                      <KpiCard icon={BarChart2}     label="Students / School"    value={summary.studentsPerSchool} sub="avg per school" />
                     </div>
                   )}
                   <ResultsPanel stats={enrolStats} tabLabel="Enrolment & Schools" f={{ ...enrolF, category: enrolCat }} regions={regions} clusters={clusters} examYears={examYears} summary={summary} />
@@ -1148,12 +1150,12 @@ export default function Statistics() {
                   {/* National KPI strip */}
                   {summary && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                      <KpiCard icon={School}        label="Schools"         value={summary.totalSchools} />
-                      <KpiCard icon={GraduationCap} label="Students"        value={summary.totalStudents} />
-                      <KpiCard icon={Users}         label="Teaching Staff"  value={summary.totalExaminers} />
-                      <KpiCard icon={MapPin}        label="Regions"         value={summary.totalRegions} />
-                      <KpiCard icon={Grid3x3}       label="Clusters"        value={summary.totalClusters} />
-                      <KpiCard icon={BarChart2}     label="Student:Teacher" value={summary.studentTeacherRatio} sub="ratio" />
+                      <KpiCard icon={School}        label="Schools"             value={summary.totalSchools} />
+                      <KpiCard icon={GraduationCap} label="Students Enrolled"   value={summary.totalStudents} />
+                      <KpiCard icon={Users}         label="Candidates Examined"  value={summary.totalCandidates} />
+                      <KpiCard icon={MapPin}        label="Regions"              value={summary.totalRegions} />
+                      <KpiCard icon={Grid3x3}       label="Clusters"             value={summary.totalClusters} />
+                      <KpiCard icon={BarChart2}     label="Students / School"    value={summary.studentsPerSchool} sub="avg per school" />
                     </div>
                   )}
                   {/* QA summary cards */}
@@ -1274,12 +1276,12 @@ export default function Statistics() {
                 <div className="space-y-4">
                   {summary && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                      <KpiCard icon={School}        label="Schools"         value={summary.totalSchools} />
-                      <KpiCard icon={GraduationCap} label="Students"        value={summary.totalStudents} />
-                      <KpiCard icon={Users}         label="Teaching Staff"  value={summary.totalExaminers} />
-                      <KpiCard icon={MapPin}        label="Regions"         value={summary.totalRegions} />
-                      <KpiCard icon={Grid3x3}       label="Clusters"        value={summary.totalClusters} />
-                      <KpiCard icon={BarChart2}     label="Student:Teacher" value={summary.studentTeacherRatio} sub="ratio" />
+                      <KpiCard icon={School}        label="Schools"             value={summary.totalSchools} />
+                      <KpiCard icon={GraduationCap} label="Students Enrolled"   value={summary.totalStudents} />
+                      <KpiCard icon={Users}         label="Candidates Examined"  value={summary.totalCandidates} />
+                      <KpiCard icon={MapPin}        label="Regions"              value={summary.totalRegions} />
+                      <KpiCard icon={Grid3x3}       label="Clusters"             value={summary.totalClusters} />
+                      <KpiCard icon={BarChart2}     label="Students / School"    value={summary.studentsPerSchool} sub="avg per school" />
                     </div>
                   )}
                   <ResultsPanel stats={examStats} tabLabel="Examination" f={{ ...examF, category: "results" }} regions={regions} clusters={clusters} examYears={examYears} summary={summary} />
