@@ -800,20 +800,6 @@ export default function Statistics() {
       <div className="container mx-auto px-4 py-6">
         <div className="max-w-6xl mx-auto space-y-5">
 
-          {/* ── National KPI strip ──────────────────────────────────── */}
-          {isSummaryLoading ? (
-            <div className="flex justify-center py-6"><Loader2 className="w-8 h-8 animate-spin" style={{ color: GREEN }} /></div>
-          ) : summary && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <KpiCard icon={School}        label="Schools"         value={summary.totalSchools} />
-              <KpiCard icon={GraduationCap} label="Students"        value={summary.totalStudents} />
-              <KpiCard icon={Users}         label="Teaching Staff"  value={summary.totalExaminers} />
-              <KpiCard icon={MapPin}        label="Regions"         value={summary.totalRegions} />
-              <KpiCard icon={Grid3x3}       label="Clusters"        value={summary.totalClusters} />
-              <KpiCard icon={BarChart2}     label="Student:Teacher" value={summary.studentTeacherRatio} sub="ratio" />
-            </div>
-          )}
-
           {/* ══════════════════════════════════════════════════════════════
               TAB: ENROLMENT & SCHOOLS
           ══════════════════════════════════════════════════════════════ */}
@@ -861,7 +847,19 @@ export default function Statistics() {
                   <p className="text-sm text-muted-foreground">Running query…</p>
                 </div>
               ) : enrolStats ? (
-                <ResultsPanel stats={enrolStats} tabLabel="Enrolment & Schools" f={{ ...enrolF, category: enrolCat }} regions={regions} clusters={clusters} examYears={examYears} />
+                <div className="space-y-4">
+                  {summary && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                      <KpiCard icon={School}        label="Schools"         value={summary.totalSchools} />
+                      <KpiCard icon={GraduationCap} label="Students"        value={summary.totalStudents} />
+                      <KpiCard icon={Users}         label="Teaching Staff"  value={summary.totalExaminers} />
+                      <KpiCard icon={MapPin}        label="Regions"         value={summary.totalRegions} />
+                      <KpiCard icon={Grid3x3}       label="Clusters"        value={summary.totalClusters} />
+                      <KpiCard icon={BarChart2}     label="Student:Teacher" value={summary.studentTeacherRatio} sub="ratio" />
+                    </div>
+                  )}
+                  <ResultsPanel stats={enrolStats} tabLabel="Enrolment & Schools" f={{ ...enrolF, category: enrolCat }} regions={regions} clusters={clusters} examYears={examYears} />
+                </div>
               ) : (
                 <EmptyState label="enrolment and schools" />
               )}
@@ -893,6 +891,17 @@ export default function Statistics() {
                 </div>
               ) : qaStats ? (
                 <div className="space-y-4">
+                  {/* National KPI strip */}
+                  {summary && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                      <KpiCard icon={School}        label="Schools"         value={summary.totalSchools} />
+                      <KpiCard icon={GraduationCap} label="Students"        value={summary.totalStudents} />
+                      <KpiCard icon={Users}         label="Teaching Staff"  value={summary.totalExaminers} />
+                      <KpiCard icon={MapPin}        label="Regions"         value={summary.totalRegions} />
+                      <KpiCard icon={Grid3x3}       label="Clusters"        value={summary.totalClusters} />
+                      <KpiCard icon={BarChart2}     label="Student:Teacher" value={summary.studentTeacherRatio} sub="ratio" />
+                    </div>
+                  )}
                   {/* QA summary cards */}
                   {qa && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1008,7 +1017,19 @@ export default function Statistics() {
                   <p className="text-sm text-muted-foreground">Running query…</p>
                 </div>
               ) : examStats ? (
-                <ResultsPanel stats={examStats} tabLabel="Examination" f={{ ...examF, category: "results" }} regions={regions} clusters={clusters} examYears={examYears} />
+                <div className="space-y-4">
+                  {summary && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                      <KpiCard icon={School}        label="Schools"         value={summary.totalSchools} />
+                      <KpiCard icon={GraduationCap} label="Students"        value={summary.totalStudents} />
+                      <KpiCard icon={Users}         label="Teaching Staff"  value={summary.totalExaminers} />
+                      <KpiCard icon={MapPin}        label="Regions"         value={summary.totalRegions} />
+                      <KpiCard icon={Grid3x3}       label="Clusters"        value={summary.totalClusters} />
+                      <KpiCard icon={BarChart2}     label="Student:Teacher" value={summary.studentTeacherRatio} sub="ratio" />
+                    </div>
+                  )}
+                  <ResultsPanel stats={examStats} tabLabel="Examination" f={{ ...examF, category: "results" }} regions={regions} clusters={clusters} examYears={examYears} />
+                </div>
               ) : (
                 <EmptyState label="examination results" />
               )}
