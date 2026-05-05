@@ -86,6 +86,64 @@ interface ExamYearStats {
   publishedPercentage: number;
 }
 
+/* ── Grade colour + name system ─────────────────────────────── */
+const GRADE_CONFIG: Record<number, {
+  label: string;
+  short: string;
+  bg: string;
+  text: string;
+  border: string;
+  iconBg: string;
+  iconText: string;
+  cardBorder: string;
+}> = {
+  3: {
+    label: "Grade 3 — Lower Basic",
+    short: "LBS",
+    bg: "bg-sky-100 dark:bg-sky-900/40",
+    text: "text-sky-700 dark:text-sky-300",
+    border: "border-sky-200 dark:border-sky-700",
+    iconBg: "bg-sky-500",
+    iconText: "text-white",
+    cardBorder: "border-sky-300/60 dark:border-sky-700/60",
+  },
+  6: {
+    label: "Grade 6 — Upper Basic",
+    short: "UBS",
+    bg: "bg-emerald-100 dark:bg-emerald-900/40",
+    text: "text-emerald-700 dark:text-emerald-300",
+    border: "border-emerald-200 dark:border-emerald-700",
+    iconBg: "bg-emerald-500",
+    iconText: "text-white",
+    cardBorder: "border-emerald-300/60 dark:border-emerald-700/60",
+  },
+  9: {
+    label: "Grade 9 — Basic Certificate",
+    short: "BCS",
+    bg: "bg-amber-100 dark:bg-amber-900/40",
+    text: "text-amber-700 dark:text-amber-300",
+    border: "border-amber-200 dark:border-amber-700",
+    iconBg: "bg-amber-500",
+    iconText: "text-white",
+    cardBorder: "border-amber-300/60 dark:border-amber-700/60",
+  },
+  12: {
+    label: "Grade 12 — Senior Secondary",
+    short: "SSS",
+    bg: "bg-violet-100 dark:bg-violet-900/40",
+    text: "text-violet-700 dark:text-violet-300",
+    border: "border-violet-200 dark:border-violet-700",
+    iconBg: "bg-violet-500",
+    iconText: "text-white",
+    cardBorder: "border-violet-300/60 dark:border-violet-700/60",
+  },
+};
+
+function getCardGradeStyle(grades: number[] | null | undefined) {
+  const g = grades && grades.length === 1 ? grades[0] : null;
+  return g ? GRADE_CONFIG[g] : null;
+}
+
 function ExamYearCard({ 
   examYear, 
   onEdit, 
@@ -110,24 +168,52 @@ function ExamYearCard({
     queryKey: [`/api/exam-years/${examYear.id}/statistics`],
   });
 
+  const grades = (examYear.grades ?? []).filter(g => GRADE_CONFIG[g]);
+  const singleGrade = getCardGradeStyle(grades);
+
   return (
-    <Card className={examYear.isActive ? "border-primary/50 bg-primary/5" : ""}>
+    <Card className={[
+      examYear.isActive && !singleGrade ? "border-primary/50 bg-primary/5" : "",
+      singleGrade ? singleGrade.cardBorder : "",
+    ].filter(Boolean).join(" ")}>
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-md flex items-center justify-center ${
-              examYear.isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`w-10 h-10 rounded-md flex items-center justify-center flex-shrink-0 ${
+              singleGrade
+                ? `${singleGrade.iconBg} ${singleGrade.iconText}`
+                : examYear.isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
             }`}>
               <Calendar className="w-5 h-5" />
             </div>
-            <div>
-              <CardTitle className="text-base">{examYear.name}</CardTitle>
+            <div className="min-w-0">
+              <CardTitle className="text-base leading-snug">{examYear.name}</CardTitle>
               <CardDescription className="text-sm">
                 {examYear.year} {examYear.hijriYear && `/ ${examYear.hijriYear}`}
               </CardDescription>
+              {/* Grade badges */}
+              {grades.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {grades.map(g => {
+                    const cfg = GRADE_CONFIG[g];
+                    return (
+                      <span
+                        key={g}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${cfg.bg} ${cfg.text} ${cfg.border}`}
+                        data-testid={`badge-grade-${g}`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.iconBg} inline-block`} />
+                        {cfg.short} — Gr. {g}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {examYear.isActive && (
               <Badge className="bg-primary/10 text-primary">Active</Badge>
             )}
