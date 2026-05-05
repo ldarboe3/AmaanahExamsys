@@ -19457,6 +19457,276 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
     }
   });
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // EXTERNAL SYNC API  (for Edu Authority & QA systems)
+  // All endpoints require:  Authorization: Bearer <AMAANAH_SYNC_API_KEY>
+  // ─────────────────────────────────────────────────────────────────────────
+
+  function requireSyncKey(req: Request, res: any, next: () => void) {
+    const SYNC_KEY = process.env.AMAANAH_SYNC_API_KEY;
+    if (!SYNC_KEY) {
+      return res.status(503).json({ message: "Sync API not configured on this server." });
+    }
+    const auth = req.headers['authorization'] as string | undefined;
+    const provided = auth?.startsWith('Bearer ') ? auth.slice(7).trim() : req.headers['x-api-key'] as string | undefined;
+    if (!provided || provided !== SYNC_KEY) {
+      return res.status(401).json({ message: "Invalid or missing API key." });
+    }
+    next();
+  }
+
+  // ── GET /api/sync/schools ─────────────────────────────────────────────────
+  // Returns all schools with their region, cluster, center, and status.
+  // Optional query: ?status=approved&regionId=1&updatedSince=2024-01-01T00:00:00Z
+  app.get("/api/sync/schools", requireSyncKey, async (req, res) => {
+    try {
+      const allSchools = await storage.getAllSchools();
+      const allRegions = await storage.getAllRegions();
+      const allClusters = await storage.getAllClusters();
+
+      const regionMap = new Map(allRegions.map((r: any) => [r.id, r]));
+      const clusterMap = new Map(allClusters.map((c: any) => [c.id, c]));
+
+      // Optional filters
+      const statusFilter = req.query.status as string | undefined;
+      const regionIdFilter = req.query.regionId ? parseInt(req.query.regionId as string) : undefined;
+      const updatedSince = req.query.updatedSince ? new Date(req.query.updatedSince as string) : undefined;
+
+      let filtered = allSchools;
+      if (statusFilter) filtered = filtered.filter((s: any) => s.status === statusFilter);
+      if (regionIdFilter) filtered = filtered.filter((s: any) => s.regionId === regionIdFilter);
+      if (updatedSince) filtered = filtered.filter((s: any) => s.updatedAt && new Date(s.updatedAt) >= updatedSince);
+
+      const result = filtered.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        nameEn: s.nameEn ?? null,
+        email: s.email,
+        phone: s.phone ?? null,
+        address: s.address ?? null,
+        schoolType: s.schoolType,
+        schoolTypes: s.schoolTypes ?? [],
+        status: s.status,
+        registrarName: s.registrarName,
+        registrationFeePaid: s.registrationFeePaid ?? false,
+        isEmailVerified: s.isEmailVerified ?? false,
+        region: s.regionId ? { id: s.regionId, name: (regionMap.get(s.regionId) as any)?.name ?? null } : null,
+        cluster: s.clusterId ? { id: s.clusterId, name: (clusterMap.get(s.clusterId) as any)?.name ?? null } : null,
+        assignedCenterId: s.assignedCenterId ?? null,
+        preferredCenterId: s.preferredCenterId ?? null,
+        schoolBadge: s.schoolBadge ?? null,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+      }));
+
+      res.json({ total: result.length, data: result });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── GET /api/sync/cluster-monitors ───────────────────────────────────────
+  // Returns all staff profiles with role=cluster_officer, their card status
+  // and assignment info, suitable for the Edu Authority system.
+  app.get("/api/sync/cluster-monitors", requireSyncKey, async (req, res) => {
+    try {
+      const allStaff = await storage.getAllStaffProfiles({ role: "cluster_officer" });
+      const allRegions = await storage.getAllRegions();
+      const allClusters = await storage.getAllClusters();
+
+      const regionMap = new Map(allRegions.map((r: any) => [r.id, r]));
+      const clusterMap = new Map(allClusters.map((c: any) => [c.id, c]));
+
+      // Optional filters
+      const statusFilter = req.query.status as string | undefined;
+      const updatedSince = req.query.updatedSince ? new Date(req.query.updatedSince as string) : undefined;
+
+      let filtered = allStaff;
+      if (statusFilter) filtered = filtered.filter((s: any) => s.status === statusFilter);
+      if (updatedSince) filtered = filtered.filter((s: any) => s.updatedAt && new Date(s.updatedAt) >= updatedSince);
+
+      const result = filtered.map((s: any) => ({
+        id: s.id,
+        staffIdNumber: s.staffIdNumber,
+        employeeId: s.employeeId ?? null,
+        firstName: s.firstName,
+        middleName: s.middleName ?? null,
+        lastName: s.lastName,
+        fullNameArabic: s.fullNameArabic ?? null,
+        role: s.role,
+        department: s.department ?? null,
+        phone: s.phone ?? null,
+        email: s.email ?? null,
+        photoUrl: s.photoUrl ?? null,
+        cardStatus: s.status,
+        cardPrintedAt: s.cardPrintedAt ?? null,
+        cardIssuedAt: s.cardIssuedAt ?? null,
+        activatedAt: s.activatedAt ?? null,
+        suspendedAt: s.suspendedAt ?? null,
+        revokedAt: s.revokedAt ?? null,
+        region: s.regionId ? { id: s.regionId, name: (regionMap.get(s.regionId) as any)?.name ?? null } : null,
+        cluster: s.clusterId ? { id: s.clusterId, name: (clusterMap.get(s.clusterId) as any)?.name ?? null } : null,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+      }));
+
+      res.json({ total: result.length, data: result });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── POST /api/sync/schools ────────────────────────────────────────────────
+  // Upsert one or many schools from an external system (e.g. QA system).
+  // Matches on email. Creates if not found; updates name/phone/address/region/cluster if found.
+  // Body: { schools: [{ name, email, phone?, address?, region?, cluster?, schoolType?, registrarName? }] }
+  app.post("/api/sync/schools", requireSyncKey, async (req, res) => {
+    try {
+      const bodySchema = z.object({
+        schools: z.array(z.object({
+          name: z.string().min(1),
+          email: z.string().email(),
+          registrarName: z.string().optional().default("Administrator"),
+          phone: z.string().optional(),
+          address: z.string().optional(),
+          schoolType: z.enum(['arabic', 'franco_arabic', 'mixed', 'other']).optional().default('arabic'),
+          region: z.string().optional(),
+          cluster: z.string().optional(),
+        })).min(1),
+      });
+
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const allRegions = await storage.getAllRegions();
+      const allClusters = await storage.getAllClusters();
+      const regionMap = new Map(allRegions.map((r: any) => [r.name.toLowerCase().trim(), r]));
+      const clusterMap = new Map(allClusters.map((c: any) => [`${c.regionId}:${c.name.toLowerCase().trim()}`, c]));
+
+      const results: any[] = [];
+
+      for (const row of parsed.data.schools) {
+        try {
+          // Resolve region
+          let regionId: number | undefined;
+          if (row.region) {
+            const region = regionMap.get(row.region.toLowerCase().trim());
+            if (region) regionId = (region as any).id;
+          }
+
+          // Resolve cluster (scoped to region if provided)
+          let clusterId: number | undefined;
+          if (row.cluster) {
+            const key = regionId ? `${regionId}:${row.cluster.toLowerCase().trim()}` : undefined;
+            const cluster = key ? clusterMap.get(key) : undefined;
+            if (cluster) clusterId = (cluster as any).id;
+          }
+
+          const existing = await storage.getSchoolByEmail(row.email);
+
+          if (existing) {
+            // Update existing school
+            const updated = await storage.updateSchool(existing.id, {
+              name: row.name,
+              phone: row.phone ?? existing.phone,
+              address: row.address ?? existing.address,
+              regionId: regionId ?? existing.regionId,
+              clusterId: clusterId ?? existing.clusterId,
+            } as any);
+            results.push({ action: 'updated', id: existing.id, email: row.email, school: updated });
+          } else {
+            // Create new school (auto-approved, no email verification needed for sync)
+            const created = await storage.createSchool({
+              name: row.name,
+              email: row.email,
+              registrarName: row.registrarName ?? 'Administrator',
+              phone: row.phone,
+              address: row.address,
+              schoolType: (row.schoolType ?? 'arabic') as any,
+              regionId,
+              clusterId,
+              status: 'approved' as any,
+              isEmailVerified: true,
+              registrationFeePaid: true,
+            } as any);
+            results.push({ action: 'created', id: created.id, email: row.email, school: created });
+          }
+        } catch (rowErr: any) {
+          results.push({ action: 'error', email: row.email, message: rowErr.message });
+        }
+      }
+
+      const created = results.filter(r => r.action === 'created').length;
+      const updated = results.filter(r => r.action === 'updated').length;
+      const errors = results.filter(r => r.action === 'error').length;
+
+      res.status(200).json({ created, updated, errors, results });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── GET /api/sync/regions ─────────────────────────────────────────────────
+  // Returns all regions (for reference/mapping by external systems).
+  app.get("/api/sync/regions", requireSyncKey, async (req, res) => {
+    try {
+      const regions = await storage.getAllRegions();
+      const clusters = await storage.getAllClusters();
+      const clustersByRegion = clusters.reduce((acc: any, c: any) => {
+        if (!acc[c.regionId]) acc[c.regionId] = [];
+        acc[c.regionId].push({ id: c.id, name: c.name, code: c.code ?? null });
+        return acc;
+      }, {});
+
+      res.json(regions.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        code: r.code ?? null,
+        clusters: clustersByRegion[r.id] ?? [],
+      })));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── GET /api/sync/status ──────────────────────────────────────────────────
+  // Health check endpoint — confirms API key is valid and returns summary counts.
+  app.get("/api/sync/status", requireSyncKey, async (req, res) => {
+    try {
+      const allSchools = await storage.getAllSchools();
+      const allStaff = await storage.getAllStaffProfiles({ role: "cluster_officer" });
+      const allRegions = await storage.getAllRegions();
+      const allClusters = await storage.getAllClusters();
+
+      const schoolsByStatus = allSchools.reduce((acc: any, s: any) => {
+        acc[s.status] = (acc[s.status] || 0) + 1;
+        return acc;
+      }, {});
+
+      const monitorsByStatus = allStaff.reduce((acc: any, s: any) => {
+        acc[s.status] = (acc[s.status] || 0) + 1;
+        return acc;
+      }, {});
+
+      res.json({
+        ok: true,
+        system: "Amaanah Examination Management System",
+        syncApiVersion: "1.0",
+        timestamp: new Date().toISOString(),
+        summary: {
+          schools: { total: allSchools.length, byStatus: schoolsByStatus },
+          clusterMonitors: { total: allStaff.length, byStatus: monitorsByStatus },
+          regions: allRegions.length,
+          clusters: allClusters.length,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }
 
