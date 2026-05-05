@@ -85,6 +85,7 @@ import {
   Key,
   KeyRound,
   CreditCard,
+  Trash2,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -190,6 +191,7 @@ export default function Schools() {
     defaultPassword: string | null;
   } | null>(null);
   const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
   const [bulkUploadData, setBulkUploadData] = useState<Array<{schoolName: string; address: string; region: string; cluster: string}>>([]);
   const [bulkUploadResults, setBulkUploadResults] = useState<{
@@ -447,6 +449,29 @@ export default function Schools() {
       toast({
         title: t.common.error,
         description: error.message || (isRTL ? "فشل في إعادة تعيين كلمة المرور" : "Failed to reset password"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteSchoolMutation = useMutation({
+    mutationFn: async (schoolId: number) => {
+      return apiRequest("DELETE", `/api/schools/${schoolId}`);
+    },
+    onSuccess: () => {
+      invalidateSchoolQueries();
+      setShowDeleteDialog(false);
+      setShowDetailsDialog(false);
+      setSelectedSchool(null);
+      toast({
+        title: isRTL ? "تم الحذف" : "School Deleted",
+        description: isRTL ? "تم حذف سجل المدرسة بنجاح." : "The school record has been permanently deleted.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || (isRTL ? "فشل في حذف المدرسة." : "Failed to delete the school."),
         variant: "destructive",
       });
     },
@@ -1727,6 +1752,16 @@ export default function Schools() {
             </Button>
             {selectedSchool && (
               <Button
+                variant="destructive"
+                onClick={() => setShowDeleteDialog(true)}
+                data-testid="button-delete-school-details"
+              >
+                <Trash2 className="w-4 h-4 me-2" />
+                {isRTL ? "حذف المدرسة" : "Delete School"}
+              </Button>
+            )}
+            {selectedSchool && (
+              <Button
                 variant="outline"
                 onClick={() => {
                   sendPasswordResetMutation.mutate(selectedSchool.id);
@@ -2130,6 +2165,45 @@ export default function Schools() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete School Warning Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent dir={isRTL ? "rtl" : "ltr"}>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              {isRTL ? "حذف سجل المدرسة" : "Delete School Record"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                {isRTL
+                  ? `هل أنت متأكد أنك تريد حذف "${selectedSchool?.name}" بشكل نهائي؟`
+                  : `Are you sure you want to permanently delete "${selectedSchool?.name}"?`}
+              </span>
+              <span className="block font-medium text-destructive">
+                {isRTL
+                  ? "سيتم حذف جميع بيانات المدرسة والطلاب المرتبطين بها. لا يمكن التراجع عن هذا الإجراء."
+                  : "All associated school data and student records will be deleted. This action cannot be undone."}
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-3 mt-2">
+            <AlertDialogCancel disabled={deleteSchoolMutation.isPending}>
+              {t.common.cancel}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => selectedSchool && deleteSchoolMutation.mutate(selectedSchool.id)}
+              disabled={deleteSchoolMutation.isPending}
+              data-testid="button-confirm-delete-school"
+            >
+              {deleteSchoolMutation.isPending
+                ? (isRTL ? "جاري الحذف..." : "Deleting...")
+                : (isRTL ? "نعم، احذف المدرسة" : "Yes, Delete School")}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Close Confirmation Dialog */}
       <AlertDialog open={showCloseConfirmation} onOpenChange={setShowCloseConfirmation}>
