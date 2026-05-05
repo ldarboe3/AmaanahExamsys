@@ -1528,6 +1528,9 @@ function CategoriesTab() {
       setNewsFormData({ name: "", slug: "", description: "" });
       toast({ title: "News category created" });
     },
+    onError: (error: any) => {
+      toast({ title: "Failed to create category", description: error.message, variant: "destructive" });
+    },
   });
 
   const createResourceCategoryMutation = useMutation({
@@ -1538,6 +1541,9 @@ function CategoriesTab() {
       setResourceFormData({ name: "", slug: "", description: "" });
       toast({ title: "Resource category created" });
     },
+    onError: (error: any) => {
+      toast({ title: "Failed to create category", description: error.message, variant: "destructive" });
+    },
   });
 
   const deleteNewsCategoryMutation = useMutation({
@@ -1546,6 +1552,9 @@ function CategoriesTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/cms/news-categories"] });
       toast({ title: "News category deleted" });
     },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete category", description: error.message, variant: "destructive" });
+    },
   });
 
   const deleteResourceCategoryMutation = useMutation({
@@ -1553,6 +1562,9 @@ function CategoriesTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cms/resource-categories"] });
       toast({ title: "Resource category deleted" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete category", description: error.message, variant: "destructive" });
     },
   });
 
