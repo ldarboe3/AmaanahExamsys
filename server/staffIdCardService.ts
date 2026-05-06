@@ -227,17 +227,23 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
   const lineH = 13;
 
   const drawInfoLine = (label: string, value: string) => {
+    // Measure actual rendered height so wrapped values don't overlap the next row
+    const valueHeight = doc
+      .font(hasAmiri ? 'Amiri' : 'Helvetica')
+      .fontSize(7)
+      .heightOfString(`:  ${value}`, { width: infoWidth });
+
     doc.font(hasAmiri ? 'Amiri-Bold' : 'Helvetica-Bold')
       .fontSize(7)
       .fillColor(DARK)
-      .text(label, labelX, infoY, { width: 36 });
+      .text(label, labelX, infoY, { width: 36, lineBreak: false });
 
     doc.font(hasAmiri ? 'Amiri' : 'Helvetica')
       .fontSize(7)
       .fillColor(DARK)
       .text(`:  ${value}`, valueX, infoY, { width: infoWidth });
 
-    infoY += lineH;
+    infoY += Math.max(lineH, valueHeight + 4);
   };
 
   drawInfoLine('EID', data.employeeId || data.staffIdNumber);
