@@ -16022,7 +16022,13 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       }
 
       const allProfiles = await storage.getAllStaffProfiles();
-      const nextNum = allProfiles.length + 1;
+      const existingNums = allProfiles
+        .map(p => parseInt((p.staffIdNumber || '').replace('AMS-', '')) || 0)
+        .filter(n => n > 0);
+      let nextNum = (existingNums.length > 0 ? Math.max(...existingNums) : 0) + 1;
+      while (allProfiles.some(p => p.staffIdNumber === `AMS-${String(nextNum).padStart(5, '0')}`)) {
+        nextNum++;
+      }
       const staffIdNumber = `AMS-${String(nextNum).padStart(5, '0')}`;
       
       const confirmationCode = Math.random().toString(36).substring(2, 8).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -16226,6 +16232,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         'issued': ['activated'],
         'activated': ['suspended', 'revoked'],
         'suspended': ['activated', 'revoked'],
+        'revoked': ['activated'],
       };
 
       const allowed = validTransitions[existing.status] || [];
@@ -16239,8 +16246,10 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       if (status === 'printed') { updateData.cardPrintedAt = new Date(); eventType = 'card_printed'; }
       if (status === 'issued') { updateData.cardIssuedAt = new Date(); eventType = 'card_issued'; }
       if (status === 'activated') { 
-        updateData.activatedAt = new Date(); 
-        eventType = existing.status === 'suspended' ? 'reactivated' : 'activated'; 
+        updateData.activatedAt = new Date();
+        updateData.revokedAt = null;
+        updateData.revokeReason = null;
+        eventType = (existing.status === 'suspended' || existing.status === 'revoked') ? 'reactivated' : 'activated'; 
       }
       if (status === 'suspended') { updateData.suspendedAt = new Date(); updateData.suspendReason = reason || null; }
       if (status === 'revoked') { updateData.revokedAt = new Date(); updateData.revokeReason = reason || null; }

@@ -319,6 +319,7 @@ export default function StaffIdentityPage() {
       issued: ["activated"],
       activated: ["suspended", "revoked"],
       suspended: ["activated", "revoked"],
+      revoked: ["activated"],
     };
     return transitions[current] || [];
   };
