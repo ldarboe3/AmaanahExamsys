@@ -2130,3 +2130,17 @@ export const insertMobilePacketScanSchema = createInsertSchema(mobilePacketScans
 });
 export type InsertMobilePacketScan = z.infer<typeof insertMobilePacketScanSchema>;
 export type MobilePacketScan = typeof mobilePacketScans.$inferSelect;
+
+// User session metadata — tracks active session devices/IPs for the security panel
+export const userSessionMetadata = pgTable("user_session_metadata", {
+  sid: varchar("sid").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  ipAddress: varchar("ip_address", { length: 100 }),
+  userAgent: text("user_agent"),
+  browser: varchar("browser", { length: 100 }),
+  os: varchar("os", { length: 100 }),
+  deviceType: varchar("device_type", { length: 50 }),
+  lastActive: timestamp("last_active").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type UserSessionMetadata = typeof userSessionMetadata.$inferSelect;

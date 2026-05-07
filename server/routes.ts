@@ -7,7 +7,7 @@ import fs from "fs";
 import path from "path";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments, studentResults, examCards, attendanceRecords, packetEvents } from "@shared/schema";
+import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments, studentResults, examCards, attendanceRecords, packetEvents, userSessionMetadata } from "@shared/schema";
 import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
@@ -265,6 +265,52 @@ ${pages.map(p => `  <url>
     })
   );
 
+  // ─── Session metadata helpers ────────────────────────────────────────────
+  function parseUserAgent(ua: string = '') {
+    let browser = 'Unknown Browser';
+    let os = 'Unknown OS';
+    let deviceType = 'desktop';
+
+    // Device type
+    if (/mobile|android|iphone|ipod|blackberry|opera mini|iemobile/i.test(ua)) deviceType = 'mobile';
+    else if (/tablet|ipad/i.test(ua)) deviceType = 'tablet';
+
+    // Browser
+    if (/edg\//i.test(ua)) browser = 'Edge';
+    else if (/opr\//i.test(ua) || /opera/i.test(ua)) browser = 'Opera';
+    else if (/chrome\/[\d.]+/i.test(ua) && !/chromium/i.test(ua)) browser = 'Chrome';
+    else if (/firefox\/[\d.]+/i.test(ua)) browser = 'Firefox';
+    else if (/safari\/[\d.]+/i.test(ua) && !/chrome/i.test(ua)) browser = 'Safari';
+    else if (/msie|trident/i.test(ua)) browser = 'Internet Explorer';
+    else if (/curl\//i.test(ua)) browser = 'cURL (API)';
+
+    // OS
+    if (/windows nt 10/i.test(ua)) os = 'Windows 10/11';
+    else if (/windows nt/i.test(ua)) os = 'Windows';
+    else if (/mac os x/i.test(ua)) os = 'macOS';
+    else if (/android/i.test(ua)) os = 'Android';
+    else if (/iphone|ipad|ipod/i.test(ua)) os = 'iOS';
+    else if (/linux/i.test(ua)) os = 'Linux';
+    else if (/cros/i.test(ua)) os = 'ChromeOS';
+
+    return { browser, os, deviceType };
+  }
+
+  async function upsertSessionMetadata(sid: string, userId: string, req: any) {
+    const ua = req.headers['user-agent'] || '';
+    const { browser, os, deviceType } = parseUserAgent(ua);
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
+    try {
+      await db.insert(userSessionMetadata).values({
+        sid, userId, ipAddress: ip, userAgent: ua, browser, os, deviceType,
+        lastActive: new Date(), createdAt: new Date(),
+      }).onConflictDoUpdate({
+        target: userSessionMetadata.sid,
+        set: { lastActive: new Date(), ipAddress: ip, userAgent: ua, browser, os, deviceType },
+      });
+    } catch { /* non-critical */ }
+  }
+
   // Auth routes
   app.get("/api/auth/user", async (req, res) => {
     if (!req.session.userId) {
@@ -446,17 +492,114 @@ ${pages.map(p => `  <url>
         console.error('Failed to create audit log for login:', auditError);
       }
 
-      req.session.save((err) => {
+      req.session.save(async (err) => {
         if (err) {
           console.error('Failed to save session:', err);
           return res.status(500).json({ message: "Login failed - session error" });
         }
+        await upsertSessionMetadata(req.session.id, user.id, req);
         res.json({ 
           ...user, 
           passwordHash: undefined,
           mustChangePassword: user.mustChangePassword 
         });
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─── Sessions management API ──────────────────────────────────────────────
+  // List all active sessions for the current user
+  app.get("/api/auth/sessions", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      // Get all session metadata for user
+      const metaRows = await db.select().from(userSessionMetadata)
+        .where(eq(userSessionMetadata.userId, userId))
+        .orderBy(desc(userSessionMetadata.lastActive));
+
+      // Cross-reference with actual live sessions table to filter expired ones
+      const activeSids = metaRows.map(m => m.sid);
+      if (activeSids.length === 0) {
+        return res.json([]);
+      }
+      const liveSessions = await db.select({ sid: sessions.sid, expire: sessions.expire })
+        .from(sessions)
+        .where(inArray(sessions.sid, activeSids));
+      const liveSet = new Set(liveSessions.map(s => s.sid));
+
+      // Remove stale metadata rows for expired sessions (fire-and-forget)
+      const staleSids = activeSids.filter(sid => !liveSet.has(sid));
+      if (staleSids.length > 0) {
+        db.delete(userSessionMetadata).where(inArray(userSessionMetadata.sid, staleSids)).catch(() => {});
+      }
+
+      const currentSid = req.session.id;
+      const result = metaRows
+        .filter(m => liveSet.has(m.sid))
+        .map(m => ({
+          sid: m.sid,
+          isCurrent: m.sid === currentSid,
+          browser: m.browser,
+          os: m.os,
+          deviceType: m.deviceType,
+          ipAddress: m.ipAddress,
+          lastActive: m.lastActive,
+          createdAt: m.createdAt,
+        }));
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Revoke a specific session
+  app.delete("/api/auth/sessions/:sid", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { sid } = req.params;
+
+      // Verify ownership
+      const [meta] = await db.select().from(userSessionMetadata)
+        .where(and(eq(userSessionMetadata.sid, sid), eq(userSessionMetadata.userId, userId)));
+      if (!meta) return res.status(404).json({ message: "Session not found" });
+
+      // Delete from both tables
+      await db.delete(sessions).where(eq(sessions.sid, sid));
+      await db.delete(userSessionMetadata).where(eq(userSessionMetadata.sid, sid));
+
+      res.json({ message: "Session revoked" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Revoke all OTHER sessions (keep current)
+  app.delete("/api/auth/sessions", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const currentSid = req.session.id;
+
+      const metaRows = await db.select({ sid: userSessionMetadata.sid }).from(userSessionMetadata)
+        .where(and(eq(userSessionMetadata.userId, userId)));
+      const otherSids = metaRows.map(m => m.sid).filter(s => s !== currentSid);
+
+      if (otherSids.length > 0) {
+        await db.delete(sessions).where(inArray(sessions.sid, otherSids));
+        await db.delete(userSessionMetadata).where(inArray(userSessionMetadata.sid, otherSids));
+      }
+
+      // Log the action
+      try {
+        await storage.createAuditLog({
+          userId, action: 'sessions_revoked_all', entityType: 'user', entityId: userId,
+          newData: { details: `Revoked ${otherSids.length} other sessions` },
+        });
+      } catch {}
+
+      res.json({ message: `Revoked ${otherSids.length} other session(s)` });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

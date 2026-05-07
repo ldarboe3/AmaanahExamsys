@@ -32,8 +32,22 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
-import { User, Loader2, Save, Key, Shield, Mail, Phone, User as UserIcon } from "lucide-react";
+import {
+  User, Loader2, Save, Key, Shield, Mail, Phone, User as UserIcon,
+  Monitor, Smartphone, Tablet, Globe, MapPin, Clock, LogOut, ShieldAlert, CheckCircle2,
+} from "lucide-react";
 import type { User as UserType } from "@shared/schema";
+
+type SessionInfo = {
+  sid: string;
+  isCurrent: boolean;
+  browser: string | null;
+  os: string | null;
+  deviceType: string | null;
+  ipAddress: string | null;
+  lastActive: string;
+  createdAt: string;
+};
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -60,6 +74,28 @@ export default function Profile() {
 
   const { data: user, isLoading } = useQuery<UserType>({
     queryKey: ["/api/auth/user"],
+  });
+
+  const { data: activeSessions = [], isLoading: sessionsLoading } = useQuery<SessionInfo[]>({
+    queryKey: ["/api/auth/sessions"],
+  });
+
+  const revokeSessionMutation = useMutation({
+    mutationFn: async (sid: string) => apiRequest("DELETE", `/api/auth/sessions/${sid}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/sessions"] });
+      toast({ title: "Session revoked", description: "The session has been signed out." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const revokeAllOthersMutation = useMutation({
+    mutationFn: async () => apiRequest("DELETE", "/api/auth/sessions"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/sessions"] });
+      toast({ title: "Signed out everywhere", description: "All other sessions have been revoked." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const profileForm = useForm<ProfileFormData>({
@@ -183,6 +219,24 @@ export default function Profile() {
       </div>
     );
   }
+
+  const DeviceIcon = ({ deviceType }: { deviceType: string | null }) => {
+    if (deviceType === 'mobile') return <Smartphone className="w-5 h-5" />;
+    if (deviceType === 'tablet') return <Tablet className="w-5 h-5" />;
+    return <Monitor className="w-5 h-5" />;
+  };
+
+  const formatRelativeTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  };
+
+  const otherSessionsCount = activeSessions.filter(s => !s.isCurrent).length;
 
   return (
     <div className="space-y-4">
@@ -415,6 +469,159 @@ export default function Profile() {
                     </div>
                   </form>
                 </Form>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── Active Sessions ─────────────────────────────── */}
+          <Card data-testid="card-active-sessions">
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <ShieldAlert className="w-5 h-5" />
+                    Active Sessions
+                  </CardTitle>
+                  <CardDescription>
+                    Devices currently signed in to your account
+                  </CardDescription>
+                </div>
+                {otherSessionsCount > 0 && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={revokeAllOthersMutation.isPending}
+                        data-testid="button-revoke-all-others"
+                      >
+                        {revokeAllOthersMutation.isPending
+                          ? <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                          : <LogOut className="w-4 h-4 me-2" />}
+                        Sign out all other devices
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Sign out all other devices?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will immediately revoke {otherSessionsCount} other active session{otherSessionsCount !== 1 ? 's' : ''}. You will remain signed in on this device.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => revokeAllOthersMutation.mutate()}>
+                          Sign out all others
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {sessionsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2].map(i => (
+                    <div key={i} className="flex items-center gap-4 p-4 rounded-md border animate-pulse">
+                      <div className="w-10 h-10 rounded-full bg-muted" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-muted rounded w-1/2" />
+                        <div className="h-3 bg-muted rounded w-1/3" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : activeSessions.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-6 text-muted-foreground">
+                  <Globe className="w-8 h-8" />
+                  <p className="text-sm">No active sessions tracked yet.</p>
+                  <p className="text-xs">Sessions are recorded on next sign-in.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {activeSessions.map((session) => (
+                    <div
+                      key={session.sid}
+                      className={`flex flex-wrap items-center gap-4 p-4 rounded-md border transition-colors ${
+                        session.isCurrent
+                          ? 'border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-500/10'
+                          : 'border-border'
+                      }`}
+                      data-testid={`row-session-${session.sid.slice(0, 8)}`}
+                    >
+                      {/* Device icon */}
+                      <div className={`flex items-center justify-center w-10 h-10 rounded-full shrink-0 ${
+                        session.isCurrent ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground'
+                      }`}>
+                        <DeviceIcon deviceType={session.deviceType} />
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-sm">
+                            {session.browser || 'Unknown Browser'}
+                          </span>
+                          <span className="text-muted-foreground text-sm">on {session.os || 'Unknown OS'}</span>
+                          {session.isCurrent && (
+                            <Badge variant="outline" className="text-emerald-600 border-emerald-500/40 dark:text-emerald-400 gap-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              This device
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                          {session.ipAddress && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {session.ipAddress}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            Active {formatRelativeTime(session.lastActive)}
+                          </span>
+                          <span className="text-muted-foreground/60">
+                            Signed in {formatRelativeTime(session.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Revoke button — only for other sessions */}
+                      {!session.isCurrent && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={revokeSessionMutation.isPending}
+                              data-testid={`button-revoke-session-${session.sid.slice(0, 8)}`}
+                            >
+                              <LogOut className="w-4 h-4 me-1" />
+                              Sign out
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Sign out this session?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will immediately revoke the session on{' '}
+                                <strong>{session.browser} / {session.os}</strong> from IP {session.ipAddress}.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => revokeSessionMutation.mutate(session.sid)}>
+                                Sign out
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
