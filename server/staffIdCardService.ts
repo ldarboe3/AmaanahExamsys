@@ -125,7 +125,7 @@ function drawGreenWaveHeader(doc: typeof PDFDocument.prototype, w: number, h: nu
 }
 
 function drawGreenWaveFooter(doc: typeof PDFDocument.prototype, w: number, h: number) {
-  const footerStart = h * 0.88;
+  const footerStart = h * 0.91;
 
   doc.save();
   doc.moveTo(0, footerStart + 5)
@@ -139,6 +139,20 @@ function drawGreenWaveFooter(doc: typeof PDFDocument.prototype, w: number, h: nu
   grad.stop(1, GREEN_DARK);
   doc.fill(grad);
   doc.restore();
+}
+
+function abbreviateDept(dept: string): string {
+  return dept
+    .replace(/\bQuality Assurance\b/gi, 'QA')
+    .replace(/\bExaminations?\b/gi, 'Exams')
+    .replace(/\bAdministration\b/gi, 'Admin')
+    .replace(/\bManagement\b/gi, 'Mgmt')
+    .replace(/\bInformation Technology\b/gi, 'IT')
+    .replace(/\bHuman Resources\b/gi, 'HR')
+    .replace(/\bFinance & Accounts\b/gi, 'Finance')
+    .replace(/\bPlanning & Development\b/gi, 'Planning & Dev')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, hasAmiri: boolean, barcodeBuffer: Buffer) {
@@ -226,12 +240,13 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
   const infoWidth = W - valueX - 8;
   const lineH = 13;
 
-  const drawInfoLine = (label: string, value: string) => {
-    // Measure actual rendered height so wrapped values don't overlap the next row
-    const valueHeight = doc
-      .font(hasAmiri ? 'Amiri' : 'Helvetica')
-      .fontSize(7)
-      .heightOfString(`:  ${value}`, { width: infoWidth });
+  const drawInfoLine = (label: string, value: string, noWrap = false) => {
+    const opts: Record<string, any> = { width: infoWidth };
+    if (noWrap) opts.lineBreak = false;
+
+    const valueHeight = noWrap
+      ? lineH
+      : doc.font(hasAmiri ? 'Amiri' : 'Helvetica').fontSize(7).heightOfString(`:  ${value}`, { width: infoWidth });
 
     doc.font(hasAmiri ? 'Amiri-Bold' : 'Helvetica-Bold')
       .fontSize(7)
@@ -241,14 +256,14 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
     doc.font(hasAmiri ? 'Amiri' : 'Helvetica')
       .fontSize(7)
       .fillColor(DARK)
-      .text(`:  ${value}`, valueX, infoY, { width: infoWidth });
+      .text(`:  ${value}`, valueX, infoY, opts);
 
     infoY += Math.max(lineH, valueHeight + 4);
   };
 
   drawInfoLine('EID', data.employeeId || data.staffIdNumber);
   if (data.department) {
-    drawInfoLine('Dept', data.department);
+    drawInfoLine('Dept', abbreviateDept(data.department), true);
   }
   drawInfoLine('Post', roleLabel);
 
@@ -271,7 +286,7 @@ function drawFrontPage(doc: typeof PDFDocument.prototype, data: StaffCardData, h
   const barcodeW = 70;
   const barcodeH = 20;
   const barcodeX = (W - barcodeW) / 2;
-  const barcodeY = H * 0.88 + 6;
+  const barcodeY = H * 0.91 + 6;
   try {
     doc.image(barcodeBuffer, barcodeX, barcodeY, { width: barcodeW, height: barcodeH });
   } catch {}
@@ -417,7 +432,7 @@ function drawBackPage(doc: typeof PDFDocument.prototype, data: StaffCardData, ha
   doc.font(hasAmiri ? 'Amiri' : 'Helvetica')
     .fontSize(4)
     .fillColor(WHITE)
-    .text('Scan QR to verify', 8, H * 0.88 + 12, { width: W - 16, align: 'center', lineBreak: false });
+    .text('Scan QR to verify', 8, H * 0.91 + 12, { width: W - 16, align: 'center', lineBreak: false });
 }
 
 async function loadPhotoBuffer(photoUrl: string | null | undefined): Promise<Buffer | null> {
