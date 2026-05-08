@@ -455,7 +455,7 @@ export function PublicFooter() {
                 rel="noopener noreferrer"
                 className="text-amber-400/70 hover:text-amber-400 transition-colors font-medium"
               >
-                {isRTL ? "مركز سكاي نت للابتكار" : "SkyNet Innovation Hub"}
+                {isRTL ? "مركز سكاي للابتكار" : "Sky Innovation Hub"}
               </a>
             </p>
           </div>

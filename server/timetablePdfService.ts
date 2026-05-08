@@ -362,7 +362,7 @@ export async function generateTimetablePdf(opts: TimetablePdfOptions): Promise<B
 
     y += 13;
     doc.fontSize(6.5).fillColor('#AAAAAA');
-    doc.text('Developed by SkyNet Innovation Hub', MX, y, { width: contentW, align: 'center' });
+    doc.text('Developed by Sky Innovation Hub', MX, y, { width: contentW, align: 'center' });
 
     doc.end();
   });

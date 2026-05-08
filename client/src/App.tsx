@@ -253,7 +253,7 @@ function AuthenticatedLayout() {
                 rel="noopener noreferrer"
                 className="font-bold hover:underline"
               >
-                SkyNet Innovation Hub
+                Sky Innovation Hub
               </a>
             </p>
           </footer>
