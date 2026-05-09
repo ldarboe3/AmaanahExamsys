@@ -7,7 +7,7 @@ import {
   auditLogs, notifications, examCards, systemSettings, schoolInvitations,
   newsCategories, newsArticles, resourceCategories, resources, announcements,
   newsletterSubscribers, impactStats,
-  paperMovements, scriptMovements, centerAssignments, centerActivityLogs,
+  paperMovements, scriptMovements, centerAssignments, centerActivityLogs, invigilatorAssignments,
   schoolExamRegistrations,
   staffProfiles, staffIdEvents,
   examCardBatches, integrityFlags, integrityFlagEvents,
@@ -740,7 +740,41 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteExamCenter(id: number): Promise<boolean> {
-    await db.delete(examCenters).where(eq(examCenters.id, id));
+    // 1. Null out hall_id in exam_packets for halls belonging to this center
+    const halls = await db.select({ id: centerHalls.id }).from(centerHalls).where(eq(centerHalls.centerId, id));
+    if (halls.length > 0) {
+      const hallIds = halls.map(h => h.id);
+      await db.update(examPackets).set({ hallId: null }).where(inArray(examPackets.hallId, hallIds));
+      await db.update(attendanceRecords).set({ hallId: null }).where(inArray(attendanceRecords.hallId, hallIds));
+    }
+    // 2. Delete center halls
+    await db.delete(centerHalls).where(eq(centerHalls.centerId, id));
+    // 3. Delete center assignments
+    await db.delete(centerAssignments).where(eq(centerAssignments.centerId, id));
+    // 4. Delete invigilator assignments
+    await db.delete(invigilatorAssignments).where(eq(invigilatorAssignments.centerId, id));
+    // 5. Delete center activity logs
+    await db.delete(centerActivityLogs).where(eq(centerActivityLogs.centerId, id));
+    // 6. Null out school center references
+    await db.update(schools).set({ assignedCenterId: null }).where(eq(schools.assignedCenterId, id));
+    await db.update(schools).set({ preferredCenterId: null }).where(eq(schools.preferredCenterId, id));
+    // 7. Null out nullable FK columns in other tables
+    await db.update(examPackets).set({ currentCenterId: null }).where(eq(examPackets.currentCenterId, id));
+    await db.update(packetEvents).set({ fromCenterId: null }).where(eq(packetEvents.fromCenterId, id));
+    await db.update(packetEvents).set({ toCenterId: null }).where(eq(packetEvents.toCenterId, id));
+    await db.update(packetEvents).set({ locationCenterId: null }).where(eq(packetEvents.locationCenterId, id));
+    await db.update(integrityFlags).set({ centerId: null }).where(eq(integrityFlags.centerId, id));
+    await db.update(deviceSyncSessions).set({ centerId: null }).where(eq(deviceSyncSessions.centerId, id));
+    await db.update(examinerAssignments).set({ centerId: null }).where(eq(examinerAssignments.centerId, id));
+    // 8. Delete the center — may throw if still referenced by exam packets, attendance, etc.
+    try {
+      await db.delete(examCenters).where(eq(examCenters.id, id));
+    } catch (err: any) {
+      if (err.code === '23503') {
+        throw new Error("Cannot delete this center because it has associated exam records (packets, attendance, or session logs). Remove those records first.");
+      }
+      throw err;
+    }
     return true;
   }
 
@@ -771,6 +805,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteCenterHall(id: number): Promise<boolean> {
+    // Null out hall_id references in exam_packets and attendance_records before deleting
+    await db.update(examPackets).set({ hallId: null }).where(eq(examPackets.hallId, id));
+    await db.update(attendanceRecords).set({ hallId: null }).where(eq(attendanceRecords.hallId, id));
     await db.delete(centerHalls).where(eq(centerHalls.id, id));
     return true;
   }
