@@ -159,12 +159,12 @@ function buildHtml(opts: TimetablePdfOptions, logoBase64: string | null, qrDataU
   }
   .header-left .org-name {
     font-weight: 700;
-    font-size: 8px;
+    font-size: 11px;
     color: #1a1a1a;
     line-height: 1.5;
   }
   .header-left .email {
-    font-size: 7px;
+    font-size: 9px;
     color: #1565c0;
     margin-top: 2px;
   }
@@ -198,12 +198,12 @@ function buildHtml(opts: TimetablePdfOptions, logoBase64: string | null, qrDataU
   }
   .header-right .org-ar {
     font-weight: 700;
-    font-size: 8.5px;
+    font-size: 12px;
     line-height: 1.6;
     color: #1a1a1a;
   }
   .header-right .email-ar {
-    font-size: 7px;
+    font-size: 9px;
     color: #1565c0;
     margin-top: 2px;
     direction: ltr;
@@ -223,12 +223,12 @@ function buildHtml(opts: TimetablePdfOptions, logoBase64: string | null, qrDataU
   }
   .banner-year {
     background: #cc0000;
-    min-width: 18mm;
+    min-width: 22mm;
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: 22px;
     font-weight: 700;
     color: #fff;
     font-family: 'Arial', sans-serif;
@@ -237,7 +237,7 @@ function buildHtml(opts: TimetablePdfOptions, logoBase64: string | null, qrDataU
   .banner-title {
     flex: 1;
     text-align: center;
-    font-size: 20px;
+    font-size: 26px;
     font-weight: 700;
     direction: rtl;
     padding: 0 4mm;
@@ -260,7 +260,7 @@ function buildHtml(opts: TimetablePdfOptions, logoBase64: string | null, qrDataU
     margin-bottom: 3mm;
   }
   .title-bar .schedule-title {
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 700;
     color: #1a1a1a;
   }
@@ -277,8 +277,8 @@ function buildHtml(opts: TimetablePdfOptions, logoBase64: string | null, qrDataU
     color: #fff;
   }
   thead th {
-    padding: 3mm 2mm;
-    font-size: 9.5px;
+    padding: 4mm 3mm;
+    font-size: 12px;
     font-weight: 700;
     text-align: center;
     border: 0.5px solid #0d7a45;
@@ -287,13 +287,13 @@ function buildHtml(opts: TimetablePdfOptions, logoBase64: string | null, qrDataU
   tbody tr { background: #fff; }
   tbody tr.alt { background: #e8f5ee; }
   tbody td {
-    padding: 2.5mm 2mm;
-    font-size: 10px;
+    padding: 3.5mm 3mm;
+    font-size: 12.5px;
     text-align: center;
     border: 0.5px solid #c8c8c8;
     direction: rtl;
     vertical-align: middle;
-    line-height: 1.5;
+    line-height: 1.6;
   }
   .col-day { width: 15%; font-weight: 700; }
   .col-date { width: 18%; }
@@ -308,7 +308,7 @@ function buildHtml(opts: TimetablePdfOptions, logoBase64: string | null, qrDataU
   }
   .notes-label {
     font-weight: 700;
-    font-size: 11px;
+    font-size: 14px;
     margin-bottom: 2mm;
     text-align: right;
   }
@@ -325,15 +325,15 @@ function buildHtml(opts: TimetablePdfOptions, logoBase64: string | null, qrDataU
   }
   .notes-text { flex: 1; }
   .note-line {
-    font-size: 9px;
-    line-height: 1.7;
+    font-size: 11.5px;
+    line-height: 1.8;
     text-align: right;
   }
 
   /* ── DEADLINE ───────────────────────────────────── */
   .deadline {
     text-align: center;
-    font-size: 10.5px;
+    font-size: 13px;
     font-weight: 700;
     color: #cc0000;
     direction: rtl;
@@ -341,7 +341,7 @@ function buildHtml(opts: TimetablePdfOptions, logoBase64: string | null, qrDataU
   }
   .payment-note {
     text-align: center;
-    font-size: 9px;
+    font-size: 11px;
     color: #1a1a1a;
     direction: rtl;
     margin-bottom: 4mm;
@@ -362,27 +362,27 @@ function buildHtml(opts: TimetablePdfOptions, logoBase64: string | null, qrDataU
     text-align: center;
   }
   .bank-label {
-    font-size: 8px;
+    font-size: 10px;
     font-weight: 700;
     color: #1a1a1a;
     margin-bottom: 2mm;
   }
   .bank-number {
-    font-size: 15px;
+    font-size: 18px;
     font-weight: 700;
     color: #1565c0;
     margin-bottom: 2mm;
     font-family: 'Arial', sans-serif;
   }
   .bank-name {
-    font-size: 7.5px;
+    font-size: 9.5px;
     color: #444;
   }
 
   /* ── FOOTER ─────────────────────────────────────── */
   .footer {
     text-align: center;
-    font-size: 6.5px;
+    font-size: 8.5px;
     color: #777;
     border-top: 0.5px solid #e5e7eb;
     padding-top: 2mm;
@@ -438,7 +438,7 @@ function buildHtml(opts: TimetablePdfOptions, logoBase64: string | null, qrDataU
   <!-- AMBER TITLE BAR -->
   <div class="title-bar">
     <div class="schedule-title">جدول اختبارات الشهادة الابتدائية – العام الدراسي ${esc(examYearName)}</div>
-    <div class="schedule-title" style="font-size:11px; direction:ltr; margin-top:2px;">Examination ${esc(examYearName)}</div>
+    <div class="schedule-title" style="font-size:14px; direction:ltr; margin-top:2px;">Examination ${esc(examYearName)}</div>
   </div>
 
   <!-- TABLE -->
