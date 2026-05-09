@@ -1,0 +1,129 @@
+We are now entering a very important structural phase for the system:
+
+### One Academic Year = All Examination Classes
+
+The system must manage **all examination classes under a single academic year**, rather than creating separate academic years for each class.
+
+---
+
+# Core Rule (Non-Negotiable):
+
+For example:
+
+### Academic Year 2026:
+
+* Grade 6
+* Grade 9
+* Grade 12
+* Any other examination classes
+
+### NOT:
+
+❌ 2026 Grade 6 as separate academic year
+❌ 2026 Grade 9 as another academic year
+❌ 2026 Grade 12 as another academic year
+
+---
+
+# Required System Logic:
+
+A single academic calendar year should act as the master container, while examination classes exist as structured records within that same year.
+
+---
+
+# Correct Structure:
+
+### Academic Year 2026
+
+→ Grade 6
+→ Grade 9
+→ Grade 12
+
+---
+
+# Immediate Required Fix:
+
+If the system currently treats each class as a separate academic year, this must be corrected across the UI and data structure.
+
+### You need to:
+
+✔ Match all records under one academic year
+✔ Separate data by class within that year
+✔ Preserve class-specific records
+✔ Align all modules to this structure
+
+---
+
+# Areas That Must Reflect This:
+
+### Across the full system:
+
+* Exam Scheduling
+* Center Assignment
+* School View
+* Timetable / Scheduling Views
+* Enrollment
+* Candidate Records
+* Reports
+* Statistics
+* Result Management
+* Packaging
+
+---
+
+# Duplicate Prevention (Critical):
+
+The system must prevent admins from creating duplicate academic years for different classes.
+
+### Example:
+
+If Academic Year 2026 already exists:
+❌ Admin cannot create another “2026” for Grade 9
+❌ Admin cannot create another “2026” for Grade 12
+
+### Instead:
+
+✔ Admin selects existing 2026
+✔ Adds/manages classes within it
+
+---
+
+# UI Expectations:
+
+### Academic Year Page:
+
+**2026**
+
+* Grade 6
+* Grade 9
+* Grade 12
+
+---
+
+# Admin Workflow:
+
+### Create Year Once:
+
+2026
+
+### Then Add:
+
+* Grade 6
+* Grade 9
+* Grade 12
+
+---
+
+# Bottom Line:
+
+The system must evolve from fragmented class-year duplication into a proper academic-year governance model:
+
+### One Academic Year
+
+### Multiple Examination Classes
+
+### Structured Separation by Class
+
+### No Duplicate Academic Years
+
+This is essential for long-term data consistency, reporting accuracy, and full examination governance.

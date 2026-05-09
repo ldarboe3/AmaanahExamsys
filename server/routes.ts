@@ -1126,6 +1126,19 @@ ${pages.map(p => `  <url>
       if (!parsed.success) {
         return res.status(400).json({ message: fromZodError(parsed.error).message });
       }
+
+      // Enforce one academic year record per Gregorian year.
+      // A single record covers all examination classes (grades 3, 6, 9, 12).
+      const allExamYears = await storage.getAllExamYears();
+      const duplicate = allExamYears.find(ey => ey.year === parsed.data.year);
+      if (duplicate) {
+        return res.status(409).json({
+          message: `Academic year ${parsed.data.year} already exists as "${duplicate.name}". One record covers all examination classes — edit it to add or update classes.`,
+          existingId: duplicate.id,
+          existingName: duplicate.name,
+        });
+      }
+
       const examYear = await storage.createExamYear({ ...parsed.data, createdBy: req.session.userId });
       
       // Send in-app notifications to all users based on their roles

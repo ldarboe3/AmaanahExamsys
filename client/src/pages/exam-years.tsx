@@ -58,6 +58,7 @@ import {
   School,
   FileCheck,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -366,6 +367,12 @@ export default function ExamYears() {
   // Available grades for exam years
   const availableGrades = [3, 6, 9, 12];
 
+  // Detect duplicate year in real-time while the create dialog is open
+  const watchedYear = form.watch('year');
+  const yearConflict = showCreateDialog
+    ? examYears?.find(ey => ey.year === Number(watchedYear))
+    : undefined;
+
   const formatDateForInput = (dateString: string | Date | null) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -422,11 +429,20 @@ export default function ExamYears() {
       });
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error?.message || "Failed to create exam year. Please try again.",
-        variant: "destructive",
-      });
+      const status = error?.status ?? error?.response?.status;
+      if (status === 409) {
+        toast({
+          title: "Duplicate Academic Year",
+          description: error?.message || "This academic year already exists. Edit the existing record to update it.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error?.message || "Failed to create exam year. Please try again.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -617,6 +633,36 @@ export default function ExamYears() {
                   )}
                 />
               </div>
+
+              {/* Duplicate year warning */}
+              {yearConflict && (
+                <div className="flex items-start gap-3 p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800" data-testid="alert-year-conflict">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                      Year {watchedYear} already exists
+                    </p>
+                    <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
+                      <span className="font-medium">"{yearConflict.name}"</span> covers all examination classes for this year.
+                      Edit it to add or update classes instead of creating a duplicate.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      data-testid="button-edit-conflicting-year"
+                      onClick={() => {
+                        setShowCreateDialog(false);
+                        openEditDialog(yearConflict);
+                      }}
+                    >
+                      <Edit className="w-3 h-3 mr-1.5" />
+                      Edit "{yearConflict.name}"
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <FormField
                 control={form.control}

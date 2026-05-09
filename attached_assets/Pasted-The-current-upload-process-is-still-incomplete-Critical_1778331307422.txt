@@ -1,0 +1,118 @@
+The current upload process is still incomplete.
+
+### Critical Fix Required:
+
+Before any center CSV upload is finalized, the system must first display a full upload confirmation preview for the administrator.
+
+---
+
+# Required New Upload Workflow:
+
+## Step 1: CSV Upload Selection
+
+Admin selects the center CSV file.
+
+---
+
+## Step 2: Pre-Upload Preview (Non-Negotiable)
+
+Before processing or saving any data, the system must display a structured preview table showing all detected records from the CSV.
+
+### Preview Must Include:
+
+✔ Center Name
+✔ Region
+✔ Cluster
+✔ Center Code / Format (e.g. 1.1)
+✔ School / Center Type (if applicable)
+✔ Validation Status (Valid / Duplicate / Missing Data)
+
+---
+
+# Purpose:
+
+This allows the admin to visually confirm:
+
+* Correct centers
+* Correct region mapping
+* Correct cluster mapping
+* No duplicate or incorrect entries
+* Proper formatting before permanent upload
+
+---
+
+# Step 3: Confirmation Controls
+
+After preview:
+
+### Buttons:
+
+✔ Confirm Upload
+✔ Cancel Upload
+✔ Download Error List (if validation issues exist)
+
+---
+
+# Step 4: Upload Progress Bar (Very Important)
+
+Once upload is confirmed, the system must display a real progress bar showing processing status.
+
+### Example:
+
+Uploading Centers...
+[██████░░░░] 60%
+
+---
+
+# Progress Bar Must Show:
+
+✔ Validation Progress
+✔ Processing Progress
+✔ Hall/Center Creation Progress (if applicable)
+✔ Completion Status
+
+---
+
+# Step 5: Completion Summary
+
+After upload:
+
+### Display:
+
+✔ Total Centers Uploaded
+✔ Total Regions Mapped
+✔ Total Clusters Mapped
+✔ Duplicates Skipped
+✔ Errors Found
+
+---
+
+# Example Final Summary:
+
+Upload Complete:
+
+* 45 Centers Uploaded
+* 3 Duplicates Skipped
+* 2 Invalid Cluster Codes
+
+---
+
+# UX Goal:
+
+This process should feel professional and controlled—not blind upload.
+
+---
+
+# Bottom Line:
+
+### Do NOT immediately upload after file selection.
+
+Instead:
+
+### Upload → Preview → Confirm → Progress Bar → Final Summary
+
+This is essential for:
+✔ Accuracy
+✔ Admin confidence
+✔ Error prevention
+✔ Professional data governance.
