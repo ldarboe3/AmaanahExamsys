@@ -43,9 +43,44 @@ import ExamExecution from "@/pages/exam-execution";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OfflineSyncBanner } from "@/components/OfflineSyncBanner";
-import { useEffect } from "react";
+import { useEffect, Component, type ReactNode } from "react";
 import { Redirect } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { AlertTriangle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    console.error("[ErrorBoundary] Caught error:", error, info.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
+          <AlertTriangle className="w-12 h-12 text-destructive" />
+          <div>
+            <h2 className="text-lg font-semibold mb-1">Something went wrong</h2>
+            <p className="text-sm text-muted-foreground max-w-md">
+              {this.state.error?.message || "An unexpected error occurred. Please try again."}
+            </p>
+          </div>
+          <Button onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}>
+            <RefreshCw className="w-4 h-4 me-2" />
+            Reload Page
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 import Home from "@/pages/home";
 import About from "@/pages/about";
@@ -242,7 +277,9 @@ function AuthenticatedLayout() {
           <OfflineSyncBanner />
           <main className="flex-1 overflow-auto">
             <div className="container mx-auto p-6">
-              <AuthenticatedRoutes />
+              <ErrorBoundary>
+                <AuthenticatedRoutes />
+              </ErrorBoundary>
             </div>
           </main>
           <footer className="border-t bg-muted/30 py-3 text-center">

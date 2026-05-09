@@ -2130,7 +2130,8 @@ function SchoolsTab({
 }
 
 function ActivityTab({ activities }: { activities: CenterDashboardData["recentActivity"] }) {
-  if (activities.length === 0) {
+  const safeActivities = activities ?? [];
+  if (safeActivities.length === 0) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
@@ -2149,7 +2150,7 @@ function ActivityTab({ activities }: { activities: CenterDashboardData["recentAc
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {activities.map(activity => (
+          {safeActivities.map(activity => (
             <div key={activity.id} className="flex items-start gap-3 pb-3 border-b last:border-0">
               <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
                 <Clock className="w-4 h-4 text-muted-foreground" />
@@ -2347,11 +2348,11 @@ export default function CenterDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {Object.keys(statistics.studentsByGrade).length === 0 ? (
+                {Object.keys(statistics.studentsByGrade ?? {}).length === 0 ? (
                   <p className="text-muted-foreground">No students enrolled</p>
                 ) : (
                   <div className="space-y-2">
-                    {Object.entries(statistics.studentsByGrade).map(([grade, count]) => (
+                    {Object.entries(statistics.studentsByGrade ?? {}).map(([grade, count]) => (
                       <div key={grade} className="flex items-center justify-between">
                         <span>Grade {grade}</span>
                         <Badge variant="outline">{count} students</Badge>
@@ -2386,7 +2387,7 @@ export default function CenterDashboard() {
             </Card>
           </div>
 
-          {!isSchoolView && <ActivityTab activities={recentActivity} />}
+          {!isSchoolView && <ActivityTab activities={recentActivity ?? []} />}
         </TabsContent>
 
         <TabsContent value="timetable" className="mt-4">
