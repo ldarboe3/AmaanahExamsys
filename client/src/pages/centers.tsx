@@ -1483,11 +1483,15 @@ export default function Centers() {
           {csvStep === 'select' && (
             <div className="space-y-4">
               <div className="rounded-md bg-muted/60 p-3 text-xs font-mono space-y-1">
-                <p className="font-semibold text-foreground text-[11px] uppercase tracking-wide mb-1.5">Expected CSV columns</p>
-                <p><span className="text-primary">name</span>, <span className="text-primary">code</span>, <span className="text-primary">region_cluster</span>, address, contact_person, contact_phone, contact_email</p>
-                <p className="mt-2 text-muted-foreground">Example row:</p>
-                <p className="text-foreground break-all">Janneh Kunda Center,CTR-101,<strong>1.1</strong>,Basse,Ahmed Fatty,9991234,center@mail.gm</p>
-                <p className="text-muted-foreground mt-1">code is optional — auto-generated if blank. region_cluster is required.</p>
+                <p className="font-semibold text-foreground text-[11px] uppercase tracking-wide mb-1.5">Required CSV columns</p>
+                <p><span className="text-primary">name</span> — center name (required)</p>
+                <p><span className="text-primary">region</span> or <span className="text-primary">region_id</span> or <span className="text-primary">region_cluster</span> — one of these is required</p>
+                <p>cluster or cluster_id — optional (defaults to first cluster in region)</p>
+                <p>code, address, contact_person, contact_phone, contact_email — optional</p>
+                <p className="mt-2 text-muted-foreground font-semibold">Accepted formats:</p>
+                <p className="text-foreground">By name: <span className="text-primary">region</span>=Basse, <span className="text-primary">cluster</span>=Cluster 1</p>
+                <p className="text-foreground">By ID: <span className="text-primary">region_id</span>=2, <span className="text-primary">cluster_id</span>=3</p>
+                <p className="text-foreground">Dot-notation: <span className="text-primary">region_cluster</span>=1.1 (region index.cluster index)</p>
               </div>
               <div
                 className="border-2 border-dashed border-border rounded-md p-8 text-center cursor-pointer hover-elevate"

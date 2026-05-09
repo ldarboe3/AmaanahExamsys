@@ -14783,6 +14783,72 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       result.push(current);
       return result.map(v => v.trim());
     };
+
+    // Resolve region + cluster from a row using multiple column strategies
+    const resolveRegionCluster = (row: Record<string, string>, sortedRegions: any[]): { targetRegion: any; targetCluster: any; errorMsg?: string } => {
+      const norm = (s: string) => (s || '').trim().toLowerCase();
+
+      // Strategy 1: region_cluster dot-notation "1.1"
+      const rcRaw = row['region_cluster'] || row['region.cluster'] || row['region_code'] || '';
+      if (rcRaw) {
+        const parts = rcRaw.split('.');
+        const regionIdx = parseInt(parts[0]) - 1;
+        const clusterIdx = parseInt(parts[1] ?? '1') - 1;
+        if (!isNaN(regionIdx) && regionIdx >= 0) {
+          const targetRegion = sortedRegions[regionIdx];
+          if (targetRegion) {
+            const regionClusters = allClusters.filter((c: any) => c.regionId === targetRegion.id).sort((a: any, b: any) => a.id - b.id);
+            const targetCluster = regionClusters[clusterIdx] ?? regionClusters[0];
+            if (targetCluster) return { targetRegion, targetCluster };
+            return { targetRegion, targetCluster: null, errorMsg: `No cluster for Region "${targetRegion.name}"` };
+          }
+          return { targetRegion: null, targetCluster: null, errorMsg: `Region index ${regionIdx + 1} not found` };
+        }
+        return { targetRegion: null, targetCluster: null, errorMsg: `Invalid region_cluster "${rcRaw}"` };
+      }
+
+      // Strategy 2: region_id + cluster_id columns
+      const regionIdRaw = row['region_id'] || '';
+      const clusterIdRaw = row['cluster_id'] || '';
+      if (regionIdRaw) {
+        const rId = parseInt(regionIdRaw);
+        const targetRegion = allRegions.find((r: any) => r.id === rId);
+        if (!targetRegion) return { targetRegion: null, targetCluster: null, errorMsg: `Region ID ${regionIdRaw} not found` };
+        let targetCluster: any = null;
+        if (clusterIdRaw) {
+          const cId = parseInt(clusterIdRaw);
+          targetCluster = allClusters.find((c: any) => c.id === cId && c.regionId === targetRegion.id);
+          if (!targetCluster) return { targetRegion, targetCluster: null, errorMsg: `Cluster ID ${clusterIdRaw} not found in region "${targetRegion.name}"` };
+        } else {
+          targetCluster = allClusters.filter((c: any) => c.regionId === targetRegion.id).sort((a: any, b: any) => a.id - b.id)[0];
+          if (!targetCluster) return { targetRegion, targetCluster: null, errorMsg: `No cluster found for region "${targetRegion.name}"` };
+        }
+        return { targetRegion, targetCluster };
+      }
+
+      // Strategy 3: region (by name) + cluster (by name, optional)
+      const regionNameRaw = row['region'] || row['region_name'] || '';
+      const clusterNameRaw = row['cluster'] || row['cluster_name'] || '';
+      if (regionNameRaw) {
+        const targetRegion = allRegions.find((r: any) => norm(r.name) === norm(regionNameRaw))
+          ?? allRegions.find((r: any) => norm(r.name).includes(norm(regionNameRaw)) || norm(regionNameRaw).includes(norm(r.name)));
+        if (!targetRegion) return { targetRegion: null, targetCluster: null, errorMsg: `Region "${regionNameRaw}" not found` };
+        const regionClusters = allClusters.filter((c: any) => c.regionId === targetRegion.id).sort((a: any, b: any) => a.id - b.id);
+        let targetCluster: any = null;
+        if (clusterNameRaw) {
+          targetCluster = regionClusters.find((c: any) => norm(c.name) === norm(clusterNameRaw))
+            ?? regionClusters.find((c: any) => norm(c.name).includes(norm(clusterNameRaw)) || norm(clusterNameRaw).includes(norm(c.name)));
+          if (!targetCluster) return { targetRegion, targetCluster: null, errorMsg: `Cluster "${clusterNameRaw}" not found in region "${targetRegion.name}"` };
+        } else {
+          targetCluster = regionClusters[0];
+          if (!targetCluster) return { targetRegion, targetCluster: null, errorMsg: `No cluster found for region "${targetRegion.name}"` };
+        }
+        return { targetRegion, targetCluster };
+      }
+
+      return { targetRegion: null, targetCluster: null, errorMsg: 'Missing region/cluster — add a region, region_id, or region_cluster column' };
+    };
+
     const rawLines = csvText.split('\n').map((l: string) => l.trim()).filter(Boolean);
     if (rawLines.length < 2) throw new Error("CSV must have header + data rows");
     const header = parseCSVLine(rawLines[0]).map((h: string) => h.toLowerCase().replace(/\s+/g, '_'));
@@ -14795,20 +14861,12 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       const values = parseCSVLine(rawLines[i]);
       const row: Record<string, string> = {};
       header.forEach((h: string, idx: number) => { row[h] = values[idx] || ''; });
-      const rcRaw = row['region_cluster'] || row['region.cluster'] || row['region_code'] || '';
       const name = row['name'] || row['center_name'] || '';
       const code = row['code'] || row['center_code'] || '';
+      const rcRaw = row['region_cluster'] || row['region.cluster'] || row['region_code'] || '';
       const push = (extra: object) => rows.push({ rowNum: i + 1, name, code, regionCluster: rcRaw, address: row['address'] || '', contactPerson: row['contact_person'] || '', contactPhone: row['contact_phone'] || '', contactEmail: row['contact_email'] || '', ...extra });
-      if (!rcRaw) { push({ regionName: '—', clusterName: '—', status: 'error', errorMsg: 'Missing region_cluster' }); errorCount++; continue; }
-      const parts = rcRaw.split('.');
-      const regionIdx = parseInt(parts[0]) - 1;
-      const clusterIdx = parseInt(parts[1] ?? '1') - 1;
-      if (isNaN(regionIdx) || regionIdx < 0) { push({ regionName: '—', clusterName: '—', status: 'error', errorMsg: `Invalid region_cluster "${rcRaw}"` }); errorCount++; continue; }
-      const targetRegion = sortedRegions[regionIdx];
-      if (!targetRegion) { push({ regionName: '—', clusterName: '—', status: 'error', errorMsg: `Region index ${regionIdx + 1} not found` }); errorCount++; continue; }
-      const regionClusters = allClusters.filter((c: any) => c.regionId === targetRegion.id).sort((a: any, b: any) => a.id - b.id);
-      const targetCluster = regionClusters[clusterIdx] ?? regionClusters[0];
-      if (!targetCluster) { push({ regionName: targetRegion.name, clusterName: '—', status: 'error', errorMsg: `No cluster for Region "${targetRegion.name}"` }); errorCount++; continue; }
+      const { targetRegion, targetCluster, errorMsg } = resolveRegionCluster(row, sortedRegions);
+      if (!targetRegion || !targetCluster) { push({ regionName: targetRegion?.name ?? '—', clusterName: '—', status: 'error', errorMsg: errorMsg ?? 'Missing region_cluster' }); errorCount++; continue; }
       if (!name) { push({ regionName: targetRegion.name, clusterName: targetCluster.name, status: 'error', errorMsg: 'Missing name' }); errorCount++; continue; }
       const isDuplicate = existingNames.has(name.toLowerCase()) || (code && existingCodes.has(code.toLowerCase()));
       if (isDuplicate) { push({ regionName: targetRegion.name, clusterName: targetCluster.name, regionId: targetRegion.id, clusterId: targetCluster.id, status: 'duplicate', errorMsg: 'Already exists in database' }); duplicateCount++; }
@@ -14884,37 +14942,62 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
           const row: Record<string, string> = {};
           header.forEach((h, idx) => { row[h] = values[idx] || ''; });
 
-          // Parse "R.C" region_cluster code  e.g. "1.1" → Region index 1, Cluster index 1
+          // Resolve region + cluster using multiple column strategies
+          const norm = (s: string) => (s || '').trim().toLowerCase();
+          let targetRegion: any = null;
+          let targetCluster: any = null;
+          let regionError = '';
+
           const rcRaw = row['region_cluster'] || row['region.cluster'] || row['region_code'] || '';
-          if (!rcRaw) {
-            results.errors.push(`Row ${i + 1}: Missing region_cluster (e.g. "1.1")`);
-            results.skipped++;
-            continue;
+          if (rcRaw) {
+            const parts = rcRaw.split('.');
+            const regionIdx = parseInt(parts[0]) - 1;
+            const clusterIdx = parseInt(parts[1] ?? '1') - 1;
+            if (!isNaN(regionIdx) && regionIdx >= 0) {
+              targetRegion = sortedRegions[regionIdx];
+              if (targetRegion) {
+                const rc = allClusters.filter(c => c.regionId === targetRegion.id).sort((a, b) => a.id - b.id);
+                targetCluster = rc[clusterIdx] ?? rc[0];
+                if (!targetCluster) regionError = `No cluster for Region "${targetRegion.name}"`;
+              } else regionError = `Region index ${regionIdx + 1} not found`;
+            } else regionError = `Invalid region_cluster "${rcRaw}"`;
+          } else {
+            const regionIdRaw = row['region_id'] || '';
+            const clusterIdRaw = row['cluster_id'] || '';
+            if (regionIdRaw) {
+              targetRegion = allRegions.find(r => r.id === parseInt(regionIdRaw));
+              if (!targetRegion) { regionError = `Region ID ${regionIdRaw} not found`; }
+              else if (clusterIdRaw) {
+                targetCluster = allClusters.find(c => c.id === parseInt(clusterIdRaw) && c.regionId === targetRegion.id);
+                if (!targetCluster) regionError = `Cluster ID ${clusterIdRaw} not found in region "${targetRegion.name}"`;
+              } else {
+                targetCluster = allClusters.filter(c => c.regionId === targetRegion.id).sort((a, b) => a.id - b.id)[0];
+                if (!targetCluster) regionError = `No cluster found for region "${targetRegion.name}"`;
+              }
+            } else {
+              const regionNameRaw = row['region'] || row['region_name'] || '';
+              const clusterNameRaw = row['cluster'] || row['cluster_name'] || '';
+              if (regionNameRaw) {
+                targetRegion = allRegions.find(r => norm(r.name) === norm(regionNameRaw))
+                  ?? allRegions.find(r => norm(r.name).includes(norm(regionNameRaw)) || norm(regionNameRaw).includes(norm(r.name)));
+                if (!targetRegion) { regionError = `Region "${regionNameRaw}" not found`; }
+                else {
+                  const rc = allClusters.filter(c => c.regionId === targetRegion.id).sort((a, b) => a.id - b.id);
+                  if (clusterNameRaw) {
+                    targetCluster = rc.find(c => norm(c.name) === norm(clusterNameRaw))
+                      ?? rc.find(c => norm(c.name).includes(norm(clusterNameRaw)) || norm(clusterNameRaw).includes(norm(c.name)));
+                    if (!targetCluster) regionError = `Cluster "${clusterNameRaw}" not found in region "${targetRegion.name}"`;
+                  } else {
+                    targetCluster = rc[0];
+                    if (!targetCluster) regionError = `No cluster found for region "${targetRegion.name}"`;
+                  }
+                }
+              } else regionError = 'Missing region — add a region, region_id, or region_cluster column';
+            }
           }
 
-          const parts = rcRaw.split('.');
-          const regionIdx = parseInt(parts[0]) - 1;
-          const clusterIdx = parseInt(parts[1] ?? '1') - 1;
-
-          if (isNaN(regionIdx) || regionIdx < 0) {
-            results.errors.push(`Row ${i + 1}: Invalid region_cluster "${rcRaw}"`);
-            results.skipped++;
-            continue;
-          }
-
-          const targetRegion = sortedRegions[regionIdx];
-          if (!targetRegion) {
-            results.errors.push(`Row ${i + 1}: Region index ${regionIdx + 1} not found`);
-            results.skipped++;
-            continue;
-          }
-
-          const regionClusters = allClusters
-            .filter(c => c.regionId === targetRegion.id)
-            .sort((a, b) => a.id - b.id);
-          const targetCluster = regionClusters[clusterIdx] ?? regionClusters[0];
-          if (!targetCluster) {
-            results.errors.push(`Row ${i + 1}: No cluster found for Region "${targetRegion.name}"`);
+          if (!targetRegion || !targetCluster) {
+            results.errors.push(`Row ${i + 1}: ${regionError}`);
             results.skipped++;
             continue;
           }
