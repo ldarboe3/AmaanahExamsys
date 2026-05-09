@@ -438,12 +438,12 @@ function CenterCard({
           <span className="line-clamp-1">{center.region?.name || t.centers.noRegion} / {center.cluster?.name || t.centers.noCluster}</span>
         </div>
 
-        {center.address && (
-          <div className="flex items-start gap-2 text-sm text-muted-foreground">
-            <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-            <span className="line-clamp-1">{center.address}</span>
-          </div>
-        )}
+        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+          <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          {center.address
+            ? <span className="line-clamp-1">{center.address}</span>
+            : <span className="italic opacity-60">No address</span>}
+        </div>
 
         {/* Exam Session Status */}
         <div className="pt-1 border-t border-black/5 dark:border-white/5">
