@@ -3228,6 +3228,38 @@ ${pages.map(p => `  <url>
     }
   });
 
+  // Move a school to a different center (updates assignment + school record)
+  app.patch("/api/schools/:id/move-center", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const schoolId = parseInt(req.params.id);
+      const { targetCenterId, examYearId } = req.body;
+      if (!targetCenterId || !examYearId) {
+        return res.status(400).json({ message: "targetCenterId and examYearId are required" });
+      }
+      // Find existing assignment for this school + exam year
+      const existing = await storage.getCenterAssignmentBySchool(schoolId, examYearId);
+      if (existing) {
+        await storage.updateCenterAssignment(existing.id, { centerId: targetCenterId });
+      } else {
+        await storage.createCenterAssignment({
+          examYearId,
+          schoolId,
+          centerId: targetCenterId,
+          assignmentMethod: 'manual',
+          notes: 'Manually moved to another center',
+        });
+      }
+      await storage.updateSchool(schoolId, { assignedCenterId: targetCenterId });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/schools/:id", isAuthenticated, async (req, res) => {
     try {
       await storage.deleteSchool(parseInt(req.params.id));
@@ -15435,7 +15467,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       }
 
       // Full data for admins
-      const [schools, students, paperMovements, scriptMovements, malpracticeReports, activityLogs, invigilators] = await Promise.all([
+      const [schools, students, paperMovements, scriptMovements, malpracticeReports, activityLogs, invigilators, centerAssignments] = await Promise.all([
         storage.getSchoolsByCenter(centerId),
         storage.getStudentsByCenter(centerId),
         yearId ? storage.getPaperMovementsByCenter(centerId, yearId) : Promise.resolve([]),
@@ -15443,7 +15475,14 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         storage.getMalpracticeReportsByCenter(centerId),
         storage.getCenterActivityLogs(centerId, yearId),
         storage.getAssignmentsByCenter(centerId),
+        yearId ? storage.getCenterAssignmentsByCenter(centerId, yearId) : Promise.resolve([]),
       ]);
+
+      // Build a schoolId → assignmentId map for the active exam year
+      const assignmentIdBySchool: Record<number, number> = {};
+      (centerAssignments as any[]).forEach((a: any) => {
+        assignmentIdBySchool[a.schoolId] = a.id;
+      });
 
       const totalStudents = yearId ? students.filter(s => s.examYearId === yearId).length : students.length;
       const studentsByGrade = students.reduce((acc: Record<number, number>, s) => {
@@ -15473,6 +15512,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
           ...school,
           studentCount: yearStudents.length,
           gradeBreakdown,
+          assignmentId: assignmentIdBySchool[school.id] ?? null,
         };
       });
       // Only show schools that actually have enrolled students for this exam year

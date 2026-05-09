@@ -69,7 +69,28 @@ import {
   ChevronUp,
   PackageCheck,
   PackageX,
+  MoreVertical,
+  Trash2,
+  MoveRight,
+  UserMinus,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -118,6 +139,7 @@ interface CenterDashboardData {
     schoolBadge?: string | null;
     studentCount?: number;
     gradeBreakdown?: Record<number, number>;
+    assignmentId?: number | null;
   }>;
   timetable: Array<{
     id: number;
@@ -1642,8 +1664,79 @@ function HallsTab({ centerId, canManage }: { centerId: number; canManage: boolea
   );
 }
 
-function SchoolsTab({ schools }: { schools: CenterDashboardData["schools"] }) {
+function SchoolsTab({
+  schools,
+  centerId,
+  examYearId,
+  canManage,
+  onRefetch,
+}: {
+  schools: CenterDashboardData["schools"];
+  centerId: number;
+  examYearId?: number;
+  canManage: boolean;
+  onRefetch: () => void;
+}) {
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [actionSchool, setActionSchool] = useState<CenterDashboardData["schools"][0] | null>(null);
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [moveTargetId, setMoveTargetId] = useState<string>("");
+
+  const { data: allCenters } = useQuery<{ id: number; name: string; code: string }[]>({
+    queryKey: ["/api/centers"],
+    enabled: canManage,
+  });
+
+  const otherCenters = (allCenters || []).filter(c => c.id !== centerId);
+
+  const moveMutation = useMutation({
+    mutationFn: async ({ schoolId, targetCenterId }: { schoolId: number; targetCenterId: number }) => {
+      return apiRequest("PATCH", `/api/schools/${schoolId}/move-center`, {
+        targetCenterId,
+        examYearId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/centers") });
+      setShowMoveDialog(false);
+      setActionSchool(null);
+      setMoveTargetId("");
+      onRefetch();
+      toast({ title: "School Moved", description: `${actionSchool?.name} has been moved to the selected center.` });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to move school", variant: "destructive" }),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async ({ assignmentId }: { assignmentId: number }) => {
+      return apiRequest("DELETE", `/api/center-assignments/${assignmentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/centers") });
+      setShowRemoveDialog(false);
+      setActionSchool(null);
+      onRefetch();
+      toast({ title: "School Removed", description: `${actionSchool?.name} has been unassigned from this center.` });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to remove school", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async ({ schoolId }: { schoolId: number }) => {
+      return apiRequest("DELETE", `/api/schools/${schoolId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/centers") });
+      setShowDeleteDialog(false);
+      setActionSchool(null);
+      onRefetch();
+      toast({ title: "School Deleted", description: `${actionSchool?.name} has been permanently deleted.` });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to delete school", variant: "destructive" }),
+  });
 
   const filtered = schools.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -1749,12 +1842,153 @@ function SchoolsTab({ schools }: { schools: CenterDashboardData["schools"] }) {
                       <p className="text-xs text-muted-foreground mt-1 truncate">{school.email}</p>
                     )}
                   </div>
+
+                  {/* Action menu — admins only */}
+                  {canManage && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 -mt-1 -me-1"
+                          data-testid={`button-school-actions-${school.id}`}
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => { setActionSchool(school); setMoveTargetId(""); setShowMoveDialog(true); }}
+                          data-testid={`menuitem-move-school-${school.id}`}
+                        >
+                          <MoveRight className="w-4 h-4 me-2" />
+                          Move to Another Center
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => { setActionSchool(school); setShowRemoveDialog(true); }}
+                          data-testid={`menuitem-remove-school-${school.id}`}
+                        >
+                          <UserMinus className="w-4 h-4 me-2" />
+                          Remove from Center
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => { setActionSchool(school); setShowDeleteDialog(true); }}
+                          className="text-destructive"
+                          data-testid={`menuitem-delete-school-${school.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 me-2" />
+                          Delete School
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Move to Another Center Dialog */}
+      <Dialog open={showMoveDialog} onOpenChange={(open) => { setShowMoveDialog(open); if (!open) { setActionSchool(null); setMoveTargetId(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MoveRight className="w-5 h-5 text-primary" />
+              Move School to Another Center
+            </DialogTitle>
+            <DialogDescription>
+              Select the destination center for <span className="font-medium">{actionSchool?.name}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Select value={moveTargetId} onValueChange={setMoveTargetId}>
+              <SelectTrigger data-testid="select-move-target-center">
+                <SelectValue placeholder="Select destination center…" />
+              </SelectTrigger>
+              <SelectContent>
+                {otherCenters.map(c => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name} <span className="text-muted-foreground text-xs">({c.code})</span>
+                  </SelectItem>
+                ))}
+                {otherCenters.length === 0 && (
+                  <SelectItem value="__none" disabled>No other centers available</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowMoveDialog(false); setActionSchool(null); setMoveTargetId(""); }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => actionSchool && moveTargetId && moveTargetId !== "__none" && moveMutation.mutate({ schoolId: actionSchool.id, targetCenterId: parseInt(moveTargetId) })}
+              disabled={!moveTargetId || moveTargetId === "__none" || moveMutation.isPending}
+              data-testid="button-confirm-move-school"
+            >
+              {moveMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+              <MoveRight className="w-4 h-4 me-2" />
+              Move School
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove from Center Confirmation */}
+      <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <UserMinus className="w-5 h-5 text-amber-500" />
+              Remove School from Center
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will unassign <span className="font-medium">{actionSchool?.name}</span> from this center. The school record and its students will remain intact. You can reassign the school to a center later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setActionSchool(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => actionSchool?.assignmentId && removeMutation.mutate({ assignmentId: actionSchool.assignmentId })}
+              disabled={removeMutation.isPending || !actionSchool?.assignmentId}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+              data-testid="button-confirm-remove-school"
+            >
+              {removeMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+              Remove from Center
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete School Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-destructive" />
+              Permanently Delete School
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will <span className="font-semibold text-destructive">permanently delete</span> <span className="font-medium">{actionSchool?.name}</span> along with all its students and data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setActionSchool(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => actionSchool && deleteMutation.mutate({ schoolId: actionSchool.id })}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-school"
+            >
+              {deleteMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -2020,7 +2254,13 @@ export default function CenterDashboard() {
             </TabsContent>
 
             <TabsContent value="schools" className="mt-4">
-              <SchoolsTab schools={schools} />
+              <SchoolsTab
+                schools={schools}
+                centerId={centerId}
+                examYearId={examYear?.id}
+                canManage={['super_admin', 'examination_admin'].includes(user?.role || '')}
+                onRefetch={refetch}
+              />
             </TabsContent>
 
             <TabsContent value="halls" className="mt-4">
