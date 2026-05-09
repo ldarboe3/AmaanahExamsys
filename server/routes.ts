@@ -14510,6 +14510,11 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
   // Auto-assign schools to centers based on cluster/region/capacity
   app.post("/api/center-assignments/auto-assign", isAuthenticated, async (req, res) => {
     try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
       const { examYearId } = req.body;
       if (!examYearId) {
         return res.status(400).json({ message: "examYearId is required" });
@@ -14520,8 +14525,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       const existingAssignments = await storage.getCenterAssignmentsByExamYear(examYearId);
       const assignedSchoolIds = new Set(existingAssignments.map(a => a.schoolId));
 
-      // Only include schools that have at least one approved student for this exam year
-      // (students are only approved after payment is confirmed)
+      // Only include schools with at least one approved student for this exam year
       const allStudents = await storage.getAllStudents();
       const schoolsWithApprovedStudents = new Set(
         allStudents
@@ -14529,66 +14533,83 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
           .map(s => s.schoolId)
       );
 
-      const unassignedSchools = allSchools.filter(s => 
+      const unassignedSchools = allSchools.filter(s =>
         s.status === 'approved' &&
         !assignedSchoolIds.has(s.id) &&
         schoolsWithApprovedStudents.has(s.id)
       );
 
-      // Track center capacities
+      // Build school→center self-assignment map (school IS a center)
+      const schoolCenterMap = new Map<number, typeof allCenters[0]>();
+      for (const center of allCenters) {
+        if ((center as any).schoolId && center.isActive) {
+          schoolCenterMap.set((center as any).schoolId, center);
+        }
+      }
+
+      // Track center student counts from already-assigned schools
       const centerStudentCounts: Record<number, number> = {};
       for (const center of allCenters) {
-        // Count students already assigned to this center
         const studentsAtCenter = await storage.getStudentsByCenter(center.id);
         centerStudentCounts[center.id] = studentsAtCenter.filter(s => s.examYearId === examYearId).length;
       }
 
       const results = {
         assigned: 0,
+        selfAssigned: 0,
         skipped: 0,
+        hallsGenerated: 0,
         warnings: [] as string[],
       };
 
-      for (const school of unassignedSchools) {
-        // Find best center: same cluster > same region > any with capacity
-        let bestCenter = null;
+      const centersWithNewAssignments = new Set<number>();
 
-        // Priority 1: Same cluster
-        const clusterCenters = allCenters.filter(c => 
-          c.clusterId === school.clusterId && c.isActive
-        );
-        for (const center of clusterCenters) {
-          const currentCount = centerStudentCounts[center.id] || 0;
-          if (currentCount < (center.capacity || 500)) {
-            bestCenter = center;
-            break;
+      for (const school of unassignedSchools) {
+        let bestCenter: typeof allCenters[0] | null = null;
+        let assignmentNote = '';
+        let isSelf = false;
+
+        // ── Priority 1: School IS a registered center → self-assign ──────────
+        const ownCenter = schoolCenterMap.get(school.id);
+        if (ownCenter) {
+          bestCenter = ownCenter;
+          assignmentNote = 'Self-assigned: school is a registered examination center';
+          isSelf = true;
+        }
+
+        // ── Priority 2: Same Region + Same Cluster ────────────────────────────
+        if (!bestCenter && school.regionId && school.clusterId) {
+          const clusterCenters = allCenters.filter(c =>
+            c.regionId === school.regionId &&
+            c.clusterId === school.clusterId &&
+            c.isActive
+          );
+          for (const center of clusterCenters) {
+            const currentCount = centerStudentCounts[center.id] || 0;
+            if (currentCount < (center.capacity || 500)) {
+              bestCenter = center;
+              assignmentNote = 'Assigned to center in same Region and Cluster';
+              break;
+            }
           }
         }
 
-        // Priority 2: Same region
-        if (!bestCenter) {
-          const regionCenters = allCenters.filter(c => 
+        // ── Priority 3: Same Region only (cluster-full fallback) ──────────────
+        if (!bestCenter && school.regionId) {
+          const regionCenters = allCenters.filter(c =>
             c.regionId === school.regionId && c.isActive
           );
           for (const center of regionCenters) {
             const currentCount = centerStudentCounts[center.id] || 0;
             if (currentCount < (center.capacity || 500)) {
               bestCenter = center;
+              assignmentNote = 'Assigned to center in same Region (all cluster centers at capacity)';
               break;
             }
           }
         }
 
-        // Priority 3: Any center with capacity
-        if (!bestCenter) {
-          for (const center of allCenters.filter(c => c.isActive)) {
-            const currentCount = centerStudentCounts[center.id] || 0;
-            if (currentCount < (center.capacity || 500)) {
-              bestCenter = center;
-              break;
-            }
-          }
-        }
+        // ── NO global fallback — Region match is mandatory ────────────────────
 
         if (bestCenter) {
           await storage.createCenterAssignment({
@@ -14596,26 +14617,183 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
             schoolId: school.id,
             centerId: bestCenter.id,
             assignmentMethod: 'auto',
-            notes: `Auto-assigned based on cluster/region priority`,
+            notes: assignmentNote,
           });
           await storage.updateSchool(school.id, { assignedCenterId: bestCenter.id });
-          
-          // Update count tracking
+
           const schoolStudents = await storage.getStudentsBySchool(school.id);
-          centerStudentCounts[bestCenter.id] = (centerStudentCounts[bestCenter.id] || 0) + 
-            schoolStudents.filter(s => s.examYearId === examYearId).length;
-          
+          const addedCount = schoolStudents.filter(s =>
+            s.examYearId === examYearId && s.status === 'approved'
+          ).length;
+          centerStudentCounts[bestCenter.id] = (centerStudentCounts[bestCenter.id] || 0) + addedCount;
+
+          centersWithNewAssignments.add(bestCenter.id);
           results.assigned++;
+          if (isSelf) results.selfAssigned++;
         } else {
           results.skipped++;
-          results.warnings.push(`No available center for ${school.name}`);
+          results.warnings.push(
+            `No center found in Region ${school.regionId ?? '?'} / Cluster ${school.clusterId ?? '?'} for "${school.name}"`
+          );
         }
+      }
+
+      // ── Auto-generate halls (40 students per hall) ────────────────────────
+      const STUDENTS_PER_HALL = 40;
+
+      for (const centerId of centersWithNewAssignments) {
+        const totalStudents = centerStudentCounts[centerId] || 0;
+        if (totalStudents === 0) continue;
+
+        const hallsNeeded = Math.ceil(totalStudents / STUDENTS_PER_HALL);
+
+        // Remove previously auto-generated halls (named "Hall N")
+        const existingHalls = await storage.getCenterHallsByCenter(centerId);
+        const autoHalls = existingHalls.filter(h => /^Hall \d+$/i.test(h.name));
+        for (const hall of autoHalls) {
+          await storage.deleteCenterHall(hall.id);
+        }
+
+        // Create halls
+        for (let i = 1; i <= hallsNeeded; i++) {
+          await storage.createCenterHall({ centerId, name: `Hall ${i}`, capacity: STUDENTS_PER_HALL });
+        }
+
+        results.hallsGenerated += hallsNeeded;
       }
 
       res.json(results);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
+  });
+
+  // ─── CSV Bulk Upload for Examination Centers ─────────────────────────────
+  const centerCsvUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req: any, file, cb) => {
+      if (file.originalname.endsWith('.csv') || file.mimetype === 'text/csv') cb(null, true);
+      else cb(new Error('Only CSV files are accepted'));
+    },
+  }).single('file');
+
+  app.post("/api/centers/bulk-upload-csv", isAuthenticated, (req, res) => {
+    centerCsvUpload(req, res, async (err) => {
+      if (err) return res.status(400).json({ message: err.message });
+      try {
+        const user = await storage.getUser(req.session.userId!);
+        if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+        const csvText = req.file.buffer.toString('utf-8');
+        const rawLines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+        if (rawLines.length < 2) return res.status(400).json({ message: "CSV must have header + data rows" });
+
+        // Simple CSV line parser (handles quoted fields)
+        const parseCSVLine = (line: string): string[] => {
+          const result: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') { inQuotes = !inQuotes; continue; }
+            if (ch === ',' && !inQuotes) { result.push(current); current = ''; continue; }
+            current += ch;
+          }
+          result.push(current);
+          return result.map(v => v.trim());
+        };
+
+        const header = parseCSVLine(rawLines[0]).map(h => h.toLowerCase().replace(/\s+/g, '_'));
+
+        const allRegions = await storage.getAllRegions();
+        const allClusters = await storage.getAllClusters();
+        const sortedRegions = [...allRegions].sort((a, b) => a.id - b.id);
+
+        const results = { created: 0, skipped: 0, errors: [] as string[] };
+
+        for (let i = 1; i < rawLines.length; i++) {
+          const values = parseCSVLine(rawLines[i]);
+          const row: Record<string, string> = {};
+          header.forEach((h, idx) => { row[h] = values[idx] || ''; });
+
+          // Parse "R.C" region_cluster code  e.g. "1.1" → Region index 1, Cluster index 1
+          const rcRaw = row['region_cluster'] || row['region.cluster'] || row['region_code'] || '';
+          if (!rcRaw) {
+            results.errors.push(`Row ${i + 1}: Missing region_cluster (e.g. "1.1")`);
+            results.skipped++;
+            continue;
+          }
+
+          const parts = rcRaw.split('.');
+          const regionIdx = parseInt(parts[0]) - 1;
+          const clusterIdx = parseInt(parts[1] ?? '1') - 1;
+
+          if (isNaN(regionIdx) || regionIdx < 0) {
+            results.errors.push(`Row ${i + 1}: Invalid region_cluster "${rcRaw}"`);
+            results.skipped++;
+            continue;
+          }
+
+          const targetRegion = sortedRegions[regionIdx];
+          if (!targetRegion) {
+            results.errors.push(`Row ${i + 1}: Region index ${regionIdx + 1} not found`);
+            results.skipped++;
+            continue;
+          }
+
+          const regionClusters = allClusters
+            .filter(c => c.regionId === targetRegion.id)
+            .sort((a, b) => a.id - b.id);
+          const targetCluster = regionClusters[clusterIdx] ?? regionClusters[0];
+          if (!targetCluster) {
+            results.errors.push(`Row ${i + 1}: No cluster found for Region "${targetRegion.name}"`);
+            results.skipped++;
+            continue;
+          }
+
+          const name = row['name'] || row['center_name'] || '';
+          if (!name) {
+            results.errors.push(`Row ${i + 1}: Missing name`);
+            results.skipped++;
+            continue;
+          }
+
+          const code = row['code'] || row['center_code'] ||
+            `CTR-${String(regionIdx + 1).padStart(2, '0')}${String(clusterIdx + 1).padStart(2, '0')}-${String(results.created + 1).padStart(3, '0')}`;
+
+          try {
+            await storage.createExamCenter({
+              name,
+              code,
+              regionId: targetRegion.id,
+              clusterId: targetCluster.id,
+              address: row['address'] || null,
+              contactPerson: row['contact_person'] || null,
+              contactPhone: row['contact_phone'] || null,
+              contactEmail: row['contact_email'] || null,
+              capacity: row['capacity'] ? parseInt(row['capacity']) : 500,
+              isActive: true,
+            } as any);
+            results.created++;
+          } catch (createErr: any) {
+            if (createErr.message?.includes('unique') || createErr.message?.includes('duplicate')) {
+              results.errors.push(`Row ${i + 1}: Code "${code}" already exists — skipped`);
+            } else {
+              results.errors.push(`Row ${i + 1}: ${createErr.message}`);
+            }
+            results.skipped++;
+          }
+        }
+
+        res.json(results);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
   });
 
   // Get assigned center for a specific school

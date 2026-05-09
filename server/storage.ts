@@ -108,6 +108,7 @@ export interface IStorage {
   getAllCenterHalls(): Promise<CenterHall[]>;
   updateCenterHall(id: number, hall: Partial<InsertCenterHall>): Promise<CenterHall | undefined>;
   deleteCenterHall(id: number): Promise<boolean>;
+  deleteHallsByCenter(centerId: number): Promise<void>;
 
   // Schools
   createSchool(school: InsertSchool): Promise<School>;
@@ -772,6 +773,10 @@ export class DatabaseStorage implements IStorage {
   async deleteCenterHall(id: number): Promise<boolean> {
     await db.delete(centerHalls).where(eq(centerHalls.id, id));
     return true;
+  }
+
+  async deleteHallsByCenter(centerId: number): Promise<void> {
+    await db.delete(centerHalls).where(eq(centerHalls.centerId, centerId));
   }
 
   // Schools

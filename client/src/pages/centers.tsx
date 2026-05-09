@@ -76,6 +76,9 @@ import {
   ShieldAlert,
   PlayCircle,
   CircleDot,
+  Upload,
+  FileUp,
+  XCircle,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -516,6 +519,9 @@ export default function Centers() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAutoAssignDialog, setShowAutoAssignDialog] = useState(false);
+  const [showCsvUploadDialog, setShowCsvUploadDialog] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvResults, setCsvResults] = useState<{ created: number; skipped: number; errors: string[] } | null>(null);
   const [selectedCenter, setSelectedCenter] = useState<CenterWithRelations | null>(null);
 
   // Redirect school admins immediately to their dedicated center info page
@@ -651,13 +657,47 @@ export default function Centers() {
     onSuccess: (data: any) => {
       invalidateCenterQueries();
       setShowAutoAssignDialog(false);
+      const parts: string[] = [];
+      if (data.selfAssigned > 0) parts.push(`${data.selfAssigned} self-assigned (school-as-center)`);
+      if (data.assigned - (data.selfAssigned ?? 0) > 0) parts.push(`${data.assigned - (data.selfAssigned ?? 0)} assigned by region/cluster`);
+      if (data.hallsGenerated > 0) parts.push(`${data.hallsGenerated} halls auto-generated`);
+      if (data.skipped > 0) parts.push(`${data.skipped} skipped (no matching region/cluster)`);
       toast({
-        title: "Schools Assigned",
-        description: `Successfully assigned ${data.assigned} schools. ${data.skipped > 0 ? `${data.skipped} schools could not be assigned.` : ''}`,
+        title: `${data.assigned} Schools Assigned`,
+        description: parts.join(' · ') || "Auto-assignment complete.",
       });
     },
     onError: () => {
       toast({ title: t.common.error, description: "Failed to auto-assign schools", variant: "destructive" });
+    },
+  });
+
+  const csvUploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/centers/bulk-upload-csv", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Upload failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      invalidateCenterQueries();
+      setCsvResults(data);
+      setCsvFile(null);
+      toast({
+        title: `${data.created} Centers Imported`,
+        description: `${data.created} created · ${data.skipped} skipped`,
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: t.common.error, description: error.message || "CSV upload failed", variant: "destructive" });
     },
   });
 
@@ -723,6 +763,10 @@ export default function Centers() {
           <p className="text-muted-foreground mt-1">{t.centers.manageDescription}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => { setCsvResults(null); setCsvFile(null); setShowCsvUploadDialog(true); }} data-testid="button-csv-upload-centers">
+            <Upload className="w-4 h-4 me-2" />
+            Import CSV
+          </Button>
           <Button variant="outline" onClick={() => setShowAutoAssignDialog(true)} data-testid="button-auto-assign">
             <Wand2 className="w-4 h-4 me-2" />
             Auto-Assign Schools
@@ -1275,15 +1319,22 @@ export default function Centers() {
         <AlertDialogContent dir={isRTL ? "rtl" : "ltr"}>
           <AlertDialogHeader>
             <AlertDialogTitle>Auto-Assign Schools to Centers</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will automatically assign eligible schools to examination centers based on:
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>Same cluster priority</li>
-                <li>Same region as fallback</li>
-                <li>Center capacity limits</li>
-              </ul>
-              <p className="mt-2 font-medium text-amber-600 dark:text-amber-400">Only schools with approved students and confirmed payment for the current exam year will be assigned.</p>
-              <p className="mt-1 font-medium">Schools already assigned will not be affected.</p>
+            <AlertDialogDescription asChild>
+              <div>
+                <p>Automatically assigns eligible schools to examination centers using the following priority rules:</p>
+                <ol className="list-decimal list-inside mt-2 space-y-1.5 text-sm">
+                  <li><span className="font-medium">Self-assignment</span> — if the school is registered as an examination center, it is assigned to itself.</li>
+                  <li><span className="font-medium">Same Region + Same Cluster</span> — the school is assigned to a center in its own cluster.</li>
+                  <li><span className="font-medium">Same Region only</span> — fallback when all cluster centers are at capacity.</li>
+                </ol>
+                <p className="mt-2 text-sm font-medium text-amber-600 dark:text-amber-400">
+                  Schools with no center in their region are skipped — there is no cross-region assignment.
+                </p>
+                <p className="mt-2 text-sm font-medium">
+                  After assignment, halls are auto-generated for each center at 40 students per hall.
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">Only schools with approved students and confirmed payment will be assigned. Already-assigned schools are not affected.</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1296,6 +1347,111 @@ export default function Centers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* CSV Bulk Upload Dialog */}
+      <Dialog open={showCsvUploadDialog} onOpenChange={(open) => { setShowCsvUploadDialog(open); if (!open) { setCsvResults(null); setCsvFile(null); } }}>
+        <DialogContent className="max-w-lg" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileUp className="w-5 h-5 text-primary" />
+              Import Examination Centers from CSV
+            </DialogTitle>
+            <DialogDescription>
+              Upload a CSV file to bulk-create examination centers. Use <span className="font-mono text-xs bg-muted px-1 rounded">1.1</span> format for Region.Cluster (e.g. "1.1" = first region, first cluster).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Format guide */}
+            <div className="rounded-md bg-muted/60 p-3 text-xs font-mono space-y-1">
+              <p className="font-semibold text-foreground text-[11px] uppercase tracking-wide mb-1.5">Expected CSV columns</p>
+              <p><span className="text-primary">name</span>, <span className="text-primary">code</span>, <span className="text-primary">region_cluster</span>, address, contact_person, contact_phone, contact_email</p>
+              <p className="mt-2 text-muted-foreground">Example row:</p>
+              <p className="text-foreground break-all">Janneh Kunda Center,CTR-101,<strong>1.1</strong>,Basse,Ahmed Fatty,9991234,center@mail.gm</p>
+              <p className="text-muted-foreground mt-1">code is optional — auto-generated if blank. region_cluster is required.</p>
+            </div>
+
+            {/* File picker */}
+            {!csvResults && (
+              <div
+                className="border-2 border-dashed border-border rounded-md p-6 text-center cursor-pointer hover-elevate transition-colors"
+                onClick={() => document.getElementById('center-csv-input')?.click()}
+                data-testid="dropzone-center-csv"
+              >
+                <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                {csvFile ? (
+                  <div className="space-y-1">
+                    <p className="font-medium text-sm">{csvFile.name}</p>
+                    <p className="text-xs text-muted-foreground">{(csvFile.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium">Click to select a CSV file</p>
+                    <p className="text-xs text-muted-foreground mt-1">Maximum 5 MB</p>
+                  </>
+                )}
+                <input
+                  id="center-csv-input"
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
+                  data-testid="input-center-csv"
+                />
+              </div>
+            )}
+
+            {/* Results */}
+            {csvResults && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 p-3 text-center">
+                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{csvResults.created}</p>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">Centers Created</p>
+                  </div>
+                  <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 text-center">
+                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{csvResults.skipped}</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">Skipped</p>
+                  </div>
+                </div>
+                {csvResults.errors.length > 0 && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 max-h-36 overflow-y-auto">
+                    <p className="text-xs font-semibold text-destructive mb-1.5 flex items-center gap-1">
+                      <XCircle className="w-3.5 h-3.5" /> {csvResults.errors.length} Error{csvResults.errors.length > 1 ? 's' : ''}
+                    </p>
+                    {csvResults.errors.map((err, i) => (
+                      <p key={i} className="text-xs text-muted-foreground">{err}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowCsvUploadDialog(false); setCsvResults(null); setCsvFile(null); }}>
+              {csvResults ? "Close" : t.common.cancel}
+            </Button>
+            {!csvResults && (
+              <Button
+                onClick={() => csvFile && csvUploadMutation.mutate(csvFile)}
+                disabled={!csvFile || csvUploadMutation.isPending}
+                data-testid="button-submit-center-csv"
+              >
+                {csvUploadMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+                <Upload className="w-4 h-4 me-2" />
+                Import Centers
+              </Button>
+            )}
+            {csvResults && csvResults.created > 0 && (
+              <Button onClick={() => { setCsvResults(null); setCsvFile(null); }}>
+                <Upload className="w-4 h-4 me-2" />
+                Import Another File
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

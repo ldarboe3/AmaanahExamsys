@@ -125,6 +125,7 @@ export const examCenters = pgTable("exam_centers", {
   contactPhone: varchar("contact_phone", { length: 50 }),
   contactEmail: varchar("contact_email", { length: 255 }),
   centerAdminId: varchar("center_admin_id").references(() => users.id),
+  schoolId: integer("school_id"), // Links this center to a school (when the school IS the center)
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -929,9 +930,11 @@ export const insertExamCenterSchema = createInsertSchema(examCenters).pick({
   contactPhone: true,
   contactEmail: true,
   centerAdminId: true,
+  schoolId: true,
   isActive: true,
 }).extend({
   code: z.string().optional(), // Make code optional - will be auto-generated if not provided
+  schoolId: z.number().optional().nullable(),
 });
 
 export const insertSchoolSchema = createInsertSchema(schools).pick({

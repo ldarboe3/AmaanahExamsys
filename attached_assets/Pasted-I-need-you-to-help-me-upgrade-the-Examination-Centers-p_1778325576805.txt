@@ -1,0 +1,63 @@
+I need you to help me upgrade the Examination Centers page with the following critical improvements:
+
+### 1. Add CSV Upload for Center Assignment
+
+The system should support bulk CSV upload for examination center setup using the required center format.
+
+### Format Requirement:
+
+**1.1** = Region 1, Cluster 1
+
+This format must be properly recognized and mapped by the system during upload so centers are automatically categorized correctly by region and cluster structure.
+
+---
+
+### 2. Dynamic Auto Hall Creation (Non-Negotiable)
+
+The system must automatically create examination halls based on the total number of students assigned from all schools under each examination center.
+
+### Default Rule:
+
+**40 students per hall (locked system default)**
+
+This should not be manually adjusted during standard center generation unless changed by authorized system settings.
+
+---
+
+### Example:
+
+If all schools assigned to one examination center produce a total of **400 students**:
+
+### Then the system must automatically:
+
+* Create **10 halls**
+* Assign hall numbers dynamically (Hall 1, Hall 2, Hall 3… Hall 10)
+* Display all halls clearly within that examination center package
+* Ensure hall allocation is visible and manageable in the center package view
+
+---
+
+### Core Logic:
+
+**Total Students ÷ 40 = Total Required Halls**
+
+### Additional Requirement:
+
+* If student count exceeds a perfect division, create an additional hall for remaining students
+  Example: 405 students = 11 halls
+
+---
+
+### Expected Outcome:
+
+This upgrade should eliminate manual hall calculations and ensure every examination center is automatically structured based on real assigned student data from connected schools.
+
+### Bottom Line:
+
+The center page must evolve from basic center creation into a smart examination center allocation system that handles:
+✔ CSV bulk upload
+✔ Region/Cluster formatting
+✔ Auto center mapping
+✔ Dynamic hall generation
+✔ Locked 40-student hall policy
+✔ Full package visibility of generated halls.
