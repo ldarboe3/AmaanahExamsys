@@ -14768,6 +14768,80 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
     },
   }).single('file');
 
+  // Helper: shared CSV parser for center rows
+  const parseCenterCsvRows = (csvText: string, allRegions: any[], allClusters: any[], allCenters: any[]) => {
+    const parseCSVLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') { inQuotes = !inQuotes; continue; }
+        if (ch === ',' && !inQuotes) { result.push(current); current = ''; continue; }
+        current += ch;
+      }
+      result.push(current);
+      return result.map(v => v.trim());
+    };
+    const rawLines = csvText.split('\n').map((l: string) => l.trim()).filter(Boolean);
+    if (rawLines.length < 2) throw new Error("CSV must have header + data rows");
+    const header = parseCSVLine(rawLines[0]).map((h: string) => h.toLowerCase().replace(/\s+/g, '_'));
+    const sortedRegions = [...allRegions].sort((a: any, b: any) => a.id - b.id);
+    const existingCodes = new Set(allCenters.map((c: any) => c.code.toLowerCase()));
+    const existingNames = new Set(allCenters.map((c: any) => c.name.toLowerCase()));
+    const rows: any[] = [];
+    let validCount = 0, errorCount = 0, duplicateCount = 0;
+    for (let i = 1; i < rawLines.length; i++) {
+      const values = parseCSVLine(rawLines[i]);
+      const row: Record<string, string> = {};
+      header.forEach((h: string, idx: number) => { row[h] = values[idx] || ''; });
+      const rcRaw = row['region_cluster'] || row['region.cluster'] || row['region_code'] || '';
+      const name = row['name'] || row['center_name'] || '';
+      const code = row['code'] || row['center_code'] || '';
+      const push = (extra: object) => rows.push({ rowNum: i + 1, name, code, regionCluster: rcRaw, address: row['address'] || '', contactPerson: row['contact_person'] || '', contactPhone: row['contact_phone'] || '', contactEmail: row['contact_email'] || '', ...extra });
+      if (!rcRaw) { push({ regionName: '—', clusterName: '—', status: 'error', errorMsg: 'Missing region_cluster' }); errorCount++; continue; }
+      const parts = rcRaw.split('.');
+      const regionIdx = parseInt(parts[0]) - 1;
+      const clusterIdx = parseInt(parts[1] ?? '1') - 1;
+      if (isNaN(regionIdx) || regionIdx < 0) { push({ regionName: '—', clusterName: '—', status: 'error', errorMsg: `Invalid region_cluster "${rcRaw}"` }); errorCount++; continue; }
+      const targetRegion = sortedRegions[regionIdx];
+      if (!targetRegion) { push({ regionName: '—', clusterName: '—', status: 'error', errorMsg: `Region index ${regionIdx + 1} not found` }); errorCount++; continue; }
+      const regionClusters = allClusters.filter((c: any) => c.regionId === targetRegion.id).sort((a: any, b: any) => a.id - b.id);
+      const targetCluster = regionClusters[clusterIdx] ?? regionClusters[0];
+      if (!targetCluster) { push({ regionName: targetRegion.name, clusterName: '—', status: 'error', errorMsg: `No cluster for Region "${targetRegion.name}"` }); errorCount++; continue; }
+      if (!name) { push({ regionName: targetRegion.name, clusterName: targetCluster.name, status: 'error', errorMsg: 'Missing name' }); errorCount++; continue; }
+      const isDuplicate = existingNames.has(name.toLowerCase()) || (code && existingCodes.has(code.toLowerCase()));
+      if (isDuplicate) { push({ regionName: targetRegion.name, clusterName: targetCluster.name, regionId: targetRegion.id, clusterId: targetCluster.id, status: 'duplicate', errorMsg: 'Already exists in database' }); duplicateCount++; }
+      else { push({ regionName: targetRegion.name, clusterName: targetCluster.name, regionId: targetRegion.id, clusterId: targetCluster.id, status: 'valid' }); validCount++; }
+    }
+    return { rows, validCount, errorCount, duplicateCount, header };
+  };
+
+  // Preview center CSV — validates and maps but does NOT save
+  app.post("/api/centers/preview-csv", isAuthenticated, (req, res) => {
+    centerCsvUpload(req, res, async (err) => {
+      if (err) return res.status(400).json({ message: err.message });
+      try {
+        const user = await storage.getUser(req.session.userId!);
+        if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+        const [allRegions, allClusters, allCenters] = await Promise.all([
+          storage.getAllRegions(),
+          storage.getAllClusters(),
+          storage.getAllExamCenters(),
+        ]);
+        const { rows, validCount, errorCount, duplicateCount } = parseCenterCsvRows(
+          req.file.buffer.toString('utf-8'), allRegions, allClusters, allCenters
+        );
+        res.json({ rows, validCount, errorCount, duplicateCount });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+  });
+
   app.post("/api/centers/bulk-upload-csv", isAuthenticated, (req, res) => {
     centerCsvUpload(req, res, async (err) => {
       if (err) return res.status(400).json({ message: err.message });

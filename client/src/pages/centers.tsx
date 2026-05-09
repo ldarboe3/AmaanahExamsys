@@ -79,7 +79,17 @@ import {
   Upload,
   FileUp,
   XCircle,
+  Download,
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -98,6 +108,27 @@ const centerSchema = z.object({
 });
 
 type CenterFormData = z.infer<typeof centerSchema>;
+
+type CsvStep = 'select' | 'preview' | 'uploading' | 'complete';
+
+interface CsvPreviewRow {
+  rowNum: number;
+  name: string;
+  code: string;
+  regionCluster: string;
+  regionName: string;
+  clusterName: string;
+  address: string;
+  status: 'valid' | 'error' | 'duplicate';
+  errorMsg?: string;
+}
+
+interface CsvPreviewResult {
+  rows: CsvPreviewRow[];
+  validCount: number;
+  errorCount: number;
+  duplicateCount: number;
+}
 
 interface CenterWithRelations extends ExamCenter {
   region?: { name: string };
@@ -520,8 +551,12 @@ export default function Centers() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAutoAssignDialog, setShowAutoAssignDialog] = useState(false);
   const [showCsvUploadDialog, setShowCsvUploadDialog] = useState(false);
+  const [csvStep, setCsvStep] = useState<CsvStep>('select');
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvResults, setCsvResults] = useState<{ created: number; skipped: number; errors: string[] } | null>(null);
+  const [csvPreviewData, setCsvPreviewData] = useState<CsvPreviewResult | null>(null);
+  const [csvProgress, setCsvProgress] = useState(0);
+  const [csvProgressLabel, setCsvProgressLabel] = useState('Uploading...');
+  const [csvFinalResult, setCsvFinalResult] = useState<{ created: number; skipped: number; errors: string[] } | null>(null);
   const [selectedCenter, setSelectedCenter] = useState<CenterWithRelations | null>(null);
 
   // Redirect school admins immediately to their dedicated center info page
@@ -672,34 +707,114 @@ export default function Centers() {
     },
   });
 
-  const csvUploadMutation = useMutation({
+  const closeCsvDialog = (open: boolean) => {
+    setShowCsvUploadDialog(open);
+    if (!open) {
+      setTimeout(() => {
+        setCsvStep('select');
+        setCsvFile(null);
+        setCsvPreviewData(null);
+        setCsvProgress(0);
+        setCsvProgressLabel('Uploading...');
+        setCsvFinalResult(null);
+      }, 200);
+    }
+  };
+
+  const downloadErrorList = () => {
+    if (!csvPreviewData) return;
+    const problematic = csvPreviewData.rows.filter(r => r.status !== 'valid');
+    const lines = [
+      'Row,Name,Code,Region_Cluster,Region,Cluster,Status,Issue',
+      ...problematic.map(r => `${r.rowNum},"${r.name}","${r.code}","${r.regionCluster}","${r.regionName}","${r.clusterName}","${r.status}","${r.errorMsg || ''}"`)
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'center-import-issues.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const csvPreviewMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/centers/bulk-upload-csv", {
+      const res = await fetch("/api/centers/preview-csv", {
         method: "POST",
         credentials: "include",
         body: formData,
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Upload failed");
+        const err = await res.json().catch(() => ({ message: "Preview failed" }));
+        throw new Error(err.message || "Preview failed");
       }
-      return res.json();
+      return res.json() as Promise<CsvPreviewResult>;
     },
-    onSuccess: (data: any) => {
-      invalidateCenterQueries();
-      setCsvResults(data);
-      setCsvFile(null);
-      toast({
-        title: `${data.created} Centers Imported`,
-        description: `${data.created} created · ${data.skipped} skipped`,
-      });
+    onSuccess: (data) => {
+      setCsvPreviewData(data);
+      setCsvStep('preview');
     },
     onError: (error: any) => {
-      toast({ title: t.common.error, description: error.message || "CSV upload failed", variant: "destructive" });
+      toast({ title: "Preview Failed", description: error.message || "Could not analyze CSV", variant: "destructive" });
     },
   });
+
+  const handleCsvConfirm = async () => {
+    if (!csvFile) return;
+    setCsvStep('uploading');
+    setCsvProgress(0);
+    setCsvProgressLabel('Uploading file...');
+    try {
+      const result = await new Promise<{ created: number; skipped: number; errors: string[] }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        formData.append("file", csvFile);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            setCsvProgress(Math.round((e.loaded / e.total) * 40));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setCsvProgress(55);
+            setCsvProgressLabel('Mapping regions and clusters...');
+            setTimeout(() => {
+              setCsvProgress(75);
+              setCsvProgressLabel('Creating examination centers...');
+              setTimeout(() => {
+                setCsvProgress(95);
+                setCsvProgressLabel('Finalizing records...');
+                setTimeout(() => {
+                  setCsvProgress(100);
+                  try { resolve(JSON.parse(xhr.responseText)); }
+                  catch { reject(new Error("Invalid server response")); }
+                }, 350);
+              }, 500);
+            }, 500);
+          } else {
+            try {
+              const err = JSON.parse(xhr.responseText);
+              reject(new Error(err.message || "Upload failed"));
+            } catch { reject(new Error(`Server error (${xhr.status})`)); }
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error — check your connection and try again"));
+        xhr.open("POST", "/api/centers/bulk-upload-csv");
+        xhr.withCredentials = true;
+        xhr.send(formData);
+      });
+      setTimeout(() => {
+        setCsvFinalResult(result);
+        setCsvStep('complete');
+        invalidateCenterQueries();
+      }, 400);
+    } catch (error: any) {
+      toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
+      setCsvStep('preview');
+    }
+  };
 
   const openCreateDialog = () => {
     form.reset({ name: "", code: "", address: "", regionId: 0, clusterId: 0, contactPerson: "", contactPhone: "", contactEmail: "" });
@@ -763,7 +878,7 @@ export default function Centers() {
           <p className="text-muted-foreground mt-1">{t.centers.manageDescription}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => { setCsvResults(null); setCsvFile(null); setShowCsvUploadDialog(true); }} data-testid="button-csv-upload-centers">
+          <Button variant="outline" onClick={() => { setCsvStep('select'); setCsvPreviewData(null); setCsvFile(null); setCsvFinalResult(null); setShowCsvUploadDialog(true); }} data-testid="button-csv-upload-centers">
             <Upload className="w-4 h-4 me-2" />
             Import CSV
           </Button>
@@ -1349,32 +1464,33 @@ export default function Centers() {
       </AlertDialog>
 
       {/* CSV Bulk Upload Dialog */}
-      <Dialog open={showCsvUploadDialog} onOpenChange={(open) => { setShowCsvUploadDialog(open); if (!open) { setCsvResults(null); setCsvFile(null); } }}>
-        <DialogContent className="max-w-lg" dir={isRTL ? "rtl" : "ltr"}>
+      <Dialog open={showCsvUploadDialog} onOpenChange={closeCsvDialog}>
+        <DialogContent className="max-w-3xl" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileUp className="w-5 h-5 text-primary" />
               Import Examination Centers from CSV
             </DialogTitle>
             <DialogDescription>
-              Upload a CSV file to bulk-create examination centers. Use <span className="font-mono text-xs bg-muted px-1 rounded">1.1</span> format for Region.Cluster (e.g. "1.1" = first region, first cluster).
+              {csvStep === 'select' && "Upload a CSV file to bulk-create examination centers. A preview will be shown before any data is saved."}
+              {csvStep === 'preview' && `Review all ${csvPreviewData?.rows.length ?? 0} detected records before confirming the import.`}
+              {csvStep === 'uploading' && "Please wait while your centers are being imported..."}
+              {csvStep === 'complete' && "Import complete. Review the results below."}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Format guide */}
-            <div className="rounded-md bg-muted/60 p-3 text-xs font-mono space-y-1">
-              <p className="font-semibold text-foreground text-[11px] uppercase tracking-wide mb-1.5">Expected CSV columns</p>
-              <p><span className="text-primary">name</span>, <span className="text-primary">code</span>, <span className="text-primary">region_cluster</span>, address, contact_person, contact_phone, contact_email</p>
-              <p className="mt-2 text-muted-foreground">Example row:</p>
-              <p className="text-foreground break-all">Janneh Kunda Center,CTR-101,<strong>1.1</strong>,Basse,Ahmed Fatty,9991234,center@mail.gm</p>
-              <p className="text-muted-foreground mt-1">code is optional — auto-generated if blank. region_cluster is required.</p>
-            </div>
-
-            {/* File picker */}
-            {!csvResults && (
+          {/* ── Step 1: File Select ── */}
+          {csvStep === 'select' && (
+            <div className="space-y-4">
+              <div className="rounded-md bg-muted/60 p-3 text-xs font-mono space-y-1">
+                <p className="font-semibold text-foreground text-[11px] uppercase tracking-wide mb-1.5">Expected CSV columns</p>
+                <p><span className="text-primary">name</span>, <span className="text-primary">code</span>, <span className="text-primary">region_cluster</span>, address, contact_person, contact_phone, contact_email</p>
+                <p className="mt-2 text-muted-foreground">Example row:</p>
+                <p className="text-foreground break-all">Janneh Kunda Center,CTR-101,<strong>1.1</strong>,Basse,Ahmed Fatty,9991234,center@mail.gm</p>
+                <p className="text-muted-foreground mt-1">code is optional — auto-generated if blank. region_cluster is required.</p>
+              </div>
               <div
-                className="border-2 border-dashed border-border rounded-md p-6 text-center cursor-pointer hover-elevate transition-colors"
+                className="border-2 border-dashed border-border rounded-md p-8 text-center cursor-pointer hover-elevate"
                 onClick={() => document.getElementById('center-csv-input')?.click()}
                 data-testid="dropzone-center-csv"
               >
@@ -1399,52 +1515,192 @@ export default function Centers() {
                   data-testid="input-center-csv"
                 />
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Results */}
-            {csvResults && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 p-3 text-center">
-                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{csvResults.created}</p>
-                    <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">Centers Created</p>
-                  </div>
-                  <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 text-center">
-                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{csvResults.skipped}</p>
-                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">Skipped</p>
-                  </div>
+          {/* ── Step 2: Preview Table ── */}
+          {csvStep === 'preview' && csvPreviewData && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 p-3 text-center">
+                  <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{csvPreviewData.validCount}</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">Ready to Import</p>
                 </div>
-                {csvResults.errors.length > 0 && (
-                  <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 max-h-36 overflow-y-auto">
-                    <p className="text-xs font-semibold text-destructive mb-1.5 flex items-center gap-1">
-                      <XCircle className="w-3.5 h-3.5" /> {csvResults.errors.length} Error{csvResults.errors.length > 1 ? 's' : ''}
-                    </p>
-                    {csvResults.errors.map((err, i) => (
-                      <p key={i} className="text-xs text-muted-foreground">{err}</p>
-                    ))}
-                  </div>
-                )}
+                <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 text-center">
+                  <p className="text-xl font-bold text-amber-700 dark:text-amber-400">{csvPreviewData.duplicateCount}</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">Duplicates (will skip)</p>
+                </div>
+                <div className="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 text-center">
+                  <p className="text-xl font-bold text-red-700 dark:text-red-400">{csvPreviewData.errorCount}</p>
+                  <p className="text-xs text-red-600 dark:text-red-500 mt-0.5">Errors (will skip)</p>
+                </div>
               </div>
-            )}
-          </div>
+              <div className="rounded-md border overflow-hidden">
+                <div className="max-h-72 overflow-y-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>Center Name</TableHead>
+                        <TableHead>Region</TableHead>
+                        <TableHead>Cluster</TableHead>
+                        <TableHead>Code</TableHead>
+                        <TableHead className="w-28">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {csvPreviewData.rows.map((row) => (
+                        <TableRow
+                          key={row.rowNum}
+                          className={
+                            row.status === 'error'
+                              ? 'bg-red-50/50 dark:bg-red-950/10'
+                              : row.status === 'duplicate'
+                              ? 'bg-amber-50/50 dark:bg-amber-950/10'
+                              : ''
+                          }
+                        >
+                          <TableCell className="text-xs text-muted-foreground">{row.rowNum}</TableCell>
+                          <TableCell className="font-medium text-sm">{row.name || <span className="text-muted-foreground italic">blank</span>}</TableCell>
+                          <TableCell className="text-sm">{row.regionName}</TableCell>
+                          <TableCell className="text-sm">{row.clusterName}</TableCell>
+                          <TableCell className="text-xs font-mono">{row.code || <span className="text-muted-foreground">auto</span>}</TableCell>
+                          <TableCell>
+                            {row.status === 'valid' && (
+                              <Badge className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border-0">Valid</Badge>
+                            )}
+                            {row.status === 'duplicate' && (
+                              <Badge className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border-0">Duplicate</Badge>
+                            )}
+                            {row.status === 'error' && (
+                              <div>
+                                <Badge className="text-xs bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border-0">Error</Badge>
+                                {row.errorMsg && <p className="text-[10px] text-destructive mt-0.5 leading-tight">{row.errorMsg}</p>}
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </div>
+          )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCsvUploadDialog(false); setCsvResults(null); setCsvFile(null); }}>
-              {csvResults ? "Close" : t.common.cancel}
-            </Button>
-            {!csvResults && (
-              <Button
-                onClick={() => csvFile && csvUploadMutation.mutate(csvFile)}
-                disabled={!csvFile || csvUploadMutation.isPending}
-                data-testid="button-submit-center-csv"
-              >
-                {csvUploadMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
-                <Upload className="w-4 h-4 me-2" />
-                Import Centers
+          {/* ── Step 3: Upload Progress ── */}
+          {csvStep === 'uploading' && (
+            <div className="py-6 space-y-6">
+              <div className="text-center space-y-2">
+                <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
+                <p className="text-sm font-medium">{csvProgressLabel}</p>
+                <p className="text-xs text-muted-foreground">{csvFile?.name}</p>
+              </div>
+              <div className="space-y-2">
+                <Progress value={csvProgress} className="h-3" />
+                <p className="text-xs text-center text-muted-foreground tabular-nums">{csvProgress}%</p>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { label: 'Validating CSV structure', threshold: 20 },
+                  { label: 'Mapping regions and clusters', threshold: 55 },
+                  { label: 'Creating examination centers', threshold: 75 },
+                  { label: 'Finalizing records', threshold: 95 },
+                ].map(({ label, threshold }) => {
+                  const done = csvProgress >= threshold + 15;
+                  const active = csvProgress >= threshold && !done;
+                  return (
+                    <div key={label} className={`flex items-center gap-2 text-xs transition-colors ${done ? 'text-emerald-600 dark:text-emerald-400' : active ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      {done
+                        ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                        : active
+                        ? <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                        : <div className="w-3.5 h-3.5 rounded-full border border-current opacity-30 shrink-0" />
+                      }
+                      {label}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 4: Complete ── */}
+          {csvStep === 'complete' && csvFinalResult && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="w-5 h-5" />
+                <p className="font-semibold">Import Complete</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 p-4 text-center">
+                  <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{csvFinalResult.created}</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-1">Centers Created</p>
+                </div>
+                <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-4 text-center">
+                  <p className="text-3xl font-bold text-amber-700 dark:text-amber-400">{csvFinalResult.skipped}</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">Skipped</p>
+                </div>
+              </div>
+              {csvFinalResult.errors.length > 0 && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 max-h-40 overflow-y-auto">
+                  <p className="text-xs font-semibold text-destructive mb-1.5 flex items-center gap-1">
+                    <XCircle className="w-3.5 h-3.5" /> {csvFinalResult.errors.length} Issue{csvFinalResult.errors.length > 1 ? 's' : ''}
+                  </p>
+                  {csvFinalResult.errors.map((err, i) => (
+                    <p key={i} className="text-xs text-muted-foreground">{err}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="flex-wrap gap-2">
+            {/* Download issues button — only in preview step when there are problems */}
+            {csvStep === 'preview' && (csvPreviewData?.errorCount ?? 0) + (csvPreviewData?.duplicateCount ?? 0) > 0 && (
+              <Button variant="outline" size="sm" onClick={downloadErrorList} className="me-auto" data-testid="button-download-issue-list">
+                <Download className="w-4 h-4 me-2" />
+                Download Issue List
               </Button>
             )}
-            {csvResults && csvResults.created > 0 && (
-              <Button onClick={() => { setCsvResults(null); setCsvFile(null); }}>
+
+            {csvStep !== 'uploading' && (
+              <Button variant="outline" onClick={() => closeCsvDialog(false)}>
+                {csvStep === 'complete' ? 'Close' : t.common.cancel}
+              </Button>
+            )}
+
+            {csvStep === 'select' && (
+              <Button
+                onClick={() => csvFile && csvPreviewMutation.mutate(csvFile)}
+                disabled={!csvFile || csvPreviewMutation.isPending}
+                data-testid="button-preview-center-csv"
+              >
+                {csvPreviewMutation.isPending
+                  ? <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                  : <Eye className="w-4 h-4 me-2" />}
+                {csvPreviewMutation.isPending ? 'Analyzing...' : 'Preview Import'}
+              </Button>
+            )}
+
+            {csvStep === 'preview' && (
+              <>
+                <Button variant="outline" onClick={() => { setCsvStep('select'); setCsvPreviewData(null); }}>
+                  Back
+                </Button>
+                <Button
+                  onClick={handleCsvConfirm}
+                  disabled={(csvPreviewData?.validCount ?? 0) === 0}
+                  data-testid="button-submit-center-csv"
+                >
+                  <Upload className="w-4 h-4 me-2" />
+                  Confirm Import ({csvPreviewData?.validCount} centers)
+                </Button>
+              </>
+            )}
+
+            {csvStep === 'complete' && (csvFinalResult?.created ?? 0) > 0 && (
+              <Button onClick={() => { setCsvStep('select'); setCsvPreviewData(null); setCsvFile(null); setCsvFinalResult(null); }}>
                 <Upload className="w-4 h-4 me-2" />
                 Import Another File
               </Button>
