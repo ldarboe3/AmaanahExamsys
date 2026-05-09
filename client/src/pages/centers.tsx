@@ -351,7 +351,8 @@ function CenterCard({
   onViewDetails,
   onDelete,
   isRTL,
-  t
+  t,
+  isAdmin,
 }: {
   center: CenterWithRelations;
   monitoring?: CenterMonitoringData;
@@ -361,6 +362,7 @@ function CenterCard({
   onDelete: () => void;
   isRTL: boolean;
   t: any;
+  isAdmin: boolean;
 }) {
   const theme = CARD_THEMES[themeIndex % CARD_THEMES.length];
   const firstSchoolWithBadge = monitoring?.schools?.find(s => s.schoolBadge);
@@ -412,11 +414,15 @@ function CenterCard({
                   {t.centers.viewDetails}
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                <Trash2 className="w-4 h-4 me-2" />
-                {t.common.delete}
-              </DropdownMenuItem>
+              {isAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onDelete} className="text-destructive" data-testid={`button-delete-center-${center.id}`}>
+                    <Trash2 className="w-4 h-4 me-2" />
+                    {t.common.delete}
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -1013,6 +1019,7 @@ export default function Centers() {
               onDelete={() => openDeleteDialog(center)}
               isRTL={isRTL}
               t={t}
+              isAdmin={['super_admin', 'examination_admin'].includes(user?.role || '')}
             />
           ))
         ) : (

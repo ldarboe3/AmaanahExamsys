@@ -1470,6 +1470,10 @@ ${pages.map(p => `  <url>
 
   app.delete("/api/centers/:id", isAuthenticated, async (req, res) => {
     try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Only admins can delete exam centers." });
+      }
       await storage.deleteExamCenter(parseInt(req.params.id));
       res.json({ message: "Deleted" });
     } catch (error: any) {
