@@ -73,6 +73,7 @@ import {
   Trash2,
   MoveRight,
   UserMinus,
+  Home,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1789,12 +1790,30 @@ function SchoolsTab({
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [moveTargetId, setMoveTargetId] = useState<string>("");
 
-  const { data: allCenters } = useQuery<{ id: number; name: string; code: string }[]>({
+  const [moveCenterSearch, setMoveCenterSearch] = useState("");
+
+  const { data: allCenters } = useQuery<{
+    id: number; name: string; code: string;
+    address?: string | null;
+    region?: { id: number; name: string; code?: string } | null;
+    cluster?: { id: number; name: string; code?: string } | null;
+  }[]>({
     queryKey: ["/api/centers"],
     enabled: canManage,
   });
 
   const otherCenters = (allCenters || []).filter(c => c.id !== centerId);
+  const filteredMoveCenters = otherCenters.filter(c => {
+    if (!moveCenterSearch.trim()) return true;
+    const q = moveCenterSearch.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      c.code.toLowerCase().includes(q) ||
+      (c.region?.name || "").toLowerCase().includes(q) ||
+      (c.cluster?.name || "").toLowerCase().includes(q) ||
+      (c.address || "").toLowerCase().includes(q)
+    );
+  });
 
   const moveMutation = useMutation({
     mutationFn: async ({ schoolId, targetCenterId }: { schoolId: number; targetCenterId: number }) => {
@@ -1981,8 +2000,8 @@ function SchoolsTab({
       )}
 
       {/* Move to Another Center Dialog */}
-      <Dialog open={showMoveDialog} onOpenChange={(open) => { setShowMoveDialog(open); if (!open) { setActionSchool(null); setMoveTargetId(""); } }}>
-        <DialogContent>
+      <Dialog open={showMoveDialog} onOpenChange={(open) => { setShowMoveDialog(open); if (!open) { setActionSchool(null); setMoveTargetId(""); setMoveCenterSearch(""); } }}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MoveRight className="w-5 h-5 text-primary" />
@@ -1992,25 +2011,78 @@ function SchoolsTab({
               Select the destination center for <span className="font-medium">{actionSchool?.name}</span>.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-2">
-            <Select value={moveTargetId} onValueChange={setMoveTargetId}>
-              <SelectTrigger data-testid="select-move-target-center">
-                <SelectValue placeholder="Select destination center…" />
-              </SelectTrigger>
-              <SelectContent>
-                {otherCenters.map(c => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name} <span className="text-muted-foreground text-xs">({c.code})</span>
-                  </SelectItem>
-                ))}
-                {otherCenters.length === 0 && (
-                  <SelectItem value="__none" disabled>No other centers available</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+
+          <div className="flex flex-col gap-3 py-1">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search by name, code, region, cluster…"
+                value={moveCenterSearch}
+                onChange={e => setMoveCenterSearch(e.target.value)}
+                className="pl-9"
+                data-testid="input-move-center-search"
+              />
+            </div>
+
+            {/* Center list */}
+            <div className="border rounded-md overflow-y-auto max-h-64 divide-y">
+              {filteredMoveCenters.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No centers match your search.</p>
+              ) : (
+                filteredMoveCenters.map(c => {
+                  const selected = moveTargetId === String(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setMoveTargetId(String(c.id))}
+                      data-testid={`option-move-center-${c.id}`}
+                      className={`w-full text-left px-4 py-3 transition-colors hover-elevate ${selected ? "bg-primary/10" : ""}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-medium text-sm leading-snug" dir="auto">{c.name}</span>
+                        <span className="text-xs font-mono text-primary shrink-0">{c.code}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                        {c.region?.name && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {c.region.name}
+                          </span>
+                        )}
+                        {c.cluster?.name && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Building2 className="w-3 h-3" />
+                            {c.cluster.name}
+                          </span>
+                        )}
+                        {c.address && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Home className="w-3 h-3" />
+                            {c.address}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Selected summary */}
+            {moveTargetId && moveTargetId !== "__none" && (() => {
+              const sel = otherCenters.find(c => String(c.id) === moveTargetId);
+              return sel ? (
+                <p className="text-xs text-muted-foreground">
+                  Selected: <span className="font-medium text-foreground">{sel.name}</span> <span className="font-mono text-primary">({sel.code})</span>
+                </p>
+              ) : null;
+            })()}
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowMoveDialog(false); setActionSchool(null); setMoveTargetId(""); }}>
+            <Button variant="outline" onClick={() => { setShowMoveDialog(false); setActionSchool(null); setMoveTargetId(""); setMoveCenterSearch(""); }}>
               Cancel
             </Button>
             <Button
