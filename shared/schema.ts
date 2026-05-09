@@ -178,6 +178,8 @@ export const schools = pgTable("schools", {
   registrationFeePaid: boolean("registration_fee_paid").default(false),
   registrationInvoiceId: integer("registration_invoice_id"),
   preferredLanguage: varchar("preferred_language", { length: 10 }).default('english'),
+  qaVerifiedAt: timestamp("qa_verified_at"),
+  qaVerifiedBy: varchar("qa_verified_by", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

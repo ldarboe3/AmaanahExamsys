@@ -20584,6 +20584,125 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
     }
   });
 
+  // ── PATCH /api/sync/schools/school-types ─────────────────────────────────
+  // QA system pushes verified school types (LBS/UBS/BCS/SSS) for a batch of schools.
+  // Matches schools by email (preferred) or name. Overwrites schoolType/schoolTypes
+  // and stamps qaVerifiedAt / qaVerifiedBy on every matched record.
+  //
+  // Body: {
+  //   verifiedBy: string,                    // monitor name / system identifier
+  //   verifiedAt?: string,                   // ISO date; defaults to now
+  //   updates: [{
+  //     email?: string,                      // match by email (preferred)
+  //     name?: string,                       // match by name if no email
+  //     schoolType: "LBS"|"UBS"|"BCS"|"SSS",
+  //     schoolTypes?: string[],              // e.g. ["BCS","SSS"] – if omitted, inferred from schoolType
+  //   }]
+  // }
+  app.patch("/api/sync/schools/school-types", requireSyncKey, async (req, res) => {
+    try {
+      const bodySchema = z.object({
+        verifiedBy: z.string().min(1),
+        verifiedAt: z.string().datetime().optional(),
+        updates: z.array(z.object({
+          email: z.string().email().optional(),
+          name: z.string().min(1).optional(),
+          schoolType: z.enum(["LBS", "UBS", "BCS", "SSS"]),
+          schoolTypes: z.array(z.string()).optional(),
+        })).min(1),
+      });
+
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const { verifiedBy, verifiedAt, updates } = parsed.data;
+      const qaVerifiedAt = verifiedAt ? new Date(verifiedAt) : new Date();
+
+      // Pre-load all schools once for name-based matching
+      const allSchools = await storage.getAllSchools();
+      const schoolByEmail = new Map(allSchools.map((s: any) => [s.email.toLowerCase(), s]));
+      const schoolByName  = new Map(allSchools.map((s: any) => [s.name.toLowerCase().trim(), s]));
+
+      const results: any[] = [];
+
+      for (const row of updates) {
+        try {
+          // Resolve school record
+          let school: any | undefined;
+          if (row.email) school = schoolByEmail.get(row.email.toLowerCase());
+          if (!school && row.name) school = schoolByName.get(row.name.toLowerCase().trim());
+
+          if (!school) {
+            results.push({ action: "not_found", email: row.email, name: row.name });
+            continue;
+          }
+
+          // Derive schoolTypes array when not explicitly provided
+          const schoolTypes = row.schoolTypes ?? [row.schoolType];
+
+          // Persist QA-verified type
+          const updated = await storage.updateSchoolQaType(school.id, {
+            schoolType: row.schoolType,
+            schoolTypes,
+            qaVerifiedBy: verifiedBy,
+            qaVerifiedAt,
+          });
+
+          results.push({ action: "updated", id: school.id, email: school.email, name: school.name, schoolType: row.schoolType, schoolTypes });
+        } catch (rowErr: any) {
+          results.push({ action: "error", email: row.email, name: row.name, message: rowErr.message });
+        }
+      }
+
+      const updated   = results.filter(r => r.action === "updated").length;
+      const not_found = results.filter(r => r.action === "not_found").length;
+      const errors    = results.filter(r => r.action === "error").length;
+
+      res.status(200).json({
+        message: `QA school-type sync complete: ${updated} updated, ${not_found} not found, ${errors} errors.`,
+        updated, not_found, errors, verifiedBy, verifiedAt: qaVerifiedAt.toISOString(), results,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── GET /api/sync/schools/qa-status ──────────────────────────────────────
+  // Returns all schools with their current QA verification status — useful for the
+  // QA system to see what it has already pushed and which schools are still pending.
+  app.get("/api/sync/schools/qa-status", requireSyncKey, async (req, res) => {
+    try {
+      const allSchools = await storage.getAllSchools();
+      const allRegions = await storage.getAllRegions();
+      const regionMap  = new Map(allRegions.map((r: any) => [r.id, r]));
+      const verifiedOnly = req.query.verifiedOnly === "true";
+
+      let schools = allSchools;
+      if (verifiedOnly) schools = schools.filter((s: any) => s.qaVerifiedAt != null);
+
+      const result = schools.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        schoolType: s.schoolType,
+        schoolTypes: s.schoolTypes ?? [],
+        qaVerified: s.qaVerifiedAt != null,
+        qaVerifiedAt: s.qaVerifiedAt ?? null,
+        qaVerifiedBy: s.qaVerifiedBy ?? null,
+        region: s.regionId ? { id: s.regionId, name: (regionMap.get(s.regionId) as any)?.name ?? null } : null,
+      }));
+
+      const verifiedCount   = result.filter(s => s.qaVerified).length;
+      const unverifiedCount = result.length - verifiedCount;
+
+      res.json({ total: result.length, verifiedCount, unverifiedCount, data: result });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── GET /api/sync/schools/:id/exam-data ──────────────────────────────────
   // Full examination data for a single school across all (or a specific) exam year.
   // Optional query: ?examYearId=1

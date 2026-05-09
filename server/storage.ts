@@ -121,6 +121,7 @@ export interface IStorage {
   getSchoolsByCenter(centerId: number): Promise<School[]>;
   getAllSchools(): Promise<School[]>;
   updateSchool(id: number, school: Partial<InsertSchool>): Promise<School | undefined>;
+  updateSchoolQaType(id: number, data: { schoolType: string; schoolTypes: string[]; qaVerifiedBy: string; qaVerifiedAt: Date }): Promise<School | undefined>;
   verifySchoolEmail(token: string): Promise<School | undefined>;
   approveSchool(id: number): Promise<School | undefined>;
   rejectSchool(id: number): Promise<School | undefined>;
@@ -881,6 +882,17 @@ export class DatabaseStorage implements IStorage {
 
   async updateSchool(id: number, school: Partial<InsertSchool>): Promise<School | undefined> {
     const [updated] = await db.update(schools).set({ ...school, updatedAt: new Date() }).where(eq(schools.id, id)).returning();
+    return updated;
+  }
+
+  async updateSchoolQaType(id: number, data: { schoolType: string; schoolTypes: string[]; qaVerifiedBy: string; qaVerifiedAt: Date }): Promise<School | undefined> {
+    const [updated] = await db.update(schools).set({
+      schoolType: data.schoolType as any,
+      schoolTypes: data.schoolTypes,
+      qaVerifiedAt: data.qaVerifiedAt,
+      qaVerifiedBy: data.qaVerifiedBy,
+      updatedAt: new Date(),
+    }).where(eq(schools.id, id)).returning();
     return updated;
   }
 

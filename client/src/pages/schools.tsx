@@ -88,6 +88,7 @@ import {
   Building2,
   MapPinOff,
   CircleDot,
+  ShieldCheck,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -184,6 +185,8 @@ interface SchoolWithRelations extends School {
   studentCount?: number;
   isSelfCenter?: boolean;
   assignedCenterName?: string | null;
+  qaVerifiedAt?: string | null;
+  qaVerifiedBy?: string | null;
 }
 
 export default function Schools() {
@@ -195,6 +198,7 @@ export default function Schools() {
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [clusterFilter, setClusterFilter] = useState<string>("all");
   const [centerFilter, setCenterFilter] = useState<string>("all");
+  const [qaFilter, setQaFilter] = useState<string>("all");
   const [pageSize, setPageSize] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [selectedSchool, setSelectedSchool] = useState<SchoolWithRelations | null>(null);
@@ -557,7 +561,12 @@ export default function Schools() {
     const matchesSearch =
       school.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       school.email.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
+    const qaVerified = !!(school as SchoolWithRelations).qaVerifiedAt;
+    const matchesQa =
+      qaFilter === "all" ||
+      (qaFilter === "qa_verified" && qaVerified) ||
+      (qaFilter === "qa_pending" && !qaVerified);
+    return matchesSearch && matchesQa;
   });
 
   const onSubmit = (data: AddSchoolFormData) => {
@@ -1013,6 +1022,26 @@ export default function Schools() {
                   </SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={qaFilter} onValueChange={v => { setQaFilter(v); setCurrentPage(0); }}>
+                <SelectTrigger className="w-[160px]" data-testid="select-qa-filter">
+                  <SelectValue placeholder={isRTL ? "تحقق النوع (QA)" : "QA Verification"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{isRTL ? "جميع المدارس" : "All Schools"}</SelectItem>
+                  <SelectItem value="qa_verified">
+                    <span className="flex items-center gap-2">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      {isRTL ? "محقق من QA" : "QA Verified"}
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="qa_pending">
+                    <span className="flex items-center gap-2">
+                      <ShieldCheck className="w-3.5 h-3.5 text-muted-foreground" />
+                      {isRTL ? "في انتظار QA" : "QA Pending"}
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
@@ -1066,9 +1095,20 @@ export default function Schools() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="text-xs">
-                          {getSchoolTypesDisplay(school, isRTL)}
-                        </Badge>
+                        <div className="flex flex-col gap-1">
+                          <Badge variant="secondary" className="text-xs w-fit">
+                            {getSchoolTypesDisplay(school, isRTL)}
+                          </Badge>
+                          {(school as SchoolWithRelations).qaVerifiedAt && (
+                            <span
+                              className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"
+                              title={`Verified by ${(school as SchoolWithRelations).qaVerifiedBy ?? "QA"} on ${new Date((school as SchoolWithRelations).qaVerifiedAt!).toLocaleDateString()}`}
+                            >
+                              <ShieldCheck className="w-3 h-3" />
+                              {isRTL ? "محقق" : "QA Verified"}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
