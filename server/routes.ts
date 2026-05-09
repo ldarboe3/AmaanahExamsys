@@ -15075,6 +15075,83 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
     });
   });
 
+  // Bulk-update center addresses from a CSV containing Center Name + Center Location columns
+  app.post("/api/centers/bulk-update-addresses", isAuthenticated, (req, res) => {
+    centerCsvUpload(req, res, async (err) => {
+      if (err) return res.status(400).json({ message: err.message });
+      try {
+        const user = await storage.getUser(req.session.userId!);
+        if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+        const parseCSVLine = (line: string): string[] => {
+          const result: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') { inQuotes = !inQuotes; continue; }
+            if (ch === ',' && !inQuotes) { result.push(current); current = ''; continue; }
+            current += ch;
+          }
+          result.push(current);
+          return result.map(v => v.trim());
+        };
+
+        // Normalize Arabic/English name for matching — collapse spaces, trim
+        const normName = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+        const csvText = req.file.buffer.toString('utf-8');
+        const rawLines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+        if (rawLines.length < 2) return res.status(400).json({ message: "CSV must have header + data rows" });
+
+        const header = parseCSVLine(rawLines[0]).map(h => h.toLowerCase().replace(/\s+/g, '_'));
+        const allCenters = await storage.getAllExamCenters();
+
+        // Build a name→center map for fast lookup
+        const centerByName = new Map<string, typeof allCenters[0]>();
+        for (const c of allCenters) {
+          centerByName.set(normName(c.name), c);
+        }
+
+        const results = { updated: 0, skipped: 0, noMatch: [] as string[], errors: [] as string[] };
+
+        for (let i = 1; i < rawLines.length; i++) {
+          const values = parseCSVLine(rawLines[i]);
+          const row: Record<string, string> = {};
+          header.forEach((h, idx) => { row[h] = values[idx] || ''; });
+
+          const name = (row['name'] || row['center_name'] || '').replace(/\s+/g, ' ').trim();
+          const address = (row['address'] || row['location'] || row['center_location'] || row['village'] || row['town'] || row['area'] || row['place'] || '').replace(/\s+/g, ' ').trim();
+
+          if (!name) { results.skipped++; continue; }
+          if (!address) { results.skipped++; continue; }
+
+          const matched = centerByName.get(normName(name));
+          if (!matched) {
+            results.noMatch.push(name);
+            results.skipped++;
+            continue;
+          }
+
+          try {
+            await storage.updateExamCenter(matched.id, { address });
+            results.updated++;
+          } catch (updateErr: any) {
+            results.errors.push(`"${name}": ${updateErr.message}`);
+            results.skipped++;
+          }
+        }
+
+        res.json(results);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+  });
+
   // Get assigned center for a specific school
   app.get("/api/center-assignments/school/:schoolId", isAuthenticated, async (req, res) => {
     try {

@@ -565,6 +565,10 @@ export default function Centers() {
   const [showUnassignedDialog, setShowUnassignedDialog] = useState(false);
   const [unassignedSearch, setUnassignedSearch] = useState("");
   const [assigningCenterId, setAssigningCenterId] = useState<Record<number, string>>({});
+  const [showUpdateAddressDialog, setShowUpdateAddressDialog] = useState(false);
+  const [updateAddressFile, setUpdateAddressFile] = useState<File | null>(null);
+  const [updateAddressResult, setUpdateAddressResult] = useState<{ updated: number; skipped: number; noMatch: string[]; errors: string[] } | null>(null);
+  const [updateAddressPhase, setUpdateAddressPhase] = useState<'select' | 'running' | 'done'>('select');
   const [csvStep, setCsvStep] = useState<CsvStep>('select');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvPreviewData, setCsvPreviewData] = useState<CsvPreviewResult | null>(null);
@@ -613,6 +617,33 @@ export default function Centers() {
   });
 
   const unassignedSchools = unassignedSchoolsData?.data ?? [];
+
+  const updateAddressMutation = useMutation({
+    mutationFn: async (file: File) => {
+      setUpdateAddressPhase('running');
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/centers/bulk-update-addresses", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Upload failed" }));
+        throw new Error(err.message || "Upload failed");
+      }
+      return res.json() as Promise<{ updated: number; skipped: number; noMatch: string[]; errors: string[] }>;
+    },
+    onSuccess: (data) => {
+      setUpdateAddressResult(data);
+      setUpdateAddressPhase('done');
+      invalidateCenterQueries();
+    },
+    onError: (err: any) => {
+      setUpdateAddressPhase('select');
+      toast({ title: t.common.error, description: err.message || "Failed to update addresses.", variant: "destructive" });
+    },
+  });
 
   const assignCenterMutation = useMutation({
     mutationFn: async ({ schoolId, centerId }: { schoolId: number; centerId: number }) => {
@@ -960,6 +991,10 @@ export default function Centers() {
           <Button variant="outline" onClick={() => { setCsvStep('select'); setCsvPreviewData(null); setCsvFile(null); setCsvFinalResult(null); setShowCsvUploadDialog(true); }} data-testid="button-csv-upload-centers">
             <Upload className="w-4 h-4 me-2" />
             Import CSV
+          </Button>
+          <Button variant="outline" onClick={() => { setUpdateAddressFile(null); setUpdateAddressResult(null); setUpdateAddressPhase('select'); setShowUpdateAddressDialog(true); }} data-testid="button-update-addresses">
+            <MapPin className="w-4 h-4 me-2" />
+            Update Addresses
           </Button>
           <Button variant="outline" onClick={openAutoAssignDialog} data-testid="button-auto-assign">
             <Wand2 className="w-4 h-4 me-2" />
@@ -1958,6 +1993,102 @@ export default function Centers() {
               </Button>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Addresses from CSV Dialog */}
+      <Dialog open={showUpdateAddressDialog} onOpenChange={(open) => { if (!updateAddressMutation.isPending) { setShowUpdateAddressDialog(open); if (!open) { setUpdateAddressFile(null); setUpdateAddressResult(null); setUpdateAddressPhase('select'); } } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-primary" />
+              Update Center Addresses from CSV
+            </DialogTitle>
+            <DialogDescription>
+              Upload the examination centers CSV. Each center will be matched by name and its address (Center Location column) will be updated.
+            </DialogDescription>
+          </DialogHeader>
+
+          {updateAddressPhase === 'select' && (
+            <div className="space-y-4">
+              <div
+                className="border-2 border-dashed rounded-md p-6 text-center cursor-pointer hover-elevate transition-colors"
+                onClick={() => document.getElementById('update-address-file-input')?.click()}
+              >
+                <FileUp className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                {updateAddressFile
+                  ? <p className="text-sm font-medium">{updateAddressFile.name}</p>
+                  : <p className="text-sm text-muted-foreground">Click to select CSV file</p>}
+                <input
+                  id="update-address-file-input"
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  onChange={e => setUpdateAddressFile(e.target.files?.[0] ?? null)}
+                  data-testid="input-update-address-file"
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowUpdateAddressDialog(false)}>Cancel</Button>
+                <Button
+                  disabled={!updateAddressFile}
+                  onClick={() => updateAddressFile && updateAddressMutation.mutate(updateAddressFile)}
+                  data-testid="button-submit-update-addresses"
+                >
+                  <Upload className="w-4 h-4 me-2" />
+                  Update Addresses
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {updateAddressPhase === 'running' && (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Matching centers and updating addresses…</p>
+            </div>
+          )}
+
+          {updateAddressPhase === 'done' && updateAddressResult && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 p-3 text-center">
+                  <p className="text-2xl font-semibold text-emerald-700 dark:text-emerald-400">{updateAddressResult.updated}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Updated</p>
+                </div>
+                <div className="rounded-md bg-muted/40 border p-3 text-center">
+                  <p className="text-2xl font-semibold">{updateAddressResult.skipped}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Skipped</p>
+                </div>
+                <div className={`rounded-md border p-3 text-center ${updateAddressResult.noMatch.length > 0 ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-800/40" : "bg-muted/40"}`}>
+                  <p className={`text-2xl font-semibold ${updateAddressResult.noMatch.length > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>{updateAddressResult.noMatch.length}</p>
+                  <p className="text-xs text-muted-foreground mt-1">No Match</p>
+                </div>
+              </div>
+
+              {updateAddressResult.noMatch.length > 0 && (
+                <div className="max-h-32 overflow-y-auto rounded-md bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30 p-3 space-y-1">
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-2">Centers not found in database:</p>
+                  {updateAddressResult.noMatch.map((name, i) => (
+                    <p key={i} className="text-xs text-muted-foreground">{name}</p>
+                  ))}
+                </div>
+              )}
+
+              {updateAddressResult.errors.length > 0 && (
+                <div className="max-h-24 overflow-y-auto rounded-md bg-destructive/10 border border-destructive/20 p-3 space-y-1">
+                  <p className="text-xs font-medium text-destructive mb-2">Errors:</p>
+                  {updateAddressResult.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-muted-foreground">{e}</p>
+                  ))}
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button onClick={() => setShowUpdateAddressDialog(false)}>Done</Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
