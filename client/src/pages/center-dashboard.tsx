@@ -108,6 +108,8 @@ interface CenterDashboardData {
     address?: string;
     regionId: number;
     clusterId: number;
+    regionName?: string;
+    clusterName?: string;
     capacity: number;
     contactPerson?: string;
     contactPhone?: string;
@@ -2172,10 +2174,31 @@ export default function CenterDashboard() {
           </Link>
           <div>
             <h1 className="text-2xl font-semibold">{center.name}</h1>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <span>Code: {center.code}</span>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+              <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                <Hash className="w-3.5 h-3.5" />
+                {center.code}
+              </span>
+              {center.regionName && (
+                <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <MapPin className="w-3.5 h-3.5" />
+                  {center.regionName}
+                </span>
+              )}
+              {center.clusterName && (
+                <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <Building2 className="w-3.5 h-3.5" />
+                  {center.clusterName}
+                </span>
+              )}
+              {center.address && (
+                <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <MapPin className="w-3.5 h-3.5" />
+                  {center.address}
+                </span>
+              )}
               {examYear && (
-                <Badge variant="outline">{examYear.name}</Badge>
+                <Badge variant="outline" className="text-xs">{examYear.name}</Badge>
               )}
             </div>
           </div>

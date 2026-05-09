@@ -15663,6 +15663,19 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         return res.status(404).json({ message: "Center not found" });
       }
 
+      // Enrich center with region/cluster names
+      const [allRegions, allClusters] = await Promise.all([
+        storage.getAllRegions(),
+        storage.getAllClusters(),
+      ]);
+      const centerRegion = allRegions.find((r: any) => r.id === center.regionId);
+      const centerCluster = allClusters.find((c: any) => c.id === center.clusterId);
+      const enrichedCenter = {
+        ...center,
+        regionName: centerRegion?.name || null,
+        clusterName: centerCluster?.name || null,
+      };
+
       const activeExamYear = examYearId ? await storage.getExamYear(examYearId) : await storage.getActiveExamYear();
       const yearId = activeExamYear?.id;
 
@@ -15700,7 +15713,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         }, {});
 
         return res.json({
-          center,
+          center: enrichedCenter,
           examYear: activeExamYear,
           schoolView: true,
           schoolId: schoolAdminSchoolId,
@@ -15779,7 +15792,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         : allEnrichedSchools;
 
       res.json({
-        center,
+        center: enrichedCenter,
         examYear: activeExamYear,
         schoolView: false,
         schoolId: null,
