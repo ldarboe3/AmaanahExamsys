@@ -1500,13 +1500,13 @@ function HallsTab({ centerId, canManage }: { centerId: number; canManage: boolea
 
   const hallSchema = z.object({
     name: z.string().min(1, "Name is required"),
-    capacity: z.coerce.number().int().min(1, "Capacity must be at least 1").default(30),
+    capacity: z.coerce.number().int().min(1, "Capacity must be at least 1").default(40),
   });
   type HallFormData = z.infer<typeof hallSchema>;
 
   const form = useForm<HallFormData>({
     resolver: zodResolver(hallSchema),
-    defaultValues: { name: "", capacity: 30 },
+    defaultValues: { name: "", capacity: 40 },
   });
 
   const createMutation = useMutation({
@@ -2162,7 +2162,7 @@ export default function CenterDashboard() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-muted-foreground" />
-                  <span>Capacity: {center.capacity}</span>
+                  <span>Capacity: {halls && halls.length > 0 ? `${halls.reduce((s: number, h: any) => s + (h.capacity || 0), 0)} (${halls.length} hall${halls.length !== 1 ? 's' : ''})` : '0 (no halls)'}</span>
                 </div>
                 {center.contactPerson && (
                   <div className="flex items-center gap-2">

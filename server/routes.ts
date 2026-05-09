@@ -1496,7 +1496,7 @@ ${pages.map(p => `  <url>
       const hall = await storage.createCenterHall({
         centerId: parseInt(req.params.centerId),
         name: req.body.name,
-        capacity: req.body.capacity ?? 30,
+        capacity: req.body.capacity ?? 40,
       });
       res.status(201).json(hall);
     } catch (error: any) {

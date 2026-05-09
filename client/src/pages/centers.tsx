@@ -458,7 +458,7 @@ function CenterCard({
         <div className="grid grid-cols-5 gap-1 pt-2 border-t border-black/5 dark:border-white/5">
           <div className="text-center">
             <p className={`text-base font-semibold ${theme.accent}`}>
-              {(center.hallCount && center.hallCount > 0 ? (center.hallTotalCapacity || 0) : (center.capacity || 0)).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
+              {(center.hallTotalCapacity || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
             </p>
             <p className="text-[10px] text-muted-foreground leading-tight">{t.centers.capacity}</p>
           </div>
@@ -859,10 +859,7 @@ export default function Centers() {
     center.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const totalCapacity = centers?.reduce((sum, c) => {
-    const cap = (c.hallCount && c.hallCount > 0) ? (c.hallTotalCapacity || 0) : (c.capacity || 0);
-    return sum + cap;
-  }, 0) || 0;
+  const totalCapacity = centers?.reduce((sum, c) => sum + (c.hallTotalCapacity || 0), 0) || 0;
   const totalAssigned = centers?.reduce((sum, c) => sum + (c.assignedStudentsCount || 0), 0) || 0;
 
   const monitoringMap = new Map<number, CenterMonitoringData>(
@@ -1335,13 +1332,13 @@ export default function Centers() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">{t.centers.capacity}</p>
                   <p className="font-medium">
-                    {selectedCenter.hallCount && selectedCenter.hallCount > 0
-                      ? (selectedCenter.hallTotalCapacity || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')
-                      : (selectedCenter.capacity?.toLocaleString(isRTL ? 'ar-EG' : 'en-US') || "—")}
+                    {(selectedCenter.hallTotalCapacity || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
                   </p>
-                  {selectedCenter.hallCount && selectedCenter.hallCount > 0 ? (
-                    <p className="text-[10px] text-muted-foreground">from {selectedCenter.hallCount} hall{selectedCenter.hallCount !== 1 ? "s" : ""}</p>
-                  ) : null}
+                  <p className="text-[10px] text-muted-foreground">
+                    {selectedCenter.hallCount
+                      ? `from ${selectedCenter.hallCount} hall${selectedCenter.hallCount !== 1 ? "s" : ""} × 40 students`
+                      : "Add halls to set capacity"}
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">{t.common.status}</p>
