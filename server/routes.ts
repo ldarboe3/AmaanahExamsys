@@ -15152,6 +15152,157 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
     });
   });
 
+  // AI-powered center assignment suggestions for unassigned schools
+  app.post("/api/centers/ai-suggest-assignments", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { schoolIds } = req.body as { schoolIds: number[] };
+      if (!Array.isArray(schoolIds) || schoolIds.length === 0) {
+        return res.status(400).json({ message: "schoolIds array is required" });
+      }
+
+      const [allSchools, allCenters, allRegions, allClusters] = await Promise.all([
+        storage.getAllSchools(),
+        storage.getAllExamCenters(),
+        storage.getAllRegions(),
+        storage.getAllClusters(),
+      ]);
+
+      const regionById = new Map(allRegions.map(r => [r.id, r]));
+      const clusterById = new Map(allClusters.map(c => [c.id, c]));
+
+      const targetSchools = allSchools.filter(s => schoolIds.includes(s.id));
+
+      // Build center context list
+      const centersContext = allCenters.map(c => ({
+        id: c.id,
+        name: c.name,
+        code: c.code,
+        regionId: c.regionId,
+        clusterId: c.clusterId,
+        regionName: c.regionId ? (regionById.get(c.regionId)?.name ?? '') : '',
+        clusterName: c.clusterId ? (clusterById.get(c.clusterId)?.name ?? '') : '',
+        address: c.address ?? '',
+      }));
+
+      const suggestions: { schoolId: number; centerId: number; centerName: string; confidence: string; reason: string }[] = [];
+
+      // For each school: deterministic match first, AI for ambiguous cases
+      const needsAI: typeof targetSchools = [];
+      const aiCandidates: Record<number, typeof centersContext> = {};
+
+      for (const school of targetSchools) {
+        const sameRegionCluster = centersContext.filter(c => c.regionId === school.regionId && c.clusterId === school.clusterId);
+        if (sameRegionCluster.length === 1) {
+          suggestions.push({
+            schoolId: school.id,
+            centerId: sameRegionCluster[0].id,
+            centerName: sameRegionCluster[0].name,
+            confidence: 'high',
+            reason: `Only center in ${sameRegionCluster[0].regionName} / ${sameRegionCluster[0].clusterName}`,
+          });
+        } else if (sameRegionCluster.length > 1) {
+          needsAI.push(school);
+          aiCandidates[school.id] = sameRegionCluster;
+        } else {
+          // No exact region+cluster match — try same region
+          const sameRegion = centersContext.filter(c => c.regionId === school.regionId);
+          needsAI.push(school);
+          aiCandidates[school.id] = sameRegion.length > 0 ? sameRegion : centersContext;
+        }
+      }
+
+      // Batch AI call for ambiguous cases
+      if (needsAI.length > 0) {
+        const OpenAI = (await import('openai')).default;
+        const openai = new OpenAI({
+          apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+          baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        });
+
+        const schoolsForAI = needsAI.map(s => ({
+          schoolId: s.id,
+          schoolName: s.name,
+          regionName: s.regionId ? (regionById.get(s.regionId)?.name ?? '') : '',
+          clusterName: s.clusterId ? (clusterById.get(s.clusterId)?.name ?? '') : '',
+          candidates: (aiCandidates[s.id] || []).slice(0, 30).map(c => ({
+            centerId: c.id,
+            centerName: c.name,
+            regionName: c.regionName,
+            clusterName: c.clusterName,
+            address: c.address,
+          })),
+        }));
+
+        const prompt = `You are an expert at matching Arabic Islamic schools to exam centers in The Gambia.
+
+For each school, pick the BEST exam center from its candidate list. Consider:
+1. Same region and cluster = highest priority
+2. Arabic name similarity (e.g. similar town/location names)  
+3. Geographic proximity based on address
+
+Return ONLY valid JSON with this exact structure:
+{
+  "suggestions": [
+    { "schoolId": 123, "centerId": 456, "reason": "Brief English reason" }
+  ]
+}
+
+Schools to match:
+${JSON.stringify(schoolsForAI, null, 2)}`;
+
+        try {
+          const aiRes = await openai.chat.completions.create({
+            model: 'gpt-4.1-mini',
+            messages: [{ role: 'user', content: prompt }],
+            response_format: { type: 'json_object' },
+            max_tokens: 2000,
+          });
+
+          const parsed = JSON.parse(aiRes.choices[0].message.content || '{}');
+          const aiSuggestions: { schoolId: number; centerId: number; reason: string }[] = parsed.suggestions || [];
+
+          for (const ai of aiSuggestions) {
+            const center = centersContext.find(c => c.id === ai.centerId);
+            if (center) {
+              const candidates = aiCandidates[ai.schoolId] || [];
+              const isExactMatch = candidates.length > 0 && candidates.some(c => c.regionId === center.regionId && c.clusterId === center.clusterId);
+              suggestions.push({
+                schoolId: ai.schoolId,
+                centerId: ai.centerId,
+                centerName: center.name,
+                confidence: isExactMatch ? 'medium' : 'low',
+                reason: ai.reason,
+              });
+            }
+          }
+        } catch (aiErr) {
+          // If AI fails, fall back to first candidate per school
+          for (const school of needsAI) {
+            const candidates = aiCandidates[school.id] || [];
+            if (candidates.length > 0) {
+              suggestions.push({
+                schoolId: school.id,
+                centerId: candidates[0].id,
+                centerName: candidates[0].name,
+                confidence: 'low',
+                reason: 'Fallback: first available center in region',
+              });
+            }
+          }
+        }
+      }
+
+      res.json({ suggestions });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get assigned center for a specific school
   app.get("/api/center-assignments/school/:schoolId", isAuthenticated, async (req, res) => {
     try {

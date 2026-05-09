@@ -83,6 +83,10 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
+  Sparkles,
+  CheckCheck,
+  ChevronsUpDown,
+  Check,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -93,6 +97,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -565,6 +571,9 @@ export default function Centers() {
   const [showUnassignedDialog, setShowUnassignedDialog] = useState(false);
   const [unassignedSearch, setUnassignedSearch] = useState("");
   const [assigningCenterId, setAssigningCenterId] = useState<Record<number, string>>({});
+  const [centerPickerOpen, setCenterPickerOpen] = useState<Record<number, boolean>>({});
+  const [aiSuggestions, setAiSuggestions] = useState<Record<number, { centerId: number; centerName: string; confidence: string; reason: string }>>({});
+  const [aiSuggestLoading, setAiSuggestLoading] = useState(false);
   const [showUpdateAddressDialog, setShowUpdateAddressDialog] = useState(false);
   const [updateAddressFile, setUpdateAddressFile] = useState<File | null>(null);
   const [updateAddressResult, setUpdateAddressResult] = useState<{ updated: number; skipped: number; noMatch: string[]; errors: string[] } | null>(null);
@@ -658,12 +667,47 @@ export default function Centers() {
         delete next[variables.schoolId];
         return next;
       });
+      setAiSuggestions(prev => {
+        const next = { ...prev };
+        delete next[variables.schoolId];
+        return next;
+      });
       toast({ title: "School Assigned", description: "School has been assigned to the center successfully." });
     },
     onError: (err: any) => {
       toast({ title: t.common.error, description: err?.message || "Failed to assign school to center.", variant: "destructive" });
     },
   });
+
+  const handleAiSuggestAll = async () => {
+    const filtered = unassignedSchools.filter((s: any) =>
+      s.name.toLowerCase().includes(unassignedSearch.toLowerCase()) ||
+      (s.code || "").toLowerCase().includes(unassignedSearch.toLowerCase())
+    );
+    if (filtered.length === 0) return;
+    setAiSuggestLoading(true);
+    try {
+      const result = await apiRequest("POST", "/api/centers/ai-suggest-assignments", {
+        schoolIds: filtered.map((s: any) => s.id),
+      }) as { suggestions: { schoolId: number; centerId: number; centerName: string; confidence: string; reason: string }[] };
+      const newSuggestions: typeof aiSuggestions = {};
+      const newSelections: typeof assigningCenterId = { ...assigningCenterId };
+      for (const s of result.suggestions) {
+        newSuggestions[s.schoolId] = { centerId: s.centerId, centerName: s.centerName, confidence: s.confidence, reason: s.reason };
+        newSelections[s.schoolId] = String(s.centerId);
+      }
+      setAiSuggestions(newSuggestions);
+      setAssigningCenterId(newSelections);
+      toast({
+        title: "AI Suggestions Ready",
+        description: `${result.suggestions.length} center${result.suggestions.length === 1 ? "" : "s"} suggested. Review and click Assign to confirm.`,
+      });
+    } catch (err: any) {
+      toast({ title: "AI Suggest Failed", description: err?.message || "Could not get AI suggestions.", variant: "destructive" });
+    } finally {
+      setAiSuggestLoading(false);
+    }
+  };
 
   const { data: monitoring } = useQuery<CenterMonitoringData[]>({
     queryKey: ["/api/centers/monitoring-dashboard", activeExamYear?.id],
@@ -2093,18 +2137,53 @@ export default function Centers() {
       </Dialog>
 
       {/* Unassigned Schools Dialog */}
-      <Dialog open={showUnassignedDialog} onOpenChange={(open) => { setShowUnassignedDialog(open); if (!open) setUnassignedSearch(""); }}>
-        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col gap-0 p-0">
+      <Dialog open={showUnassignedDialog} onOpenChange={(open) => {
+        setShowUnassignedDialog(open);
+        if (!open) {
+          setUnassignedSearch("");
+          setAiSuggestions({});
+          setAssigningCenterId({});
+          setCenterPickerOpen({});
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col gap-0 p-0">
           <DialogHeader className="px-6 pt-6 pb-4 border-b">
-            <DialogTitle className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-amber-500" />
-              Unassigned Schools
-            </DialogTitle>
-            <DialogDescription>
-              {unassignedSchools.length === 0
-                ? "All schools are currently assigned to an exam center."
-                : `${unassignedSchools.length} school${unassignedSchools.length === 1 ? "" : "s"} have not been assigned to an exam center. Select a center for each school and click Assign.`}
-            </DialogDescription>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+                  Unassigned Schools
+                </DialogTitle>
+                <DialogDescription className="mt-1">
+                  {unassignedSchools.length === 0
+                    ? "All schools are currently assigned to an exam center."
+                    : `${unassignedSchools.length} school${unassignedSchools.length === 1 ? "" : "s"} need an exam center. Use AI Suggest to auto-fill, then confirm each assignment.`}
+                </DialogDescription>
+              </div>
+              {unassignedSchools.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAiSuggestAll}
+                  disabled={aiSuggestLoading || unassignedLoading}
+                  data-testid="button-ai-suggest-all"
+                  className="shrink-0"
+                >
+                  {aiSuggestLoading
+                    ? <><Loader2 className="w-4 h-4 me-1.5 animate-spin" />Thinking…</>
+                    : <><Sparkles className="w-4 h-4 me-1.5 text-violet-500" />AI Suggest All</>
+                  }
+                </Button>
+              )}
+            </div>
+            {Object.keys(aiSuggestions).length > 0 && (
+              <div className="mt-3 flex items-center gap-2 rounded-md bg-violet-50 dark:bg-violet-950/30 border border-violet-200/60 dark:border-violet-800/40 px-3 py-2">
+                <Sparkles className="w-3.5 h-3.5 text-violet-500 shrink-0" />
+                <p className="text-xs text-violet-700 dark:text-violet-300">
+                  AI pre-filled {Object.keys(aiSuggestions).length} center suggestions. Review each row and click Assign to confirm.
+                </p>
+              </div>
+            )}
           </DialogHeader>
 
           {unassignedSchools.length > 0 && (
@@ -2135,7 +2214,7 @@ export default function Centers() {
               </div>
             ) : (
               (() => {
-                const filtered = unassignedSchools.filter(s =>
+                const filtered = unassignedSchools.filter((s: any) =>
                   s.name.toLowerCase().includes(unassignedSearch.toLowerCase()) ||
                   (s.code || "").toLowerCase().includes(unassignedSearch.toLowerCase())
                 );
@@ -2144,52 +2223,121 @@ export default function Centers() {
                     <div className="text-center py-8 text-muted-foreground text-sm">No schools match your search.</div>
                   );
                 }
-                return filtered.map((school: any) => (
-                  <div
-                    key={school.id}
-                    className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-md border bg-muted/30"
-                    data-testid={`row-unassigned-school-${school.id}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{school.name}</p>
-                      <p className="text-xs text-muted-foreground">{school.code}{school.region?.name ? ` · ${school.region.name}` : ""}{school.cluster?.name ? ` · ${school.cluster.name}` : ""}</p>
+                return filtered.map((school: any) => {
+                  const suggestion = aiSuggestions[school.id];
+                  const selectedCenterId = assigningCenterId[school.id];
+                  const selectedCenter = selectedCenterId ? (centers ?? []).find(c => String(c.id) === selectedCenterId) : null;
+                  const isAiPrefilled = suggestion && selectedCenterId === String(suggestion.centerId);
+                  const confidenceColor = suggestion?.confidence === 'high'
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : suggestion?.confidence === 'medium'
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-muted-foreground';
+
+                  return (
+                    <div
+                      key={school.id}
+                      className={`flex flex-col gap-2 p-3 rounded-md border transition-colors ${isAiPrefilled ? "bg-violet-50/60 dark:bg-violet-950/20 border-violet-200/50 dark:border-violet-800/30" : "bg-muted/30"}`}
+                      data-testid={`row-unassigned-school-${school.id}`}
+                    >
+                      <div className="flex items-start sm:items-center gap-3 flex-col sm:flex-row">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{school.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {school.code}
+                            {school.region?.name ? ` · ${school.region.name}` : ""}
+                            {school.cluster?.name ? ` / ${school.cluster.name}` : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                          {/* Searchable center combobox */}
+                          <Popover
+                            open={!!centerPickerOpen[school.id]}
+                            onOpenChange={(open) => setCenterPickerOpen(prev => ({ ...prev, [school.id]: open }))}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className="flex-1 sm:w-56 justify-between font-normal"
+                                data-testid={`select-center-for-school-${school.id}`}
+                              >
+                                <span className="truncate text-sm">
+                                  {selectedCenter ? selectedCenter.name : <span className="text-muted-foreground">Select center…</span>}
+                                </span>
+                                <ChevronsUpDown className="w-3.5 h-3.5 ms-1 text-muted-foreground shrink-0" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Search centers…" />
+                                <CommandList className="max-h-60">
+                                  <CommandEmpty>No centers found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {(centers ?? []).map(c => (
+                                      <CommandItem
+                                        key={c.id}
+                                        value={`${c.name} ${(c as any).region?.name ?? ''} ${(c as any).cluster?.name ?? ''} ${(c as any).address ?? ''}`}
+                                        onSelect={() => {
+                                          setAssigningCenterId(prev => ({ ...prev, [school.id]: String(c.id) }));
+                                          setCenterPickerOpen(prev => ({ ...prev, [school.id]: false }));
+                                        }}
+                                        className="flex flex-col items-start gap-0.5 py-2"
+                                      >
+                                        <div className="flex items-center gap-2 w-full">
+                                          <Check className={`w-3.5 h-3.5 shrink-0 ${selectedCenterId === String(c.id) ? "opacity-100 text-primary" : "opacity-0"}`} />
+                                          <span className="font-medium text-sm">{c.name}</span>
+                                        </div>
+                                        <div className="ps-5.5 text-xs text-muted-foreground leading-tight">
+                                          {[(c as any).region?.name, (c as any).cluster?.name, (c as any).address].filter(Boolean).join(' · ') || 'No location info'}
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          <Button
+                            size="sm"
+                            disabled={!selectedCenterId || assignCenterMutation.isPending}
+                            onClick={() => {
+                              const cid = parseInt(selectedCenterId ?? "");
+                              if (!isNaN(cid)) assignCenterMutation.mutate({ schoolId: school.id, centerId: cid });
+                            }}
+                            data-testid={`button-assign-school-${school.id}`}
+                          >
+                            {assignCenterMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Assign"}
+                          </Button>
+                        </div>
+                      </div>
+                      {/* AI suggestion info row */}
+                      {suggestion && (
+                        <div className="flex items-center gap-2 ps-1">
+                          <Sparkles className={`w-3 h-3 shrink-0 ${confidenceColor}`} />
+                          <p className="text-xs text-muted-foreground">
+                            <span className={`font-medium ${confidenceColor}`}>
+                              {suggestion.confidence === 'high' ? 'High confidence' : suggestion.confidence === 'medium' ? 'Medium confidence' : 'Low confidence'}
+                            </span>
+                            {" · "}{suggestion.reason}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Select
-                        value={assigningCenterId[school.id] ?? ""}
-                        onValueChange={val => setAssigningCenterId(prev => ({ ...prev, [school.id]: val }))}
-                      >
-                        <SelectTrigger className="w-48 text-sm" data-testid={`select-center-for-school-${school.id}`}>
-                          <SelectValue placeholder="Select center…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(centers ?? []).map(c => (
-                            <SelectItem key={c.id} value={String(c.id)}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        size="sm"
-                        disabled={!assigningCenterId[school.id] || assignCenterMutation.isPending}
-                        onClick={() => {
-                          const cid = parseInt(assigningCenterId[school.id]);
-                          if (!isNaN(cid)) assignCenterMutation.mutate({ schoolId: school.id, centerId: cid });
-                        }}
-                        data-testid={`button-assign-school-${school.id}`}
-                      >
-                        {assignCenterMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Assign"}
-                      </Button>
-                    </div>
-                  </div>
-                ));
+                  );
+                });
               })()
             )}
           </div>
 
-          <div className="px-6 py-4 border-t flex justify-end">
-            <Button variant="outline" onClick={() => { setShowUnassignedDialog(false); setUnassignedSearch(""); }}>
+          <div className="px-6 py-4 border-t flex items-center justify-between gap-2 flex-wrap">
+            {Object.keys(aiSuggestions).length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                <Sparkles className="w-3 h-3 inline me-1 text-violet-500" />
+                {Object.values(aiSuggestions).filter(s => s.confidence === 'high').length} high · {Object.values(aiSuggestions).filter(s => s.confidence === 'medium').length} medium · {Object.values(aiSuggestions).filter(s => s.confidence === 'low').length} low confidence
+              </p>
+            )}
+            <Button variant="outline" className="ms-auto" onClick={() => { setShowUnassignedDialog(false); setUnassignedSearch(""); setAiSuggestions({}); setAssigningCenterId({}); }}>
               Close
             </Button>
           </div>
