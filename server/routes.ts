@@ -1477,6 +1477,7 @@ ${pages.map(p => `  <url>
       await storage.deleteExamCenter(parseInt(req.params.id));
       res.json({ message: "Deleted" });
     } catch (error: any) {
+      console.error(`[deleteExamCenter] id=${req.params.id} error:`, error?.message, error?.code, error?.detail);
       res.status(500).json({ message: error.message });
     }
   });

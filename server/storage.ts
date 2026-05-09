@@ -776,14 +776,14 @@ export class DatabaseStorage implements IStorage {
     }
     // 10. Null out nullable FK columns in remaining tables
     await db.update(examPackets).set({ currentCenterId: null }).where(eq(examPackets.currentCenterId, id));
-    await db.update(packetEvents).set({ fromCenterId: null }).where(eq(packetEvents.fromCenterId, id));
-    await db.update(packetEvents).set({ toCenterId: null }).where(eq(packetEvents.toCenterId, id));
     await db.update(packetEvents).set({ locationCenterId: null }).where(eq(packetEvents.locationCenterId, id));
     await db.update(integrityFlags).set({ centerId: null }).where(eq(integrityFlags.centerId, id));
     await db.update(deviceSyncSessions).set({ centerId: null }).where(eq(deviceSyncSessions.centerId, id));
     await db.update(examinerAssignments).set({ centerId: null }).where(eq(examinerAssignments.centerId, id));
     await db.update(staffProfiles).set({ centerId: null }).where(eq(staffProfiles.centerId, id));
     await db.update(users).set({ centerId: null }).where(eq(users.centerId, id));
+    await db.update(handoverLogs).set({ fromCenterId: null }).where(eq(handoverLogs.fromCenterId, id));
+    await db.update(handoverLogs).set({ toCenterId: null }).where(eq(handoverLogs.toCenterId, id));
     // 11. Delete the center
     await db.delete(examCenters).where(eq(examCenters.id, id));
     return true;
