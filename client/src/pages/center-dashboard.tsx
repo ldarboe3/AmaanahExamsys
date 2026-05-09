@@ -1682,7 +1682,6 @@ function SchoolsTab({
   const [actionSchool, setActionSchool] = useState<CenterDashboardData["schools"][0] | null>(null);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [moveTargetId, setMoveTargetId] = useState<string>("");
 
   const { data: allCenters } = useQuery<{ id: number; name: string; code: string }[]>({
@@ -1722,20 +1721,6 @@ function SchoolsTab({
       toast({ title: "School Removed", description: `${actionSchool?.name} has been unassigned from this center.` });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to remove school", variant: "destructive" }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async ({ schoolId }: { schoolId: number }) => {
-      return apiRequest("DELETE", `/api/schools/${schoolId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/centers") });
-      setShowDeleteDialog(false);
-      setActionSchool(null);
-      onRefetch();
-      toast({ title: "School Deleted", description: `${actionSchool?.name} has been permanently deleted.` });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to delete school", variant: "destructive" }),
   });
 
   const filtered = schools.filter(s =>
@@ -1872,14 +1857,6 @@ function SchoolsTab({
                           <UserMinus className="w-4 h-4 me-2" />
                           Remove from Center
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => { setActionSchool(school); setShowDeleteDialog(true); }}
-                          className="text-destructive"
-                          data-testid={`menuitem-delete-school-${school.id}`}
-                        >
-                          <Trash2 className="w-4 h-4 me-2" />
-                          Delete School
-                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
@@ -1963,32 +1940,6 @@ function SchoolsTab({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete School Confirmation */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Trash2 className="w-5 h-5 text-destructive" />
-              Permanently Delete School
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This will <span className="font-semibold text-destructive">permanently delete</span> <span className="font-medium">{actionSchool?.name}</span> along with all its students and data. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setActionSchool(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => actionSchool && deleteMutation.mutate({ schoolId: actionSchool.id })}
-              disabled={deleteMutation.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete-school"
-            >
-              {deleteMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
-              Delete Permanently
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

@@ -85,7 +85,9 @@ import {
   Key,
   KeyRound,
   CreditCard,
-  Trash2,
+  Building2,
+  MapPinOff,
+  CircleDot,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -165,6 +167,8 @@ interface SchoolWithRelations extends School {
   region?: { name: string };
   cluster?: { name: string };
   studentCount?: number;
+  isSelfCenter?: boolean;
+  assignedCenterName?: string | null;
 }
 
 export default function Schools() {
@@ -175,6 +179,7 @@ export default function Schools() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [clusterFilter, setClusterFilter] = useState<string>("all");
+  const [centerFilter, setCenterFilter] = useState<string>("all");
   const [pageSize, setPageSize] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [selectedSchool, setSelectedSchool] = useState<SchoolWithRelations | null>(null);
@@ -191,7 +196,6 @@ export default function Schools() {
     defaultPassword: string | null;
   } | null>(null);
   const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
   const [bulkUploadData, setBulkUploadData] = useState<Array<{schoolName: string; address: string; region: string; cluster: string}>>([]);
   const [bulkUploadResults, setBulkUploadResults] = useState<{
@@ -242,6 +246,7 @@ export default function Schools() {
   if (typeFilter !== "all") queryParams.set("schoolType", typeFilter);
   if (regionFilter !== "all") queryParams.set("regionId", regionFilter);
   if (clusterFilter !== "all") queryParams.set("clusterId", clusterFilter);
+  if (centerFilter !== "all") queryParams.set("centerAssignment", centerFilter);
   queryParams.set("limit", pageSize.toString());
   queryParams.set("offset", (currentPage * pageSize).toString());
   const queryString = queryParams.toString();
@@ -249,6 +254,11 @@ export default function Schools() {
 
   const { data: response, isLoading } = useQuery<{ data: SchoolWithRelations[]; total: number; limit: number; offset: number }>({
     queryKey: [schoolsUrl],
+  });
+
+  // Always fetch unassigned count (independent of current filters) for the alert banner
+  const { data: unassignedResponse } = useQuery<{ total: number }>({
+    queryKey: ["/api/schools?centerAssignment=unassigned&limit=1"],
   });
   
   const schools = response?.data || [];
@@ -449,29 +459,6 @@ export default function Schools() {
       toast({
         title: t.common.error,
         description: error.message || (isRTL ? "فشل في إعادة تعيين كلمة المرور" : "Failed to reset password"),
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteSchoolMutation = useMutation({
-    mutationFn: async (schoolId: number) => {
-      return apiRequest("DELETE", `/api/schools/${schoolId}`);
-    },
-    onSuccess: () => {
-      invalidateSchoolQueries();
-      setShowDeleteDialog(false);
-      setShowDetailsDialog(false);
-      setSelectedSchool(null);
-      toast({
-        title: isRTL ? "تم الحذف" : "School Deleted",
-        description: isRTL ? "تم حذف سجل المدرسة بنجاح." : "The school record has been permanently deleted.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: t.common.error,
-        description: error.message || (isRTL ? "فشل في حذف المدرسة." : "Failed to delete the school."),
         variant: "destructive",
       });
     },
@@ -888,6 +875,35 @@ export default function Schools() {
         </div>
       </div>
 
+      {/* Unassigned Schools Alert */}
+      {(unassignedResponse?.total ?? 0) > 0 && (
+        <Alert className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20" data-testid="alert-unassigned-schools">
+          <MapPinOff className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertTitle className="text-amber-800 dark:text-amber-300">
+            {isRTL
+              ? `${unassignedResponse!.total} مدرسة غير مسندة إلى أي مركز امتحان`
+              : `${unassignedResponse!.total} ${unassignedResponse!.total === 1 ? "school is" : "schools are"} not assigned to any examination center`}
+          </AlertTitle>
+          <AlertDescription className="text-amber-700 dark:text-amber-400/80 flex items-center justify-between flex-wrap gap-2">
+            <span>
+              {isRTL
+                ? "يجب إسناد هذه المدارس إلى مراكز امتحان قبل إجراء الامتحانات."
+                : "These schools must be assigned to an examination center before exams can be conducted."}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCenterFilter("unassigned")}
+              className="border-amber-500 text-amber-700 dark:text-amber-400 shrink-0"
+              data-testid="button-filter-unassigned"
+            >
+              <MapPinOff className="w-4 h-4 me-1.5" />
+              {isRTL ? "عرض المدارس غير المسندة" : "View Unassigned Schools"}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
@@ -956,6 +972,32 @@ export default function Schools() {
                   <SelectItem value="rejected">{t.common.rejected}</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={centerFilter} onValueChange={setCenterFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-center-filter">
+                  <SelectValue placeholder={isRTL ? "إسناد المركز" : "Center Assignment"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{isRTL ? "جميع الحالات" : "All Assignments"}</SelectItem>
+                  <SelectItem value="assigned">
+                    <span className="flex items-center gap-2">
+                      <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                      {isRTL ? "مسند إلى مركز" : "Assigned to Center"}
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="self_center">
+                    <span className="flex items-center gap-2">
+                      <CircleDot className="w-3.5 h-3.5 text-primary" />
+                      {isRTL ? "مركز ذاتي" : "Self-Center"}
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="unassigned">
+                    <span className="flex items-center gap-2">
+                      <MapPinOff className="w-3.5 h-3.5 text-amber-600" />
+                      {isRTL ? "غير مسند (يتطلب إجراء)" : "Unassigned (Requires Action)"}
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
@@ -988,6 +1030,7 @@ export default function Schools() {
                     <TableHead>{t.schools.title}</TableHead>
                     <TableHead>{t.common.type}</TableHead>
                     <TableHead>{t.schools.region}</TableHead>
+                    <TableHead>{isRTL ? "إسناد المركز" : "Center Assignment"}</TableHead>
                     <TableHead>{t.common.status}</TableHead>
                     <TableHead>{t.common.students}</TableHead>
                     <TableHead className={isRTL ? "text-left" : "text-right"}>{t.common.actions}</TableHead>
@@ -1016,6 +1059,26 @@ export default function Schools() {
                         <span className="text-sm text-muted-foreground">
                           {getRegionName(school.regionId)}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        {school.isSelfCenter ? (
+                          <Badge variant="outline" className="text-xs gap-1 border-primary/40 text-primary" data-testid={`badge-center-self-${school.id}`}>
+                            <CircleDot className="w-3 h-3" />
+                            {isRTL ? "مركز ذاتي" : "Self-Center"}
+                          </Badge>
+                        ) : school.assignedCenterId ? (
+                          <Badge variant="outline" className="text-xs gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400" data-testid={`badge-center-assigned-${school.id}`}>
+                            <Building2 className="w-3 h-3" />
+                            <span className="truncate max-w-[120px]" title={school.assignedCenterName ?? undefined}>
+                              {school.assignedCenterName ?? isRTL ? "مسند" : "Assigned"}
+                            </span>
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs gap-1 border-amber-500/40 text-amber-700 dark:text-amber-500" data-testid={`badge-center-unassigned-${school.id}`}>
+                            <MapPinOff className="w-3 h-3" />
+                            {isRTL ? "غير مسند" : "Unassigned"}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge className={`${statusColors[school.status || 'pending']} text-xs`}>
@@ -1752,16 +1815,6 @@ export default function Schools() {
             </Button>
             {selectedSchool && (
               <Button
-                variant="destructive"
-                onClick={() => setShowDeleteDialog(true)}
-                data-testid="button-delete-school-details"
-              >
-                <Trash2 className="w-4 h-4 me-2" />
-                {isRTL ? "حذف المدرسة" : "Delete School"}
-              </Button>
-            )}
-            {selectedSchool && (
-              <Button
                 variant="outline"
                 onClick={() => {
                   sendPasswordResetMutation.mutate(selectedSchool.id);
@@ -2165,45 +2218,6 @@ export default function Schools() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Delete School Warning Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent dir={isRTL ? "rtl" : "ltr"}>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="w-5 h-5" />
-              {isRTL ? "حذف سجل المدرسة" : "Delete School Record"}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <span className="block">
-                {isRTL
-                  ? `هل أنت متأكد أنك تريد حذف "${selectedSchool?.name}" بشكل نهائي؟`
-                  : `Are you sure you want to permanently delete "${selectedSchool?.name}"?`}
-              </span>
-              <span className="block font-medium text-destructive">
-                {isRTL
-                  ? "سيتم حذف جميع بيانات المدرسة والطلاب المرتبطين بها. لا يمكن التراجع عن هذا الإجراء."
-                  : "All associated school data and student records will be deleted. This action cannot be undone."}
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex justify-end gap-3 mt-2">
-            <AlertDialogCancel disabled={deleteSchoolMutation.isPending}>
-              {t.common.cancel}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => selectedSchool && deleteSchoolMutation.mutate(selectedSchool.id)}
-              disabled={deleteSchoolMutation.isPending}
-              data-testid="button-confirm-delete-school"
-            >
-              {deleteSchoolMutation.isPending
-                ? (isRTL ? "جاري الحذف..." : "Deleting...")
-                : (isRTL ? "نعم، احذف المدرسة" : "Yes, Delete School")}
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Close Confirmation Dialog */}
       <AlertDialog open={showCloseConfirmation} onOpenChange={setShowCloseConfirmation}>

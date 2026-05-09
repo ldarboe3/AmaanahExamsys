@@ -1565,6 +1565,7 @@ ${pages.map(p => `  <url>
       const clusterId = req.query.clusterId ? parseInt(req.query.clusterId as string) : undefined;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+      const centerAssignment = req.query.centerAssignment as string | undefined;
       
       if (status && status !== 'all') {
         schools = schools.filter(s => s.status === status);
@@ -1577,6 +1578,23 @@ ${pages.map(p => `  <url>
       }
       if (clusterId) {
         schools = schools.filter(s => s.clusterId === clusterId);
+      }
+
+      // Load all exam centers to derive isSelfCenter and assignedCenterName
+      const allCenters = await storage.getAllExamCenters();
+      const selfCenterSchoolIds = new Set(allCenters.filter(c => c.schoolId != null).map(c => c.schoolId!));
+      const centerById = new Map(allCenters.map(c => [c.id, c]));
+
+      // Apply centerAssignment filter before pagination
+      if (centerAssignment && centerAssignment !== 'all') {
+        schools = schools.filter(s => {
+          const isSelf = selfCenterSchoolIds.has(s.id);
+          const isAssigned = s.assignedCenterId != null;
+          if (centerAssignment === 'self_center') return isSelf;
+          if (centerAssignment === 'assigned') return isAssigned && !isSelf;
+          if (centerAssignment === 'unassigned') return !isAssigned && !isSelf;
+          return true;
+        });
       }
       
       const total = schools.length;
@@ -1596,10 +1614,12 @@ ${pages.map(p => `  <url>
       // Create a map for quick lookup
       const countMap = new Map(studentCounts.map(sc => [sc.schoolId, sc.count]));
       
-      // Add studentCount to each school
+      // Add studentCount, isSelfCenter, assignedCenterName to each school
       const schoolsWithCounts = schools.map(school => ({
         ...school,
-        studentCount: countMap.get(school.id) || 0
+        studentCount: countMap.get(school.id) || 0,
+        isSelfCenter: selfCenterSchoolIds.has(school.id),
+        assignedCenterName: school.assignedCenterId ? (centerById.get(school.assignedCenterId)?.name ?? null) : null,
       }));
       
       res.json({ data: schoolsWithCounts, total, limit: limit || total, offset });
@@ -3262,6 +3282,10 @@ ${pages.map(p => `  <url>
 
   app.delete("/api/schools/:id", isAuthenticated, async (req, res) => {
     try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "School deletion is restricted to super administrators only." });
+      }
       await storage.deleteSchool(parseInt(req.params.id));
       res.json({ message: "Deleted" });
     } catch (error: any) {
