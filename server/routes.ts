@@ -1328,7 +1328,15 @@ ${pages.map(p => `  <url>
         }
       }
       
-      // Add school, student, and hall counts for each center
+      // Fetch region/cluster lookup maps once
+      const [allRegions, allClusters] = await Promise.all([
+        storage.getAllRegions(),
+        storage.getAllClusters(),
+      ]);
+      const regionMap = new Map(allRegions.map(r => [r.id, r]));
+      const clusterMap = new Map(allClusters.map(c => [c.id, c]));
+
+      // Add school, student, hall counts and region/cluster objects for each center
       const centersWithCounts = await Promise.all(centers.map(async (center) => {
         const [schools, students, halls] = await Promise.all([
           storage.getSchoolsByCenter(center.id),
@@ -1336,8 +1344,12 @@ ${pages.map(p => `  <url>
           storage.getCenterHallsByCenter(center.id),
         ]);
         const hallTotalCapacity = halls.reduce((sum: number, h: any) => sum + (h.capacity || 0), 0);
+        const region = center.regionId ? regionMap.get(center.regionId) : undefined;
+        const cluster = center.clusterId ? clusterMap.get(center.clusterId) : undefined;
         return {
           ...center,
+          region: region ? { id: region.id, name: region.name, code: (region as any).code } : undefined,
+          cluster: cluster ? { id: cluster.id, name: cluster.name, code: (cluster as any).code } : undefined,
           assignedSchoolsCount: schools.length,
           assignedStudentsCount: students.length,
           hallCount: halls.length,
