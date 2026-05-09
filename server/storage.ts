@@ -758,7 +758,23 @@ export class DatabaseStorage implements IStorage {
     // 6. Null out school center references
     await db.update(schools).set({ assignedCenterId: null }).where(eq(schools.assignedCenterId, id));
     await db.update(schools).set({ preferredCenterId: null }).where(eq(schools.preferredCenterId, id));
-    // 7. Null out nullable FK columns in other tables
+    // 7. Delete rows with NOT NULL centerId that cannot be nulled
+    await db.delete(attendanceRecords).where(eq(attendanceRecords.centerId, id));
+    await db.delete(malpracticeReports).where(eq(malpracticeReports.centerId, id));
+    await db.delete(paperMovements).where(eq(paperMovements.centerId, id));
+    await db.delete(scriptMovements).where(eq(scriptMovements.centerId, id));
+    await db.delete(examSessionLogs).where(eq(examSessionLogs.centerId, id));
+    // 8. Delete exam packet verifications directly referencing this center
+    await db.delete(examPacketVerifications).where(eq(examPacketVerifications.centerId, id));
+    // 9. Handle exam packets whose destinationCenterId is this center (NOT NULL — must delete)
+    const destPackets = await db.select({ id: examPackets.id }).from(examPackets).where(eq(examPackets.destinationCenterId, id));
+    if (destPackets.length > 0) {
+      const destPacketIds = destPackets.map(p => p.id);
+      await db.delete(packetEvents).where(inArray(packetEvents.packetId, destPacketIds));
+      await db.delete(examPacketVerifications).where(inArray(examPacketVerifications.packetId, destPacketIds));
+      await db.delete(examPackets).where(inArray(examPackets.id, destPacketIds));
+    }
+    // 10. Null out nullable FK columns in remaining tables
     await db.update(examPackets).set({ currentCenterId: null }).where(eq(examPackets.currentCenterId, id));
     await db.update(packetEvents).set({ fromCenterId: null }).where(eq(packetEvents.fromCenterId, id));
     await db.update(packetEvents).set({ toCenterId: null }).where(eq(packetEvents.toCenterId, id));
@@ -766,15 +782,10 @@ export class DatabaseStorage implements IStorage {
     await db.update(integrityFlags).set({ centerId: null }).where(eq(integrityFlags.centerId, id));
     await db.update(deviceSyncSessions).set({ centerId: null }).where(eq(deviceSyncSessions.centerId, id));
     await db.update(examinerAssignments).set({ centerId: null }).where(eq(examinerAssignments.centerId, id));
-    // 8. Delete the center — may throw if still referenced by exam packets, attendance, etc.
-    try {
-      await db.delete(examCenters).where(eq(examCenters.id, id));
-    } catch (err: any) {
-      if (err.code === '23503') {
-        throw new Error("Cannot delete this center because it has associated exam records (packets, attendance, or session logs). Remove those records first.");
-      }
-      throw err;
-    }
+    await db.update(staffProfiles).set({ centerId: null }).where(eq(staffProfiles.centerId, id));
+    await db.update(users).set({ centerId: null }).where(eq(users.centerId, id));
+    // 11. Delete the center
+    await db.delete(examCenters).where(eq(examCenters.id, id));
     return true;
   }
 
