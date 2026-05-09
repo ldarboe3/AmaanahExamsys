@@ -248,7 +248,7 @@ export default function ExamScheduling() {
   }, [examYears]);
 
   // Grade label map and standard grade list — defined early so gradeTabList can reference them
-  const GRADE_LABELS: Record<number, string> = { 3: "Grade 3 (LBS)", 6: "Grade 6 (UBS)", 9: "Grade 9 (BCS)", 12: "Grade 12 (SSS)" };
+  const GRADE_LABELS: Record<number, string> = { 3: "Grade 3 (LBS)", 6: "Grade 6 (LBS)", 9: "Grade 9 (UBS)", 12: "Grade 12 (SSS)" };
   const ALL_STANDARD_GRADES = [3, 6, 9, 12];
   const uniqueGrades = Array.from(new Set([
     ...(examYears.find(ey => ey.id === Number(selectedExamYearId))?.grades || []),

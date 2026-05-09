@@ -94,6 +94,21 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { School, Region, Cluster } from "@shared/schema";
 
+// Compute school type(s) from enrolled grade numbers
+// Grade 6 only → LBS | Grade 9 only → UBS | Grade 12 → SSS | Grade 6+9 → BCS | Grade 6+9+12 → BCS+SSS
+const computeSchoolTypesFromGrades = (grades: number[]): string[] => {
+  const has3  = grades.includes(3);
+  const has6  = grades.includes(6);
+  const has9  = grades.includes(9);
+  const has12 = grades.includes(12);
+  const types: string[] = [];
+  if ((has3 || has6) && has9) types.push("BCS");
+  else if (has3 || has6)      types.push("LBS");
+  else if (has9)               types.push("UBS");
+  if (has12) types.push("SSS");
+  return types;
+};
+
 const getSchoolTypeLabel = (type: string, isRTL: boolean) => {
   const labels: Record<string, { en: string; ar: string }> = {
     LBS: { en: "Lower Basic School", ar: "ابتدائي" },

@@ -110,7 +110,7 @@ interface Region  { id: number; name: string; }
 interface Cluster { id: number; name: string; regionId: number; }
 
 const GRADE_LABELS: Record<number, string> = {
-  3: "Grade 3 — LBS", 6: "Grade 6 — UBS", 9: "Grade 9 — BCS", 12: "Grade 12 — SSS",
+  3: "Grade 3 — LBS", 6: "Grade 6 — LBS", 9: "Grade 9 — UBS", 12: "Grade 12 — SSS",
 };
 const TYPE_LABELS: Record<string, string> = {
   LBS: "Lower Basic (LBS)", UBS: "Upper Basic (UBS)", BCS: "Basic Cycle (BCS)", SSS: "Senior Secondary (SSS)",

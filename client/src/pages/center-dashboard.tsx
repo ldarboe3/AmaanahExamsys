@@ -273,9 +273,24 @@ function buildPrintHeader(info: PrintInfo, title: string, logoSrc: string) {
     </div>`;
 }
 
-// Grade label helpers
-const GRADE_LABELS: Record<number, string> = { 3: "Grade 3 (LBS)", 6: "Grade 6 (UBS)", 9: "Grade 9 (BCS)", 12: "Grade 12 (SSS)" };
+// Grade label helpers — individual grade → level abbreviation
+const GRADE_LABELS: Record<number, string> = { 3: "Grade 3 (LBS)", 6: "Grade 6 (LBS)", 9: "Grade 9 (UBS)", 12: "Grade 12 (SSS)" };
 function gradeLabel(g: number) { return GRADE_LABELS[g] || `Grade ${g}`; }
+
+// Compute school type badge(s) from enrolled grade numbers
+// Grade 6 only → LBS | Grade 9 only → UBS | Grade 12 → SSS | Grade 6+9 → BCS | Grade 6+9+12 → BCS + SSS
+function computeSchoolTypesFromGrades(grades: number[]): string[] {
+  const has3  = grades.includes(3);
+  const has6  = grades.includes(6);
+  const has9  = grades.includes(9);
+  const has12 = grades.includes(12);
+  const types: string[] = [];
+  if ((has3 || has6) && has9) types.push("BCS");
+  else if (has3 || has6)      types.push("LBS");
+  else if (has9)               types.push("UBS");
+  if (has12) types.push("SSS");
+  return types.length > 0 ? types : [];
+}
 
 function TimetableTab({ timetable, printInfo, schoolGrades }: {
   timetable: CenterDashboardData["timetable"];
@@ -1895,7 +1910,15 @@ function SchoolsTab({
                   <div className="flex-1 min-w-0">
                     <p className="font-medium leading-snug line-clamp-2" dir="auto">{school.name}</p>
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
-                      <Badge variant="outline" className="text-xs">{school.schoolType}</Badge>
+                      {(() => {
+                        const enrolledGrades = school.gradeBreakdown ? Object.keys(school.gradeBreakdown).map(Number) : [];
+                        const computed = enrolledGrades.length > 0
+                          ? computeSchoolTypesFromGrades(enrolledGrades)
+                          : (school.schoolType ? [school.schoolType] : []);
+                        return computed.length > 0
+                          ? computed.map(t => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)
+                          : <Badge variant="outline" className="text-xs">{school.schoolType || "—"}</Badge>;
+                      })()}
                       {(school.studentCount ?? 0) > 0 && (
                         <Badge variant="secondary" className="text-xs">
                           {school.studentCount} {school.studentCount === 1 ? "student" : "students"}
