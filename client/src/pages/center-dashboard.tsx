@@ -74,6 +74,7 @@ import {
   MoveRight,
   UserMinus,
   Home,
+  Building2,
 } from "lucide-react";
 import {
   DropdownMenu,
