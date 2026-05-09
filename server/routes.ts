@@ -14886,7 +14886,8 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       const name = row['name'] || row['center_name'] || '';
       const code = row['code'] || row['center_code'] || '';
       const rcRaw = row['region_cluster'] || row['region.cluster'] || row['region_code'] || '';
-      const push = (extra: object) => rows.push({ rowNum: i + 1, name, code, regionCluster: rcRaw, address: row['address'] || '', contactPerson: row['contact_person'] || '', contactPhone: row['contact_phone'] || '', contactEmail: row['contact_email'] || '', ...extra });
+      const address = row['address'] || row['location'] || row['village'] || row['town'] || row['area'] || row['place'] || row['center_location'] || '';
+      const push = (extra: object) => rows.push({ rowNum: i + 1, name, code, regionCluster: rcRaw, address, contactPerson: row['contact_person'] || '', contactPhone: row['contact_phone'] || '', contactEmail: row['contact_email'] || '', ...extra });
       const { targetRegion, targetCluster, errorMsg } = resolveRegionCluster(row, sortedRegions);
       if (!targetRegion || !targetCluster) { push({ regionName: targetRegion?.name ?? '—', clusterName: '—', status: 'error', errorMsg: errorMsg ?? 'Missing region_cluster' }); errorCount++; continue; }
       if (!name) { push({ regionName: targetRegion.name, clusterName: targetCluster.name, status: 'error', errorMsg: 'Missing name' }); errorCount++; continue; }
@@ -15049,7 +15050,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
               code,
               regionId: targetRegion.id,
               clusterId: targetCluster.id,
-              address: row['address'] || null,
+              address: row['address'] || row['location'] || row['village'] || row['town'] || row['area'] || row['place'] || row['center_location'] || null,
               contactPerson: row['contact_person'] || null,
               contactPhone: row['contact_phone'] || null,
               contactEmail: row['contact_email'] || null,
