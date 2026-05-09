@@ -15025,8 +15025,10 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
             continue;
           }
 
+          const _rIdx = sortedRegions.findIndex((r: any) => r.id === targetRegion.id) + 1;
+          const _cIdx = allClusters.filter((c: any) => c.regionId === targetRegion.id).sort((a: any, b: any) => a.id - b.id).findIndex((c: any) => c.id === targetCluster.id) + 1;
           const code = row['code'] || row['center_code'] ||
-            `CTR-${String(regionIdx + 1).padStart(2, '0')}${String(clusterIdx + 1).padStart(2, '0')}-${String(results.created + 1).padStart(3, '0')}`;
+            `CTR-${String(_rIdx).padStart(2, '0')}${String(_cIdx).padStart(2, '0')}-${String(results.created + 1).padStart(3, '0')}`;
 
           try {
             await storage.createExamCenter({
