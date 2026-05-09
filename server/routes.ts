@@ -15666,16 +15666,26 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       const activeExamYear = examYearId ? await storage.getExamYear(examYearId) : await storage.getActiveExamYear();
       const yearId = activeExamYear?.id;
 
-      // Get timetable and enrich with subject names — same for all roles
-      const rawTimetable = yearId ? await storage.getTimetableByExamYear(yearId) : [];
+      // Get published exam schedules — the live master timetable source
       const allSubjects = await storage.getAllSubjects();
-      const timetable = rawTimetable.map((entry: any) => {
-        const subject = allSubjects.find(s => s.id === entry.subjectId);
+      const rawSchedules = yearId
+        ? await storage.getExamSchedules({ examYearId: yearId, isPublished: true })
+        : [];
+      const timetable = rawSchedules.map((entry: any) => {
+        const subject = allSubjects.find((s: any) => s.id === entry.subjectId);
         return {
-          ...entry,
+          id: entry.id,
+          examDate: entry.examDate,
+          startTime: entry.scheduledStartTime,
+          endTime: entry.scheduledEndTime,
+          subjectId: entry.subjectId,
           subjectName: subject?.name || null,
           subjectArabicName: subject?.arabicName || null,
-          venue: entry.venue || center.name,
+          subjectType: subject ? (subject.isCore ? 'Core' : 'Elective') : null,
+          grade: entry.grade,
+          durationMinutes: entry.durationMinutes,
+          venue: center.name,
+          isPublished: entry.isPublished,
         };
       });
 
@@ -15704,7 +15714,8 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
             malpracticeCount: 0,
           },
           schools: [],
-          timetable,
+          // Filter timetable to only grades this school has students in
+          timetable: timetable.filter((t: any) => Object.keys(studentsByGrade).map(Number).includes(t.grade)),
           paperMovements: [],
           scriptMovements: [],
           malpracticeReports: [],

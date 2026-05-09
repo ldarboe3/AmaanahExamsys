@@ -1,0 +1,152 @@
+The Center Timetable tab is currently incomplete because it is not properly displaying the published Exam Schedules from the Exam Scheduling system.
+
+### Core Fix Required:
+
+Each Examination Center must automatically display all relevant Exam Schedules directly from the Exam Scheduling page, with clear class-by-class timetable separation.
+
+---
+
+# Non-Negotiable Rule:
+
+The Center Timetable tab should function as a live class timetable viewer for all examination classes assigned to that center.
+
+---
+
+# Required Center Timetable Logic:
+
+If a center hosts:
+✔ Grade 6
+✔ Grade 9
+✔ Grade 12
+
+### Then the Center Timetable must display:
+
+### Grade 6 Timetable
+
+### Grade 9 Timetable
+
+### Grade 12 Timetable
+
+Each class must be clearly separated—not merged into one confusing schedule.
+
+---
+
+# Display Format Options:
+
+### Preferred:
+
+✔ Class Tabs
+✔ Dropdown by Class
+✔ Separate timetable cards
+✔ Expandable schedule sections
+
+---
+
+# Example:
+
+## Center ABC:
+
+### Grade 6
+
+* English
+* Mathematics
+* Science
+
+### Grade 9
+
+* Arabic
+* Mathematics
+* Social Studies
+
+---
+
+# School Dashboard Integration (Very Important):
+
+Each school must also be able to view:
+
+### 1. Their Assigned Examination Center
+
+### 2. That Center’s Full Timetable
+
+### 3. Only the timetable for examination classes the school actually has
+
+---
+
+# School Logic:
+
+If School A has:
+✔ Grade 6 only
+→ Show only Grade 6 center timetable
+
+If School B has:
+✔ Grade 6 + Grade 9
+→ Show Grade 6 and Grade 9 separately
+
+---
+
+# Prevent:
+
+❌ Schools seeing irrelevant classes
+❌ Mixed class timetable confusion
+❌ Empty timetable pages when schedules exist
+
+---
+
+# Required Sync:
+
+The system must connect:
+
+### Exam Scheduling Page
+
+→ Center Timetable Tab
+→ School Dashboard
+
+This should be a live synchronized structure, not manually duplicated schedules.
+
+---
+
+# Data Flow:
+
+### Academic Year
+
+→ Exam Scheduling
+→ Center Assigned Classes
+→ Center Timetable
+→ School Timetable Access
+
+---
+
+# UI Improvements:
+
+### Center Dashboard:
+
+✔ Center Overview
+✔ Assigned Schools
+✔ Examination Classes
+✔ Class Timetable Tab
+
+### School Dashboard:
+
+✔ Assigned Center
+✔ Center Name
+✔ Center Region/Cluster
+✔ Available Class Timetable(s)
+
+---
+
+# Bottom Line:
+
+The timetable system must become one connected scheduling ecosystem.
+
+### Exam Scheduling = Master Source
+
+### Center Timetable = Center-Specific Class View
+
+### School Dashboard = School-Specific Center Timetable Access
+
+This ensures:
+✔ Accurate center schedules
+✔ Accurate school schedules
+✔ Proper class separation
+✔ Better exam logistics
+✔ Zero timetable confusion.
