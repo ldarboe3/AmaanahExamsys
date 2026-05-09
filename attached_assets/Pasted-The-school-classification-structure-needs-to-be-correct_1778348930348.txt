@@ -1,0 +1,162 @@
+The school classification structure needs to be corrected immediately to reflect proper institutional categorization.
+
+### Critical Classification Update:
+
+A school that has both:
+
+### Grade 6 + Grade 9
+
+Should NOT be displayed as only LBS.
+
+### Correct classification:
+
+## BCS (Basic Cycle School)
+
+---
+
+# Updated Education Level Logic:
+
+### Grade 6 only:
+
+✔ LBS (Lower Basic School)
+
+### Grade 9 only:
+
+✔ UBS (Upper Basic School)
+
+### Grade 12 only:
+
+✔ SSS (Senior Secondary School)
+
+---
+
+# Combined Structure:
+
+### Grade 6 + Grade 9:
+
+✔ BCS (Basic Cycle School)
+
+---
+
+# Expanded Combined Structures:
+
+### Grade 6 + Grade 9 + Grade 12:
+
+✔ BCS
+✔ SSS
+
+(Or display as Basic Cycle + Senior Secondary depending UI design)
+
+---
+
+# Important Rule:
+
+BCS replaces separate LBS display when both Lower and Upper Basic levels exist together.
+
+### Example:
+
+❌ LBS + UBS
+
+### Replace with:
+
+✔ BCS
+
+---
+
+# School Type Classification Matrix:
+
+### School has Grade 6 only:
+
+→ LBS
+
+### School has Grade 9 only:
+
+→ UBS
+
+### School has Grade 6 + Grade 9:
+
+→ BCS
+
+### School has Grade 12 only:
+
+→ SSS
+
+### School has Grade 6 + Grade 9 + Grade 12:
+
+→ BCS + SSS
+
+---
+
+# UI Display Examples:
+
+### Correct:
+
+School Name: ABC Academy
+Type: BCS
+
+### Full:
+
+School Name: XYZ Integrated School
+Type: BCS | SSS
+
+---
+
+# Required Across System:
+
+This corrected classification must sync everywhere:
+
+### School Dashboard
+
+✔ School Cards
+✔ School Profile
+✔ Center Assignment
+✔ Timetable Eligibility
+✔ Reporting
+✔ Mapping Dashboard
+✔ Enrollment
+✔ Examination Class Logic
+
+---
+
+# Timetable Logic:
+
+### BCS:
+
+Display:
+✔ Grade 6
+✔ Grade 9
+
+### BCS + SSS:
+
+Display:
+✔ Grade 6
+✔ Grade 9
+✔ Grade 12
+
+---
+
+# Prevent:
+
+❌ Mislabeling BCS schools as only LBS
+❌ Duplicate LBS + UBS display when BCS applies
+❌ Incorrect school identity in reports
+
+---
+
+# Bottom Line:
+
+The system must move from raw class labels into true institutional classification.
+
+### Grade Structure Determines Official School Type:
+
+✔ LBS
+✔ UBS
+✔ BCS
+✔ SSS
+
+This ensures:
+✔ Accurate school identity
+✔ Accurate governance
+✔ Accurate scheduling
+✔ Accurate reporting
+✔ Professional educational structure.

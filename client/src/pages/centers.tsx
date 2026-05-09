@@ -692,28 +692,55 @@ export default function Centers() {
     },
   });
 
+  const [autoAssignPhase, setAutoAssignPhase] = useState<'confirm' | 'running' | 'done' | 'error'>('confirm');
+  const [autoAssignProgress, setAutoAssignProgress] = useState(0);
+  const [autoAssignResult, setAutoAssignResult] = useState<any>(null);
+  const [autoAssignError, setAutoAssignError] = useState<string>('');
+
+  const openAutoAssignDialog = () => {
+    setAutoAssignPhase('confirm');
+    setAutoAssignProgress(0);
+    setAutoAssignResult(null);
+    setAutoAssignError('');
+    setShowAutoAssignDialog(true);
+  };
+
+  const closeAutoAssignDialog = () => {
+    if (autoAssignPhase === 'running') return; // block close while running
+    setShowAutoAssignDialog(false);
+  };
+
   const autoAssignMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/center-assignments/auto-assign", {
-        examYearId: (await fetch("/api/exam-years/active").then(r => r.json())).id
-      });
-      return response;
+      setAutoAssignPhase('running');
+      setAutoAssignProgress(0);
+      // Animate progress while waiting for the server
+      let prog = 0;
+      const interval = setInterval(() => {
+        prog = Math.min(prog + Math.random() * 12, 88);
+        setAutoAssignProgress(Math.round(prog));
+      }, 300);
+      try {
+        const activeYear = await fetch("/api/exam-years/active").then(r => r.json());
+        const response = await apiRequest("POST", "/api/center-assignments/auto-assign", {
+          examYearId: activeYear.id
+        });
+        clearInterval(interval);
+        setAutoAssignProgress(100);
+        return response;
+      } catch (err) {
+        clearInterval(interval);
+        throw err;
+      }
     },
     onSuccess: (data: any) => {
       invalidateCenterQueries();
-      setShowAutoAssignDialog(false);
-      const parts: string[] = [];
-      if (data.selfAssigned > 0) parts.push(`${data.selfAssigned} self-assigned (school-as-center)`);
-      if (data.assigned - (data.selfAssigned ?? 0) > 0) parts.push(`${data.assigned - (data.selfAssigned ?? 0)} assigned by region/cluster`);
-      if (data.hallsGenerated > 0) parts.push(`${data.hallsGenerated} halls auto-generated`);
-      if (data.skipped > 0) parts.push(`${data.skipped} skipped (no matching region/cluster)`);
-      toast({
-        title: `${data.assigned} Schools Assigned`,
-        description: parts.join(' · ') || "Auto-assignment complete.",
-      });
+      setAutoAssignResult(data);
+      setAutoAssignPhase('done');
     },
-    onError: () => {
-      toast({ title: t.common.error, description: "Failed to auto-assign schools", variant: "destructive" });
+    onError: (err: any) => {
+      setAutoAssignError(err?.message || "An unexpected error occurred during auto-assignment.");
+      setAutoAssignPhase('error');
     },
   });
 
@@ -898,7 +925,7 @@ export default function Centers() {
             <Upload className="w-4 h-4 me-2" />
             Import CSV
           </Button>
-          <Button variant="outline" onClick={() => setShowAutoAssignDialog(true)} data-testid="button-auto-assign">
+          <Button variant="outline" onClick={openAutoAssignDialog} data-testid="button-auto-assign">
             <Wand2 className="w-4 h-4 me-2" />
             Auto-Assign Schools
           </Button>
@@ -1498,38 +1525,132 @@ export default function Centers() {
       </AlertDialog>
 
       {/* Auto-Assign Schools Dialog */}
-      <AlertDialog open={showAutoAssignDialog} onOpenChange={setShowAutoAssignDialog}>
-        <AlertDialogContent dir={isRTL ? "rtl" : "ltr"}>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Auto-Assign Schools to Centers</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div>
-                <p>Automatically assigns eligible schools to examination centers using the following priority rules:</p>
-                <ol className="list-decimal list-inside mt-2 space-y-1.5 text-sm">
-                  <li><span className="font-medium">Self-assignment</span> — if the school is registered as an examination center, it is assigned to itself.</li>
-                  <li><span className="font-medium">Same Region + Same Cluster</span> — the school is assigned to a center in its own cluster.</li>
-                  <li><span className="font-medium">Same Region only</span> — fallback when all cluster centers are at capacity.</li>
-                </ol>
-                <p className="mt-2 text-sm font-medium text-amber-600 dark:text-amber-400">
-                  Schools with no center in their region are skipped — there is no cross-region assignment.
-                </p>
-                <p className="mt-2 text-sm font-medium">
-                  After assignment, halls are auto-generated for each center at 40 students per hall.
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">Only schools with approved students and confirmed payment will be assigned. Already-assigned schools are not affected.</p>
+      <Dialog open={showAutoAssignDialog} onOpenChange={closeAutoAssignDialog}>
+        <DialogContent className="max-w-lg" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wand2 className="w-5 h-5 text-primary" />
+              Auto-Assign Schools to Centers
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* ── Confirm phase ── */}
+          {autoAssignPhase === 'confirm' && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Automatically assigns eligible schools to examination centers using the following priority rules:</p>
+              <ol className="list-decimal list-inside space-y-1.5 text-sm">
+                <li><span className="font-medium">Self-assignment</span> — if the school is registered as an examination center, it is assigned to itself.</li>
+                <li><span className="font-medium">Same Region + Same Cluster</span> — the school is assigned to a center in its own cluster.</li>
+                <li><span className="font-medium">Same Region only</span> — fallback when all cluster centers are at capacity.</li>
+              </ol>
+              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                Schools with no center in their region are skipped — there is no cross-region assignment.
+              </p>
+              <p className="text-sm font-medium">After assignment, halls are auto-generated for each center at 40 students per hall.</p>
+              <p className="text-sm text-muted-foreground">Only schools with approved students and confirmed payment will be assigned. Already-assigned schools are not affected.</p>
+              <DialogFooter className="pt-2">
+                <Button variant="outline" onClick={closeAutoAssignDialog}>{t.common.cancel}</Button>
+                <Button onClick={() => autoAssignMutation.mutate()} data-testid="button-run-auto-assign">
+                  <Wand2 className="w-4 h-4 me-2" />
+                  Run Auto-Assignment
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {/* ── Running phase ── */}
+          {autoAssignPhase === 'running' && (
+            <div className="space-y-5 py-2">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
+                <div>
+                  <p className="font-medium text-sm">Running auto-assignment…</p>
+                  <p className="text-xs text-muted-foreground">Please wait — do not close this window.</p>
+                </div>
               </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => autoAssignMutation.mutate()} disabled={autoAssignMutation.isPending}>
-              {autoAssignMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
-              <Wand2 className="w-4 h-4 me-2" />
-              Run Auto-Assignment
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <div className="space-y-1.5">
+                <Progress value={autoAssignProgress} className="h-2.5" />
+                <p className="text-xs text-muted-foreground text-right">{autoAssignProgress}%</p>
+              </div>
+              <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+                <p>Matching schools to centers by region and cluster…</p>
+                <p>Generating halls for assigned centers…</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Done phase ── */}
+          {autoAssignPhase === 'done' && autoAssignResult && (
+            <div className="space-y-4 py-1">
+              <div className="flex items-start gap-3 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-emerald-800 dark:text-emerald-300">
+                    Auto-assignment complete — {autoAssignResult.assigned ?? 0} school{(autoAssignResult.assigned ?? 0) !== 1 ? "s" : ""} assigned
+                  </p>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">The center list has been refreshed automatically.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-md border p-3 space-y-0.5">
+                  <p className="text-2xl font-bold text-primary">{autoAssignResult.assigned ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">Total assigned</p>
+                </div>
+                <div className="rounded-md border p-3 space-y-0.5">
+                  <p className="text-2xl font-bold">{autoAssignResult.selfAssigned ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">Self-assigned (school = center)</p>
+                </div>
+                <div className="rounded-md border p-3 space-y-0.5">
+                  <p className="text-2xl font-bold">{autoAssignResult.hallsGenerated ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">Halls auto-generated</p>
+                </div>
+                <div className="rounded-md border p-3 space-y-0.5">
+                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{autoAssignResult.skipped ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">Skipped (no region match)</p>
+                </div>
+              </div>
+              {autoAssignResult.warnings?.length > 0 && (
+                <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 space-y-1">
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Warnings
+                  </p>
+                  {autoAssignResult.warnings.slice(0, 5).map((w: string, i: number) => (
+                    <p key={i} className="text-xs text-amber-700 dark:text-amber-400">{w}</p>
+                  ))}
+                  {autoAssignResult.warnings.length > 5 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-500">…and {autoAssignResult.warnings.length - 5} more</p>
+                  )}
+                </div>
+              )}
+              <DialogFooter>
+                <Button onClick={closeAutoAssignDialog} data-testid="button-close-auto-assign-done">
+                  Close
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {/* ── Error phase ── */}
+          {autoAssignPhase === 'error' && (
+            <div className="space-y-4 py-1">
+              <div className="flex items-start gap-3 p-3 rounded-md bg-destructive/10 border border-destructive/30">
+                <XCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-destructive">Auto-assignment failed</p>
+                  <p className="text-xs text-muted-foreground mt-1">{autoAssignError || "An unexpected error occurred. Please try again."}</p>
+                </div>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={closeAutoAssignDialog}>Close</Button>
+                <Button onClick={() => autoAssignMutation.mutate()} data-testid="button-retry-auto-assign">
+                  <Wand2 className="w-4 h-4 me-2" />
+                  Retry
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* CSV Bulk Upload Dialog */}
       <Dialog open={showCsvUploadDialog} onOpenChange={closeCsvDialog}>
