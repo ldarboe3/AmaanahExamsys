@@ -201,6 +201,7 @@ export interface IStorage {
   createTimetableEntry(entry: InsertExamTimetable): Promise<ExamTimetable>;
   getTimetableByExamYear(examYearId: number): Promise<ExamTimetable[]>;
   getTimetableByGrade(examYearId: number, grade: number): Promise<ExamTimetable[]>;
+  getTimetableByGradeAnyYear(grades: number[]): Promise<ExamTimetable[]>;
   updateTimetableEntry(id: number, entry: Partial<InsertExamTimetable>): Promise<ExamTimetable | undefined>;
   deleteTimetableEntry(id: number): Promise<boolean>;
 
@@ -1298,6 +1299,11 @@ export class DatabaseStorage implements IStorage {
 
   async getTimetableByGrade(examYearId: number, grade: number): Promise<ExamTimetable[]> {
     return db.select().from(examTimetable).where(and(eq(examTimetable.examYearId, examYearId), eq(examTimetable.grade, grade))).orderBy(asc(examTimetable.examDate));
+  }
+
+  async getTimetableByGradeAnyYear(grades: number[]): Promise<ExamTimetable[]> {
+    if (grades.length === 0) return [];
+    return db.select().from(examTimetable).where(inArray(examTimetable.grade, grades)).orderBy(asc(examTimetable.examDate));
   }
 
   async updateTimetableEntry(id: number, entry: Partial<InsertExamTimetable>): Promise<ExamTimetable | undefined> {
