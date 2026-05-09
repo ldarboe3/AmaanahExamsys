@@ -19,7 +19,7 @@ import {
   Users,
   CreditCard,
   MapPin,
-  ClipboardList,
+
   Award,
   FileCheck,
   UserCheck,
@@ -81,6 +81,7 @@ const schoolAdminMenuDefs: MenuItemDef[] = [
   { key: "students", url: "/students", icon: Users },
   { key: "payments", url: "/payments", icon: CreditCard },
   { key: "results", url: "/school-results", icon: FileCheck },
+  { key: "examScheduling", url: "/exam-scheduling", icon: Timer },
   { key: "examCenter", url: "/center-info", icon: MapPin },
   { key: "schoolProfile", url: "/school-profile", icon: School },
 ];
@@ -98,7 +99,6 @@ const logisticsOfficerMenuDefs: MenuItemDef[] = [
 const managementDefs: MenuItemDef[] = [
   { key: "regionsAndClusters", url: "/regions", icon: Building2 },
   { key: "subjects", url: "/subjects", icon: BookOpen },
-  { key: "timetable", url: "/timetable", icon: ClipboardList },
   { key: "websiteManagement", url: "/website-management", icon: Globe },
   { key: "reportsAndExports", url: "/reports", icon: FileDown },
   { key: "auditLogs", url: "/audit-logs", icon: History },

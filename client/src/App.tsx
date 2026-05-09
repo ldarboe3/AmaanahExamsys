@@ -34,7 +34,6 @@ import Regions from "@/pages/regions";
 import AuditLogs from "@/pages/audit-logs";
 import Reports from "@/pages/reports";
 import Subjects from "@/pages/subjects";
-import Timetable from "@/pages/timetable";
 import Settings from "@/pages/settings";
 import Profile from "@/pages/profile";
 import SchoolProfile from "@/pages/school-profile";
@@ -125,7 +124,9 @@ function AuthenticatedRoutes() {
       <Route path="/mobile-timetable">
         {() => <ProtectedRoute component={MobileTimetable} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics", "regional_coordinator", "cluster_coordinator", "examiner"]} />}
       </Route>
-      <Route path="/exam-scheduling" component={ExamScheduling} />
+      <Route path="/exam-scheduling">
+        {() => <ProtectedRoute component={ExamScheduling} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "regional_logistics", "cluster_logistics", "regional_coordinator", "cluster_coordinator", "examiner", "school_admin"]} />}
+      </Route>
       <Route path="/exam-day">
         {() => <ProtectedRoute component={ExamDay} allowedRoles={["super_admin", "examination_admin", "logistics_admin", "examiner"]} />}
       </Route>
@@ -144,7 +145,7 @@ function AuthenticatedRoutes() {
       <Route path="/reports" component={Reports} />
       <Route path="/website-management" component={WebsiteManagement} />
       <Route path="/subjects" component={Subjects} />
-      <Route path="/timetable" component={Timetable} />
+      <Route path="/timetable">{() => <Redirect to="/exam-scheduling" />}</Route>
       <Route path="/settings" component={Settings} />
       <Route path="/profile" component={Profile} />
       <Route path="/school-profile" component={SchoolProfile} />

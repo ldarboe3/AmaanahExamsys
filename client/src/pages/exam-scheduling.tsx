@@ -184,6 +184,14 @@ export default function ExamScheduling() {
   ]);
 
   const isHQ = user?.role === "super_admin" || user?.role === "examination_admin";
+  const isSchoolAdmin = user?.role === "school_admin";
+
+  const [activeGradeTab, setActiveGradeTab] = useState<string>("all");
+
+  const { data: schoolProfile } = useQuery<any>({
+    queryKey: ["/api/school/profile"],
+    enabled: isSchoolAdmin,
+  });
 
   // Live clock — updates every 60 seconds so timetable status badges stay current
   const [now, setNow] = useState(() => new Date());
@@ -207,10 +215,10 @@ export default function ExamScheduling() {
 
   const timetableFilters = new URLSearchParams();
   if (selectedExamYearId) timetableFilters.set("examYearId", selectedExamYearId);
-  if (selectedGrade && selectedGrade !== "all") timetableFilters.set("grade", selectedGrade);
+  if (activeGradeTab !== "all") timetableFilters.set("grade", activeGradeTab);
 
   const { data: timetableEntries = [], isLoading: timetableLoading } = useQuery<any[]>({
-    queryKey: ["/api/timetable", selectedExamYearId, selectedGrade],
+    queryKey: ["/api/timetable", selectedExamYearId, activeGradeTab],
     queryFn: () => fetch(`/api/timetable?${timetableFilters.toString()}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!selectedExamYearId,
   });
@@ -230,6 +238,30 @@ export default function ExamScheduling() {
     refetchInterval: 15_000,
     enabled: isHQ && activeTab === "monitoring",
   });
+
+  // Auto-select active exam year on load
+  useEffect(() => {
+    if (examYears.length > 0 && !selectedExamYearId) {
+      const activeYear = examYears.find((ey: ExamYear) => ey.isActive);
+      if (activeYear) setSelectedExamYearId(String(activeYear.id));
+    }
+  }, [examYears]);
+
+  // School-specific grades (null = no restriction, show all)
+  const contextGrades: number[] | null =
+    isSchoolAdmin && schoolProfile?.grades?.length > 0
+      ? [...schoolProfile.grades].sort((a: number, b: number) => a - b)
+      : null;
+
+  // When school profile loads, jump to their first grade tab
+  useEffect(() => {
+    if (contextGrades && contextGrades.length > 0 && activeGradeTab === "all") {
+      setActiveGradeTab(String(contextGrades[0]));
+    }
+  }, [schoolProfile]);
+
+  // Grade tabs displayed — school's own grades, or all unique grades in the selected year
+  const gradeTabList: number[] = contextGrades ?? uniqueGrades;
 
   const aiGenerateMutation = useMutation({
     mutationFn: async () => {
@@ -368,10 +400,14 @@ export default function ExamScheduling() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">
-            {(t.nav as any).examScheduling || "Exam Scheduling"}
+            {isSchoolAdmin ? "Exam Schedule" : ((t.nav as any).examScheduling || "Exam Scheduling")}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Manage exam schedules, record sessions, and monitor timing compliance
+            {isSchoolAdmin
+              ? schoolProfile
+                ? `Examination schedule for ${schoolProfile.name}`
+                : "Examination schedule for your school"
+              : "Manage exam schedules, record sessions, and monitor timing compliance"}
           </p>
         </div>
         {isHQ && (
@@ -388,35 +424,33 @@ export default function ExamScheduling() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="w-48">
-          <Select value={selectedExamYearId} onValueChange={setSelectedExamYearId}>
-            <SelectTrigger data-testid="select-exam-year">
-              <SelectValue placeholder="Select Exam Year" />
-            </SelectTrigger>
-            <SelectContent>
-              {examYears.map(ey => (
-                <SelectItem key={ey.id} value={ey.id.toString()} data-testid={`option-year-${ey.id}`}>
-                  {ey.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="w-36">
-          <Select value={selectedGrade} onValueChange={setSelectedGrade}>
-            <SelectTrigger data-testid="select-grade">
-              <SelectValue placeholder="Grade" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Grades</SelectItem>
-              {uniqueGrades.map(g => (
-                <SelectItem key={g} value={g.toString()} data-testid={`option-grade-${g}`}>
-                  {GRADE_LABELS[g] || `Grade ${g}`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {!isSchoolAdmin && (
+          <div className="w-48">
+            <Select value={selectedExamYearId} onValueChange={setSelectedExamYearId}>
+              <SelectTrigger data-testid="select-exam-year">
+                <SelectValue placeholder="Select Exam Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {examYears.map(ey => (
+                  <SelectItem key={ey.id} value={ey.id.toString()} data-testid={`option-year-${ey.id}`}>
+                    {ey.name}{ey.isActive ? " (Active)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {isSchoolAdmin && selectedExamYearId && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Calendar className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+            <span className="font-medium text-foreground">
+              {examYears.find(ey => ey.id === Number(selectedExamYearId))?.name}
+            </span>
+            {examYears.find(ey => ey.id === Number(selectedExamYearId))?.isActive && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">Active</span>
+            )}
+          </div>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -432,8 +466,41 @@ export default function ExamScheduling() {
         </TabsList>
 
         <TabsContent value="timetable" className="space-y-4">
-          {/* HQ Toolbar */}
-          {isHQ && selectedExamYearId && (
+          {/* Grade Class Tabs — separate view per examination class */}
+          {selectedExamYearId && gradeTabList.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pt-1" data-testid="grade-tabs">
+              {!contextGrades && (
+                <button
+                  onClick={() => setActiveGradeTab("all")}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+                    activeGradeTab === "all"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted text-muted-foreground border-transparent hover:border-border"
+                  }`}
+                  data-testid="tab-grade-all"
+                >
+                  All Classes
+                </button>
+              )}
+              {gradeTabList.map(g => (
+                <button
+                  key={g}
+                  onClick={() => setActiveGradeTab(String(g))}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+                    activeGradeTab === String(g)
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted text-muted-foreground border-transparent hover:border-border"
+                  }`}
+                  data-testid={`tab-grade-${g}`}
+                >
+                  {GRADE_LABELS[g] || `Grade ${g}`}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Toolbar */}
+          {selectedExamYearId && (
             <div className="flex flex-wrap items-center gap-2 justify-end">
               <Button
                 variant="outline"
@@ -446,34 +513,48 @@ export default function ExamScheduling() {
                 <FileDown className="w-4 h-4" />
                 Download PDF
               </Button>
-              <Button
-                size="default"
-                onClick={openAddEntry}
-                data-testid="button-add-timetable-entry"
-                className="gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Add Entry
-              </Button>
+              {isHQ && (
+                <Button
+                  size="default"
+                  onClick={openAddEntry}
+                  data-testid="button-add-timetable-entry"
+                  className="gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Entry
+                </Button>
+              )}
             </div>
           )}
 
           {!selectedExamYearId ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">Select an exam year to view the timetable</CardContent></Card>
+            <Card><CardContent className="py-12 text-center text-muted-foreground">
+              <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="font-medium">No Active Exam Year</p>
+              <p className="text-sm mt-1">No active examination year has been configured yet.</p>
+            </CardContent></Card>
           ) : timetableLoading ? (
             <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}</div>
           ) : timetableEntries.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
                 <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="font-medium">No Timetable Entries</p>
-                <p className="text-sm mt-1">Use the AI Auto-Schedule button to generate a timetable, or add entries manually above.</p>
+                <p className="font-medium">
+                  {activeGradeTab !== "all"
+                    ? `No schedule published for ${GRADE_LABELS[Number(activeGradeTab)] || `Grade ${activeGradeTab}`} yet`
+                    : "No Timetable Entries"}
+                </p>
+                <p className="text-sm mt-1">
+                  {isHQ
+                    ? "Use the AI Auto-Schedule button to generate a timetable, or add entries manually above."
+                    : "The examination schedule has not been published yet. Check back later."}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-3">
-              {/* Coverage banner — shows which regions/centers this timetable applies to */}
-              {centers.length > 0 ? (
+              {/* Coverage banner — HQ only */}
+              {isHQ && (centers.length > 0 ? (
                 <div className="rounded-md border bg-muted/30 p-3 flex flex-wrap items-center gap-4 text-sm">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <MapPin className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
@@ -499,7 +580,7 @@ export default function ExamScheduling() {
                     </span>
                   </div>
                 </div>
-              )}
+              ))}
               {Array.from(new Set(timetableEntries.map((e: any) => e.examDate))).sort().map(date => {
                 const today = new Date(now); today.setHours(0, 0, 0, 0);
                 const cardDay = new Date(date + "T00:00:00"); cardDay.setHours(0, 0, 0, 0);
