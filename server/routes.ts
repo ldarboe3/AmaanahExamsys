@@ -15907,28 +15907,58 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
       const activeExamYear = examYearId ? await storage.getExamYear(examYearId) : await storage.getActiveExamYear();
       const yearId = activeExamYear?.id;
 
-      // Get published exam schedules — the live master timetable source
+      // Build timetable: prefer published exam_schedules entries; fall back to
+      // exam_timetable (the primary authoring table) when no published schedules exist.
       const allSubjects = await storage.getAllSubjects();
-      const rawSchedules = yearId
-        ? await storage.getExamSchedules({ examYearId: yearId, isPublished: true })
-        : [];
-      const timetable = rawSchedules.map((entry: any) => {
-        const subject = allSubjects.find((s: any) => s.id === entry.subjectId);
-        return {
-          id: entry.id,
-          examDate: entry.examDate,
-          startTime: entry.scheduledStartTime,
-          endTime: entry.scheduledEndTime,
-          subjectId: entry.subjectId,
-          subjectName: subject?.name || null,
-          subjectArabicName: subject?.arabicName || null,
-          subjectType: subject ? (subject.isCore ? 'Core' : 'Elective') : null,
-          grade: entry.grade,
-          durationMinutes: entry.durationMinutes,
-          venue: center.name,
-          isPublished: entry.isPublished,
-        };
-      });
+      let timetable: any[] = [];
+      if (yearId) {
+        const publishedSchedules = await storage.getExamSchedules({ examYearId: yearId, isPublished: true });
+        if (publishedSchedules.length > 0) {
+          // Use the published exam_schedules entries
+          timetable = publishedSchedules.map((entry: any) => {
+            const subject = allSubjects.find((s: any) => s.id === entry.subjectId);
+            return {
+              id: entry.id,
+              examDate: entry.examDate,
+              startTime: entry.scheduledStartTime,
+              endTime: entry.scheduledEndTime,
+              subjectId: entry.subjectId,
+              subjectName: subject?.name || null,
+              subjectArabicName: subject?.arabicName || null,
+              subjectType: subject ? (subject.isCore ? 'Core' : 'Elective') : null,
+              grade: entry.grade,
+              durationMinutes: entry.durationMinutes,
+              venue: center.name,
+              isPublished: true,
+            };
+          });
+        } else {
+          // Fall back to exam_timetable (primary authoring table)
+          const timetableEntries = await storage.getTimetableByExamYear(yearId);
+          timetable = timetableEntries.map((entry: any) => {
+            const subject = allSubjects.find((s: any) => s.id === entry.subjectId);
+            const [sh, sm] = (entry.startTime || "").split(":").map(Number);
+            const [eh, em] = (entry.endTime || "").split(":").map(Number);
+            const durationMinutes = !isNaN(sh) && !isNaN(eh)
+              ? (eh * 60 + em) - (sh * 60 + sm)
+              : null;
+            return {
+              id: entry.id,
+              examDate: entry.examDate,
+              startTime: entry.startTime,
+              endTime: entry.endTime,
+              subjectId: entry.subjectId,
+              subjectName: subject?.name || null,
+              subjectArabicName: subject?.arabicName || null,
+              subjectType: subject ? (subject.isCore ? 'Core' : 'Elective') : null,
+              grade: entry.grade,
+              durationMinutes,
+              venue: entry.venue || center.name,
+              isPublished: true,
+            };
+          });
+        }
+      }
 
       if (isSchoolAdmin && schoolAdminSchoolId) {
         // School admin: only show their school's data
