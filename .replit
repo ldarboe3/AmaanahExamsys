@@ -7,10 +7,10 @@ channel = "stable-24_05"
 packages = ["glib", "nss", "nspr", "at-spi2-atk", "cups", "libdrm", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXfixes", "xorg.libXrandr", "libxkbcommon", "mesa", "alsa-lib", "pango", "chromium"]
 
 [deployment]
-deploymentTarget = "cloudrun"
+deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
 publicDir = "dist/public"
-run = ["sh", "-c", "npm run start"]
+run = ["npm", "run", "start"]
 
 [[ports]]
 localPort = 5000

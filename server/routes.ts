@@ -10,7 +10,7 @@ import { db } from "./db";
 import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments, studentResults, examCards, attendanceRecords, packetEvents, userSessionMetadata } from "@shared/schema";
 import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import connectPgSimple from "connect-pg-simple";
-import { pool } from "./db";
+import { pool, rawQuery } from "./db";
 import {
   insertSchoolSchema, insertStudentSchema, insertExamYearSchema,
   insertExamCenterSchema, insertRegionSchema, insertClusterSchema,
@@ -13400,7 +13400,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
   // Public national summary stats (KPI cards + QA compliance)
   app.get("/api/public/national-summary", async (_req, res) => {
     try {
-      const { pool } = await import('./db');
+      const { rawQuery } = await import('./db');
 
       const [
         schoolsResult,
@@ -13415,17 +13415,17 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         schoolTypeResult,
         enrolmentTrendResult,
       ] = await Promise.all([
-        pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status = 'approved') AS active FROM schools`),
-        pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE gender = 'male') AS male, COUNT(*) FILTER (WHERE gender = 'female') AS female FROM students WHERE status = 'approved'`),
-        pool.query(`SELECT COUNT(*) AS total FROM users WHERE role = 'school_admin'`),
-        pool.query(`SELECT COUNT(DISTINCT student_id) AS total FROM student_results`),
-        pool.query(`SELECT COUNT(*) AS total FROM regions`),
-        pool.query(`SELECT COUNT(*) AS total FROM clusters`),
-        pool.query(`SELECT COUNT(*) AS total FROM subjects`),
-        pool.query(`SELECT id, name, is_active, exam_start_date FROM exam_years ORDER BY exam_start_date DESC NULLS LAST`),
-        pool.query(`SELECT gender, COUNT(*) AS cnt FROM students WHERE status = 'approved' GROUP BY gender`),
-        pool.query(`SELECT school_type, COUNT(*) AS cnt FROM schools WHERE status = 'approved' GROUP BY school_type ORDER BY cnt DESC`),
-        pool.query(`
+        rawQuery(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status = 'approved') AS active FROM schools`),
+        rawQuery(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE gender = 'male') AS male, COUNT(*) FILTER (WHERE gender = 'female') AS female FROM students WHERE status = 'approved'`),
+        rawQuery(`SELECT COUNT(*) AS total FROM users WHERE role = 'school_admin'`),
+        rawQuery(`SELECT COUNT(DISTINCT student_id) AS total FROM student_results`),
+        rawQuery(`SELECT COUNT(*) AS total FROM regions`),
+        rawQuery(`SELECT COUNT(*) AS total FROM clusters`),
+        rawQuery(`SELECT COUNT(*) AS total FROM subjects`),
+        rawQuery(`SELECT id, name, is_active, exam_start_date FROM exam_years ORDER BY exam_start_date DESC NULLS LAST`),
+        rawQuery(`SELECT gender, COUNT(*) AS cnt FROM students WHERE status = 'approved' GROUP BY gender`),
+        rawQuery(`SELECT school_type, COUNT(*) AS cnt FROM schools WHERE status = 'approved' GROUP BY school_type ORDER BY cnt DESC`),
+        rawQuery(`
           SELECT ey.name AS year_name, ey.id AS year_id,
                  COUNT(DISTINCT CASE WHEN s.gender = 'male' THEN s.id END) AS male,
                  COUNT(DISTINCT CASE WHEN s.gender = 'female' THEN s.id END) AS female,
@@ -13690,7 +13690,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         const clusterClause = clusterId && clusterId !== 'all' ? `AND sc.cluster_id = ${parseInt(clusterId)}` : '';
 
         if (groupBy === 'region') {
-          const qr = await pool.query(`
+          const qr = await rawQuery(`
             SELECT r.name AS label,
                    COUNT(DISTINCT sr.student_id) AS total,
                    COUNT(DISTINCT CASE WHEN sr.total_score::numeric >= 50 THEN sr.student_id END) AS passed
@@ -13709,7 +13709,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
           total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
 
         } else if (groupBy === 'cluster') {
-          const qr = await pool.query(`
+          const qr = await rawQuery(`
             SELECT cl.name AS label,
                    COUNT(DISTINCT sr.student_id) AS total,
                    COUNT(DISTINCT CASE WHEN sr.total_score::numeric >= 50 THEN sr.student_id END) AS passed
@@ -13728,7 +13728,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
           total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
 
         } else if (groupBy === 'school') {
-          const qr = await pool.query(`
+          const qr = await rawQuery(`
             SELECT sc.id AS school_id, sc.name AS label, sc.school_type,
                    r.name AS region_name, cl.name AS cluster_name,
                    COUNT(DISTINCT sr.student_id) AS total,
@@ -13751,7 +13751,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
           total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
 
         } else if (groupBy === 'grade') {
-          const qr = await pool.query(`
+          const qr = await rawQuery(`
             SELECT st.grade,
                    COUNT(DISTINCT sr.student_id) AS total,
                    COUNT(DISTINCT CASE WHEN sr.total_score::numeric >= 50 THEN sr.student_id END) AS passed
@@ -13769,7 +13769,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
           total = results.reduce((s, r) => s + (r.extra?.total || 0), 0);
 
         } else if (groupBy === 'examYear') {
-          const qr = await pool.query(`
+          const qr = await rawQuery(`
             SELECT ey.id, ey.name AS label,
                    COUNT(DISTINCT sr.student_id) AS total,
                    COUNT(DISTINCT CASE WHEN sr.total_score::numeric >= 50 THEN sr.student_id END) AS passed
@@ -15624,7 +15624,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
 
       if (!centerId) return res.status(400).json({ message: "centerId is required" });
 
-      const result = await pool.query(`
+      const result = await rawQuery(`
         WITH center_students AS (
           -- Students whose school is assigned to this center
           SELECT DISTINCT s.id, s.first_name, s.middle_name, s.last_name, s.index_number, s.grade, s.school_id, s.exam_year_id,
@@ -15691,7 +15691,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
       const centerId = req.query.centerId ? parseInt(req.query.centerId as string) : null;
 
       // Attendance counts grouped by center + subject
-      const { rows: attendanceRows } = await pool.query(`
+      const { rows: attendanceRows } = await rawQuery(`
         SELECT
           ec.id AS center_id, ec.name AS center_name,
           COALESCE(r.id, 0) AS region_id, COALESCE(r.name, 'No Region') AS region_name,
@@ -15712,7 +15712,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
       `, [examYearId, regionId, clusterId, centerId]);
 
       // Total registered students per center via center_assignments
-      const { rows: registeredRows } = await pool.query(`
+      const { rows: registeredRows } = await rawQuery(`
         SELECT
           ca.center_id,
           COUNT(DISTINCT s.id)::int AS total_students
@@ -15761,7 +15761,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
       const centerId = req.query.centerId ? parseInt(req.query.centerId as string) : null;
 
       // Flag 1: Attended but no marks recorded
-      const { rows: attendedNoMarks } = await pool.query(`
+      const { rows: attendedNoMarks } = await rawQuery(`
         SELECT
           'attended_no_marks' AS flag_type,
           ar.student_id,
@@ -15793,7 +15793,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
       `, [examYearId, regionId, clusterId, centerId]);
 
       // Flag 2: Has marks but no attendance record
-      const { rows: marksNoAttend } = await pool.query(`
+      const { rows: marksNoAttend } = await rawQuery(`
         SELECT
           'marks_no_attendance' AS flag_type,
           sr.student_id,
@@ -15827,7 +15827,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
       `, [examYearId, regionId, clusterId, centerId]);
 
       // Flag 3: Passing marks (>=50) but no attendance record
-      const { rows: passingNoAttend } = await pool.query(`
+      const { rows: passingNoAttend } = await rawQuery(`
         SELECT
           'passing_no_attendance' AS flag_type,
           sr.student_id,
@@ -17778,7 +17778,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
       const centerId = parseInt(req.params.centerId);
       const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
 
-      const result = await pool.query(`
+      const result = await rawQuery(`
         SELECT
           ep.id,
           ep.barcode,
@@ -21102,13 +21102,13 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
         ? allSchools
         : allSchools.filter((s: any) => regMap.has(s.id));
 
-      // Fetch students for all target schools in one pool query via raw SQL
-      const { pool } = await import('./db');
+      // Fetch students for all target schools in one query via raw SQL
+      const { rawQuery } = await import('./db');
       const schoolIds = targetSchools.map((s: any) => s.id);
 
       if (schoolIds.length === 0) return res.json({ examYear: { id: examYear.id, name: (examYear as any).name }, total: 0, data: [] });
 
-      const studentsResult = await pool.query(
+      const studentsResult = await rawQuery(
         `SELECT school_id, grade, status, COUNT(*) AS cnt
          FROM students
          WHERE school_id = ANY($1) AND exam_year_id = $2
@@ -21116,7 +21116,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
         [schoolIds, examYearId]
       );
 
-      const invoicesResult = await pool.query(
+      const invoicesResult = await rawQuery(
         `SELECT school_id, status, SUM(total_amount::numeric) AS invoiced, SUM(paid_amount::numeric) AS paid
          FROM invoices
          WHERE school_id = ANY($1) AND exam_year_id = $2
