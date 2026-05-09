@@ -1996,6 +1996,11 @@ export default function CenterDashboard() {
     enabled: centerId > 0,
   });
 
+  const { data: halls = [] } = useQuery<CenterHall[]>({
+    queryKey: [`/api/centers/${centerId}/halls`],
+    enabled: centerId > 0,
+  });
+
   const isSchoolAdmin = user?.role === "school_admin";
   const backUrl = isSchoolAdmin ? "/center-info" : "/centers";
   const backLabel = isSchoolAdmin ? "Back to Exam Center" : "Back to Centers";
