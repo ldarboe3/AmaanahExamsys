@@ -80,6 +80,8 @@ import {
   FileUp,
   XCircle,
   Download,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -551,6 +553,8 @@ export default function Centers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [clusterFilter, setClusterFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 24;
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
@@ -865,6 +869,15 @@ export default function Centers() {
     center.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const totalPages = Math.ceil((filteredCenters?.length || 0) / ITEMS_PER_PAGE);
+  const paginatedCenters = filteredCenters?.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, regionFilter, clusterFilter]);
+
   const totalCapacity = centers?.reduce((sum, c) => sum + (c.hallTotalCapacity || 0), 0) || 0;
   const totalAssigned = centers?.reduce((sum, c) => sum + (c.assignedStudentsCount || 0), 0) || 0;
 
@@ -1007,13 +1020,13 @@ export default function Centers() {
             <CenterCardSkeleton />
             <CenterCardSkeleton />
           </>
-        ) : filteredCenters && filteredCenters.length > 0 ? (
-          filteredCenters.map((center, index) => (
+        ) : paginatedCenters && paginatedCenters.length > 0 ? (
+          paginatedCenters.map((center, index) => (
             <CenterCard
               key={center.id}
               center={center}
               monitoring={monitoringMap.get(center.id)}
-              themeIndex={index}
+              themeIndex={(currentPage - 1) * ITEMS_PER_PAGE + index}
               onEdit={() => openEditDialog(center)}
               onViewDetails={() => openViewDetails(center)}
               onDelete={() => openDeleteDialog(center)}
@@ -1040,6 +1053,57 @@ export default function Centers() {
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-2 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredCenters?.length || 0)} of {filteredCenters?.length || 0} centers
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              data-testid="button-page-prev"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+              .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((item, idx) =>
+                item === 'ellipsis' ? (
+                  <span key={`ellipsis-${idx}`} className="px-1 text-muted-foreground text-sm">…</span>
+                ) : (
+                  <Button
+                    key={item}
+                    variant={currentPage === item ? "default" : "outline"}
+                    size="icon"
+                    onClick={() => setCurrentPage(item as number)}
+                    data-testid={`button-page-${item}`}
+                  >
+                    {item}
+                  </Button>
+                )
+              )}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              data-testid="button-page-next"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>

@@ -1,0 +1,127 @@
+The current Region and Cluster synchronization is structurally incorrect and must be fixed immediately.
+
+### Core Problem:
+
+Examination Centers have already been assigned to Regions and Clusters, but those assignments are not properly syncing with the existing Region and Cluster records already used by Schools.
+
+As a result:
+
+### ❌ Examination Center cards are falsely showing “No Region” or “No Cluster Assigned”
+
+Even when valid Region and Cluster data actually exists.
+
+---
+
+# Non-Negotiable Fix:
+
+All Schools and Examination Centers must reference the exact same master Region and Cluster records.
+
+### There should NOT be:
+
+❌ Separate Region logic for schools
+❌ Separate Region logic for centers
+❌ Separate Cluster logic for schools
+❌ Duplicate or disconnected administrative records
+
+---
+
+# Correct System Structure:
+
+## One Shared Master Structure:
+
+### Region Master Record
+
+→ Cluster Master Record
+→ Schools
+→ Examination Centers
+
+---
+
+# Required System Logic:
+
+When an examination center is created or assigned:
+
+### The system must:
+
+✔ Check the center’s assigned school
+✔ Match its Region to the school’s Region record
+✔ Match its Cluster to the school’s Cluster record
+✔ Sync center display card automatically
+✔ Prevent “No Region / No Cluster” false errors
+
+---
+
+# Important Rule:
+
+If a school is:
+
+### Region 2 → Cluster 2.1
+
+Then its examination center must inherit:
+
+### Region 2 → Cluster 2.1
+
+Unless manually overridden by authorized admin controls.
+
+---
+
+# Required Data Correction:
+
+You need to audit and reconcile all existing examination center records against current school Region and Cluster records.
+
+### System should:
+
+✔ Identify mismatched center records
+✔ Identify blank center region/cluster fields
+✔ Auto-match based on linked school
+✔ Repair broken references
+✔ Flag unresolved records for admin review
+
+---
+
+# UI Fix:
+
+### Examination Center Card Must Display:
+
+✔ Region Name
+✔ Region Code
+✔ Cluster Name
+✔ Cluster Code
+
+### Not:
+
+❌ “No Region Assigned”
+❌ “No Cluster Assigned”
+
+---
+
+# Recommended Sync Tool:
+
+### Add:
+
+## “Sync Centers with School Region & Cluster Records”
+
+### This should:
+
+✔ Bulk repair old records
+✔ Standardize future records
+✔ Remove duplicate region structures
+
+---
+
+# Bottom Line:
+
+The system must stop treating Schools and Examination Centers as separate geographic systems.
+
+### One Region Record
+
+### One Cluster Record
+
+### Shared by All Related Entities
+
+This ensures:
+✔ Accurate center cards
+✔ Accurate school mapping
+✔ Accurate reports
+✔ Accurate AI assignments
+✔ Accurate national geographic governance.
