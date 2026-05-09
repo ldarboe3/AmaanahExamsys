@@ -82,6 +82,7 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  AlertCircle,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -561,6 +562,9 @@ export default function Centers() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAutoAssignDialog, setShowAutoAssignDialog] = useState(false);
   const [showCsvUploadDialog, setShowCsvUploadDialog] = useState(false);
+  const [showUnassignedDialog, setShowUnassignedDialog] = useState(false);
+  const [unassignedSearch, setUnassignedSearch] = useState("");
+  const [assigningCenterId, setAssigningCenterId] = useState<Record<number, string>>({});
   const [csvStep, setCsvStep] = useState<CsvStep>('select');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvPreviewData, setCsvPreviewData] = useState<CsvPreviewResult | null>(null);
@@ -596,6 +600,38 @@ export default function Centers() {
 
   const { data: activeExamYear } = useQuery<any>({
     queryKey: ["/api/exam-years/active"],
+  });
+
+  const { data: unassignedSchoolsData, isLoading: unassignedLoading } = useQuery<{ data: any[]; total: number }>({
+    queryKey: ["/api/schools", "unassigned"],
+    queryFn: async () => {
+      const res = await fetch("/api/schools?centerAssignment=unassigned", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load unassigned schools");
+      return res.json();
+    },
+    enabled: showUnassignedDialog || true,
+  });
+
+  const unassignedSchools = unassignedSchoolsData?.data ?? [];
+
+  const assignCenterMutation = useMutation({
+    mutationFn: async ({ schoolId, centerId }: { schoolId: number; centerId: number }) => {
+      return apiRequest("POST", `/api/schools/${schoolId}/assign-center`, { centerId });
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schools", "unassigned"] });
+      invalidateCenterQueries();
+      queryClient.invalidateQueries({ queryKey: ["/api/schools"] });
+      setAssigningCenterId(prev => {
+        const next = { ...prev };
+        delete next[variables.schoolId];
+        return next;
+      });
+      toast({ title: "School Assigned", description: "School has been assigned to the center successfully." });
+    },
+    onError: (err: any) => {
+      toast({ title: t.common.error, description: err?.message || "Failed to assign school to center.", variant: "destructive" });
+    },
   });
 
   const { data: monitoring } = useQuery<CenterMonitoringData[]>({
@@ -937,7 +973,7 @@ export default function Centers() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between gap-2">
@@ -990,6 +1026,29 @@ export default function Centers() {
                 <CheckCircle2 className="w-5 h-5 text-chart-4" />
               </div>
             </div>
+          </CardContent>
+        </Card>
+        {/* Unassigned Schools — clickable */}
+        <Card
+          className={`cursor-pointer hover-elevate transition-colors ${unassignedSchools.length > 0 ? "border-amber-300/60 dark:border-amber-700/40" : ""}`}
+          onClick={() => setShowUnassignedDialog(true)}
+          data-testid="card-unassigned-schools"
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm text-muted-foreground">Unassigned Schools</p>
+                <p className={`text-2xl font-semibold ${unassignedSchools.length > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
+                  {unassignedLoading ? "—" : unassignedSchools.length.toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
+                </p>
+              </div>
+              <div className={`w-10 h-10 rounded-md flex items-center justify-center shrink-0 ${unassignedSchools.length > 0 ? "bg-amber-100 dark:bg-amber-900/30" : "bg-muted/40"}`}>
+                <AlertCircle className={`w-5 h-5 ${unassignedSchools.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`} />
+              </div>
+            </div>
+            {unassignedSchools.length > 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Click to assign</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -1899,6 +1958,110 @@ export default function Centers() {
               </Button>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unassigned Schools Dialog */}
+      <Dialog open={showUnassignedDialog} onOpenChange={(open) => { setShowUnassignedDialog(open); if (!open) setUnassignedSearch(""); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col gap-0 p-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-500" />
+              Unassigned Schools
+            </DialogTitle>
+            <DialogDescription>
+              {unassignedSchools.length === 0
+                ? "All schools are currently assigned to an exam center."
+                : `${unassignedSchools.length} school${unassignedSchools.length === 1 ? "" : "s"} have not been assigned to an exam center. Select a center for each school and click Assign.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {unassignedSchools.length > 0 && (
+            <div className="px-6 pt-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search schools..."
+                  value={unassignedSearch}
+                  onChange={e => setUnassignedSearch(e.target.value)}
+                  data-testid="input-unassigned-school-search"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2 min-h-0">
+            {unassignedLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : unassignedSchools.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
+                <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                <p className="font-medium">All schools assigned</p>
+                <p className="text-sm text-muted-foreground">Every registered school has been assigned to an exam center.</p>
+              </div>
+            ) : (
+              (() => {
+                const filtered = unassignedSchools.filter(s =>
+                  s.name.toLowerCase().includes(unassignedSearch.toLowerCase()) ||
+                  (s.code || "").toLowerCase().includes(unassignedSearch.toLowerCase())
+                );
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-muted-foreground text-sm">No schools match your search.</div>
+                  );
+                }
+                return filtered.map((school: any) => (
+                  <div
+                    key={school.id}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-md border bg-muted/30"
+                    data-testid={`row-unassigned-school-${school.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{school.name}</p>
+                      <p className="text-xs text-muted-foreground">{school.code}{school.region?.name ? ` · ${school.region.name}` : ""}{school.cluster?.name ? ` · ${school.cluster.name}` : ""}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Select
+                        value={assigningCenterId[school.id] ?? ""}
+                        onValueChange={val => setAssigningCenterId(prev => ({ ...prev, [school.id]: val }))}
+                      >
+                        <SelectTrigger className="w-48 text-sm" data-testid={`select-center-for-school-${school.id}`}>
+                          <SelectValue placeholder="Select center…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(centers ?? []).map(c => (
+                            <SelectItem key={c.id} value={String(c.id)}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        disabled={!assigningCenterId[school.id] || assignCenterMutation.isPending}
+                        onClick={() => {
+                          const cid = parseInt(assigningCenterId[school.id]);
+                          if (!isNaN(cid)) assignCenterMutation.mutate({ schoolId: school.id, centerId: cid });
+                        }}
+                        data-testid={`button-assign-school-${school.id}`}
+                      >
+                        {assignCenterMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Assign"}
+                      </Button>
+                    </div>
+                  </div>
+                ));
+              })()
+            )}
+          </div>
+
+          <div className="px-6 py-4 border-t flex justify-end">
+            <Button variant="outline" onClick={() => { setShowUnassignedDialog(false); setUnassignedSearch(""); }}>
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
