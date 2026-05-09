@@ -587,6 +587,7 @@ interface PrintLabelOpts {
   packet: ExamPacket;
   subjectName: string;
   centerName: string;
+  centerAddress?: string;
   examYearLabel: string;
   examDate?: string;
   startTime?: string;
@@ -597,7 +598,7 @@ interface PrintLabelOpts {
 }
 
 function buildLabelHtml(opts: PrintLabelOpts, qrDataUrl: string, logoDataUrl: string): string {
-  const { packet, subjectName, centerName, examYearLabel, examDate, startTime, endTime, regionName, clusterName, hallName } = opts;
+  const { packet, subjectName, centerName, centerAddress, examYearLabel, examDate, startTime, endTime, regionName, clusterName, hallName } = opts;
   const statusLabel = STATUS_CFG[packet.status]?.label ?? packet.status;
   const printDate = new Date().toLocaleString();
 
@@ -658,7 +659,7 @@ function buildLabelHtml(opts: PrintLabelOpts, qrDataUrl: string, logoDataUrl: st
         <div class="field"><label>Grade</label><p>Grade ${packet.grade}</p></div>
         ${regionName ? `<div class="field"><label>Region</label><p>${regionName}</p></div>` : ""}
         ${clusterName ? `<div class="field"><label>Cluster</label><p>${clusterName}</p></div>` : ""}
-        <div class="field"><label>Destination Center</label><p>${centerName}</p></div>
+        <div class="field"><label>Destination Center</label><p>${centerName}</p>${centerAddress ? `<p class="center-address">${centerAddress}</p>` : ""}</div>
         ${hallName ? `<div class="field hall-field"><label>Exam Hall</label><p class="hall-name">${hallName}</p></div>` : ""}
         <div class="field"><label>Paper Count</label><p>${packet.paperCount} papers</p></div>
         <div class="field"><label>Security Seal #</label><p class="mono">${packet.securitySealNumber ?? "—"}</p></div>
@@ -713,6 +714,7 @@ const LABEL_STYLES = `
   .field label { font-size: 9pt; text-transform: uppercase; color: #888; letter-spacing: 0.6px; font-weight: 600; }
   .field p { font-size: 15pt; font-weight: 700; color: #111; margin-top: 1.5px; }
   .field p.mono { font-family: 'Courier New', monospace; font-size: 13pt; }
+  .field p.center-address { font-size: 10pt; font-weight: 500; color: #555; margin-top: 2px; }
   .hall-field { grid-column: 1 / -1; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 5px; padding: 3mm 4mm; }
   .hall-field label { color: #166534; font-size: 10pt; }
   .hall-name { color: #14532d !important; font-size: 18pt !important; }
@@ -1116,6 +1118,7 @@ export default function PacketTracking() {
 
   const subjectMap = Object.fromEntries(subjects.map(s => [s.id, s.name]));
   const centerMap = Object.fromEntries(centers.map(c => [c.id, c.name]));
+  const centerAddressMap = Object.fromEntries(centers.map(c => [c.id, c.address ?? ""]));
   const examYearMap = Object.fromEntries(examYears.map(y => [y.id, y.year]));
   const regionMap = Object.fromEntries(regions.map(r => [r.id, r.name]));
   const clusterMap = Object.fromEntries(clusters.map(c => [c.id, c.name]));
@@ -1410,6 +1413,7 @@ export default function PacketTracking() {
                         packet: p,
                         subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
                         centerName: centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
+                        centerAddress: centerAddressMap[p.destinationCenterId] || undefined,
                         examYearLabel: examYearMap[p.examYearId] ? String(examYearMap[p.examYearId]) : `Year ${p.examYearId}`,
                         examDate: tt?.examDate ?? undefined,
                         startTime: tt?.startTime ?? undefined,
@@ -1517,6 +1521,7 @@ export default function PacketTracking() {
                                 packet: p,
                                 subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
                                 centerName: centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
+                                centerAddress: centerAddressMap[p.destinationCenterId] || undefined,
                                 examYearLabel: examYearMap[p.examYearId] ? String(examYearMap[p.examYearId]) : `Year ${p.examYearId}`,
                                 examDate: tt?.examDate ?? undefined,
                                 startTime: tt?.startTime ?? undefined,
@@ -1720,6 +1725,7 @@ export default function PacketTracking() {
                                       packet: p,
                                       subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
                                       centerName: centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
+                                      centerAddress: centerAddressMap[p.destinationCenterId] || undefined,
                                       examYearLabel: examYearMap[p.examYearId] ? String(examYearMap[p.examYearId]) : `Year ${p.examYearId}`,
                                       examDate: tt?.examDate ?? undefined,
                                       startTime: tt?.startTime ?? undefined,
@@ -1751,6 +1757,7 @@ export default function PacketTracking() {
                                       packet: p,
                                       subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
                                       centerName: centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
+                                      centerAddress: centerAddressMap[p.destinationCenterId] || undefined,
                                       examYearLabel: examYearMap[p.examYearId] ? String(examYearMap[p.examYearId]) : `Year ${p.examYearId}`,
                                       examDate: tt?.examDate ?? undefined,
                                       startTime: tt?.startTime ?? undefined,
