@@ -14576,6 +14576,27 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
     }
   });
 
+  // Unassign a school from its center by school ID (works regardless of whether a center_assignment record exists)
+  app.delete("/api/schools/:id/unassign-center", isAuthenticated, async (req, res) => {
+    try {
+      const schoolId = parseInt(req.params.id);
+      const school = await storage.getSchool(schoolId);
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      // Clear the direct FK on the school record
+      await storage.updateSchool(schoolId, { assignedCenterId: null as any });
+      // Also clean up any center_assignment records for this school across all exam years
+      const allAssignments = await storage.getCenterAssignmentsBySchool(schoolId);
+      for (const a of allAssignments) {
+        await storage.deleteCenterAssignment(a.id);
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Auto-assign schools to centers based on cluster/region/capacity
   app.post("/api/center-assignments/auto-assign", isAuthenticated, async (req, res) => {
     try {

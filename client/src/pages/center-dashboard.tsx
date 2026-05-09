@@ -1710,8 +1710,8 @@ function SchoolsTab({
   });
 
   const removeMutation = useMutation({
-    mutationFn: async ({ assignmentId }: { assignmentId: number }) => {
-      return apiRequest("DELETE", `/api/center-assignments/${assignmentId}`);
+    mutationFn: async ({ schoolId }: { schoolId: number }) => {
+      return apiRequest("DELETE", `/api/schools/${schoolId}/unassign-center`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/centers") });
@@ -1928,8 +1928,8 @@ function SchoolsTab({
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setActionSchool(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => actionSchool?.assignmentId && removeMutation.mutate({ assignmentId: actionSchool.assignmentId })}
-              disabled={removeMutation.isPending || !actionSchool?.assignmentId}
+              onClick={() => actionSchool && removeMutation.mutate({ schoolId: actionSchool.id })}
+              disabled={removeMutation.isPending}
               className="bg-amber-600 text-white hover:bg-amber-700"
               data-testid="button-confirm-remove-school"
             >
