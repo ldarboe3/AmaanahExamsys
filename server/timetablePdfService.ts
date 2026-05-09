@@ -2,7 +2,7 @@ import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import path from 'path';
 import fs from 'fs';
-import { shapeArabicText } from './arabicTextHelper';
+import { shapeArabicTextForPdf } from './arabicTextHelper';
 
 const A4_W = 595.28;
 const A4_H = 841.89;
@@ -25,7 +25,7 @@ const AMIRI_REG  = path.resolve(process.cwd(), 'fonts', 'Amiri-Regular.ttf');
 
 function ar(text: string): string {
   if (!text) return '';
-  try { return shapeArabicText(text); } catch { return text; }
+  try { return shapeArabicTextForPdf(text); } catch { return text; }
 }
 
 const ARABIC_DAYS: Record<string, string> = {
