@@ -247,6 +247,14 @@ export default function ExamScheduling() {
     }
   }, [examYears]);
 
+  // Grade label map and standard grade list — defined early so gradeTabList can reference them
+  const GRADE_LABELS: Record<number, string> = { 3: "Grade 3 (LBS)", 6: "Grade 6 (UBS)", 9: "Grade 9 (BCS)", 12: "Grade 12 (SSS)" };
+  const ALL_STANDARD_GRADES = [3, 6, 9, 12];
+  const uniqueGrades = Array.from(new Set([
+    ...(examYears.find(ey => ey.id === Number(selectedExamYearId))?.grades || []),
+    ...ALL_STANDARD_GRADES,
+  ])).sort();
+
   // School-specific grades (null = no restriction, show all)
   const contextGrades: number[] | null =
     isSchoolAdmin && schoolProfile?.grades?.length > 0
@@ -302,13 +310,6 @@ export default function ExamScheduling() {
   });
 
   const getSubjectName = (id: number) => subjects.find(s => s.id === id)?.name || `Subject ${id}`;
-
-  const GRADE_LABELS: Record<number, string> = { 3: "Grade 3 (LBS)", 6: "Grade 6 (UBS)", 9: "Grade 9 (BCS)", 12: "Grade 12 (SSS)" };
-  const ALL_STANDARD_GRADES = [3, 6, 9, 12];
-  const uniqueGrades = Array.from(new Set([
-    ...(examYears.find(ey => ey.id === Number(selectedExamYearId))?.grades || []),
-    ...ALL_STANDARD_GRADES,
-  ])).sort();
 
   // ── Manual entry management ──────────────────────────────────────────
   const emptyForm = { subjectId: "", examDate: "", startTime: "", endTime: "", grade: "" };
