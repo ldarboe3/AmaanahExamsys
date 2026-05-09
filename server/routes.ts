@@ -20355,14 +20355,12 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
     if (platformCache.packets && Date.now() - platformCache.builtAt < PLATFORM_CACHE_TTL) {
       return platformCache.packets;
     }
-    // Rebuild cache
-    const [packets, regions, clusters, centers, subjects] = await Promise.all([
-      storage.getExamPackets(),
-      storage.getAllRegions(),
-      storage.getAllClusters(),
-      storage.getAllExamCenters(),
-      storage.getAllSubjects(),
-    ]);
+    // Rebuild cache — sequential queries to avoid exhausting the DB connection pool
+    const packets = await storage.getExamPackets();
+    const regions = await storage.getAllRegions();
+    const clusters = await storage.getAllClusters();
+    const centers = await storage.getAllExamCenters();
+    const subjects = await storage.getAllSubjects();
     const regionMap: Record<number, { name: string; code: string | null }> = {};
     for (const r of regions as any[]) regionMap[r.id] = { name: r.name, code: r.code ?? null };
     const clusterMap: Record<number, { name: string }> = {};
@@ -20407,10 +20405,8 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
     return platformCache.packets!;
   }
 
-  // Warm the cache at startup (non-blocking)
-  getPlatformPackets().catch(err =>
-    console.error("[Platform cache] Initial load failed:", err?.message ?? err)
-  );
+  // Cache is built lazily on first request — no startup warmup to avoid
+  // exhausting the connection pool while the session store is initialising.
 
   // GET /api/platform/all-packets
   // Returns every exam packet with real names for region, cluster, center, and subject.
