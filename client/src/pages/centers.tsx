@@ -65,7 +65,6 @@ import {
   Mail,
   Building2,
   Loader2,
-  Wand2,
   Timer,
   AlertTriangle,
   CheckCircle2,
@@ -359,6 +358,7 @@ function CenterCard({
   onEdit,
   onViewDetails,
   onDelete,
+  onAddSchool,
   isRTL,
   t,
   isAdmin,
@@ -369,6 +369,7 @@ function CenterCard({
   onEdit: () => void;
   onViewDetails: () => void;
   onDelete: () => void;
+  onAddSchool: () => void;
   isRTL: boolean;
   t: any;
   isAdmin: boolean;
@@ -498,7 +499,7 @@ function CenterCard({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
           <Badge variant={center.isActive ? "default" : "secondary"} className="text-xs">
             {center.isActive ? t.common.active : t.common.inactive}
           </Badge>
@@ -508,12 +509,25 @@ function CenterCard({
               {monitoring.malpracticeCount} incident{monitoring.malpracticeCount > 1 ? "s" : ""}
             </Badge>
           ) : null}
-          <Link href={`/centers/${center.id}`}>
-            <Button size="sm" variant="outline" data-testid={`button-manage-${center.id}`}>
-              <Eye className="w-3.5 h-3.5 me-1.5" />
-              {t.centers.viewDetails}
-            </Button>
-          </Link>
+          <div className="flex items-center gap-1.5 ms-auto">
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onAddSchool}
+                data-testid={`button-add-school-${center.id}`}
+              >
+                <Plus className="w-3.5 h-3.5 me-1" />
+                Add School
+              </Button>
+            )}
+            <Link href={`/centers/${center.id}`}>
+              <Button size="sm" variant="outline" data-testid={`button-manage-${center.id}`}>
+                <Eye className="w-3.5 h-3.5 me-1.5" />
+                {t.centers.viewDetails}
+              </Button>
+            </Link>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -566,7 +580,6 @@ export default function Centers() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showAutoAssignDialog, setShowAutoAssignDialog] = useState(false);
   const [showCsvUploadDialog, setShowCsvUploadDialog] = useState(false);
   const [showUnassignedDialog, setShowUnassignedDialog] = useState(false);
   const [unassignedSearch, setUnassignedSearch] = useState("");
@@ -803,55 +816,35 @@ export default function Centers() {
     },
   });
 
-  const [autoAssignPhase, setAutoAssignPhase] = useState<'confirm' | 'running' | 'done' | 'error'>('confirm');
-  const [autoAssignProgress, setAutoAssignProgress] = useState(0);
-  const [autoAssignResult, setAutoAssignResult] = useState<any>(null);
-  const [autoAssignError, setAutoAssignError] = useState<string>('');
+  // Add Another School to a center
+  const [showAddSchoolDialog, setShowAddSchoolDialog] = useState(false);
+  const [addSchoolTargetCenter, setAddSchoolTargetCenter] = useState<CenterWithRelations | null>(null);
+  const [addSchoolSearch, setAddSchoolSearch] = useState("");
+  const [addSchoolSelectedId, setAddSchoolSelectedId] = useState<number | null>(null);
 
-  const openAutoAssignDialog = () => {
-    setAutoAssignPhase('confirm');
-    setAutoAssignProgress(0);
-    setAutoAssignResult(null);
-    setAutoAssignError('');
-    setShowAutoAssignDialog(true);
-  };
-
-  const closeAutoAssignDialog = () => {
-    if (autoAssignPhase === 'running') return; // block close while running
-    setShowAutoAssignDialog(false);
-  };
-
-  const autoAssignMutation = useMutation({
-    mutationFn: async () => {
-      setAutoAssignPhase('running');
-      setAutoAssignProgress(0);
-      // Animate progress while waiting for the server
-      let prog = 0;
-      const interval = setInterval(() => {
-        prog = Math.min(prog + Math.random() * 12, 88);
-        setAutoAssignProgress(Math.round(prog));
-      }, 300);
-      try {
-        const activeYear = await fetch("/api/exam-years/active").then(r => r.json());
-        const response = await apiRequest("POST", "/api/center-assignments/auto-assign", {
-          examYearId: activeYear.id
-        });
-        clearInterval(interval);
-        setAutoAssignProgress(100);
-        return response;
-      } catch (err) {
-        clearInterval(interval);
-        throw err;
-      }
+  const { data: allSchoolsData } = useQuery<{ data: any[]; total: number }>({
+    queryKey: ["/api/schools", "all-for-add"],
+    queryFn: async () => {
+      const res = await fetch("/api/schools?limit=1000", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load schools");
+      return res.json();
     },
-    onSuccess: (data: any) => {
+    enabled: showAddSchoolDialog,
+  });
+
+  const addSchoolMutation = useMutation({
+    mutationFn: async ({ schoolId, centerId }: { schoolId: number; centerId: number }) => {
+      return apiRequest("POST", `/api/schools/${schoolId}/assign-center`, { centerId });
+    },
+    onSuccess: () => {
       invalidateCenterQueries();
-      setAutoAssignResult(data);
-      setAutoAssignPhase('done');
+      setShowAddSchoolDialog(false);
+      setAddSchoolSelectedId(null);
+      setAddSchoolSearch("");
+      toast({ title: "School added", description: "The school has been assigned to this center." });
     },
     onError: (err: any) => {
-      setAutoAssignError(err?.message || "An unexpected error occurred during auto-assignment.");
-      setAutoAssignPhase('error');
+      toast({ title: t.common.error, description: err.message || "Failed to add school.", variant: "destructive" });
     },
   });
 
@@ -1040,10 +1033,6 @@ export default function Centers() {
             <MapPin className="w-4 h-4 me-2" />
             Update Addresses
           </Button>
-          <Button variant="outline" onClick={openAutoAssignDialog} data-testid="button-auto-assign">
-            <Wand2 className="w-4 h-4 me-2" />
-            Auto-Assign Schools
-          </Button>
           <Button onClick={openCreateDialog} data-testid="button-add-center">
             <Plus className="w-4 h-4 me-2" />
             {t.centers.addCenter}
@@ -1195,6 +1184,12 @@ export default function Centers() {
               onEdit={() => openEditDialog(center)}
               onViewDetails={() => openViewDetails(center)}
               onDelete={() => openDeleteDialog(center)}
+              onAddSchool={() => {
+                setAddSchoolTargetCenter(center);
+                setAddSchoolSearch("");
+                setAddSchoolSelectedId(null);
+                setShowAddSchoolDialog(true);
+              }}
               isRTL={isRTL}
               t={t}
               isAdmin={['super_admin', 'examination_admin'].includes(user?.role || '')}
@@ -1662,131 +1657,114 @@ export default function Centers() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Auto-Assign Schools Dialog */}
-      <Dialog open={showAutoAssignDialog} onOpenChange={closeAutoAssignDialog}>
-        <DialogContent className="max-w-lg" dir={isRTL ? "rtl" : "ltr"}>
+      {/* Add Another School to Center Dialog */}
+      <Dialog open={showAddSchoolDialog} onOpenChange={(open) => {
+        if (!open) { setShowAddSchoolDialog(false); setAddSchoolSelectedId(null); setAddSchoolSearch(""); }
+      }}>
+        <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Wand2 className="w-5 h-5 text-primary" />
-              Auto-Assign Schools to Centers
+              <School className="w-5 h-5 text-primary" />
+              Add School to Center
             </DialogTitle>
+            <DialogDescription>
+              {addSchoolTargetCenter
+                ? `Assign an additional school to "${addSchoolTargetCenter.name}"`
+                : "Select a school to assign to this center"}
+            </DialogDescription>
           </DialogHeader>
 
-          {/* ── Confirm phase ── */}
-          {autoAssignPhase === 'confirm' && (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Automatically assigns eligible schools to examination centers using the following priority rules:</p>
-              <ol className="list-decimal list-inside space-y-1.5 text-sm">
-                <li><span className="font-medium">Self-assignment</span> — if the school is registered as an examination center, it is assigned to itself.</li>
-                <li><span className="font-medium">Same Region + Same Cluster</span> — the school is assigned to a center in its own cluster.</li>
-                <li><span className="font-medium">Same Region only</span> — fallback when all cluster centers are at capacity.</li>
-              </ol>
-              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                Schools with no center in their region are skipped — there is no cross-region assignment.
-              </p>
-              <p className="text-sm font-medium">After assignment, halls are auto-generated for each center at 40 students per hall.</p>
-              <p className="text-sm text-muted-foreground">Only schools with approved students and confirmed payment will be assigned. Already-assigned schools are not affected.</p>
-              <DialogFooter className="pt-2">
-                <Button variant="outline" onClick={closeAutoAssignDialog}>{t.common.cancel}</Button>
-                <Button onClick={() => autoAssignMutation.mutate()} data-testid="button-run-auto-assign">
-                  <Wand2 className="w-4 h-4 me-2" />
-                  Run Auto-Assignment
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-
-          {/* ── Running phase ── */}
-          {autoAssignPhase === 'running' && (
-            <div className="space-y-5 py-2">
-              <div className="flex items-center gap-3">
-                <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
-                <div>
-                  <p className="font-medium text-sm">Running auto-assignment…</p>
-                  <p className="text-xs text-muted-foreground">Please wait — do not close this window.</p>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Progress value={autoAssignProgress} className="h-2.5" />
-                <p className="text-xs text-muted-foreground text-right">{autoAssignProgress}%</p>
-              </div>
-              <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
-                <p>Matching schools to centers by region and cluster…</p>
-                <p>Generating halls for assigned centers…</p>
-              </div>
-            </div>
-          )}
-
-          {/* ── Done phase ── */}
-          {autoAssignPhase === 'done' && autoAssignResult && (
-            <div className="space-y-4 py-1">
-              <div className="flex items-start gap-3 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-emerald-800 dark:text-emerald-300">
-                    Auto-assignment complete — {autoAssignResult.assigned ?? 0} school{(autoAssignResult.assigned ?? 0) !== 1 ? "s" : ""} assigned
+          <div className="space-y-3">
+            {/* Center info */}
+            {addSchoolTargetCenter && (
+              <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+                <p className="font-semibold">{addSchoolTargetCenter.name}</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5" />
+                  {addSchoolTargetCenter.region?.name} / {addSchoolTargetCenter.cluster?.name}
+                </p>
+                {addSchoolTargetCenter.address && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5" />
+                    {addSchoolTargetCenter.address}
                   </p>
-                  <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">The center list has been refreshed automatically.</p>
-                </div>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-md border p-3 space-y-0.5">
-                  <p className="text-2xl font-bold text-primary">{autoAssignResult.assigned ?? 0}</p>
-                  <p className="text-xs text-muted-foreground">Total assigned</p>
-                </div>
-                <div className="rounded-md border p-3 space-y-0.5">
-                  <p className="text-2xl font-bold">{autoAssignResult.selfAssigned ?? 0}</p>
-                  <p className="text-xs text-muted-foreground">Self-assigned (school = center)</p>
-                </div>
-                <div className="rounded-md border p-3 space-y-0.5">
-                  <p className="text-2xl font-bold">{autoAssignResult.hallsGenerated ?? 0}</p>
-                  <p className="text-xs text-muted-foreground">Halls auto-generated</p>
-                </div>
-                <div className="rounded-md border p-3 space-y-0.5">
-                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{autoAssignResult.skipped ?? 0}</p>
-                  <p className="text-xs text-muted-foreground">Skipped (no region match)</p>
-                </div>
+            )}
+
+            {/* School search */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Select School</p>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search school by name…"
+                  value={addSchoolSearch}
+                  onChange={(e) => setAddSchoolSearch(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-add-school-search"
+                />
               </div>
-              {autoAssignResult.warnings?.length > 0 && (
-                <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 space-y-1">
-                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Warnings
-                  </p>
-                  {autoAssignResult.warnings.slice(0, 5).map((w: string, i: number) => (
-                    <p key={i} className="text-xs text-amber-700 dark:text-amber-400">{w}</p>
+              <div className="rounded-md border bg-background divide-y max-h-56 overflow-y-auto">
+                {(allSchoolsData?.data ?? [])
+                  .filter((s: any) =>
+                    !addSchoolSearch ||
+                    s.name?.toLowerCase().includes(addSchoolSearch.toLowerCase()) ||
+                    s.nameEn?.toLowerCase().includes(addSchoolSearch.toLowerCase())
+                  )
+                  .slice(0, 50)
+                  .map((school: any) => (
+                    <button
+                      key={school.id}
+                      type="button"
+                      className={`w-full text-left px-3 py-2.5 text-sm hover-elevate transition-colors ${
+                        addSchoolSelectedId === school.id ? "bg-primary/10 text-primary font-medium" : ""
+                      }`}
+                      onClick={() => setAddSchoolSelectedId(school.id)}
+                      data-testid={`option-school-${school.id}`}
+                    >
+                      <p className="font-medium leading-snug">{school.name}</p>
+                      {school.nameEn && school.nameEn !== school.name && (
+                        <p className="text-xs text-muted-foreground">{school.nameEn}</p>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {school.region?.name ?? ""}{school.cluster?.name ? ` / ${school.cluster.name}` : ""}
+                      </p>
+                    </button>
                   ))}
-                  {autoAssignResult.warnings.length > 5 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-500">…and {autoAssignResult.warnings.length - 5} more</p>
-                  )}
-                </div>
-              )}
-              <DialogFooter>
-                <Button onClick={closeAutoAssignDialog} data-testid="button-close-auto-assign-done">
-                  Close
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-
-          {/* ── Error phase ── */}
-          {autoAssignPhase === 'error' && (
-            <div className="space-y-4 py-1">
-              <div className="flex items-start gap-3 p-3 rounded-md bg-destructive/10 border border-destructive/30">
-                <XCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-destructive">Auto-assignment failed</p>
-                  <p className="text-xs text-muted-foreground mt-1">{autoAssignError || "An unexpected error occurred. Please try again."}</p>
-                </div>
+                {(allSchoolsData?.data ?? []).filter((s: any) =>
+                  !addSchoolSearch ||
+                  s.name?.toLowerCase().includes(addSchoolSearch.toLowerCase()) ||
+                  s.nameEn?.toLowerCase().includes(addSchoolSearch.toLowerCase())
+                ).length === 0 && (
+                  <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                    No schools match your search
+                  </div>
+                )}
               </div>
-              <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={closeAutoAssignDialog}>Close</Button>
-                <Button onClick={() => autoAssignMutation.mutate()} data-testid="button-retry-auto-assign">
-                  <Wand2 className="w-4 h-4 me-2" />
-                  Retry
-                </Button>
-              </DialogFooter>
             </div>
-          )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setShowAddSchoolDialog(false); setAddSchoolSelectedId(null); setAddSchoolSearch(""); }}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              disabled={!addSchoolSelectedId || addSchoolMutation.isPending}
+              onClick={() => {
+                if (addSchoolSelectedId && addSchoolTargetCenter) {
+                  addSchoolMutation.mutate({ schoolId: addSchoolSelectedId, centerId: addSchoolTargetCenter.id });
+                }
+              }}
+              data-testid="button-confirm-add-school"
+            >
+              {addSchoolMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 me-2 animate-spin" />Assigning…</>
+              ) : (
+                <><Plus className="w-4 h-4 me-2" />Add School</>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
