@@ -506,9 +506,9 @@ export default function Settings() {
                           <div className="flex items-start gap-3">
                             <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
                             <div>
-                              <h3 className="font-semibold text-destructive">Examination Year Has Passed</h3>
+                              <h3 className="font-semibold text-destructive">Registration Period Has Closed</h3>
                               <p className="text-sm text-destructive/80 mt-1">
-                                The current examination year has already ended. Registration options are no longer available. Schools can only view their records.
+                                The student registration period for this examination year has closed. Registration options are no longer available. Schools can only view their existing records.
                               </p>
                             </div>
                           </div>

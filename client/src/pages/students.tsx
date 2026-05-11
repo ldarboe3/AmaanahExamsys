@@ -1985,13 +1985,13 @@ export default function Students() {
               <div className="flex items-center justify-center gap-3 mb-4">
                 <Calendar className="w-6 h-6 text-destructive" />
                 <h2 className="text-lg font-bold text-destructive">
-                  {isRTL ? "انتهت السنة الامتحانية" : "Examination Year Has Passed"}
+                  {isRTL ? "انتهت فترة التسجيل" : "Registration Period Has Closed"}
                 </h2>
               </div>
               <p className="text-center text-sm text-destructive/80">
                 {isRTL 
-                  ? "هذه السنة الامتحانية قد انتهت. يمكنك فقط عرض سجلاتك هنا."
-                  : "This examination year has already passed. You can only view your records here."}
+                  ? "انتهت فترة تسجيل الطلاب. يمكنك فقط عرض السجلات الحالية هنا."
+                  : "The student registration period for this examination year has closed. You can only view existing records here."}
               </p>
             </CardContent>
           </Card>
