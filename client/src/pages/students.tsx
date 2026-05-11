@@ -1715,27 +1715,6 @@ export default function Students() {
           )}
         </div>
 
-        {/* Step 3 Instructions */}
-        <Card className="border-2 border-chart-3/20 bg-chart-3/5">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-chart-3 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                3
-              </div>
-              <div>
-                <h3 className="font-semibold text-chart-3">
-                  {isRTL ? "الخطوة 3: رفع قائمة الطلاب" : "Step 3: Upload Student List"}
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {isRTL 
-                    ? "قم بتحميل قالب CSV، أدخل بيانات الطلاب، ثم ارفع الملف. بعد الرفع سيتم احتساب الفاتورة تلقائياً."
-                    : "Download the CSV template, fill in student data, then upload the file. Your invoice will be calculated automatically after upload."}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Selected Exam Year Info */}
         {currentExamYear && (
           <div className="bg-primary/10 border border-primary/20 rounded-md p-3">
