@@ -18106,15 +18106,50 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
       // ── Existing packets for this year + grade ──
       const existingPackets = await storage.getExamPackets({ examYearId, grade: selectedGrade });
 
+      // ── Build coverage matrix: per eligible center × per subject ──
+      const buildCoverageMatrix = () => eligibleCenters.map((center: any) => {
+        const subjectStatuses = subjects.map((subject: any) => {
+          const existingPkt = existingPackets.find((p: any) =>
+            p.subjectId === subject.id && p.destinationCenterId === center.id
+          );
+          return {
+            subjectId: subject.id,
+            subjectName: subject.name,
+            arabicName: subject.arabicName ?? null,
+            exists: !!existingPkt,
+            packetId: existingPkt?.id ?? null,
+            barcode: existingPkt?.barcode ?? null,
+          };
+        });
+        const existingCount = subjectStatuses.filter(s => s.exists).length;
+        return {
+          centerId: center.id,
+          centerName: center.name,
+          studentCount: centerGradeStudentCount[center.id],
+          subjects: subjectStatuses,
+          existingCount,
+          missingCount: subjects.length - existingCount,
+          total: subjects.length,
+          complete: existingCount === subjects.length && subjects.length > 0,
+          completionPercent: subjects.length > 0 ? Math.round((existingCount / subjects.length) * 100) : 0,
+        };
+      });
+
       // ── Preview mode: return data without creating anything ──
       if (previewOnly) {
-        const wouldSkip = skipExisting
-          ? existingPackets.filter((p: any) =>
-              eligibleCenters.some((c: any) => c.id === p.destinationCenterId) &&
-              subjects.some((s: any) => s.id === p.subjectId)
-            ).length
-          : 0;
-        const totalExpected = subjects.length * eligibleCenters.length;
+        const coverageMatrix = buildCoverageMatrix();
+        const centersComplete = coverageMatrix.filter(c => c.complete).length;
+        const centersPartial  = coverageMatrix.filter(c => !c.complete && c.existingCount > 0).length;
+        const centersEmpty    = coverageMatrix.filter(c => c.existingCount === 0).length;
+        const totalExpected   = subjects.length * eligibleCenters.length;
+        const totalExistingInScope = existingPackets.filter((p: any) =>
+          eligibleCenters.some((c: any) => c.id === p.destinationCenterId) &&
+          subjects.some((s: any) => s.id === p.subjectId)
+        ).length;
+        const overallCoverage = totalExpected > 0 ? Math.round((totalExistingInScope / totalExpected) * 100) : 0;
+
+        // wouldSkip = distinct (subject×center) combos that already have packets
+        const wouldSkip = skipExisting ? totalExistingInScope : 0;
         const wouldCreate = Math.max(0, totalExpected - (skipExisting ? wouldSkip : 0));
 
         return res.json({
@@ -18130,11 +18165,20 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
           centersWithNoStudents: centersWithNoStudents.map((c: any) => ({ id: c.id, name: c.name })),
           totalSubjects: subjects.length,
           totalCenters: eligibleCenters.length,
-          existingPackets: existingPackets.length,
+          existingPackets: totalExistingInScope,
           wouldSkip,
           wouldCreate,
           totalExpected,
           warnings,
+          coverageMatrix,
+          coverageSummary: {
+            centersComplete,
+            centersPartial,
+            centersEmpty,
+            overallCoverage,
+            totalRequired: totalExpected,
+            totalExisting: totalExistingInScope,
+          },
         });
       }
 
@@ -18234,6 +18278,40 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
         newData: { details: `Auto-generated ${created.length} Grade ${selectedGrade} packets for exam year ${examYear.year}, skipped ${skipped}` },
       });
 
+      // ── Post-generation coverage audit ──
+      // Compute from existing + newly created without an extra DB round-trip
+      const allPacketsAfter = [...existingPackets, ...created];
+      const postCoverageMatrix = eligibleCenters.map((center: any) => {
+        const missing = subjects.filter((subject: any) =>
+          !allPacketsAfter.some((p: any) =>
+            p.subjectId === subject.id && p.destinationCenterId === center.id
+          )
+        );
+        const existingCount = subjects.length - missing.length;
+        return {
+          centerId: center.id,
+          centerName: center.name,
+          existingCount,
+          missingCount: missing.length,
+          total: subjects.length,
+          complete: missing.length === 0,
+          missingSubjects: missing.map((s: any) => s.name),
+        };
+      });
+      const centersNowComplete  = postCoverageMatrix.filter(c => c.complete).length;
+      const centersStillPartial = postCoverageMatrix.filter(c => !c.complete && c.existingCount > 0).length;
+      const centersStillEmpty   = postCoverageMatrix.filter(c => c.existingCount === 0).length;
+      const totalRequired = subjects.length * eligibleCenters.length;
+      const totalCovered  = new Set(
+        allPacketsAfter
+          .filter((p: any) =>
+            eligibleCenters.some((c: any) => c.id === p.destinationCenterId) &&
+            subjects.some((s: any) => s.id === p.subjectId)
+          )
+          .map((p: any) => `${p.subjectId}-${p.destinationCenterId}`)
+      ).size;
+      const coveragePercent = totalRequired > 0 ? Math.round((totalCovered / totalRequired) * 100) : 0;
+
       res.status(201).json({
         created: created.length,
         skipped,
@@ -18244,6 +18322,16 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
         grade: selectedGrade,
         warnings,
         centersWithNoStudents: centersWithNoStudents.map((c: any) => ({ id: c.id, name: c.name })),
+        // Coverage audit
+        centersNowComplete,
+        centersStillPartial,
+        centersStillEmpty,
+        totalRequired,
+        totalCovered,
+        coveragePercent,
+        incompletecenters: postCoverageMatrix
+          .filter(c => !c.complete)
+          .map(c => ({ centerId: c.centerId, centerName: c.centerName, missingCount: c.missingCount, missingSubjects: c.missingSubjects })),
         packets: created,
       });
     } catch (error: any) {
