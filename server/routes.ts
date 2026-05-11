@@ -18034,163 +18034,194 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
       }
 
       const schema = z.object({
-        examYearId: z.coerce.number().int().positive(),
-        skipExisting: z.boolean().optional().default(true),
+        examYearId:    z.coerce.number().int().positive(),
+        grade:         z.coerce.number().int().positive().optional().nullable(),
+        skipExisting:  z.boolean().optional().default(true),
         bufferPercent: z.number().min(0).max(100).optional().default(15),
-        regionId: z.coerce.number().int().positive().optional().nullable(),
+        regionId:      z.coerce.number().int().positive().optional().nullable(),
+        previewOnly:   z.boolean().optional().default(false),
       });
       const parsed = schema.safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ message: "Validation error" });
-      const { examYearId, skipExisting, bufferPercent, regionId } = parsed.data;
+      if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+      const { examYearId, grade, skipExisting, bufferPercent, regionId, previewOnly } = parsed.data;
 
       const examYear = await storage.getExamYear(examYearId);
       if (!examYear) return res.status(400).json({ message: "Exam year not found" });
 
-      // Use PUBLISHED timetable subjects for this exam year (aligned with scheduled exams)
+      // Determine the target grade (explicit param takes priority, else derive from exam year)
+      const examGrades: number[] = (examYear as any).grades ?? [];
+      const selectedGrade: number = grade ?? (examGrades.length > 0 ? examGrades[0] : 0);
+      if (!selectedGrade) {
+        return res.status(400).json({ message: "Grade is required. Either pass grade or configure grades on the exam year." });
+      }
+
+      // ── Subjects: prefer published timetable, fallback to all subjects for this grade ──
       const allSubjects = await storage.getAllSubjects();
       const publishedSchedules = await storage.getExamSchedules({ examYearId, isPublished: true });
       const timetabledSubjectIds = [...new Set(publishedSchedules.map((s: any) => s.subjectId))];
-      const subjects = timetabledSubjectIds.length > 0
-        ? allSubjects.filter((s: any) => timetabledSubjectIds.includes(s.id))
-        : (() => {
-            // Fallback: filter by exam year grades if timetable not yet published
-            const examGrades: number[] = (examYear as any).grades ?? [];
-            return examGrades.length > 0
-              ? allSubjects.filter((s: any) => examGrades.includes(s.grade))
-              : allSubjects;
-          })();
 
-      // Get centers — scoped to a specific region if requested, otherwise all centers
-      const centers = regionId
+      let subjects: any[];
+      let timetableBased = false;
+      if (timetabledSubjectIds.length > 0) {
+        subjects = allSubjects.filter((s: any) => timetabledSubjectIds.includes(s.id) && s.grade === selectedGrade);
+        timetableBased = subjects.length > 0;
+      }
+      if (!timetableBased || (subjects! && subjects.length === 0)) {
+        subjects = allSubjects.filter((s: any) => s.grade === selectedGrade);
+        timetableBased = false;
+      }
+
+      // ── Centers scoped to region, then filtered by those with Grade students ──
+      const allCenters = regionId
         ? await storage.getExamCentersByRegion(regionId)
         : await storage.getAllExamCenters();
 
-      // Build center → student count map
-      const centerStudentCount: Record<number, number> = {};
-      for (const center of centers) {
+      // Build center → grade-specific student count
+      const centerGradeStudentCount: Record<number, number> = {};
+      for (const center of allCenters) {
         const schools = await storage.getSchoolsByCenter(center.id);
         let count = 0;
         for (const school of schools) {
-          const students = await storage.getStudentsBySchool(school.id);
-          count += students.length;
+          const sts = await storage.getStudentsBySchool(school.id);
+          count += sts.filter((s: any) => s.grade === selectedGrade && s.examYearId === examYearId).length;
         }
-        centerStudentCount[center.id] = count;
+        centerGradeStudentCount[center.id] = count;
       }
 
-      // Get existing packets to detect duplicates
-      const existingPackets = await storage.getExamPackets({ examYearId });
+      const eligibleCenters = allCenters.filter((c: any) => centerGradeStudentCount[c.id] > 0);
+      const centersWithNoStudents = allCenters.filter((c: any) => centerGradeStudentCount[c.id] === 0);
+
+      // ── Warnings ──
+      const warnings: string[] = [];
+      if (subjects.length === 0) {
+        warnings.push(`No subjects found for Grade ${selectedGrade}. Add subjects or publish a timetable first.`);
+      }
+      if (eligibleCenters.length === 0) {
+        warnings.push(`No centers have Grade ${selectedGrade} students enrolled for this exam year.`);
+      }
+      if (centersWithNoStudents.length > 0) {
+        warnings.push(`${centersWithNoStudents.length} center(s) have no Grade ${selectedGrade} students — they will be skipped.`);
+      }
+
+      // ── Existing packets for this year + grade ──
+      const existingPackets = await storage.getExamPackets({ examYearId, grade: selectedGrade });
+
+      // ── Preview mode: return data without creating anything ──
+      if (previewOnly) {
+        const wouldSkip = skipExisting
+          ? existingPackets.filter((p: any) =>
+              eligibleCenters.some((c: any) => c.id === p.destinationCenterId) &&
+              subjects.some((s: any) => s.id === p.subjectId)
+            ).length
+          : 0;
+        const totalExpected = subjects.length * eligibleCenters.length;
+        const wouldCreate = Math.max(0, totalExpected - (skipExisting ? wouldSkip : 0));
+
+        return res.json({
+          previewOnly: true,
+          examYearId,
+          examYearName: (examYear as any).name ?? String(examYear.year),
+          grade: selectedGrade,
+          timetableBased,
+          subjects: subjects.map((s: any) => ({ id: s.id, name: s.name, arabicName: s.arabicName })),
+          eligibleCenters: eligibleCenters.map((c: any) => ({
+            id: c.id, name: c.name, studentCount: centerGradeStudentCount[c.id],
+          })),
+          centersWithNoStudents: centersWithNoStudents.map((c: any) => ({ id: c.id, name: c.name })),
+          totalSubjects: subjects.length,
+          totalCenters: eligibleCenters.length,
+          existingPackets: existingPackets.length,
+          wouldSkip,
+          wouldCreate,
+          totalExpected,
+          warnings,
+        });
+      }
+
+      // ── Actual generation ──
+      if (subjects.length === 0 || eligibleCenters.length === 0) {
+        return res.status(400).json({
+          message: `Cannot generate packets: ${subjects.length === 0 ? "no subjects" : "no eligible centers"} for Grade ${selectedGrade}.`,
+        });
+      }
 
       const created: any[] = [];
       let skipped = 0;
-
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
-      // Pre-fetch halls for all centers so we can create per-hall packets
+      // Pre-fetch halls for eligible centers
       const centerHallsMap: Record<number, any[]> = {};
-      for (const center of centers) {
-        const halls = await storage.getCenterHallsByCenter(center.id);
-        centerHallsMap[center.id] = halls;
+      for (const center of eligibleCenters) {
+        centerHallsMap[center.id] = await storage.getCenterHallsByCenter(center.id);
       }
 
       for (const subject of subjects) {
         const subjectCode = ((subject as any).code || (subject as any).name.substring(0, 3))
           .toUpperCase().replace(/\s/g, '').replace(/[()]/g, '');
 
-        for (const center of centers) {
+        for (const center of eligibleCenters) {
           const halls = centerHallsMap[center.id] ?? [];
-          const studentCount = centerStudentCount[center.id] ?? 0;
+          const studentCount = centerGradeStudentCount[center.id] ?? 0;
 
           if (halls.length > 0) {
-            // Hall-based packaging: one packet per hall per subject
+            // Hall-based: one packet per hall per subject
             for (const hall of halls) {
-              // Skip if packet already exists for this subject + center + hall + year
               if (skipExisting && existingPackets.some((p: any) =>
                 p.subjectId === subject.id &&
                 p.destinationCenterId === center.id &&
                 (p as any).hallId === hall.id
-              )) {
-                skipped++;
-                continue;
-              }
+              )) { skipped++; continue; }
 
-              // Divide students evenly across halls, rounded up, minimum 10
               const perHallStudents = Math.ceil(studentCount / halls.length);
-              const rawCount = Math.ceil(perHallStudents * (1 + (bufferPercent / 100)));
-              const paperCount = Math.max(10, Math.ceil(rawCount / 10) * 10);
+              const paperCount = Math.max(10, Math.ceil(Math.ceil(perHallStudents * (1 + bufferPercent / 100)) / 10) * 10);
+              const securitySealNumber = `SEAL-${dateStr}-${Math.random().toString(36).toUpperCase().slice(2, 7)}`;
 
-              const sealRand = Math.random().toString(36).toUpperCase().slice(2, 7);
-              const securitySealNumber = `SEAL-${dateStr}-${sealRand}`;
-
-              let barcode: string;
-              let attempts = 0;
-              const baseSeq = (await storage.getExamPackets({ examYearId, grade: (subject as any).grade })).length;
+              let barcode = ""; let attempts = 0;
               do {
-                const seq = String(baseSeq + created.length + 1 + attempts).padStart(3, '0');
-                barcode = `PKT-${examYear.year}-G${(subject as any).grade}-${subjectCode}-C${center.id}-H${hall.id}-${seq}`;
-                const dup = await storage.getExamPacketByBarcode(barcode);
-                if (!dup) break;
+                const seq = String(existingPackets.length + created.length + 1 + attempts).padStart(3, '0');
+                barcode = `PKT-${examYear.year}-G${selectedGrade}-${subjectCode}-C${center.id}-H${hall.id}-${seq}`;
+                if (!await storage.getExamPacketByBarcode(barcode)) break;
                 attempts++;
               } while (attempts < 100);
 
-              const packet = await storage.createExamPacket({
-                examYearId,
-                subjectId: subject.id,
-                grade: (subject as any).grade,
+              created.push(await storage.createExamPacket({
+                examYearId, subjectId: subject.id, grade: selectedGrade,
                 destinationCenterId: center.id,
                 destinationRegionId: (center as any).regionId ?? null,
                 destinationClusterId: (center as any).clusterId ?? null,
-                hallId: hall.id,
-                paperCount,
-                securitySealNumber,
-                notes: `Auto-generated: Hall "${hall.name}", ~${perHallStudents} students + ${bufferPercent}% buffer`,
-                barcode,
-                createdBy: user.id,
-              });
-              created.push(packet);
+                hallId: hall.id, paperCount, securitySealNumber,
+                notes: `Grade ${selectedGrade} auto-gen: Hall "${hall.name}", ~${perHallStudents} students + ${bufferPercent}% buffer`,
+                barcode, createdBy: user.id,
+              }));
             }
           } else {
-            // No halls: create one packet per center (original behavior)
+            // No halls: one packet per center
             if (skipExisting && existingPackets.some((p: any) =>
               p.subjectId === subject.id &&
               p.destinationCenterId === center.id &&
               !(p as any).hallId
-            )) {
-              skipped++;
-              continue;
-            }
+            )) { skipped++; continue; }
 
-            // paper count = students + buffer%, rounded up to nearest 10, minimum 10
-            const rawCount = Math.ceil(studentCount * (1 + (bufferPercent / 100)));
-            const paperCount = Math.max(10, Math.ceil(rawCount / 10) * 10);
+            const paperCount = Math.max(10, Math.ceil(Math.ceil(studentCount * (1 + bufferPercent / 100)) / 10) * 10);
+            const securitySealNumber = `SEAL-${dateStr}-${Math.random().toString(36).toUpperCase().slice(2, 7)}`;
 
-            const sealRand = Math.random().toString(36).toUpperCase().slice(2, 7);
-            const securitySealNumber = `SEAL-${dateStr}-${sealRand}`;
-
-            let barcode: string;
-            let attempts = 0;
-            const baseSeq = (await storage.getExamPackets({ examYearId, grade: (subject as any).grade })).length;
+            let barcode = ""; let attempts = 0;
             do {
-              const seq = String(baseSeq + created.length + 1 + attempts).padStart(3, '0');
-              barcode = `PKT-${examYear.year}-G${(subject as any).grade}-${subjectCode}-C${center.id}-${seq}`;
-              const dup = await storage.getExamPacketByBarcode(barcode);
-              if (!dup) break;
+              const seq = String(existingPackets.length + created.length + 1 + attempts).padStart(3, '0');
+              barcode = `PKT-${examYear.year}-G${selectedGrade}-${subjectCode}-C${center.id}-${seq}`;
+              if (!await storage.getExamPacketByBarcode(barcode)) break;
               attempts++;
             } while (attempts < 100);
 
-            const packet = await storage.createExamPacket({
-              examYearId,
-              subjectId: subject.id,
-              grade: (subject as any).grade,
+            created.push(await storage.createExamPacket({
+              examYearId, subjectId: subject.id, grade: selectedGrade,
               destinationCenterId: center.id,
               destinationRegionId: (center as any).regionId ?? null,
               destinationClusterId: (center as any).clusterId ?? null,
-              paperCount,
-              securitySealNumber,
-              notes: `Auto-generated: ${studentCount} students + ${bufferPercent}% buffer`,
-              barcode,
-              createdBy: user.id,
-            });
-            created.push(packet);
+              paperCount, securitySealNumber,
+              notes: `Grade ${selectedGrade} auto-gen: ${studentCount} students + ${bufferPercent}% buffer`,
+              barcode, createdBy: user.id,
+            }));
           }
         }
       }
@@ -18200,7 +18231,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
         action: "create",
         entityType: "exam_packet",
         entityId: "auto-generate",
-        newData: { details: `Auto-generated ${created.length} packets for exam year ${examYear.year}, skipped ${skipped} existing` },
+        newData: { details: `Auto-generated ${created.length} Grade ${selectedGrade} packets for exam year ${examYear.year}, skipped ${skipped}` },
       });
 
       res.status(201).json({
@@ -18208,8 +18239,11 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
         skipped,
         total: created.length + skipped,
         subjectCount: subjects.length,
-        centerCount: centers.length,
-        timetableBased: timetabledSubjectIds.length > 0,
+        centerCount: eligibleCenters.length,
+        timetableBased,
+        grade: selectedGrade,
+        warnings,
+        centersWithNoStudents: centersWithNoStudents.map((c: any) => ({ id: c.id, name: c.name })),
         packets: created,
       });
     } catch (error: any) {
