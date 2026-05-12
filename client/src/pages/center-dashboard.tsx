@@ -2024,7 +2024,8 @@ function SchoolsTab({
       const url = clusterId ? `/api/schools?clusterId=${clusterId}` : "/api/schools";
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch cluster schools");
-      return res.json();
+      const json = await res.json();
+      return Array.isArray(json) ? json : (json.data ?? []);
     },
     enabled: canManage && showAddDialog && !!clusterId,
   });
