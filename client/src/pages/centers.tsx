@@ -474,7 +474,7 @@ function CenterCard({
         <div className="grid grid-cols-5 gap-1 pt-2 border-t border-black/5 dark:border-white/5">
           <div className="text-center">
             <p className={`text-base font-semibold ${theme.accent}`}>
-              {(center.hallTotalCapacity || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
+              {(center.hallTotalCapacity || (center as any).capacity || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
             </p>
             <p className="text-[10px] text-muted-foreground leading-tight">{t.centers.capacity}</p>
           </div>
@@ -1028,7 +1028,7 @@ export default function Centers() {
   // Reset to page 1 whenever filters change
   useEffect(() => { setCurrentPage(1); }, [searchQuery, regionFilter, clusterFilter]);
 
-  const totalCapacity = centers?.reduce((sum, c) => sum + (c.hallTotalCapacity || 0), 0) || 0;
+  const totalCapacity = centers?.reduce((sum, c) => sum + (c.hallTotalCapacity || (c as any).capacity || 0), 0) || 0;
   const totalAssigned = centers?.reduce((sum, c) => sum + (c.assignedStudentsCount || 0), 0) || 0;
 
   const monitoringMap = new Map<number, CenterMonitoringData>(
@@ -1582,12 +1582,12 @@ export default function Centers() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">{t.centers.capacity}</p>
                   <p className="font-medium">
-                    {(selectedCenter.hallTotalCapacity || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
+                    {(selectedCenter.hallTotalCapacity || (selectedCenter as any).capacity || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
                   </p>
                   <p className="text-[10px] text-muted-foreground">
                     {selectedCenter.hallCount
-                      ? `from ${selectedCenter.hallCount} hall${selectedCenter.hallCount !== 1 ? "s" : ""} × 40 students`
-                      : "Add halls to set capacity"}
+                      ? `from ${selectedCenter.hallCount} hall${selectedCenter.hallCount !== 1 ? "s" : ""}`
+                      : `center capacity · configure halls for detail`}
                   </p>
                 </div>
                 <div className="space-y-1">
