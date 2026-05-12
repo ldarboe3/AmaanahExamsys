@@ -1565,6 +1565,88 @@ ${pages.map(p => `  <url>
     }
   });
 
+  // Sync halls for a center based on student counts per grade and exam year
+  app.post("/api/centers/:id/sync-halls", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const centerId = parseInt(req.params.id);
+      const examYearId = req.body.examYearId ? parseInt(req.body.examYearId) : null;
+      const HALL_CAPACITY = 40;
+
+      // Get all students in this center
+      const centerStudents = await storage.getStudentsByCenter(centerId);
+      // Filter by exam year and approved status
+      const activeStudents = centerStudents.filter((s: any) =>
+        s.status === 'approved' &&
+        (!examYearId || s.examYearId === examYearId)
+      );
+
+      // Count students per grade
+      const gradeCountMap: Record<number, number> = {};
+      for (const s of activeStudents) {
+        if (s.grade != null) {
+          gradeCountMap[s.grade] = (gradeCountMap[s.grade] || 0) + 1;
+        }
+      }
+
+      // Get existing halls
+      const existingHalls = await storage.getCenterHallsByCenter(centerId);
+
+      // For each grade with students, sync halls
+      const results: { grade: number; hallsBefore: number; hallsAfter: number }[] = [];
+      const processedGrades = new Set<number>();
+
+      for (const [gradeStr, count] of Object.entries(gradeCountMap)) {
+        const grade = Number(gradeStr);
+        processedGrades.add(grade);
+        const hallsNeeded = Math.max(1, Math.ceil(count / HALL_CAPACITY));
+        const gradeHalls = existingHalls.filter((h: any) => h.grade === grade);
+        const hallsBefore = gradeHalls.length;
+
+        if (gradeHalls.length < hallsNeeded) {
+          // Create missing halls
+          for (let i = gradeHalls.length + 1; i <= hallsNeeded; i++) {
+            await storage.createCenterHall({
+              centerId,
+              name: `Grade ${grade} — Hall ${i}`,
+              capacity: HALL_CAPACITY,
+              grade,
+            });
+          }
+        } else if (gradeHalls.length > hallsNeeded) {
+          // Delete excess halls (from the end)
+          const toDelete = gradeHalls.slice(hallsNeeded);
+          for (const hall of toDelete) {
+            await storage.deleteCenterHall(hall.id);
+          }
+        }
+        results.push({ grade, hallsBefore, hallsAfter: hallsNeeded });
+      }
+
+      // Delete halls for grades that have 0 students (but had halls before)
+      const orphanHalls = existingHalls.filter((h: any) =>
+        h.grade != null && !processedGrades.has(h.grade)
+      );
+      for (const hall of orphanHalls) {
+        await storage.deleteCenterHall(hall.id);
+      }
+      if (orphanHalls.length > 0) {
+        const removedGrades = [...new Set(orphanHalls.map((h: any) => h.grade))];
+        for (const g of removedGrades) {
+          results.push({ grade: g as number, hallsBefore: orphanHalls.filter((h: any) => h.grade === g).length, hallsAfter: 0 });
+        }
+      }
+
+      const updatedHalls = await storage.getCenterHallsByCenter(centerId);
+      res.json({ results, totalHalls: updatedHalls.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Schools API
   app.get("/api/schools", isAuthenticated, async (req, res) => {
     try {

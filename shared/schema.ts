@@ -136,6 +136,7 @@ export const centerHalls = pgTable("center_halls", {
   centerId: integer("center_id").notNull().references(() => examCenters.id),
   name: varchar("name", { length: 100 }).notNull(),
   capacity: integer("capacity").default(30),
+  grade: integer("grade"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -143,6 +144,7 @@ export const insertCenterHallSchema = createInsertSchema(centerHalls).pick({
   centerId: true,
   name: true,
   capacity: true,
+  grade: true,
 });
 export type InsertCenterHall = z.infer<typeof insertCenterHallSchema>;
 export type CenterHall = typeof centerHalls.$inferSelect;

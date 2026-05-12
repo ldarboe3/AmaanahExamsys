@@ -1678,26 +1678,47 @@ function LogisticsTab({
   );
 }
 
-interface CenterHall { id: number; centerId: number; name: string; capacity: number; }
+interface CenterHall { id: number; centerId: number; name: string; capacity: number; grade?: number | null; }
 
-function HallsTab({ centerId, canManage }: { centerId: number; canManage: boolean }) {
+function HallsTab({
+  centerId,
+  canManage,
+  allowedGrades,
+  examYearId,
+  studentsByGrade,
+}: {
+  centerId: number;
+  canManage: boolean;
+  allowedGrades?: number[];
+  examYearId?: number;
+  studentsByGrade?: Record<number, number>;
+}) {
   const { toast } = useToast();
   const [showDialog, setShowDialog] = useState(false);
   const [editingHall, setEditingHall] = useState<CenterHall | null>(null);
 
-  const { data: halls = [], isLoading } = useQuery<CenterHall[]>({
+  const visibleHallGrades: number[] = allowedGrades && allowedGrades.length > 0 ? allowedGrades : [];
+  const [activeGrade, setActiveGrade] = useState<string>(String(visibleHallGrades[0] ?? ""));
+  useEffect(() => {
+    if (visibleHallGrades.length > 0 && !visibleHallGrades.map(String).includes(activeGrade)) {
+      setActiveGrade(String(visibleHallGrades[0]));
+    }
+  }, [visibleHallGrades.join(","), activeGrade]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const { data: halls = [], isLoading, refetch: refetchHalls } = useQuery<CenterHall[]>({
     queryKey: [`/api/centers/${centerId}/halls`],
   });
 
   const hallSchema = z.object({
     name: z.string().min(1, "Name is required"),
     capacity: z.coerce.number().int().min(1, "Capacity must be at least 1").default(40),
+    grade: z.coerce.number().int().optional().nullable(),
   });
   type HallFormData = z.infer<typeof hallSchema>;
 
   const form = useForm<HallFormData>({
     resolver: zodResolver(hallSchema),
-    defaultValues: { name: "", capacity: 40 },
+    defaultValues: { name: "", capacity: 40, grade: activeGrade ? Number(activeGrade) : null },
   });
 
   const createMutation = useMutation({
@@ -1734,15 +1755,26 @@ function HallsTab({ centerId, canManage }: { centerId: number; canManage: boolea
     onError: () => toast({ title: "Error", description: "Failed to delete hall", variant: "destructive" }),
   });
 
+  const syncMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/centers/${centerId}/sync-halls`, { examYearId }),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/centers/${centerId}/halls`] });
+      refetchHalls();
+      const total = res?.totalHalls ?? 0;
+      toast({ title: "Halls Synced", description: `${total} hall(s) now configured based on student counts.` });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to sync halls", variant: "destructive" }),
+  });
+
   function openCreate() {
     setEditingHall(null);
-    form.reset({ name: "", capacity: 30 });
+    form.reset({ name: "", capacity: 40, grade: activeGrade ? Number(activeGrade) : null });
     setShowDialog(true);
   }
 
   function openEdit(hall: CenterHall) {
     setEditingHall(hall);
-    form.reset({ name: hall.name, capacity: hall.capacity });
+    form.reset({ name: hall.name, capacity: hall.capacity ?? 40, grade: hall.grade ?? null });
     setShowDialog(true);
   }
 
@@ -1751,18 +1783,43 @@ function HallsTab({ centerId, canManage }: { centerId: number; canManage: boolea
     else createMutation.mutate(data);
   }
 
+  // Filter halls by active grade tab
+  const gradeHalls = activeGrade
+    ? halls.filter(h => String(h.grade) === activeGrade)
+    : halls;
+
+  const totalCapacity = gradeHalls.reduce((s, h) => s + (h.capacity ?? 0), 0);
+  const gradeStudentCount = activeGrade && studentsByGrade ? (studentsByGrade[Number(activeGrade)] ?? 0) : 0;
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
+      <GradeTabBar grades={visibleHallGrades} activeGrade={activeGrade} onGradeChange={setActiveGrade} />
+
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h3 className="font-semibold">Exam Halls</h3>
-          <p className="text-sm text-muted-foreground">Rooms / halls within this center used during examinations</p>
+          <h3 className="font-semibold">Exam Halls {activeGrade ? `— ${gradeLabel(Number(activeGrade))}` : ""}</h3>
+          <p className="text-sm text-muted-foreground">
+            {gradeHalls.length} hall(s) · {totalCapacity} seats capacity
+            {gradeStudentCount > 0 && ` · ${gradeStudentCount} students`}
+          </p>
         </div>
         {canManage && (
-          <Button size="sm" onClick={openCreate} data-testid="button-add-hall">
-            <Plus className="w-4 h-4 me-2" />
-            Add Hall
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+              data-testid="button-sync-halls"
+            >
+              {syncMutation.isPending ? <Loader2 className="w-4 h-4 me-2 animate-spin" /> : <RefreshCw className="w-4 h-4 me-2" />}
+              Auto-Sync Halls
+            </Button>
+            <Button size="sm" onClick={openCreate} data-testid="button-add-hall">
+              <Plus className="w-4 h-4 me-2" />
+              Add Hall
+            </Button>
+          </div>
         )}
       </div>
 
@@ -1770,12 +1827,27 @@ function HallsTab({ centerId, canManage }: { centerId: number; canManage: boolea
         <div className="space-y-2">
           {[1,2,3].map(i => <Skeleton key={i} className="h-12" />)}
         </div>
-      ) : halls.length === 0 ? (
+      ) : gradeHalls.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">No Halls Configured</h3>
-            <p className="text-muted-foreground">Add halls / rooms to organise students and exam packets by location.</p>
+            <h3 className="text-lg font-medium mb-2">No Halls for {gradeLabel(Number(activeGrade))}</h3>
+            <p className="text-muted-foreground mb-4">
+              {gradeStudentCount > 0
+                ? `${gradeStudentCount} students enrolled — use Auto-Sync to generate halls automatically.`
+                : "No students enrolled for this class yet."}
+            </p>
+            {canManage && gradeStudentCount > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+                data-testid="button-sync-halls-empty"
+              >
+                {syncMutation.isPending ? <Loader2 className="w-4 h-4 me-2 animate-spin" /> : <RefreshCw className="w-4 h-4 me-2" />}
+                Auto-Sync Halls
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -1784,14 +1856,18 @@ function HallsTab({ centerId, canManage }: { centerId: number; canManage: boolea
             <TableHeader>
               <TableRow>
                 <TableHead>Hall Name</TableHead>
+                <TableHead>Class</TableHead>
                 <TableHead>Capacity</TableHead>
                 {canManage && <TableHead className="text-end">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {halls.map(hall => (
+              {gradeHalls.map(hall => (
                 <TableRow key={hall.id} data-testid={`row-hall-${hall.id}`}>
                   <TableCell className="font-medium">{hall.name}</TableCell>
+                  <TableCell>
+                    {hall.grade ? <Badge variant="outline" className="text-xs">{gradeLabel(hall.grade)}</Badge> : <span className="text-muted-foreground text-xs">—</span>}
+                  </TableCell>
                   <TableCell>{hall.capacity} students</TableCell>
                   {canManage && (
                     <TableCell className="text-end">
@@ -1831,6 +1907,29 @@ function HallsTab({ centerId, canManage }: { centerId: number; canManage: boolea
                   <FormMessage />
                 </FormItem>
               )} />
+              {visibleHallGrades.length > 0 && (
+                <FormField control={form.control} name="grade" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Exam Class</FormLabel>
+                    <Select
+                      onValueChange={v => field.onChange(v ? Number(v) : null)}
+                      value={field.value ? String(field.value) : ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-hall-grade">
+                          <SelectValue placeholder="Select class…" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {visibleHallGrades.map(g => (
+                          <SelectItem key={g} value={String(g)}>{gradeLabel(g)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
               <FormField control={form.control} name="capacity" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Capacity (students)</FormLabel>
@@ -2724,6 +2823,9 @@ export default function CenterDashboard() {
               <HallsTab
                 centerId={centerId}
                 canManage={['super_admin', 'examination_admin'].includes(user?.role || '')}
+                allowedGrades={allowedGrades}
+                examYearId={selectedExamYearId}
+                studentsByGrade={statistics.studentsByGrade}
               />
             </TabsContent>
           </>
