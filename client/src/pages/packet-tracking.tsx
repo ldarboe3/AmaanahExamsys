@@ -816,8 +816,10 @@ async function toBase64DataUrl(url: string): Promise<string> {
 interface PrintLabelOpts {
   packet: ExamPacket;
   subjectName: string;
+  centerId: number;
   centerName: string;
   centerAddress?: string;
+  centerCode?: string;
   examYearLabel: string;
   examDate?: string;
   startTime?: string;
@@ -828,7 +830,7 @@ interface PrintLabelOpts {
 }
 
 function buildLabelHtml(opts: PrintLabelOpts, qrDataUrl: string, logoDataUrl: string): string {
-  const { packet, subjectName, centerName, centerAddress, examYearLabel, examDate, startTime, endTime, regionName, clusterName, hallName } = opts;
+  const { packet, subjectName, centerName, centerAddress, centerCode, examYearLabel, examDate, startTime, endTime, regionName, clusterName, hallName } = opts;
   const statusLabel = STATUS_CFG[packet.status]?.label ?? packet.status;
   const printDate = new Date().toLocaleString();
 
@@ -889,7 +891,7 @@ function buildLabelHtml(opts: PrintLabelOpts, qrDataUrl: string, logoDataUrl: st
         <div class="field"><label>Grade</label><p>Grade ${packet.grade}</p></div>
         ${regionName ? `<div class="field"><label>Region</label><p>${regionName}</p></div>` : ""}
         ${clusterName ? `<div class="field"><label>Cluster</label><p>${clusterName}</p></div>` : ""}
-        <div class="field"><label>Destination Center</label><p>${centerName}</p>${centerAddress ? `<p class="center-address">${centerAddress}</p>` : ""}</div>
+        <div class="field center-field"><label>Destination Center${centerCode ? ` &nbsp;<span class="center-code">${centerCode}</span>` : ""}</label><p class="center-name">${centerName}</p>${centerAddress ? `<p class="center-address">${centerAddress}</p>` : `<p class="center-address no-address">No address on file</p>`}</div>
         ${hallName ? `<div class="field hall-field"><label>Exam Hall</label><p class="hall-name">${hallName}</p></div>` : ""}
         <div class="field"><label>Paper Count</label><p>${packet.paperCount} papers</p></div>
         <div class="field"><label>Security Seal #</label><p class="mono">${packet.securitySealNumber ?? "—"}</p></div>
@@ -944,7 +946,12 @@ const LABEL_STYLES = `
   .field label { font-size: 9pt; text-transform: uppercase; color: #888; letter-spacing: 0.6px; font-weight: 600; }
   .field p { font-size: 15pt; font-weight: 700; color: #111; margin-top: 1.5px; }
   .field p.mono { font-family: 'Courier New', monospace; font-size: 13pt; }
-  .field p.center-address { font-size: 10pt; font-weight: 500; color: #555; margin-top: 2px; }
+  .center-field { grid-column: 1 / -1; background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: 5px; padding: 3mm 4mm; }
+  .center-field label { color: #0f766e; }
+  .center-code { font-size: 8pt; background: #ccfbf1; color: #0f766e; border-radius: 3px; padding: 1px 5px; font-weight: 700; vertical-align: middle; }
+  .center-name { font-size: 16pt !important; color: #134e4a !important; }
+  .field p.center-address { font-size: 12pt; font-weight: 600; color: #0f766e; margin-top: 2px; }
+  .field p.center-address.no-address { color: #aaa; font-style: italic; font-weight: 400; font-size: 10pt; }
   .hall-field { grid-column: 1 / -1; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 5px; padding: 3mm 4mm; }
   .hall-field label { color: #166534; font-size: 10pt; }
   .hall-name { color: #14532d !important; font-size: 18pt !important; }
@@ -984,8 +991,30 @@ const LABEL_STYLES = `
   }
 `;
 
+// Fetch center details fresh from the API (bypasses stale local map)
+async function fetchCenterDetails(centerId: number): Promise<{ name: string; address: string | null; code: string | null }> {
+  try {
+    const r = await fetch(`/api/centers/${centerId}`);
+    if (!r.ok) throw new Error("not found");
+    const c = await r.json();
+    return { name: c.name ?? `Center ${centerId}`, address: c.address ?? null, code: c.code ?? null };
+  } catch {
+    return { name: `Center ${centerId}`, address: null, code: null };
+  }
+}
+
 async function printPacketLabel(opts: PrintLabelOpts) {
   const { packet } = opts;
+
+  // Always fetch fresh center data so name/address are never stale or missing
+  const centerFresh = await fetchCenterDetails(opts.centerId);
+  const enrichedOpts: PrintLabelOpts = {
+    ...opts,
+    centerName: centerFresh.name,
+    centerAddress: centerFresh.address ?? undefined,
+    centerCode: centerFresh.code ?? undefined,
+  };
+
   const [qrDataUrl, logoDataUrl] = await Promise.all([
     QRCode.toDataURL(packet.barcode, { width: 200, margin: 1, color: { dark: "#000000", light: "#ffffff" } }),
     toBase64DataUrl(amanahLogoUrl).catch(() => ""),
@@ -995,7 +1024,7 @@ async function printPacketLabel(opts: PrintLabelOpts) {
 <html>
 <head><meta charset="UTF-8" /><title>Packet Label – ${packet.barcode}</title>
 <style>${LABEL_STYLES}</style></head>
-<body>${buildLabelHtml(opts, qrDataUrl, logoDataUrl)}</body>
+<body>${buildLabelHtml(enrichedOpts, qrDataUrl, logoDataUrl)}</body>
 </html>`;
 
   const win = window.open("", "_blank", "width=900,height=650");
@@ -1008,14 +1037,27 @@ async function printPacketLabel(opts: PrintLabelOpts) {
 
 async function printAllPacketLabels(items: PrintLabelOpts[]) {
   if (items.length === 0) return;
+
+  // Batch-fetch all unique center IDs in parallel
+  const uniqueCenterIds = [...new Set(items.map(i => i.centerId))];
+  const centerDetails = await Promise.all(uniqueCenterIds.map(id => fetchCenterDetails(id)));
+  const centerByIdMap = Object.fromEntries(uniqueCenterIds.map((id, i) => [id, centerDetails[i]]));
+
   const logoDataUrl = await toBase64DataUrl(amanahLogoUrl).catch(() => "");
 
   const labelBodies = await Promise.all(
     items.map(async (opts) => {
+      const cd = centerByIdMap[opts.centerId];
+      const enrichedOpts: PrintLabelOpts = {
+        ...opts,
+        centerName: cd?.name ?? opts.centerName,
+        centerAddress: cd?.address ?? opts.centerAddress,
+        centerCode: cd?.code ?? opts.centerCode,
+      };
       const qrDataUrl = await QRCode.toDataURL(opts.packet.barcode, {
         width: 200, margin: 1, color: { dark: "#000000", light: "#ffffff" },
       });
-      return buildLabelHtml(opts, qrDataUrl, logoDataUrl);
+      return buildLabelHtml(enrichedOpts, qrDataUrl, logoDataUrl);
     })
   );
 
@@ -2075,6 +2117,7 @@ export default function PacketTracking() {
                       const tt = timetableBySubject[`${p.subjectId}-${p.grade}`];
                       return {
                         packet: p,
+                        centerId: p.destinationCenterId,
                         subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
                         centerName: centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
                         centerAddress: centerAddressMap[p.destinationCenterId] || undefined,
@@ -2183,6 +2226,7 @@ export default function PacketTracking() {
                               const tt = timetableBySubject[`${p.subjectId}-${p.grade}`];
                               printPacketLabel({
                                 packet: p,
+                                centerId: p.destinationCenterId,
                                 subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
                                 centerName: centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
                                 centerAddress: centerAddressMap[p.destinationCenterId] || undefined,
@@ -2396,6 +2440,7 @@ export default function PacketTracking() {
                                     const tt = timetableBySubject[`${p.subjectId}-${p.grade}`];
                                     printPacketLabel({
                                       packet: p,
+                                      centerId: p.destinationCenterId,
                                       subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
                                       centerName: centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
                                       centerAddress: centerAddressMap[p.destinationCenterId] || undefined,
@@ -2428,6 +2473,7 @@ export default function PacketTracking() {
                                     const tt = timetableBySubject[`${p.subjectId}-${p.grade}`];
                                     return {
                                       packet: p,
+                                      centerId: p.destinationCenterId,
                                       subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
                                       centerName: centerMap[p.destinationCenterId] ?? `Center ${p.destinationCenterId}`,
                                       centerAddress: centerAddressMap[p.destinationCenterId] || undefined,
