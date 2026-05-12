@@ -16293,10 +16293,8 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
           assignmentId: assignmentIdBySchool[school.id] ?? null,
         };
       });
-      // Only show schools that actually have enrolled students for this exam year
-      const enrichedSchools = yearId
-        ? allEnrichedSchools.filter(s => s.studentCount > 0)
-        : allEnrichedSchools;
+      // Show all assigned schools regardless of student enrollment
+      const enrichedSchools = allEnrichedSchools;
 
       res.json({
         center: { ...enrichedCenter, schoolType: enrichedSchools[0]?.schoolType ?? null },

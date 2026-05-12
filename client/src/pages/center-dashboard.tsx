@@ -1835,18 +1835,29 @@ function HallsTab({
             <p className="text-muted-foreground mb-4">
               {gradeStudentCount > 0
                 ? `${gradeStudentCount} students enrolled — use Auto-Sync to generate halls automatically.`
-                : "No students enrolled for this class yet."}
+                : "No halls configured yet. Add halls manually or enroll students to use Auto-Sync."}
             </p>
-            {canManage && gradeStudentCount > 0 && (
-              <Button
-                variant="outline"
-                onClick={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
-                data-testid="button-sync-halls-empty"
-              >
-                {syncMutation.isPending ? <Loader2 className="w-4 h-4 me-2 animate-spin" /> : <RefreshCw className="w-4 h-4 me-2" />}
-                Auto-Sync Halls
-              </Button>
+            {canManage && (
+              <div className="flex items-center justify-center gap-2">
+                {gradeStudentCount > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => syncMutation.mutate()}
+                    disabled={syncMutation.isPending}
+                    data-testid="button-sync-halls-empty"
+                  >
+                    {syncMutation.isPending ? <Loader2 className="w-4 h-4 me-2 animate-spin" /> : <RefreshCw className="w-4 h-4 me-2" />}
+                    Auto-Sync Halls
+                  </Button>
+                )}
+                <Button
+                  onClick={openCreate}
+                  data-testid="button-add-hall-empty"
+                >
+                  <Plus className="w-4 h-4 me-2" />
+                  Add Hall
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
