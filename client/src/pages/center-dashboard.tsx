@@ -443,12 +443,25 @@ function TimetableTab({ timetable, printInfo, schoolGrades, allowedGrades }: {
 
   return (
     <div className="space-y-4">
-      {/* Top bar: print */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      {/* Top bar: grade tabs + print */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1">
+          {visibleGrades.map(g => (
+            <Button
+              key={g}
+              size="sm"
+              variant={activeGrade === String(g) ? "default" : "outline"}
+              onClick={() => setActiveGrade(String(g))}
+              data-testid={`button-grade-tab-${g}`}
+            >
+              {gradeLabel(g)}
+            </Button>
+          ))}
+        </div>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => handlePrint(undefined)}
+          onClick={() => handlePrint(activeGrade ? Number(activeGrade) : undefined)}
           data-testid="button-print-timetable"
         >
           <Printer className="w-4 h-4 me-2" />
@@ -456,8 +469,9 @@ function TimetableTab({ timetable, printInfo, schoolGrades, allowedGrades }: {
         </Button>
       </div>
 
-      {/* Grade schedule panels — all grades shown */}
+      {/* Grade schedule panel */}
       {visibleGrades.map(g => {
+        if (String(g) !== activeGrade) return null;
         const gradeEntries = timetable.filter(e => e.grade === g).sort((a, b) =>
           a.examDate.localeCompare(b.examDate) || a.startTime.localeCompare(b.startTime)
         );
@@ -1441,6 +1455,7 @@ function LogisticsTab({
 
   return (
     <div className="space-y-4">
+      <GradeTabBar grades={grades} activeGrade={activeGrade} onGradeChange={setActiveGrade} />
       {/* Packet Tracking Section */}
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4 flex-wrap">
