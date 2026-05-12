@@ -1547,9 +1547,9 @@ export default function PacketTracking() {
   const centerToRegionMap = Object.fromEntries(centers.map(c => [c.id, (c as any).regionId]));
   const centerToClusterMap = Object.fromEntries(centers.map(c => [c.id, (c as any).clusterId]));
   const availableGrades = Array.from(new Set(packets.map(p => p.grade))).sort((a, b) => a - b);
-  // keyed by subjectId — last write wins if duplicates exist across years; prefer active exam year entry
+  // keyed by "subjectId-grade" so the same subject in different grades gets its own entry
   const timetableBySubject = Object.fromEntries(
-    [...timetable].reverse().map(t => [t.subjectId, t])
+    [...timetable].reverse().map(t => [`${t.subjectId}-${t.grade}`, t])
   );
 
   // unique exam years that actually have packets
@@ -1838,7 +1838,7 @@ export default function PacketTracking() {
                       const rId = p.destinationRegionId ?? centerToRegionMap[p.destinationCenterId];
                       const cId = p.destinationClusterId ?? centerToClusterMap[p.destinationCenterId];
                       const hId = (p as any).hallId;
-                      const tt = timetableBySubject[p.subjectId];
+                      const tt = timetableBySubject[`${p.subjectId}-${p.grade}`];
                       return {
                         packet: p,
                         subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
@@ -1946,7 +1946,7 @@ export default function PacketTracking() {
                             size="sm"
                             variant="ghost"
                             onClick={() => {
-                              const tt = timetableBySubject[p.subjectId];
+                              const tt = timetableBySubject[`${p.subjectId}-${p.grade}`];
                               printPacketLabel({
                                 packet: p,
                                 subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
@@ -2150,7 +2150,7 @@ export default function PacketTracking() {
                                   onClick={() => {
                                     const rId2 = p.destinationRegionId ?? centerToRegionMap[p.destinationCenterId];
                                     const cId2 = p.destinationClusterId ?? centerToClusterMap[p.destinationCenterId];
-                                    const tt = timetableBySubject[p.subjectId];
+                                    const tt = timetableBySubject[`${p.subjectId}-${p.grade}`];
                                     printPacketLabel({
                                       packet: p,
                                       subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
@@ -2182,7 +2182,7 @@ export default function PacketTracking() {
                                   const items: PrintLabelOpts[] = hPackets.map(p => {
                                     const rId2 = p.destinationRegionId ?? centerToRegionMap[p.destinationCenterId];
                                     const cId2 = p.destinationClusterId ?? centerToClusterMap[p.destinationCenterId];
-                                    const tt = timetableBySubject[p.subjectId];
+                                    const tt = timetableBySubject[`${p.subjectId}-${p.grade}`];
                                     return {
                                       packet: p,
                                       subjectName: subjectMap[p.subjectId] ?? `Subject ${p.subjectId}`,
