@@ -919,75 +919,76 @@ function buildLabelHtml(opts: PrintLabelOpts, qrDataUrl: string, logoDataUrl: st
 const LABEL_STYLES = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, sans-serif; background: #fff; color: #111; }
-  @page { size: A4 landscape; margin: 12mm; }
+  @page { size: A4 landscape; margin: 7mm; }
   .label {
-    width: 270mm; min-height: 168mm;
+    width: calc(297mm - 14mm); height: calc(210mm - 14mm);
     border: 2.5px solid #0d9488; border-radius: 8px;
-    padding: 12mm; display: flex; flex-direction: column; gap: 7mm;
-    page-break-after: always;
+    padding: 7mm 9mm; display: flex; flex-direction: column; gap: 3.5mm;
+    overflow: hidden; page-break-after: always;
   }
   .label:last-child { page-break-after: avoid; }
   .header {
     display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 2px solid #0d9488; padding-bottom: 5mm;
+    border-bottom: 1.5px solid #0d9488; padding-bottom: 3mm; flex-shrink: 0;
   }
-  .header-left { display: flex; align-items: center; gap: 5mm; }
-  .header-logo { width: 20mm; height: 20mm; object-fit: contain; flex-shrink: 0; }
-  .org-name { font-size: 26pt; font-weight: 900; color: #0d9488; letter-spacing: 0.5px; }
-  .org-sub  { font-size: 12pt; color: #555; margin-top: 1.5mm; }
+  .header-left { display: flex; align-items: center; gap: 4mm; }
+  .header-logo { width: 14mm; height: 14mm; object-fit: contain; flex-shrink: 0; }
+  .org-name { font-size: 20pt; font-weight: 900; color: #0d9488; letter-spacing: 0.5px; }
+  .org-sub  { font-size: 9pt; color: #555; margin-top: 1mm; }
   .title-badge {
     background: #0d9488; color: #fff;
-    font-size: 13pt; font-weight: 700;
-    padding: 5px 14px; border-radius: 5px; letter-spacing: 0.5px;
+    font-size: 11pt; font-weight: 700;
+    padding: 4px 12px; border-radius: 5px; letter-spacing: 0.5px;
   }
-  .body { display: flex; gap: 10mm; flex: 1; }
-  .details { flex: 1; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm 8mm; }
-  .field label { font-size: 9pt; text-transform: uppercase; color: #888; letter-spacing: 0.6px; font-weight: 600; }
-  .field p { font-size: 15pt; font-weight: 700; color: #111; margin-top: 1.5px; }
-  .field p.mono { font-family: 'Courier New', monospace; font-size: 13pt; }
-  .center-field { grid-column: 1 / -1; background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: 5px; padding: 3mm 4mm; }
+  .body { display: flex; gap: 7mm; flex: 1; min-height: 0; }
+  .details { flex: 1; min-height: 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3.5mm 6mm; }
+  .field label { font-size: 7.5pt; text-transform: uppercase; color: #888; letter-spacing: 0.6px; font-weight: 600; }
+  .field p { font-size: 13pt; font-weight: 700; color: #111; margin-top: 1px; }
+  .field p.mono { font-family: 'Courier New', monospace; font-size: 11pt; }
+  .center-field { grid-column: 1 / -1; background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: 5px; padding: 2mm 3mm; }
   .center-field label { color: #0f766e; }
-  .center-code { font-size: 8pt; background: #ccfbf1; color: #0f766e; border-radius: 3px; padding: 1px 5px; font-weight: 700; vertical-align: middle; }
-  .center-name { font-size: 16pt !important; color: #134e4a !important; }
-  .field p.center-address { font-size: 12pt; font-weight: 600; color: #0f766e; margin-top: 2px; }
-  .field p.center-address.no-address { color: #aaa; font-style: italic; font-weight: 400; font-size: 10pt; }
-  .hall-field { grid-column: 1 / -1; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 5px; padding: 3mm 4mm; }
-  .hall-field label { color: #166534; font-size: 10pt; }
-  .hall-name { color: #14532d !important; font-size: 18pt !important; }
-  .qr-block { display: flex; flex-direction: column; align-items: center; gap: 3mm; }
-  .qr-block img { width: 52mm; height: 52mm; border: 1px solid #e5e7eb; border-radius: 5px; }
-  .qr-label { font-size: 9pt; color: #555; text-align: center; max-width: 56mm; line-height: 1.4; }
+  .center-code { font-size: 7pt; background: #ccfbf1; color: #0f766e; border-radius: 3px; padding: 1px 4px; font-weight: 700; vertical-align: middle; }
+  .center-name { font-size: 13pt !important; color: #134e4a !important; }
+  .field p.center-address { font-size: 10pt; font-weight: 600; color: #0f766e; margin-top: 1px; }
+  .field p.center-address.no-address { color: #aaa; font-style: italic; font-weight: 400; font-size: 9pt; }
+  .hall-field { grid-column: 1 / -1; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 5px; padding: 2mm 3mm; }
+  .hall-field label { color: #166534; font-size: 8pt; }
+  .hall-name { color: #14532d !important; font-size: 15pt !important; }
+  .qr-block { display: flex; flex-direction: column; align-items: center; gap: 2mm; flex-shrink: 0; }
+  .qr-block img { width: 44mm; height: 44mm; border: 1px solid #e5e7eb; border-radius: 5px; }
+  .qr-label { font-size: 7.5pt; color: #555; text-align: center; max-width: 48mm; line-height: 1.35; }
   .barcode-strip {
     background: #f8fafc; border: 1.5px solid #e5e7eb; border-radius: 5px;
-    padding: 4mm 6mm; text-align: center;
+    padding: 2.5mm 5mm; text-align: center; flex-shrink: 0;
   }
-  .barcode-strip .bc-text { font-family: 'Courier New', monospace; font-size: 20pt; font-weight: 900; letter-spacing: 3px; color: #0d9488; }
-  .barcode-strip .bc-hint { font-size: 10pt; color: #888; margin-top: 2mm; }
-  .footer { border-top: 1px solid #e5e7eb; padding-top: 4mm; display: flex; justify-content: space-between; align-items: center; }
-  .footer p { font-size: 9pt; color: #aaa; }
+  .barcode-strip .bc-text { font-family: 'Courier New', monospace; font-size: 16pt; font-weight: 900; letter-spacing: 2px; color: #0d9488; }
+  .barcode-strip .bc-hint { font-size: 8pt; color: #888; margin-top: 1mm; }
+  .footer { border-top: 1px solid #e5e7eb; padding-top: 2.5mm; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+  .footer p { font-size: 8pt; color: #aaa; }
   .status-badge {
     display: inline-block; background: #d1fae5; color: #065f46;
-    font-size: 12pt; font-weight: 700; padding: 3px 12px; border-radius: 20px;
+    font-size: 11pt; font-weight: 700; padding: 2px 10px; border-radius: 20px;
   }
   .schedule-banner {
     background: #0f766e; color: #fff;
-    border-radius: 6px; padding: 4mm 7mm;
-    display: flex; align-items: center; justify-content: space-between; gap: 8mm;
+    border-radius: 6px; padding: 2.5mm 6mm;
+    display: flex; align-items: center; justify-content: space-between; gap: 6mm;
+    flex-shrink: 0;
   }
-  .schedule-banner .sch-label { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.7px; opacity: 0.85; margin-bottom: 1.5px; }
-  .schedule-banner .sch-val  { font-size: 16pt; font-weight: 800; letter-spacing: 0.3px; }
+  .schedule-banner .sch-label { font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.7px; opacity: 0.85; margin-bottom: 1px; }
+  .schedule-banner .sch-val  { font-size: 13pt; font-weight: 800; letter-spacing: 0.3px; }
   .schedule-banner .sch-divider { width: 1px; background: rgba(255,255,255,0.35); align-self: stretch; }
-  .schedule-banner .sch-time  { font-size: 20pt; font-weight: 900; letter-spacing: 1px; }
+  .schedule-banner .sch-time  { font-size: 16pt; font-weight: 900; letter-spacing: 1px; }
   .schedule-banner .sch-dur-pill {
     display: inline-block; background: rgba(255,255,255,0.2);
     border: 1.5px solid rgba(255,255,255,0.45);
-    border-radius: 4px; padding: 2px 10px; margin-top: 2px;
-    font-size: 17pt; font-weight: 900; letter-spacing: 0.5px;
+    border-radius: 4px; padding: 1px 8px; margin-top: 1px;
+    font-size: 14pt; font-weight: 900; letter-spacing: 0.5px;
   }
   .no-schedule-notice {
     background: #fef3c7; color: #92400e;
-    border-radius: 6px; padding: 3mm 7mm; font-size: 10pt; font-style: italic;
+    border-radius: 6px; padding: 2mm 6mm; font-size: 9pt; font-style: italic; flex-shrink: 0;
   }
 `;
 
