@@ -2364,9 +2364,16 @@ export default function Students() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm text-muted-foreground">
-                            {student.school?.name || (isRTL ? "غير معروف" : "Unknown")}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm">
+                              {student.school?.name || (isRTL ? "غير معروف" : "Unknown")}
+                            </span>
+                            {(student.school as any)?.schoolType && (
+                              <Badge variant="outline" className="text-xs w-fit">
+                                {(student.school as any).schoolType}
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Badge className={`${statusColors[student.status || 'pending']} text-xs`}>

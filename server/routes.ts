@@ -3992,7 +3992,7 @@ ${pages.map(p => `  <url>
         const examYear = allExamYears.find(ey => ey.id === student.examYearId);
         return {
           ...student,
-          school: school ? { id: school.id, name: school.name } : null,
+          school: school ? { id: school.id, name: school.name, schoolType: school.schoolType } : null,
           examYear: examYear ? { id: examYear.id, name: examYear.name } : null
         };
       });
@@ -15993,8 +15993,9 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
           return acc;
         }, {});
 
+        const schoolRecord = await storage.getSchool(schoolAdminSchoolId);
         return res.json({
-          center: enrichedCenter,
+          center: { ...enrichedCenter, schoolType: schoolRecord?.schoolType ?? null },
           examYear: activeExamYear,
           schoolView: true,
           schoolId: schoolAdminSchoolId,
@@ -16073,7 +16074,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
         : allEnrichedSchools;
 
       res.json({
-        center: enrichedCenter,
+        center: { ...enrichedCenter, schoolType: enrichedSchools[0]?.schoolType ?? null },
         examYear: activeExamYear,
         schoolView: false,
         schoolId: null,

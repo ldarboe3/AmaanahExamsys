@@ -117,6 +117,7 @@ interface CenterDashboardData {
     contactPhone?: string;
     contactEmail?: string;
     isActive: boolean;
+    schoolType?: string | null;
   };
   schoolView: boolean;
   schoolId: number | null;
@@ -279,6 +280,22 @@ function buildPrintHeader(info: PrintInfo, title: string, logoSrc: string) {
 const GRADE_LABELS: Record<number, string> = { 3: "Grade 3 (LBS)", 6: "Grade 6 (LBS)", 9: "Grade 9 (UBS)", 12: "Grade 12 (SSS)" };
 function gradeLabel(g: number) { return GRADE_LABELS[g] || `Grade ${g}`; }
 
+// School type badge colors
+const SCHOOL_TYPE_COLORS: Record<string, string> = {
+  LBS: "border-emerald-500/50 text-emerald-700 dark:text-emerald-400",
+  BCS: "border-blue-500/50 text-blue-700 dark:text-blue-400",
+  UBS: "border-violet-500/50 text-violet-700 dark:text-violet-400",
+  SSS: "border-amber-500/50 text-amber-700 dark:text-amber-400",
+};
+
+// Allowed exam grades per school type
+function getAllowedGradesByType(schoolType?: string | null): number[] {
+  if (schoolType === 'LBS') return [6];
+  if (schoolType === 'SSS') return [12];
+  if (schoolType === 'BCS' || schoolType === 'UBS') return [6, 9];
+  return [6, 9]; // default/fallback
+}
+
 // Compute school type badge(s) from enrolled grade numbers
 // Grade 6 only → LBS | Grade 9 only → UBS | Grade 12 → SSS | Grade 6+9 → BCS | Grade 6+9+12 → BCS + SSS
 function computeSchoolTypesFromGrades(grades: number[]): string[] {
@@ -294,18 +311,21 @@ function computeSchoolTypesFromGrades(grades: number[]): string[] {
   return types.length > 0 ? types : [];
 }
 
-function TimetableTab({ timetable, printInfo, schoolGrades }: {
+function TimetableTab({ timetable, printInfo, schoolGrades, allowedGrades }: {
   timetable: CenterDashboardData["timetable"];
   printInfo?: PrintInfo;
   schoolGrades?: number[];
+  allowedGrades?: number[];
 }) {
   const { isRTL } = useLanguage();
 
   // All unique grades present in the schedule, sorted
   const allGrades = Array.from(new Set(timetable.map(e => e.grade))).sort((a, b) => a - b);
-  // For school view, restrict to only the school's grades
+  // For school view, restrict to only the school's grades; for admin, apply allowedGrades filter
   const visibleGrades = schoolGrades && schoolGrades.length > 0
     ? allGrades.filter(g => schoolGrades.includes(g))
+    : allowedGrades && allowedGrades.length > 0
+    ? allGrades.filter(g => allowedGrades.includes(g))
     : allGrades;
 
   const [activeGrade, setActiveGrade] = useState<string>(
@@ -1321,11 +1341,13 @@ function PacketStatusBadge({ status }: { status: string }) {
 function LogisticsTab({ 
   centerId,
   examYearId,
-  scriptMovements 
+  scriptMovements,
+  allowedGrades,
 }: { 
   centerId: number;
   examYearId?: number;
   scriptMovements: CenterDashboardData["scriptMovements"];
+  allowedGrades?: number[];
 }) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [gradeFilter, setGradeFilter] = useState<string>("all");
@@ -1344,16 +1366,21 @@ function LogisticsTab({
     },
   });
 
-  const grades = packets ? [...new Set(packets.map(p => p.grade))].sort((a, b) => a - b) : [];
+  const grades = packets
+    ? [...new Set(packets.map(p => p.grade))]
+        .filter(g => !allowedGrades || allowedGrades.length === 0 || allowedGrades.includes(g))
+        .sort((a, b) => a - b)
+    : [];
 
   const filtered = (packets ?? []).filter(p => {
     const matchesGrade = gradeFilter === "all" || String(p.grade) === gradeFilter;
+    const matchesAllowed = !allowedGrades || allowedGrades.length === 0 || allowedGrades.includes(p.grade);
     const matchesBarcode = !barcodeSearch || p.barcode.toLowerCase().includes(barcodeSearch.toLowerCase()) || p.subject_name.toLowerCase().includes(barcodeSearch.toLowerCase());
     const matchesStatus = statusFilter === "all" ||
       (statusFilter === "received" && p.received_at_center) ||
       (statusFilter === "in_transit" && ['dispatched_to_center', 'dispatched_to_cluster', 'dispatched_to_region', 'at_cluster', 'at_region'].includes(p.status)) ||
       (statusFilter === "not_dispatched" && ['created', 'packed'].includes(p.status));
-    return matchesGrade && matchesBarcode && matchesStatus;
+    return matchesGrade && matchesAllowed && matchesBarcode && matchesStatus;
   });
 
   const totalPackets = packets?.length ?? 0;
@@ -1930,15 +1957,11 @@ function SchoolsTab({
                   <div className="flex-1 min-w-0">
                     <p className="font-medium leading-snug line-clamp-2" dir="auto">{school.name}</p>
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
-                      {(() => {
-                        const enrolledGrades = school.gradeBreakdown ? Object.keys(school.gradeBreakdown).map(Number) : [];
-                        const computed = enrolledGrades.length > 0
-                          ? computeSchoolTypesFromGrades(enrolledGrades)
-                          : (school.schoolType ? [school.schoolType] : []);
-                        return computed.length > 0
-                          ? computed.map(t => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)
-                          : <Badge variant="outline" className="text-xs">{school.schoolType || "—"}</Badge>;
-                      })()}
+                      {school.schoolType ? (
+                        <Badge variant="outline" className={`text-xs ${SCHOOL_TYPE_COLORS[school.schoolType] || ""}`}>
+                          {school.schoolType}
+                        </Badge>
+                      ) : null}
                       {(school.studentCount ?? 0) > 0 && (
                         <Badge variant="secondary" className="text-xs">
                           {school.studentCount} {school.studentCount === 1 ? "student" : "students"}
@@ -2252,6 +2275,8 @@ export default function CenterDashboard() {
 
   const { center, examYear, statistics, schools, timetable, paperMovements, scriptMovements, malpracticeReports, recentActivity, invigilators } = data;
 
+  const allowedGrades = getAllowedGradesByType(center.schoolType);
+
   const printInfo: PrintInfo | undefined = isSchoolView ? {
     centerName: center.name,
     centerAddress: center.address,
@@ -2293,6 +2318,11 @@ export default function CenterDashboard() {
                   <MapPin className="w-3.5 h-3.5" />
                   {center.address}
                 </span>
+              )}
+              {center.schoolType && (
+                <Badge variant="outline" className={`text-xs ${SCHOOL_TYPE_COLORS[center.schoolType] || ""}`}>
+                  {center.schoolType}
+                </Badge>
               )}
               {examYear && (
                 <Badge variant="outline" className="text-xs">{examYear.name}</Badge>
@@ -2398,6 +2428,7 @@ export default function CenterDashboard() {
             schoolGrades={data.schoolView && data.statistics?.studentsByGrade
               ? Object.keys(data.statistics.studentsByGrade).map(Number)
               : undefined}
+            allowedGrades={!isSchoolView ? allowedGrades : undefined}
           />
         </TabsContent>
 
@@ -2419,7 +2450,8 @@ export default function CenterDashboard() {
               <LogisticsTab 
                 centerId={centerId}
                 examYearId={examYear?.id}
-                scriptMovements={scriptMovements} 
+                scriptMovements={scriptMovements}
+                allowedGrades={allowedGrades}
               />
             </TabsContent>
 
