@@ -18305,6 +18305,103 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
     }
   });
 
+  // Recalculate paper counts for all existing packets (no new packets created)
+  app.post("/api/exam-packets/recalculate-paper-counts", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const schema = z.object({
+        examYearId:    z.coerce.number().int().positive(),
+        grade:         z.coerce.number().int().positive().optional().nullable(),
+        bufferPercent: z.number().min(0).max(100).optional().default(15),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+      const { examYearId, grade, bufferPercent } = parsed.data;
+
+      const examYear = await storage.getExamYear(examYearId);
+      if (!examYear) return res.status(400).json({ message: "Exam year not found" });
+
+      const examGrades: number[] = (examYear as any).grades ?? [];
+      const selectedGrade: number = grade ?? (examGrades.length > 0 ? examGrades[0] : 0);
+      if (!selectedGrade) return res.status(400).json({ message: "Grade is required." });
+
+      // Fetch all existing packets for this year+grade
+      const packets = await storage.getExamPackets({ examYearId, grade: selectedGrade });
+      if (packets.length === 0) {
+        return res.json({ updated: 0, message: "No packets found for this year and grade." });
+      }
+
+      // Build center → student count for this grade
+      const allCenters = await storage.getAllExamCenters();
+      const centerGradeStudentCount: Record<number, number> = {};
+      for (const center of allCenters) {
+        const schools = await storage.getSchoolsByCenter(center.id);
+        let count = 0;
+        for (const school of schools) {
+          const sts = await storage.getStudentsBySchool(school.id);
+          count += sts.filter((s: any) => s.grade === selectedGrade && s.examYearId === examYearId).length;
+        }
+        centerGradeStudentCount[center.id] = count;
+      }
+
+      // Build center → halls map
+      const centerHallsMap: Record<number, any[]> = {};
+      for (const center of allCenters) {
+        centerHallsMap[center.id] = await storage.getCenterHallsByCenter(center.id);
+      }
+
+      let updated = 0;
+      const skipped: number[] = [];
+
+      for (const pkt of packets) {
+        const centerId = pkt.destinationCenterId;
+        const studentCount = centerGradeStudentCount[centerId] ?? 0;
+        const halls = centerHallsMap[centerId] ?? [];
+
+        let paperCount: number;
+
+        if ((pkt as any).hallId && halls.length > 0) {
+          // Hall-based packet: divide students evenly across halls
+          const perHallStudents = Math.ceil(studentCount / halls.length);
+          paperCount = Math.max(10, Math.ceil(Math.ceil(perHallStudents * (1 + bufferPercent / 100)) / 10) * 10);
+        } else if (studentCount > 0) {
+          // Center-level packet
+          paperCount = Math.max(10, Math.ceil(Math.ceil(studentCount * (1 + bufferPercent / 100)) / 10) * 10);
+        } else {
+          // No students at this center — keep current value
+          skipped.push(pkt.id);
+          continue;
+        }
+
+        await storage.updateExamPacket(pkt.id, { paperCount });
+        updated++;
+      }
+
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "update",
+        entityType: "exam_packet",
+        entityId: "recalculate",
+        newData: { details: `Recalculated paper counts for ${updated} Grade ${selectedGrade} packets (${bufferPercent}% buffer). Skipped ${skipped.length} with no students.` },
+      });
+
+      res.json({
+        updated,
+        skipped: skipped.length,
+        total: packets.length,
+        grade: selectedGrade,
+        bufferPercent,
+        message: `Updated ${updated} packet${updated !== 1 ? "s" : ""}${skipped.length > 0 ? `, skipped ${skipped.length} (no students at center)` : ""}.`,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Auto-generate packets for all timetabled subjects × centers for an exam year
   app.post("/api/exam-packets/auto-generate", isAuthenticated, async (req, res) => {
     try {

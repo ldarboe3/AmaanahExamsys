@@ -458,6 +458,149 @@ function EditPacketDialog({ packet, onClose }: { packet: ExamPacket; onClose: ()
   );
 }
 
+// ── Recalculate Paper Counts Dialog ──────────────────────────────────────────
+
+function RecalculatePaperCountsDialog({ onClose, examYears, subjects }: {
+  onClose: () => void;
+  examYears: ExamYear[];
+  subjects: Subject[];
+}) {
+  const { toast } = useToast();
+  const [examYearId, setExamYearId] = useState<number>(examYears[0]?.id ?? 0);
+  const [grade, setGrade] = useState<number>(0);
+  const [bufferPercent, setBufferPercent] = useState<number>(15);
+  const [result, setResult] = useState<{ updated: number; skipped: number; total: number; message: string } | null>(null);
+
+  const availableGrades = Array.from(new Set(subjects.map(s => s.grade))).sort((a, b) => a - b);
+
+  const mutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/exam-packets/recalculate-paper-counts", {
+      examYearId,
+      grade: grade || null,
+      bufferPercent,
+    }).then(r => r.json()),
+    onSuccess: (data: any) => {
+      setResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
+      toast({ title: "Paper counts recalculated", description: data.message });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <RefreshCw className="w-5 h-5 text-teal-600" />
+            Recalculate Paper Counts
+          </DialogTitle>
+          <DialogDescription>
+            Automatically updates the paper count for every existing packet based on current student enrollment + buffer. No new packets are created.
+          </DialogDescription>
+        </DialogHeader>
+
+        {result ? (
+          <div className="space-y-4">
+            <div className="rounded-md border bg-emerald-50 dark:bg-emerald-950/30 p-4 space-y-2">
+              <p className="font-semibold text-emerald-700 dark:text-emerald-300 text-sm">Recalculation complete</p>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-background rounded-sm p-2">
+                  <p className="text-xl font-bold">{result.total}</p>
+                  <p className="text-[10px] text-muted-foreground">Total</p>
+                </div>
+                <div className="bg-teal-50 dark:bg-teal-950/30 rounded-sm p-2">
+                  <p className="text-xl font-bold text-teal-700 dark:text-teal-300">{result.updated}</p>
+                  <p className="text-[10px] text-muted-foreground">Updated</p>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-sm p-2">
+                  <p className="text-xl font-bold text-amber-700 dark:text-amber-300">{result.skipped}</p>
+                  <p className="text-[10px] text-muted-foreground">Skipped</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">{result.message}</p>
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={onClose} data-testid="button-close-recalculate">Done</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Exam Year</label>
+                <Select value={String(examYearId)} onValueChange={v => setExamYearId(Number(v))}>
+                  <SelectTrigger data-testid="select-recalc-exam-year">
+                    <SelectValue placeholder="Select exam year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {examYears.map(y => (
+                      <SelectItem key={y.id} value={String(y.id)}>{y.year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Grade</label>
+                <Select value={String(grade)} onValueChange={v => setGrade(Number(v))}>
+                  <SelectTrigger data-testid="select-recalc-grade">
+                    <SelectValue placeholder="All grades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">— All grades —</SelectItem>
+                    {availableGrades.map(g => (
+                      <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Buffer %</label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={bufferPercent}
+                    onChange={e => setBufferPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
+                    className="w-24"
+                    data-testid="input-recalc-buffer"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Extra papers above enrolled student count, rounded up to nearest 10.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border bg-amber-50 dark:bg-amber-950/30 p-3">
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                This will overwrite the paper count on all matching packets. Packets whose destination center has no enrolled students will be skipped.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button
+                disabled={!examYearId || mutation.isPending}
+                onClick={() => mutation.mutate()}
+                data-testid="button-run-recalculate"
+              >
+                {mutation.isPending
+                  ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Recalculating…</>
+                  : <><RefreshCw className="w-4 h-4 mr-2" />Recalculate Now</>
+                }
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Timeline Modal ────────────────────────────────────────────────────────────
 
 function TimelineModal({ barcode, onClose }: { barcode: string; onClose: () => void }) {
@@ -1568,6 +1711,7 @@ export default function PacketTracking() {
   const [timelineBarcode, setTimelineBarcode] = useState<string | null>(null);
   const [showStatusFlow, setShowStatusFlow] = useState(false);
   const [editPacket, setEditPacket] = useState<ExamPacket | null>(null);
+  const [showRecalculate, setShowRecalculate] = useState(false);
   const { toast } = useToast();
 
   const deleteMutation = useMutation({
@@ -1692,6 +1836,10 @@ export default function PacketTracking() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setShowRecalculate(true)} data-testid="button-recalculate-paper-counts">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Recalculate Papers
+          </Button>
           <Button variant="outline" onClick={() => setShowAutoGenerate(true)} data-testid="button-auto-generate">
             <Sparkles className="w-4 h-4 mr-2" />
             AI Generate All
@@ -2411,6 +2559,15 @@ export default function PacketTracking() {
         <EditPacketDialog
           packet={editPacket}
           onClose={() => setEditPacket(null)}
+        />
+      )}
+
+      {/* Recalculate paper counts dialog */}
+      {showRecalculate && (
+        <RecalculatePaperCountsDialog
+          onClose={() => setShowRecalculate(false)}
+          examYears={examYears}
+          subjects={subjects}
         />
       )}
     </div>
