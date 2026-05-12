@@ -187,6 +187,7 @@ interface CenterDashboardData {
     studentId?: number;
     status: string;
     createdAt: string;
+    grade?: number;
   }>;
   recentActivity: Array<{
     id: number;
@@ -208,6 +209,7 @@ const malpracticeSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters"),
   studentId: z.coerce.number().optional(),
   subjectId: z.coerce.number().optional(),
+  grade: z.coerce.number().optional(),
 });
 
 type MalpracticeFormData = z.infer<typeof malpracticeSchema>;
@@ -309,6 +311,29 @@ function computeSchoolTypesFromGrades(grades: number[]): string[] {
   else if (has9)               types.push("UBS");
   if (has12) types.push("SSS");
   return types.length > 0 ? types : [];
+}
+
+function GradeTabBar({ grades, activeGrade, onGradeChange }: {
+  grades: number[];
+  activeGrade: string;
+  onGradeChange: (grade: string) => void;
+}) {
+  if (grades.length <= 1) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {grades.map(g => (
+        <Button
+          key={g}
+          size="sm"
+          variant={activeGrade === String(g) ? "default" : "outline"}
+          onClick={() => onGradeChange(String(g))}
+          data-testid={`button-grade-tab-${g}`}
+        >
+          {gradeLabel(g)}
+        </Button>
+      ))}
+    </div>
+  );
 }
 
 function TimetableTab({ timetable, printInfo, schoolGrades, allowedGrades }: {
@@ -555,15 +580,21 @@ interface CenterAttendanceRow {
   check_in_time?: string;
 }
 
-function AttendanceTab({ centerId, examYearId, schoolId, printInfo }: { centerId: number; examYearId?: number; schoolId?: number | null; printInfo?: PrintInfo }) {
+function AttendanceTab({ centerId, examYearId, schoolId, printInfo, allowedGrades }: { centerId: number; examYearId?: number; schoolId?: number | null; printInfo?: PrintInfo; allowedGrades?: number[] }) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [lookupResult, setLookupResult] = useState<any>(null);
   const [isLooking, setIsLooking] = useState(false);
   const [rosterSearch, setRosterSearch] = useState("");
-  const [gradeFilter, setGradeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const isSchoolView = !!schoolId;
+  const visibleAttGrades: number[] = allowedGrades && allowedGrades.length > 0 ? allowedGrades : [];
+  const [activeGrade, setActiveGrade] = useState<string>(String(visibleAttGrades[0] ?? ""));
+  useEffect(() => {
+    if (visibleAttGrades.length > 0 && !visibleAttGrades.map(String).includes(activeGrade)) {
+      setActiveGrade(String(visibleAttGrades[0]));
+    }
+  }, [visibleAttGrades.join(","), activeGrade]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // For school admin: fetch their students' attendance records
   const { data: schoolAttendance, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useQuery<Array<{
@@ -640,9 +671,12 @@ function AttendanceTab({ centerId, examYearId, schoolId, printInfo }: { centerId
     }
   };
 
-  const presentCount = schoolAttendance?.filter(r => r.attendance.some(a => a.status === "present")).length ?? 0;
-  const absentCount = schoolAttendance?.filter(r => r.attendance.some(a => a.status === "absent")).length ?? 0;
-  const unmarkedCount = schoolAttendance?.filter(r => r.attendance.length === 0).length ?? 0;
+  const gradeSchoolAttendance = activeGrade
+    ? (schoolAttendance ?? []).filter(r => String(r.student.grade) === activeGrade)
+    : (schoolAttendance ?? []);
+  const presentCount = gradeSchoolAttendance.filter(r => r.attendance.some(a => a.status === "present")).length;
+  const absentCount = gradeSchoolAttendance.filter(r => r.attendance.some(a => a.status === "absent")).length;
+  const unmarkedCount = gradeSchoolAttendance.filter(r => r.attendance.length === 0).length;
 
   const handlePrintAttendance = () => {
     if (!printInfo || !schoolAttendance) return;
@@ -695,6 +729,7 @@ function AttendanceTab({ centerId, examYearId, schoolId, printInfo }: { centerId
 
   return (
     <div className="space-y-4">
+      <GradeTabBar grades={visibleAttGrades} activeGrade={activeGrade} onGradeChange={setActiveGrade} />
       {/* School-scoped attendance summary */}
       {isSchoolView && (
         <div className="grid grid-cols-3 gap-3">
@@ -822,7 +857,7 @@ function AttendanceTab({ centerId, examYearId, schoolId, printInfo }: { centerId
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {schoolAttendance.map(({ student, attendance }) => {
+                  {gradeSchoolAttendance.map(({ student, attendance }) => {
                     const latestRecord = attendance.sort(
                       (a, b) => new Date(b.attendanceTime).getTime() - new Date(a.attendanceTime).getTime()
                     )[0];
@@ -871,17 +906,13 @@ function AttendanceTab({ centerId, examYearId, schoolId, printInfo }: { centerId
         const absentCount = centerRecords?.filter(r => r.is_present === false).length ?? 0;
         const notScannedCount = centerRecords?.filter(r => r.is_present == null).length ?? 0;
 
-        const grades = centerRecords
-          ? [...new Set(centerRecords.map(r => r.grade))].sort((a, b) => a - b)
-          : [];
-
         const filtered = (centerRecords ?? []).filter(row => {
           const fullName = `${row.first_name} ${row.middle_name ?? ""} ${row.last_name}`.toLowerCase();
           const matchesSearch = !rosterSearch ||
             fullName.includes(rosterSearch.toLowerCase()) ||
             (row.index_number ?? "").includes(rosterSearch) ||
             row.school_name.toLowerCase().includes(rosterSearch.toLowerCase());
-          const matchesGrade = gradeFilter === "all" || String(row.grade) === gradeFilter;
+          const matchesGrade = !activeGrade || String(row.grade) === activeGrade;
           const matchesStatus = statusFilter === "all" ||
             (statusFilter === "present" && row.is_present === true) ||
             (statusFilter === "absent" && row.is_present === false) ||
@@ -944,18 +975,6 @@ function AttendanceTab({ centerId, examYearId, schoolId, printInfo }: { centerId
                     data-testid="input-roster-search"
                   />
                 </div>
-                <Select value={gradeFilter} onValueChange={setGradeFilter}>
-                  <SelectTrigger className="w-36" data-testid="select-grade-filter">
-                    <Filter className="w-4 h-4 me-2 text-muted-foreground" />
-                    <SelectValue placeholder="All Grades" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Grades</SelectItem>
-                    {grades.map(g => (
-                      <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-40" data-testid="select-status-filter">
                     <SelectValue placeholder="All Statuses" />
@@ -1056,14 +1075,24 @@ function AttendanceTab({ centerId, examYearId, schoolId, printInfo }: { centerId
 function MalpracticeTab({ 
   centerId, 
   examYearId, 
-  reports 
+  reports,
+  allowedGrades,
 }: { 
   centerId: number; 
   examYearId?: number;
   reports: CenterDashboardData["malpracticeReports"];
+  allowedGrades?: number[];
 }) {
   const { toast } = useToast();
   const [showReportDialog, setShowReportDialog] = useState(false);
+
+  const visibleMalGrades: number[] = allowedGrades && allowedGrades.length > 0 ? allowedGrades : [];
+  const [activeGrade, setActiveGrade] = useState<string>(String(visibleMalGrades[0] ?? ""));
+  useEffect(() => {
+    if (visibleMalGrades.length > 0 && !visibleMalGrades.map(String).includes(activeGrade)) {
+      setActiveGrade(String(visibleMalGrades[0]));
+    }
+  }, [visibleMalGrades.join(","), activeGrade]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const form = useForm<MalpracticeFormData>({
     resolver: zodResolver(malpracticeSchema),
@@ -1071,6 +1100,7 @@ function MalpracticeTab({
       incidentType: "",
       malpracticeType: "",
       description: "",
+      grade: undefined,
     },
   });
 
@@ -1122,13 +1152,18 @@ function MalpracticeTab({
     return <Badge variant={variants[status] || "secondary"}>{status.replace('_', ' ')}</Badge>;
   };
 
+  const filteredReports = activeGrade
+    ? reports.filter(r => !r.grade || String(r.grade) === activeGrade)
+    : reports;
+
   return (
     <div className="space-y-4">
+      <GradeTabBar grades={visibleMalGrades} activeGrade={activeGrade} onGradeChange={setActiveGrade} />
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Malpractice Reports</h3>
           <p className="text-sm text-muted-foreground">
-            {reports.length} report(s) recorded
+            {filteredReports.length} report(s) recorded
           </p>
         </div>
         <Button onClick={() => setShowReportDialog(true)} data-testid="button-new-report">
@@ -1137,7 +1172,7 @@ function MalpracticeTab({
         </Button>
       </div>
 
-      {reports.length === 0 ? (
+      {filteredReports.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -1147,7 +1182,7 @@ function MalpracticeTab({
         </Card>
       ) : (
         <div className="space-y-3">
-          {reports.map(report => (
+          {filteredReports.map(report => (
             <Card key={report.id}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
@@ -1229,6 +1264,31 @@ function MalpracticeTab({
                   </FormItem>
                 )}
               />
+
+              {visibleMalGrades.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="grade"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Exam Class</FormLabel>
+                      <Select onValueChange={v => field.onChange(Number(v))} value={field.value ? String(field.value) : ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-report-grade">
+                            <SelectValue placeholder="Select exam class" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {visibleMalGrades.map(g => (
+                            <SelectItem key={g} value={String(g)}>{gradeLabel(g)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -1350,7 +1410,7 @@ function LogisticsTab({
   allowedGrades?: number[];
 }) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [gradeFilter, setGradeFilter] = useState<string>("all");
+  const [activeGrade, setActiveGrade] = useState<string>(String(allowedGrades && allowedGrades.length > 0 ? allowedGrades[0] : ""));
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [barcodeSearch, setBarcodeSearch] = useState("");
 
@@ -1372,8 +1432,14 @@ function LogisticsTab({
         .sort((a, b) => a - b)
     : [];
 
+  useEffect(() => {
+    if (grades.length > 0 && !grades.map(String).includes(activeGrade)) {
+      setActiveGrade(String(grades[0]));
+    }
+  }, [grades.join(","), activeGrade]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const filtered = (packets ?? []).filter(p => {
-    const matchesGrade = gradeFilter === "all" || String(p.grade) === gradeFilter;
+    const matchesGrade = !activeGrade || String(p.grade) === activeGrade;
     const matchesAllowed = !allowedGrades || allowedGrades.length === 0 || allowedGrades.includes(p.grade);
     const matchesBarcode = !barcodeSearch || p.barcode.toLowerCase().includes(barcodeSearch.toLowerCase()) || p.subject_name.toLowerCase().includes(barcodeSearch.toLowerCase());
     const matchesStatus = statusFilter === "all" ||
@@ -1390,6 +1456,7 @@ function LogisticsTab({
 
   return (
     <div className="space-y-4">
+      <GradeTabBar grades={grades} activeGrade={activeGrade} onGradeChange={setActiveGrade} />
       {/* Packet Tracking Section */}
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4 flex-wrap">
@@ -1440,16 +1507,6 @@ function LogisticsTab({
                 data-testid="input-packet-search"
               />
             </div>
-            <Select value={gradeFilter} onValueChange={setGradeFilter}>
-              <SelectTrigger className="w-36" data-testid="select-packet-grade">
-                <Filter className="w-4 h-4 me-2 text-muted-foreground" />
-                <SelectValue placeholder="All Grades" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Grades</SelectItem>
-                {grades.map(g => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}
-              </SelectContent>
-            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-44" data-testid="select-packet-status">
                 <SelectValue placeholder="All Statuses" />
@@ -1804,12 +1861,14 @@ function SchoolsTab({
   examYearId,
   canManage,
   onRefetch,
+  allowedGrades,
 }: {
   schools: CenterDashboardData["schools"];
   centerId: number;
   examYearId?: number;
   canManage: boolean;
   onRefetch: () => void;
+  allowedGrades?: number[];
 }) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -1817,6 +1876,13 @@ function SchoolsTab({
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [moveTargetId, setMoveTargetId] = useState<string>("");
+  const visibleSchoolGrades: number[] = allowedGrades && allowedGrades.length > 0 ? allowedGrades : [];
+  const [activeGrade, setActiveGrade] = useState<string>(String(visibleSchoolGrades[0] ?? ""));
+  useEffect(() => {
+    if (visibleSchoolGrades.length > 0 && !visibleSchoolGrades.map(String).includes(activeGrade)) {
+      setActiveGrade(String(visibleSchoolGrades[0]));
+    }
+  }, [visibleSchoolGrades.join(","), activeGrade]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [moveCenterSearch, setMoveCenterSearch] = useState("");
 
@@ -1875,10 +1941,16 @@ function SchoolsTab({
     onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to remove school", variant: "destructive" }),
   });
 
-  const filtered = schools.filter(s =>
+  const nameFiltered = schools.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     (s.email || "").toLowerCase().includes(search.toLowerCase())
   );
+  const filtered = activeGrade
+    ? nameFiltered.filter(s => {
+        if (!s.gradeBreakdown || Object.keys(s.gradeBreakdown).length === 0) return true;
+        return (s.gradeBreakdown[Number(activeGrade)] ?? 0) > 0;
+      })
+    : nameFiltered;
 
   if (schools.length === 0) {
     return (
@@ -1896,6 +1968,7 @@ function SchoolsTab({
 
   return (
     <div className="space-y-4">
+      <GradeTabBar grades={visibleSchoolGrades} activeGrade={activeGrade} onGradeChange={setActiveGrade} />
       {/* Summary strip */}
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex flex-wrap gap-3">
@@ -2433,7 +2506,7 @@ export default function CenterDashboard() {
         </TabsContent>
 
         <TabsContent value="attendance" className="mt-4">
-          <AttendanceTab centerId={centerId} examYearId={examYear?.id} schoolId={isSchoolView ? schoolId : null} printInfo={printInfo} />
+          <AttendanceTab centerId={centerId} examYearId={examYear?.id} schoolId={isSchoolView ? schoolId : null} printInfo={printInfo} allowedGrades={allowedGrades} />
         </TabsContent>
 
         {!isSchoolView && (
@@ -2442,7 +2515,8 @@ export default function CenterDashboard() {
               <MalpracticeTab 
                 centerId={centerId} 
                 examYearId={examYear?.id} 
-                reports={malpracticeReports} 
+                reports={malpracticeReports}
+                allowedGrades={allowedGrades}
               />
             </TabsContent>
 
@@ -2462,6 +2536,7 @@ export default function CenterDashboard() {
                 examYearId={examYear?.id}
                 canManage={['super_admin', 'examination_admin'].includes(user?.role || '')}
                 onRefetch={refetch}
+                allowedGrades={allowedGrades}
               />
             </TabsContent>
 
