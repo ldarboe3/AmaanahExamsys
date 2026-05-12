@@ -18262,14 +18262,13 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
       const schema = z.object({
         examYearId:    z.coerce.number().int().positive(),
         grade:         z.coerce.number().int().positive().optional().nullable(),
-        skipExisting:  z.boolean().optional().default(true),
         bufferPercent: z.number().min(0).max(100).optional().default(15),
         regionId:      z.coerce.number().int().positive().optional().nullable(),
         previewOnly:   z.boolean().optional().default(false),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
-      const { examYearId, grade, skipExisting, bufferPercent, regionId, previewOnly } = parsed.data;
+      const { examYearId, grade, bufferPercent, regionId, previewOnly } = parsed.data;
 
       const examYear = await storage.getExamYear(examYearId);
       if (!examYear) return res.status(400).json({ message: "Exam year not found" });
@@ -18374,9 +18373,10 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
         ).length;
         const overallCoverage = totalExpected > 0 ? Math.round((totalExistingInScope / totalExpected) * 100) : 0;
 
-        // wouldSkip = distinct (subject×center) combos that already have packets
-        const wouldSkip = skipExisting ? totalExistingInScope : 0;
-        const wouldCreate = Math.max(0, totalExpected - (skipExisting ? wouldSkip : 0));
+        // wouldUpdate = existing packets that will have their paperCount refreshed
+        // wouldCreate = missing subject×center combos that will get new packets
+        const wouldUpdate = totalExistingInScope;
+        const wouldCreate = Math.max(0, totalExpected - wouldUpdate);
 
         return res.json({
           previewOnly: true,
@@ -18392,7 +18392,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
           totalSubjects: subjects.length,
           totalCenters: eligibleCenters.length,
           existingPackets: totalExistingInScope,
-          wouldSkip,
+          wouldUpdate,
           wouldCreate,
           totalExpected,
           warnings,
@@ -18416,7 +18416,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
       }
 
       const created: any[] = [];
-      let skipped = 0;
+      let updated = 0;
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
       // Pre-fetch halls for eligible centers
@@ -18436,20 +18436,66 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
           if (halls.length > 0) {
             // Hall-based: one packet per hall per subject
             for (const hall of halls) {
-              if (skipExisting && existingPackets.some((p: any) =>
+              const perHallStudents = Math.ceil(studentCount / halls.length);
+              const paperCount = Math.max(10, Math.ceil(Math.ceil(perHallStudents * (1 + bufferPercent / 100)) / 10) * 10);
+
+              const existingPkt = existingPackets.find((p: any) =>
                 p.subjectId === subject.id &&
                 p.destinationCenterId === center.id &&
                 (p as any).hallId === hall.id
-              )) { skipped++; continue; }
+              );
 
-              const perHallStudents = Math.ceil(studentCount / halls.length);
-              const paperCount = Math.max(10, Math.ceil(Math.ceil(perHallStudents * (1 + bufferPercent / 100)) / 10) * 10);
+              if (existingPkt) {
+                // Update existing packet's paper count to reflect current enrollment
+                await storage.updateExamPacket(existingPkt.id, {
+                  paperCount,
+                  notes: `Grade ${selectedGrade} auto-sync: Hall "${hall.name}", ~${perHallStudents} students + ${bufferPercent}% buffer`,
+                });
+                updated++;
+              } else {
+                const securitySealNumber = `SEAL-${dateStr}-${Math.random().toString(36).toUpperCase().slice(2, 7)}`;
+                let barcode = ""; let attempts = 0;
+                do {
+                  const seq = String(existingPackets.length + created.length + 1 + attempts).padStart(3, '0');
+                  barcode = `PKT-${examYear.year}-G${selectedGrade}-${subjectCode}-C${center.id}-H${hall.id}-${seq}`;
+                  if (!await storage.getExamPacketByBarcode(barcode)) break;
+                  attempts++;
+                } while (attempts < 100);
+
+                created.push(await storage.createExamPacket({
+                  examYearId, subjectId: subject.id, grade: selectedGrade,
+                  destinationCenterId: center.id,
+                  destinationRegionId: (center as any).regionId ?? null,
+                  destinationClusterId: (center as any).clusterId ?? null,
+                  hallId: hall.id, paperCount, securitySealNumber,
+                  notes: `Grade ${selectedGrade} auto-gen: Hall "${hall.name}", ~${perHallStudents} students + ${bufferPercent}% buffer`,
+                  barcode, createdBy: user.id,
+                }));
+              }
+            }
+          } else {
+            // No halls: one packet per center
+            const paperCount = Math.max(10, Math.ceil(Math.ceil(studentCount * (1 + bufferPercent / 100)) / 10) * 10);
+
+            const existingPkt = existingPackets.find((p: any) =>
+              p.subjectId === subject.id &&
+              p.destinationCenterId === center.id &&
+              !(p as any).hallId
+            );
+
+            if (existingPkt) {
+              // Update existing packet's paper count to reflect current enrollment
+              await storage.updateExamPacket(existingPkt.id, {
+                paperCount,
+                notes: `Grade ${selectedGrade} auto-sync: ${studentCount} students + ${bufferPercent}% buffer`,
+              });
+              updated++;
+            } else {
               const securitySealNumber = `SEAL-${dateStr}-${Math.random().toString(36).toUpperCase().slice(2, 7)}`;
-
               let barcode = ""; let attempts = 0;
               do {
                 const seq = String(existingPackets.length + created.length + 1 + attempts).padStart(3, '0');
-                barcode = `PKT-${examYear.year}-G${selectedGrade}-${subjectCode}-C${center.id}-H${hall.id}-${seq}`;
+                barcode = `PKT-${examYear.year}-G${selectedGrade}-${subjectCode}-C${center.id}-${seq}`;
                 if (!await storage.getExamPacketByBarcode(barcode)) break;
                 attempts++;
               } while (attempts < 100);
@@ -18459,39 +18505,11 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
                 destinationCenterId: center.id,
                 destinationRegionId: (center as any).regionId ?? null,
                 destinationClusterId: (center as any).clusterId ?? null,
-                hallId: hall.id, paperCount, securitySealNumber,
-                notes: `Grade ${selectedGrade} auto-gen: Hall "${hall.name}", ~${perHallStudents} students + ${bufferPercent}% buffer`,
+                paperCount, securitySealNumber,
+                notes: `Grade ${selectedGrade} auto-gen: ${studentCount} students + ${bufferPercent}% buffer`,
                 barcode, createdBy: user.id,
               }));
             }
-          } else {
-            // No halls: one packet per center
-            if (skipExisting && existingPackets.some((p: any) =>
-              p.subjectId === subject.id &&
-              p.destinationCenterId === center.id &&
-              !(p as any).hallId
-            )) { skipped++; continue; }
-
-            const paperCount = Math.max(10, Math.ceil(Math.ceil(studentCount * (1 + bufferPercent / 100)) / 10) * 10);
-            const securitySealNumber = `SEAL-${dateStr}-${Math.random().toString(36).toUpperCase().slice(2, 7)}`;
-
-            let barcode = ""; let attempts = 0;
-            do {
-              const seq = String(existingPackets.length + created.length + 1 + attempts).padStart(3, '0');
-              barcode = `PKT-${examYear.year}-G${selectedGrade}-${subjectCode}-C${center.id}-${seq}`;
-              if (!await storage.getExamPacketByBarcode(barcode)) break;
-              attempts++;
-            } while (attempts < 100);
-
-            created.push(await storage.createExamPacket({
-              examYearId, subjectId: subject.id, grade: selectedGrade,
-              destinationCenterId: center.id,
-              destinationRegionId: (center as any).regionId ?? null,
-              destinationClusterId: (center as any).clusterId ?? null,
-              paperCount, securitySealNumber,
-              notes: `Grade ${selectedGrade} auto-gen: ${studentCount} students + ${bufferPercent}% buffer`,
-              barcode, createdBy: user.id,
-            }));
           }
         }
       }
@@ -18501,7 +18519,7 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
         action: "create",
         entityType: "exam_packet",
         entityId: "auto-generate",
-        newData: { details: `Auto-generated ${created.length} Grade ${selectedGrade} packets for exam year ${examYear.year}, skipped ${skipped}` },
+        newData: { details: `Auto-generated ${created.length} new + updated ${updated} Grade ${selectedGrade} packets for exam year ${examYear.year}` },
       });
 
       // ── Post-generation coverage audit ──
@@ -18540,8 +18558,8 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
 
       res.status(201).json({
         created: created.length,
-        skipped,
-        total: created.length + skipped,
+        updated,
+        total: created.length + updated,
         subjectCount: subjects.length,
         centerCount: eligibleCenters.length,
         timetableBased,
