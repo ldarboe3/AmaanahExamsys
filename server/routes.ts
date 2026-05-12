@@ -18664,6 +18664,36 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
     }
   });
 
+  app.patch("/api/exam-packets/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["super_admin", "examination_admin", "logistics_admin"].includes(user.role || "")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const id = parseInt(req.params.id);
+      const packet = await storage.getExamPacket(id);
+      if (!packet) return res.status(404).json({ message: "Packet not found" });
+
+      const editSchema = z.object({
+        paperCount: z.coerce.number().int().min(0).optional(),
+        securitySealNumber: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+      });
+      const parsed = editSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten().fieldErrors });
+
+      const updateData: Record<string, any> = {};
+      if (parsed.data.paperCount !== undefined) updateData.paperCount = parsed.data.paperCount;
+      if (parsed.data.securitySealNumber !== undefined) updateData.securitySealNumber = parsed.data.securitySealNumber;
+      if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes;
+
+      const updated = await storage.updateExamPacket(id, updateData);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.patch("/api/exam-packets/:id/status", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);

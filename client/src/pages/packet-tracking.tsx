@@ -373,6 +373,91 @@ function CreatePacketDialog({ open, onClose }: { open: boolean; onClose: () => v
   );
 }
 
+// ── Edit Packet Dialog ────────────────────────────────────────────────────────
+
+const editPacketFormSchema = z.object({
+  paperCount: z.coerce.number().int().min(0, "Must be 0 or more"),
+  securitySealNumber: z.string().optional(),
+  notes: z.string().optional(),
+});
+type EditPacketFormData = z.infer<typeof editPacketFormSchema>;
+
+function EditPacketDialog({ packet, onClose }: { packet: ExamPacket; onClose: () => void }) {
+  const { toast } = useToast();
+
+  const form = useForm<EditPacketFormData>({
+    resolver: zodResolver(editPacketFormSchema),
+    defaultValues: {
+      paperCount: packet.paperCount ?? 0,
+      securitySealNumber: packet.securitySealNumber ?? "",
+      notes: packet.notes ?? "",
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (data: EditPacketFormData) =>
+      apiRequest("PATCH", `/api/exam-packets/${packet.id}`, {
+        paperCount: data.paperCount,
+        securitySealNumber: data.securitySealNumber || null,
+        notes: data.notes || null,
+      }),
+    onSuccess: () => {
+      toast({ title: "Packet updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/exam-packets"] });
+      onClose();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Packet</DialogTitle>
+          <DialogDescription className="font-mono text-xs">{packet.barcode}</DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-4">
+            <FormField control={form.control} name="paperCount" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Paper Count</FormLabel>
+                <FormControl>
+                  <Input type="number" min={0} data-testid="input-edit-paper-count" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="securitySealNumber" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Security Seal #</FormLabel>
+                <FormControl>
+                  <Input data-testid="input-edit-seal-number" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="notes" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Notes</FormLabel>
+                <FormControl>
+                  <Input data-testid="input-edit-notes" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              <Button type="submit" disabled={mutation.isPending} data-testid="button-save-packet-edit">
+                {mutation.isPending ? "Saving…" : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Timeline Modal ────────────────────────────────────────────────────────────
 
 function TimelineModal({ barcode, onClose }: { barcode: string; onClose: () => void }) {
@@ -1482,6 +1567,7 @@ export default function PacketTracking() {
   const [currentPage, setCurrentPage] = useState(1);
   const [timelineBarcode, setTimelineBarcode] = useState<string | null>(null);
   const [showStatusFlow, setShowStatusFlow] = useState(false);
+  const [editPacket, setEditPacket] = useState<ExamPacket | null>(null);
   const { toast } = useToast();
 
   const deleteMutation = useMutation({
@@ -1969,6 +2055,15 @@ export default function PacketTracking() {
                           <Button
                             size="sm"
                             variant="ghost"
+                            onClick={() => setEditPacket(p)}
+                            data-testid={`button-edit-packet-${p.id}`}
+                          >
+                            <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             onClick={() => setTimelineBarcode(p.barcode)}
                             data-testid={`button-view-timeline-${p.id}`}
                           >
@@ -2310,6 +2405,14 @@ export default function PacketTracking() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit packet dialog */}
+      {editPacket && (
+        <EditPacketDialog
+          packet={editPacket}
+          onClose={() => setEditPacket(null)}
+        />
+      )}
     </div>
   );
 }
