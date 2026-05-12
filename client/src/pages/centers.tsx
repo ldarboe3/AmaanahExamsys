@@ -598,6 +598,7 @@ export default function Centers() {
   const [csvProgressLabel, setCsvProgressLabel] = useState('Uploading...');
   const [csvFinalResult, setCsvFinalResult] = useState<{ created: number; skipped: number; errors: string[] } | null>(null);
   const [selectedCenter, setSelectedCenter] = useState<CenterWithRelations | null>(null);
+  const [ensureCentersResult, setEnsureCentersResult] = useState<{ centersCreated: number; alreadyHadCenter: number; assigned: number; skipped: number; warnings: string[] } | null>(null);
 
   // Redirect school admins immediately to their dedicated center info page
   useEffect(() => {
@@ -813,6 +814,24 @@ export default function Centers() {
     },
     onError: () => {
       toast({ title: t.common.error, description: t.centers.failedToDelete, variant: "destructive" });
+    },
+  });
+
+  const ensureCentersMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/center-assignments/ensure-school-centers") as Promise<{ centersCreated: number; alreadyHadCenter: number; assigned: number; skipped: number; warnings: string[] }>;
+    },
+    onSuccess: (data) => {
+      setEnsureCentersResult(data);
+      invalidateCenterQueries();
+      queryClient.invalidateQueries({ queryKey: ["/api/schools", "unassigned"] });
+      toast({
+        title: "School Centers Ensured",
+        description: `${data.centersCreated} center(s) created, ${data.assigned} school(s) assigned to their own center.`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to ensure school centers.", variant: "destructive" });
     },
   });
 
@@ -1032,6 +1051,10 @@ export default function Centers() {
           <Button variant="outline" onClick={() => { setUpdateAddressFile(null); setUpdateAddressResult(null); setUpdateAddressPhase('select'); setShowUpdateAddressDialog(true); }} data-testid="button-update-addresses">
             <MapPin className="w-4 h-4 me-2" />
             Update Addresses
+          </Button>
+          <Button variant="outline" onClick={() => ensureCentersMutation.mutate()} disabled={ensureCentersMutation.isPending} data-testid="button-ensure-school-centers">
+            {ensureCentersMutation.isPending ? <Loader2 className="w-4 h-4 me-2 animate-spin" /> : <School className="w-4 h-4 me-2" />}
+            Ensure School Centers
           </Button>
           <Button onClick={openCreateDialog} data-testid="button-add-center">
             <Plus className="w-4 h-4 me-2" />
@@ -2319,6 +2342,59 @@ export default function Centers() {
               Close
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ensure School Centers Result Dialog */}
+      <Dialog open={!!ensureCentersResult} onOpenChange={(open) => { if (!open) setEnsureCentersResult(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <School className="w-5 h-5 text-primary" />
+              School Centers Ensured
+            </DialogTitle>
+            <DialogDescription>
+              Every approved school now has its own dedicated exam center.
+            </DialogDescription>
+          </DialogHeader>
+          {ensureCentersResult && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-md bg-muted/40 p-3 text-center">
+                  <p className="text-2xl font-semibold text-emerald-600 dark:text-emerald-400">{ensureCentersResult.centersCreated}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Centers created</p>
+                </div>
+                <div className="rounded-md bg-muted/40 p-3 text-center">
+                  <p className="text-2xl font-semibold">{ensureCentersResult.alreadyHadCenter}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Already had center</p>
+                </div>
+                <div className="rounded-md bg-muted/40 p-3 text-center">
+                  <p className="text-2xl font-semibold text-primary">{ensureCentersResult.assigned}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Newly assigned</p>
+                </div>
+                <div className="rounded-md bg-muted/40 p-3 text-center">
+                  <p className={`text-2xl font-semibold ${ensureCentersResult.skipped > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>{ensureCentersResult.skipped}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Skipped</p>
+                </div>
+              </div>
+              {ensureCentersResult.warnings.length > 0 && (
+                <div className="rounded-md border border-amber-200 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-950/20 p-3 space-y-1 max-h-40 overflow-y-auto">
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    Warnings ({ensureCentersResult.warnings.length})
+                  </p>
+                  {ensureCentersResult.warnings.map((w, i) => (
+                    <p key={i} className="text-xs text-muted-foreground">{w}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setEnsureCentersResult(null)} data-testid="button-close-ensure-result">
+              Done
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
