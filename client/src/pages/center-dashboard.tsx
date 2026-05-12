@@ -1862,6 +1862,8 @@ function SchoolsTab({
   canManage,
   onRefetch,
   allowedGrades,
+  clusterId,
+  clusterName,
 }: {
   schools: CenterDashboardData["schools"];
   centerId: number;
@@ -1869,6 +1871,8 @@ function SchoolsTab({
   canManage: boolean;
   onRefetch: () => void;
   allowedGrades?: number[];
+  clusterId?: number;
+  clusterName?: string;
 }) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -1876,6 +1880,9 @@ function SchoolsTab({
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [moveTargetId, setMoveTargetId] = useState<string>("");
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [addSchoolSearch, setAddSchoolSearch] = useState("");
+  const [selectedAddSchoolId, setSelectedAddSchoolId] = useState<number | null>(null);
   const visibleSchoolGrades: number[] = allowedGrades && allowedGrades.length > 0 ? allowedGrades : [];
   const [activeGrade, setActiveGrade] = useState<string>(String(visibleSchoolGrades[0] ?? ""));
   useEffect(() => {
@@ -1894,6 +1901,44 @@ function SchoolsTab({
   }[]>({
     queryKey: ["/api/centers"],
     enabled: canManage,
+  });
+
+  // Schools in the same cluster (for add dialog)
+  const { data: clusterSchools, isLoading: isLoadingClusterSchools } = useQuery<Array<{
+    id: number; name: string; schoolType: string; email?: string;
+    studentCount?: number; assignedCenterId?: number | null;
+  }>>({
+    queryKey: ["/api/schools", { clusterId }],
+    queryFn: async () => {
+      const url = clusterId ? `/api/schools?clusterId=${clusterId}` : "/api/schools";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch cluster schools");
+      return res.json();
+    },
+    enabled: canManage && showAddDialog && !!clusterId,
+  });
+
+  const assignedSchoolIds = new Set(schools.map(s => s.id));
+  const availableClusterSchools = (clusterSchools || []).filter(s => !assignedSchoolIds.has(s.id));
+  const filteredClusterSchools = availableClusterSchools.filter(s =>
+    !addSchoolSearch.trim() ||
+    s.name.toLowerCase().includes(addSchoolSearch.toLowerCase()) ||
+    (s.email || "").toLowerCase().includes(addSchoolSearch.toLowerCase())
+  );
+
+  const addSchoolMutation = useMutation({
+    mutationFn: async (schoolId: number) => {
+      return apiRequest("POST", `/api/schools/${schoolId}/assign-center`, { centerId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/centers") });
+      setShowAddDialog(false);
+      setSelectedAddSchoolId(null);
+      setAddSchoolSearch("");
+      onRefetch();
+      toast({ title: "School Added", description: "The school has been assigned to this center." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to assign school", variant: "destructive" }),
   });
 
   const otherCenters = (allCenters || []).filter(c => c.id !== centerId);
@@ -1952,15 +1997,98 @@ function SchoolsTab({
       })
     : nameFiltered;
 
+  const addSchoolDialog = canManage && (
+    <Dialog open={showAddDialog} onOpenChange={(open) => { setShowAddDialog(open); if (!open) { setAddSchoolSearch(""); setSelectedAddSchoolId(null); } }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Plus className="w-5 h-5 text-primary" />
+            Add School to This Center
+          </DialogTitle>
+          <DialogDescription>
+            Select a school from {clusterName ? <span className="font-medium">{clusterName}</span> : "this cluster"} to assign to this center.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-3 py-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Search schools..."
+              value={addSchoolSearch}
+              onChange={e => setAddSchoolSearch(e.target.value)}
+              className="pl-9"
+              data-testid="input-add-school-search"
+              autoFocus
+            />
+          </div>
+          <div className="border rounded-md overflow-y-auto max-h-72 divide-y">
+            {isLoadingClusterSchools ? (
+              <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Loading schools…</span>
+              </div>
+            ) : filteredClusterSchools.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                {availableClusterSchools.length === 0 ? "All schools in this cluster are already assigned to this center." : "No schools match your search."}
+              </p>
+            ) : (
+              filteredClusterSchools.map(s => {
+                const selected = selectedAddSchoolId === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSelectedAddSchoolId(s.id)}
+                    data-testid={`option-add-school-${s.id}`}
+                    className={`w-full text-left px-4 py-3 transition-colors hover-elevate ${selected ? "bg-primary/10" : ""}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-sm leading-snug" dir="auto">{s.name}</span>
+                      {s.assignedCenterId && s.assignedCenterId !== centerId && (
+                        <Badge variant="secondary" className="text-xs shrink-0">Assigned elsewhere</Badge>
+                      )}
+                    </div>
+                    {s.email && <p className="text-xs text-muted-foreground mt-0.5">{s.email}</p>}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
+          <Button
+            onClick={() => selectedAddSchoolId && addSchoolMutation.mutate(selectedAddSchoolId)}
+            disabled={!selectedAddSchoolId || addSchoolMutation.isPending}
+            data-testid="button-confirm-add-school"
+          >
+            {addSchoolMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+            <Plus className="w-4 h-4 me-2" />
+            Add School
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (schools.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <School className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium mb-2">No Schools Assigned</h3>
-          <p className="text-muted-foreground">No schools have been assigned to this center yet.</p>
-        </CardContent>
-      </Card>
+      <>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <School className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">No Schools Assigned</h3>
+            <p className="text-muted-foreground mb-4">No schools have been assigned to this center yet.</p>
+            {canManage && (
+              <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-school-empty">
+                <Plus className="w-4 h-4 me-2" />
+                Add School to This Center
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+        {addSchoolDialog}
+      </>
     );
   }
 
@@ -1981,15 +2109,27 @@ function SchoolsTab({
             {totalStudents} Students enrolled
           </div>
         </div>
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search schools..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9"
-            data-testid="input-schools-search"
-          />
+        <div className="flex items-center gap-2">
+          {canManage && (
+            <Button
+              onClick={() => setShowAddDialog(true)}
+              size="sm"
+              data-testid="button-add-school-to-center"
+            >
+              <Plus className="w-4 h-4 me-2" />
+              Add School
+            </Button>
+          )}
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search schools..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9"
+              data-testid="input-schools-search"
+            />
+          </div>
         </div>
       </div>
 
@@ -2095,6 +2235,8 @@ function SchoolsTab({
           ))}
         </div>
       )}
+
+      {addSchoolDialog}
 
       {/* Move to Another Center Dialog */}
       <Dialog open={showMoveDialog} onOpenChange={(open) => { setShowMoveDialog(open); if (!open) { setActionSchool(null); setMoveTargetId(""); setMoveCenterSearch(""); } }}>
@@ -2573,6 +2715,8 @@ export default function CenterDashboard() {
                 canManage={['super_admin', 'examination_admin'].includes(user?.role || '')}
                 onRefetch={refetch}
                 allowedGrades={allowedGrades}
+                clusterId={center.clusterId}
+                clusterName={center.clusterName}
               />
             </TabsContent>
 
