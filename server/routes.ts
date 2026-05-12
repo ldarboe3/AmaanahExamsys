@@ -1647,6 +1647,62 @@ ${pages.map(p => `  <url>
     }
   });
 
+  // Sync students to their schools under a center
+  app.post("/api/centers/:id/sync-students", isAuthenticated, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !['super_admin', 'examination_admin'].includes(user.role || '')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const centerId = parseInt(req.params.id);
+      const examYearId = req.body.examYearId ? parseInt(req.body.examYearId) : null;
+
+      // Resolve active exam year if not provided
+      const activeYear = examYearId
+        ? await storage.getExamYear(examYearId)
+        : await storage.getActiveExamYear();
+      const yearId = activeYear?.id ?? null;
+
+      // Get all schools assigned to this center
+      const assignedSchools = await storage.getSchoolsByCenter(centerId);
+      if (assignedSchools.length === 0) {
+        return res.json({ totalSchools: 0, totalStudents: 0, schools: [], examYear: activeYear?.name ?? null });
+      }
+
+      // Get all students for those schools in one query
+      const allStudents = await storage.getStudentsByCenter(centerId);
+      const yearStudents = yearId
+        ? allStudents.filter((s: any) => s.examYearId === yearId)
+        : allStudents;
+
+      // Build per-school summary
+      const schoolSummaries = assignedSchools.map((school: any) => {
+        const schoolStudents = yearStudents.filter((s: any) => s.schoolId === school.id);
+        const gradeBreakdown: Record<number, number> = {};
+        for (const s of schoolStudents) {
+          if (s.grade != null) gradeBreakdown[s.grade] = (gradeBreakdown[s.grade] || 0) + 1;
+        }
+        return {
+          schoolId: school.id,
+          schoolName: school.name,
+          studentCount: schoolStudents.length,
+          gradeBreakdown,
+        };
+      });
+
+      const totalStudents = schoolSummaries.reduce((sum: number, s: any) => sum + s.studentCount, 0);
+
+      res.json({
+        totalSchools: assignedSchools.length,
+        totalStudents,
+        examYear: activeYear?.name ?? null,
+        schools: schoolSummaries,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Schools API
   app.get("/api/schools", isAuthenticated, async (req, res) => {
     try {

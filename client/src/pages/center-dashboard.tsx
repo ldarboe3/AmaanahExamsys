@@ -1993,6 +1993,7 @@ function SchoolsTab({
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addSchoolSearch, setAddSchoolSearch] = useState("");
   const [selectedAddSchoolId, setSelectedAddSchoolId] = useState<number | null>(null);
+  const [syncResult, setSyncResult] = useState<{ totalStudents: number; totalSchools: number; examYear: string | null } | null>(null);
   const visibleSchoolGrades: number[] = allowedGrades && allowedGrades.length > 0 ? allowedGrades : [];
   const [activeGrade, setActiveGrade] = useState<string>(String(visibleSchoolGrades[0] ?? ""));
   useEffect(() => {
@@ -2062,6 +2063,21 @@ function SchoolsTab({
       (c.cluster?.name || "").toLowerCase().includes(q) ||
       (c.address || "").toLowerCase().includes(q)
     );
+  });
+
+  const syncStudentsMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/centers/${centerId}/sync-students`, { examYearId });
+    },
+    onSuccess: (res: any) => {
+      setSyncResult({ totalStudents: res.totalStudents, totalSchools: res.totalSchools, examYear: res.examYear });
+      onRefetch();
+      toast({
+        title: "Students Synced",
+        description: `Found ${res.totalStudents} student${res.totalStudents !== 1 ? "s" : ""} across ${res.totalSchools} school${res.totalSchools !== 1 ? "s" : ""}${res.examYear ? ` for ${res.examYear}` : ""}.`,
+      });
+    },
+    onError: (e: any) => toast({ title: "Sync Failed", description: e.message || "Could not sync students", variant: "destructive" }),
   });
 
   const moveMutation = useMutation({
@@ -2219,16 +2235,28 @@ function SchoolsTab({
             {totalStudents} Students enrolled
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {canManage && (
-            <Button
-              onClick={() => setShowAddDialog(true)}
-              size="sm"
-              data-testid="button-add-school-to-center"
-            >
-              <Plus className="w-4 h-4 me-2" />
-              Add School
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => syncStudentsMutation.mutate()}
+                disabled={syncStudentsMutation.isPending}
+                data-testid="button-sync-students"
+              >
+                {syncStudentsMutation.isPending ? <Loader2 className="w-4 h-4 me-2 animate-spin" /> : <RefreshCw className="w-4 h-4 me-2" />}
+                Sync Students
+              </Button>
+              <Button
+                onClick={() => setShowAddDialog(true)}
+                size="sm"
+                data-testid="button-add-school-to-center"
+              >
+                <Plus className="w-4 h-4 me-2" />
+                Add School
+              </Button>
+            </>
           )}
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
