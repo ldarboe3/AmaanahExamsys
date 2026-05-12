@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { formatNumber } from "@/lib/formatters";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1032,7 +1033,9 @@ export default function Students() {
     return matchesSearch;
   });
 
-  const pendingCount = students?.filter(s => s.status === 'pending').length || 0;
+  // Grade-scoped counts from the full (unpaginated) allStudents list
+  const gradeAllStudents = allStudents?.filter(s => s.grade === selectedGrade) || [];
+  const pendingCount = gradeAllStudents.filter(s => s.status === 'pending').length;
 
   // Toggle select all pending students (must be after filteredStudents is defined)
   const toggleSelectAll = () => {
@@ -2082,7 +2085,7 @@ export default function Students() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">{t.dashboard.totalStudents}</p>
-                  <p className="text-2xl font-semibold">{students?.length || 0}</p>
+                  <p className="text-2xl font-semibold">{formatNumber(totalStudents)}</p>
                 </div>
                 <div className={`w-10 h-10 rounded-md ${colors.bg} flex items-center justify-center`}>
                   <Users className={`w-5 h-5 ${colors.icon}`} />
@@ -2095,7 +2098,7 @@ export default function Students() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">{t.common.pending}</p>
-                  <p className="text-2xl font-semibold">{pendingCount}</p>
+                  <p className="text-2xl font-semibold">{formatNumber(pendingCount)}</p>
                 </div>
                 <div className="w-10 h-10 rounded-md bg-chart-5/10 flex items-center justify-center">
                   <Users className="w-5 h-5 text-chart-5" />
@@ -2109,7 +2112,7 @@ export default function Students() {
                 <div>
                   <p className="text-sm text-muted-foreground">{t.common.approved}</p>
                   <p className="text-2xl font-semibold">
-                    {students?.filter(s => s.status === 'approved').length || 0}
+                    {formatNumber(gradeAllStudents.filter(s => s.status === 'approved').length)}
                   </p>
                 </div>
                 <div className="w-10 h-10 rounded-md bg-chart-3/10 flex items-center justify-center">
@@ -2124,7 +2127,7 @@ export default function Students() {
                 <div>
                   <p className="text-sm text-muted-foreground">{isRTL ? "مع رقم الفهرس" : "With Index #"}</p>
                   <p className="text-2xl font-semibold">
-                    {students?.filter(s => s.indexNumber).length || 0}
+                    {formatNumber(gradeAllStudents.filter(s => s.indexNumber).length)}
                   </p>
                 </div>
                 <div className="w-10 h-10 rounded-md bg-chart-2/10 flex items-center justify-center">
