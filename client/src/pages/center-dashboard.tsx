@@ -588,13 +588,6 @@ function AttendanceTab({ centerId, examYearId, schoolId, printInfo, allowedGrade
   const [rosterSearch, setRosterSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const isSchoolView = !!schoolId;
-  const visibleAttGrades: number[] = allowedGrades && allowedGrades.length > 0 ? allowedGrades : [];
-  const [activeGrade, setActiveGrade] = useState<string>(String(visibleAttGrades[0] ?? ""));
-  useEffect(() => {
-    if (visibleAttGrades.length > 0 && !visibleAttGrades.map(String).includes(activeGrade)) {
-      setActiveGrade(String(visibleAttGrades[0]));
-    }
-  }, [visibleAttGrades.join(","), activeGrade]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // For school admin: fetch their students' attendance records
   const { data: schoolAttendance, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useQuery<Array<{
@@ -671,9 +664,7 @@ function AttendanceTab({ centerId, examYearId, schoolId, printInfo, allowedGrade
     }
   };
 
-  const gradeSchoolAttendance = activeGrade
-    ? (schoolAttendance ?? []).filter(r => String(r.student.grade) === activeGrade)
-    : (schoolAttendance ?? []);
+  const gradeSchoolAttendance = schoolAttendance ?? [];
   const presentCount = gradeSchoolAttendance.filter(r => r.attendance.some(a => a.status === "present")).length;
   const absentCount = gradeSchoolAttendance.filter(r => r.attendance.some(a => a.status === "absent")).length;
   const unmarkedCount = gradeSchoolAttendance.filter(r => r.attendance.length === 0).length;
@@ -729,7 +720,6 @@ function AttendanceTab({ centerId, examYearId, schoolId, printInfo, allowedGrade
 
   return (
     <div className="space-y-4">
-      <GradeTabBar grades={visibleAttGrades} activeGrade={activeGrade} onGradeChange={setActiveGrade} />
       {/* School-scoped attendance summary */}
       {isSchoolView && (
         <div className="grid grid-cols-3 gap-3">
@@ -912,7 +902,7 @@ function AttendanceTab({ centerId, examYearId, schoolId, printInfo, allowedGrade
             fullName.includes(rosterSearch.toLowerCase()) ||
             (row.index_number ?? "").includes(rosterSearch) ||
             row.school_name.toLowerCase().includes(rosterSearch.toLowerCase());
-          const matchesGrade = !activeGrade || String(row.grade) === activeGrade;
+          const matchesGrade = true;
           const matchesStatus = statusFilter === "all" ||
             (statusFilter === "present" && row.is_present === true) ||
             (statusFilter === "absent" && row.is_present === false) ||
@@ -1086,13 +1076,6 @@ function MalpracticeTab({
   const { toast } = useToast();
   const [showReportDialog, setShowReportDialog] = useState(false);
 
-  const visibleMalGrades: number[] = allowedGrades && allowedGrades.length > 0 ? allowedGrades : [];
-  const [activeGrade, setActiveGrade] = useState<string>(String(visibleMalGrades[0] ?? ""));
-  useEffect(() => {
-    if (visibleMalGrades.length > 0 && !visibleMalGrades.map(String).includes(activeGrade)) {
-      setActiveGrade(String(visibleMalGrades[0]));
-    }
-  }, [visibleMalGrades.join(","), activeGrade]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const form = useForm<MalpracticeFormData>({
     resolver: zodResolver(malpracticeSchema),
@@ -1152,13 +1135,10 @@ function MalpracticeTab({
     return <Badge variant={variants[status] || "secondary"}>{status.replace('_', ' ')}</Badge>;
   };
 
-  const filteredReports = activeGrade
-    ? reports.filter(r => !r.grade || String(r.grade) === activeGrade)
-    : reports;
+  const filteredReports = reports;
 
   return (
     <div className="space-y-4">
-      <GradeTabBar grades={visibleMalGrades} activeGrade={activeGrade} onGradeChange={setActiveGrade} />
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Malpractice Reports</h3>
@@ -1265,7 +1245,7 @@ function MalpracticeTab({
                 )}
               />
 
-              {visibleMalGrades.length > 0 && (
+              {(allowedGrades && allowedGrades.length > 0) && (
                 <FormField
                   control={form.control}
                   name="grade"
@@ -1279,7 +1259,7 @@ function MalpracticeTab({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {visibleMalGrades.map(g => (
+                          {allowedGrades.map((g: number) => (
                             <SelectItem key={g} value={String(g)}>{gradeLabel(g)}</SelectItem>
                           ))}
                         </SelectContent>
@@ -1876,13 +1856,6 @@ function SchoolsTab({
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [moveTargetId, setMoveTargetId] = useState<string>("");
-  const visibleSchoolGrades: number[] = allowedGrades && allowedGrades.length > 0 ? allowedGrades : [];
-  const [activeGrade, setActiveGrade] = useState<string>(String(visibleSchoolGrades[0] ?? ""));
-  useEffect(() => {
-    if (visibleSchoolGrades.length > 0 && !visibleSchoolGrades.map(String).includes(activeGrade)) {
-      setActiveGrade(String(visibleSchoolGrades[0]));
-    }
-  }, [visibleSchoolGrades.join(","), activeGrade]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [moveCenterSearch, setMoveCenterSearch] = useState("");
 
@@ -1941,16 +1914,10 @@ function SchoolsTab({
     onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to remove school", variant: "destructive" }),
   });
 
-  const nameFiltered = schools.filter(s =>
+  const filtered = schools.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     (s.email || "").toLowerCase().includes(search.toLowerCase())
   );
-  const filtered = activeGrade
-    ? nameFiltered.filter(s => {
-        if (!s.gradeBreakdown || Object.keys(s.gradeBreakdown).length === 0) return true;
-        return (s.gradeBreakdown[Number(activeGrade)] ?? 0) > 0;
-      })
-    : nameFiltered;
 
   if (schools.length === 0) {
     return (
@@ -1968,7 +1935,6 @@ function SchoolsTab({
 
   return (
     <div className="space-y-4">
-      <GradeTabBar grades={visibleSchoolGrades} activeGrade={activeGrade} onGradeChange={setActiveGrade} />
       {/* Summary strip */}
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex flex-wrap gap-3">
@@ -2273,11 +2239,30 @@ export default function CenterDashboard() {
   const { toast } = useToast();
   const { isRTL } = useLanguage();
   const { user } = useAuth();
+  const [selectedExamYearId, setSelectedExamYearId] = useState<number | undefined>(undefined);
 
-  const { data, isLoading, error, refetch } = useQuery<CenterDashboardData>({
-    queryKey: [`/api/centers/${centerId}/dashboard`],
+  const { data: allExamYears } = useQuery<Array<{ id: number; name: string; year: number; isActive: boolean }>>({
+    queryKey: ["/api/exam-years"],
     enabled: centerId > 0,
   });
+
+  const dashboardUrl = centerId > 0
+    ? (selectedExamYearId
+        ? `/api/centers/${centerId}/dashboard?examYearId=${selectedExamYearId}`
+        : `/api/centers/${centerId}/dashboard`)
+    : null;
+
+  const { data, isLoading, error, refetch } = useQuery<CenterDashboardData>({
+    queryKey: [dashboardUrl],
+    enabled: !!dashboardUrl,
+  });
+
+  // Initialize selectedExamYearId from the active year returned by the API
+  useEffect(() => {
+    if (data?.examYear?.id && !selectedExamYearId) {
+      setSelectedExamYearId(data.examYear.id);
+    }
+  }, [data?.examYear?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: halls = [] } = useQuery<CenterHall[]>({
     queryKey: [`/api/centers/${centerId}/halls`],
@@ -2397,9 +2382,25 @@ export default function CenterDashboard() {
                   {center.schoolType}
                 </Badge>
               )}
-              {examYear && (
+              {allExamYears && allExamYears.length > 0 ? (
+                <Select
+                  value={selectedExamYearId ? String(selectedExamYearId) : ""}
+                  onValueChange={(v) => setSelectedExamYearId(Number(v))}
+                >
+                  <SelectTrigger className="h-7 text-xs px-2 gap-1 min-w-[150px]" data-testid="select-exam-year">
+                    <SelectValue placeholder="Select year..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allExamYears.map(y => (
+                      <SelectItem key={y.id} value={String(y.id)}>
+                        {y.name}{y.isActive ? " (Active)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : examYear ? (
                 <Badge variant="outline" className="text-xs">{examYear.name}</Badge>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

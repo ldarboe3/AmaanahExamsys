@@ -471,7 +471,11 @@ function CenterCard({
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-5 gap-1 pt-2 border-t border-black/5 dark:border-white/5">
+        <div className="grid grid-cols-6 gap-1 pt-2 border-t border-black/5 dark:border-white/5">
+          <div className="text-center">
+            <p className={`text-base font-semibold ${theme.accent}`}>{(center.assignedStudentsCount || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Students</p>
+          </div>
           <div className="text-center">
             <p className={`text-base font-semibold ${theme.accent}`}>
               {(center.hallTotalCapacity || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
@@ -1047,10 +1051,6 @@ export default function Centers() {
           <Button variant="outline" onClick={() => { setCsvStep('select'); setCsvPreviewData(null); setCsvFile(null); setCsvFinalResult(null); setShowCsvUploadDialog(true); }} data-testid="button-csv-upload-centers">
             <Upload className="w-4 h-4 me-2" />
             Import CSV
-          </Button>
-          <Button variant="outline" onClick={() => { setUpdateAddressFile(null); setUpdateAddressResult(null); setUpdateAddressPhase('select'); setShowUpdateAddressDialog(true); }} data-testid="button-update-addresses">
-            <MapPin className="w-4 h-4 me-2" />
-            Update Addresses
           </Button>
           <Button variant="outline" onClick={() => ensureCentersMutation.mutate()} disabled={ensureCentersMutation.isPending} data-testid="button-ensure-school-centers">
             {ensureCentersMutation.isPending ? <Loader2 className="w-4 h-4 me-2 animate-spin" /> : <School className="w-4 h-4 me-2" />}

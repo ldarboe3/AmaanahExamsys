@@ -1337,12 +1337,17 @@ ${pages.map(p => `  <url>
       const clusterMap = new Map(allClusters.map(c => [c.id, c]));
 
       // Add school, student, hall counts and region/cluster objects for each center
+      const activeYearForList = await storage.getActiveExamYear();
       const centersWithCounts = await Promise.all(centers.map(async (center) => {
-        const [schools, students, halls] = await Promise.all([
+        const [schools, allStudents, halls] = await Promise.all([
           storage.getSchoolsByCenter(center.id),
           storage.getStudentsByCenter(center.id),
           storage.getCenterHallsByCenter(center.id),
         ]);
+        // Filter students to active exam year for accurate current-year count
+        const students = activeYearForList
+          ? allStudents.filter((s: any) => s.examYearId === activeYearForList.id)
+          : allStudents;
         const hallTotalCapacity = halls.reduce((sum: number, h: any) => sum + (h.capacity || 0), 0);
         const region = center.regionId ? regionMap.get(center.regionId) : undefined;
         const cluster = center.clusterId ? clusterMap.get(center.clusterId) : undefined;
@@ -14847,6 +14852,9 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         warnings: [] as string[],
       };
 
+      const activeYearForEnsure = await storage.getActiveExamYear();
+      const STUDENTS_PER_HALL = 40;
+
       for (const school of approvedSchools) {
         if (!school.regionId || !school.clusterId) {
           results.skipped++;
@@ -14884,6 +14892,23 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         if (school.assignedCenterId !== center.id) {
           await storage.updateSchool(school.id, { assignedCenterId: center.id });
           results.assigned++;
+        }
+
+        // Auto-generate halls based on student count (for new centers or centers with no halls)
+        const existingHalls = await storage.getCenterHallsByCenter(center.id);
+        if (existingHalls.length === 0) {
+          const schoolStudents = await storage.getStudentsBySchool(school.id);
+          const yearStudents = activeYearForEnsure
+            ? schoolStudents.filter((s: any) => s.examYearId === activeYearForEnsure.id && s.status === 'approved')
+            : schoolStudents.filter((s: any) => s.status === 'approved');
+          const hallsNeeded = Math.max(1, Math.ceil(yearStudents.length / STUDENTS_PER_HALL));
+          for (let i = 1; i <= hallsNeeded; i++) {
+            await storage.createCenterHall({
+              centerId: center.id,
+              name: `Hall ${i}`,
+              capacity: STUDENTS_PER_HALL,
+            });
+          }
         }
       }
 
