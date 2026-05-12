@@ -471,11 +471,7 @@ function CenterCard({
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-6 gap-1 pt-2 border-t border-black/5 dark:border-white/5">
-          <div className="text-center">
-            <p className={`text-base font-semibold ${theme.accent}`}>{(center.assignedStudentsCount || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">Students</p>
-          </div>
+        <div className="grid grid-cols-5 gap-1 pt-2 border-t border-black/5 dark:border-white/5">
           <div className="text-center">
             <p className={`text-base font-semibold ${theme.accent}`}>
               {(center.hallTotalCapacity || 0).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
