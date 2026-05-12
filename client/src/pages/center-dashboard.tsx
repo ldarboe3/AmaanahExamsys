@@ -75,6 +75,7 @@ import {
   UserMinus,
   Home,
   Building2,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -2415,32 +2416,33 @@ export default function CenterDashboard() {
                   {center.schoolType}
                 </Badge>
               )}
-              {allExamYears && allExamYears.length > 0 ? (
-                <Select
-                  value={selectedExamYearId ? String(selectedExamYearId) : ""}
-                  onValueChange={(v) => setSelectedExamYearId(Number(v))}
-                >
-                  <SelectTrigger className="h-7 text-xs px-2 gap-1 min-w-[150px]" data-testid="select-exam-year">
-                    <SelectValue placeholder="Select year..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allExamYears.map(y => (
-                      <SelectItem key={y.id} value={String(y.id)}>
-                        {y.name}{y.isActive ? " (Active)" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : examYear ? (
-                <Badge variant="outline" className="text-xs">{examYear.name}</Badge>
-              ) : null}
             </div>
           </div>
         </div>
-        <Button onClick={() => refetch()} variant="outline" size="sm">
-          <RefreshCw className="w-4 h-4 me-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {allExamYears && allExamYears.length > 0 && (
+            <Select
+              value={selectedExamYearId ? String(selectedExamYearId) : ""}
+              onValueChange={(v) => setSelectedExamYearId(Number(v))}
+            >
+              <SelectTrigger className="min-w-[180px]" data-testid="select-exam-year">
+                <CalendarIcon className="w-4 h-4 me-1 text-muted-foreground" />
+                <SelectValue placeholder="Select exam year..." />
+              </SelectTrigger>
+              <SelectContent>
+                {allExamYears.map(y => (
+                  <SelectItem key={y.id} value={String(y.id)}>
+                    {y.name}{y.isActive ? " (Active)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button onClick={() => refetch()} variant="outline" size="sm">
+            <RefreshCw className="w-4 h-4 me-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {isSchoolView ? (
@@ -2540,7 +2542,7 @@ export default function CenterDashboard() {
         </TabsContent>
 
         <TabsContent value="attendance" className="mt-4">
-          <AttendanceTab centerId={centerId} examYearId={examYear?.id} schoolId={isSchoolView ? schoolId : null} printInfo={printInfo} allowedGrades={allowedGrades} />
+          <AttendanceTab centerId={centerId} examYearId={selectedExamYearId} schoolId={isSchoolView ? schoolId : null} printInfo={printInfo} allowedGrades={allowedGrades} />
         </TabsContent>
 
         {!isSchoolView && (
@@ -2548,7 +2550,7 @@ export default function CenterDashboard() {
             <TabsContent value="malpractice" className="mt-4">
               <MalpracticeTab 
                 centerId={centerId} 
-                examYearId={examYear?.id} 
+                examYearId={selectedExamYearId} 
                 reports={malpracticeReports}
                 allowedGrades={allowedGrades}
               />
@@ -2557,7 +2559,7 @@ export default function CenterDashboard() {
             <TabsContent value="logistics" className="mt-4">
               <LogisticsTab 
                 centerId={centerId}
-                examYearId={examYear?.id}
+                examYearId={selectedExamYearId}
                 scriptMovements={scriptMovements}
                 allowedGrades={allowedGrades}
               />
@@ -2567,7 +2569,7 @@ export default function CenterDashboard() {
               <SchoolsTab
                 schools={schools}
                 centerId={centerId}
-                examYearId={examYear?.id}
+                examYearId={selectedExamYearId}
                 canManage={['super_admin', 'examination_admin'].includes(user?.role || '')}
                 onRefetch={refetch}
                 allowedGrades={allowedGrades}
