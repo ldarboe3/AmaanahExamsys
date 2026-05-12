@@ -589,10 +589,10 @@ export default function Students() {
     return queryString ? `/api/students?${queryString}` : "/api/students";
   }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedGrade, selectedExamYear, isSchoolAdmin, effectiveSchoolId, pageSize, currentPage]);
 
-  // Fetch all students for counting (without grade filter) - scoped to selected exam year
+  // Fetch all students for counting (without grade filter, without status filter) - scoped to selected exam year
+  // NOTE: intentionally excludes statusFilter so grade card totals always reflect ALL students
   const allStudentsUrl = useMemo(() => {
     const queryParams = new URLSearchParams();
-    if (statusFilter !== "all") queryParams.set("status", statusFilter);
     // Filter by selected exam year
     if (selectedExamYear) {
       queryParams.set("examYearId", selectedExamYear.toString());
@@ -607,7 +607,7 @@ export default function Students() {
     }
     const queryString = queryParams.toString();
     return queryString ? `/api/students?${queryString}` : "/api/students";
-  }, [statusFilter, regionFilter, clusterFilter, schoolFilter, selectedExamYear, isSchoolAdmin, effectiveSchoolId]);
+  }, [regionFilter, clusterFilter, schoolFilter, selectedExamYear, isSchoolAdmin, effectiveSchoolId]);
 
   // Fetch all students for school across ALL exam years (for past year visibility check)
   // This is NOT scoped by selectedExamYear so we can always check which years have students

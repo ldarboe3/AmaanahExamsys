@@ -205,6 +205,27 @@ export default function Results() {
     });
   }, [schools, regionFilter, clusterFilter]);
 
+  // Fetch ALL students for the selected exam year (no grade filter) — used for grade card counts
+  const { data: allYearStudentsResponse } = useQuery<{ data: any[]; total: number }>({
+    queryKey: ["/api/students", "grade-counts", selectedExamYear],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedExamYear) params.set("examYearId", String(selectedExamYear));
+      const response = await fetch(`/api/students?${params}`);
+      return response.json();
+    },
+    enabled: !!selectedExamYear && !selectedGrade,
+  });
+
+  const allYearStudents = allYearStudentsResponse?.data || [];
+
+  const getGradeStudentCount = (grade: number) =>
+    allYearStudents.filter((s: any) => s.grade === grade).length;
+  const getGradeApprovedCount = (grade: number) =>
+    allYearStudents.filter((s: any) => s.grade === grade && s.status === "approved").length;
+  const getGradePendingCount = (grade: number) =>
+    allYearStudents.filter((s: any) => s.grade === grade && s.status === "pending").length;
+
   // Get unique grades
   const uniqueGrades = [3, 6, 9, 12];
 
@@ -560,6 +581,9 @@ export default function Results() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {uniqueGrades.map((grade) => {
             const colors = getGradeColors(grade);
+            const totalCount = getGradeStudentCount(grade);
+            const approvedCount = getGradeApprovedCount(grade);
+            const pendingCount = getGradePendingCount(grade);
             return (
               <Card 
                 key={grade}
@@ -574,9 +598,25 @@ export default function Results() {
                     </div>
                   </div>
                   <h3 className="text-xl font-bold mb-1">{getGradeLabel(grade, isRTL)}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {isRTL ? "عرض النتائج" : "View results"}
+                  <p className="text-sm font-medium text-foreground">
+                    {formatNumber(totalCount)} {isRTL ? "طالب مسجل" : "students registered"}
                   </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-chart-2 inline-block" />
+                      {formatNumber(approvedCount)} {isRTL ? "معتمد" : "approved"}
+                    </span>
+                    <span className="mx-1.5">•</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-chart-4 inline-block" />
+                      {formatNumber(pendingCount)} {isRTL ? "معلق" : "pending"}
+                    </span>
+                  </p>
+                  <div className="border-t mt-3 pt-3">
+                    <p className="text-xs text-muted-foreground">
+                      {isRTL ? "انقر للعرض" : "Click to view"}
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             );
