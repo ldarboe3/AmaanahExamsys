@@ -1,15 +1,2 @@
-name: Deploy to Render
-
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Render deploy
-        run: |
-          curl -f -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}" \
-            -H "Content-Type: application/json"
+# Auto-deploy is handled by Render's native GitHub integration.
+# Enable it in: Render dashboard → your service → Settings → Auto-Deploy → Yes
