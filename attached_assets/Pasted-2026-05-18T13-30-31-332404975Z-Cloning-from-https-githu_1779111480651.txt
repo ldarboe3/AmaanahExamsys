@@ -1,0 +1,47 @@
+2026-05-18T13:30:31.332404975Z ==> Cloning from https://github.com/ldarboe3/AmaanahExamsys
+2026-05-18T13:30:38.085728679Z ==> Checking out commit d8545a7147e6b5c46ef8c7c5024321b4f0ff20b8 in branch main
+2026-05-18T13:30:40.472816414Z ==> Requesting Node.js version 20
+2026-05-18T13:30:42.979492647Z ==> Using Node.js version 20.20.2 via /opt/render/project/src/.nvmrc
+2026-05-18T13:30:42.979522778Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2026-05-18T13:30:43.066260269Z ==> Running build command 'npm install && npm run build'...
+2026-05-18T13:31:21.346147577Z 
+2026-05-18T13:31:21.346184657Z added 694 packages, and audited 695 packages in 38s
+2026-05-18T13:31:21.346203128Z 
+2026-05-18T13:31:21.346234778Z 83 packages are looking for funding
+2026-05-18T13:31:21.346241328Z   run `npm fund` for details
+2026-05-18T13:31:21.40584956Z 
+2026-05-18T13:31:21.405887061Z 23 vulnerabilities (5 low, 7 moderate, 9 high, 2 critical)
+2026-05-18T13:31:21.405892581Z 
+2026-05-18T13:31:21.405897831Z To address issues that do not require attention, run:
+2026-05-18T13:31:21.405903001Z   npm audit fix
+2026-05-18T13:31:21.405907831Z 
+2026-05-18T13:31:21.405913861Z To address all issues possible (including breaking changes), run:
+2026-05-18T13:31:21.405919371Z   npm audit fix --force
+2026-05-18T13:31:21.405923931Z 
+2026-05-18T13:31:21.405928761Z Some issues need review, and may require choosing
+2026-05-18T13:31:21.405933551Z a different dependency.
+2026-05-18T13:31:21.405938131Z 
+2026-05-18T13:31:21.405943341Z Run `npm audit` for details.
+2026-05-18T13:31:21.704296877Z 
+2026-05-18T13:31:21.704326327Z > rest-express@1.0.0 build
+2026-05-18T13:31:21.704332287Z > node build.mjs
+2026-05-18T13:31:21.704337247Z 
+2026-05-18T13:31:21.779611973Z node:internal/modules/esm/resolve:873
+2026-05-18T13:31:21.779641153Z   throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+2026-05-18T13:31:21.779646723Z         ^
+2026-05-18T13:31:21.779651633Z 
+2026-05-18T13:31:21.779657733Z Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'esbuild' imported from /opt/render/project/src/build.mjs
+2026-05-18T13:31:21.779663974Z     at packageResolve (node:internal/modules/esm/resolve:873:9)
+2026-05-18T13:31:21.779668924Z     at moduleResolve (node:internal/modules/esm/resolve:946:18)
+2026-05-18T13:31:21.779677764Z     at defaultResolve (node:internal/modules/esm/resolve:1188:11)
+2026-05-18T13:31:21.779683174Z     at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:708:12)
+2026-05-18T13:31:21.779688064Z     at #cachedDefaultResolve (node:internal/modules/esm/loader:657:25)
+2026-05-18T13:31:21.779692934Z     at ModuleLoader.resolve (node:internal/modules/esm/loader:640:38)
+2026-05-18T13:31:21.779730574Z     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:264:38)
+2026-05-18T13:31:21.779739364Z     at ModuleJob._link (node:internal/modules/esm/module_job:168:49) {
+2026-05-18T13:31:21.779744594Z   code: 'ERR_MODULE_NOT_FOUND'
+2026-05-18T13:31:21.779749414Z }
+2026-05-18T13:31:21.779754054Z 
+2026-05-18T13:31:21.779758954Z Node.js v20.20.2
+2026-05-18T13:31:21.863872625Z ==> Build failed 😞
+2026-05-18T13:31:21.863934075Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
