@@ -27,6 +27,32 @@ export class ObjectNotFoundError extends Error {
   }
 }
 
+/**
+ * Standalone helper — upload a PDF buffer to Cloudinary and return the HTTPS URL.
+ * Used directly by PDF generation services.
+ */
+export async function uploadPDFBuffer(buffer: Buffer, filename: string): Promise<string> {
+  const publicId = filename.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const result = await new Promise<any>((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: CLOUDINARY_FOLDER + '/pdfs',
+        resource_type: 'raw',
+        type: 'upload',
+        public_id: publicId,
+        format: 'pdf',
+        overwrite: true,
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    );
+    stream.end(buffer);
+  });
+  return result.secure_url;
+}
+
 export class ObjectStorageService {
   /**
    * Upload a file buffer directly to Cloudinary.
@@ -160,6 +186,33 @@ export class ObjectStorageService {
     requestedPermission?: ObjectPermission;
   }): Promise<boolean> {
     return true;
+  }
+
+  /**
+   * Upload a PDF buffer directly to Cloudinary and return the public HTTPS URL.
+   * Used by PDF generation services to persist generated PDFs on Cloudinary
+   * instead of the ephemeral local filesystem.
+   */
+  async uploadPDFBuffer(buffer: Buffer, filename: string): Promise<string> {
+    const publicId = filename.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const result = await new Promise<any>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: CLOUDINARY_FOLDER + '/pdfs',
+          resource_type: 'raw',
+          type: 'upload',
+          public_id: publicId,
+          format: 'pdf',
+          overwrite: true,
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      stream.end(buffer);
+    });
+    return result.secure_url;
   }
 
   private parseObjectPath(objectPath: string): {

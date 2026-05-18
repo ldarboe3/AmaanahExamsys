@@ -532,8 +532,14 @@ export async function generatePrimaryCertificatePDF(data: PrimaryCertificateData
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
       scale: 1
     });
-    
-    return pdfPath;
+
+    const { uploadPDFBuffer } = await import('./objectStorage');
+    const pdfBuffer = fs.readFileSync(pdfPath);
+    const cloudinaryUrl = await uploadPDFBuffer(pdfBuffer, filename);
+    try { fs.unlinkSync(pdfPath); } catch (_) {}
+
+    console.log(`[Certificate PDF] Uploaded to Cloudinary: ${cloudinaryUrl}`);
+    return cloudinaryUrl;
   } finally {
     await page.close();
   }

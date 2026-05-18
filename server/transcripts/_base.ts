@@ -220,7 +220,14 @@ export async function generateGenericTranscriptPDF(data: TranscriptData): Promis
     const fileName = `transcript_${student.indexNumber || student.id}_g${student.grade}_${Date.now()}.pdf`;
     const filePath = path.join(TRANSCRIPT_OUTPUT_DIR, fileName);
     await page.pdf({ path: filePath, format: 'A4', printBackground: true, margin: { top: '0', right: '0', bottom: '0', left: '0' } });
-    return filePath;
+
+    const { uploadPDFBuffer } = await import('../objectStorage');
+    const pdfBuffer = fs.readFileSync(filePath);
+    const cloudinaryUrl = await uploadPDFBuffer(pdfBuffer, fileName);
+    try { fs.unlinkSync(filePath); } catch (_) {}
+
+    console.log(`[Transcript PDF] Uploaded to Cloudinary: ${cloudinaryUrl}`);
+    return cloudinaryUrl;
   } finally {
     await page.close();
   }

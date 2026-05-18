@@ -789,9 +789,14 @@ export async function generateTranscriptPDF(data: TranscriptData): Promise<strin
       preferCSSPageSize: true,
       timeout: 30000
     });
-    
-    console.log(`[Transcript PDF] Successfully generated: ${filePath}`);
-    return filePath;
+
+    const { uploadPDFBuffer } = await import('./objectStorage');
+    const pdfBuffer = fs.readFileSync(filePath);
+    const cloudinaryUrl = await uploadPDFBuffer(pdfBuffer, fileName);
+    try { fs.unlinkSync(filePath); } catch (_) {}
+
+    console.log(`[Transcript PDF] Uploaded to Cloudinary: ${cloudinaryUrl}`);
+    return cloudinaryUrl;
   } finally {
     await page.close();
   }

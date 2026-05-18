@@ -11491,22 +11491,27 @@ ${pages.map(p => `  <url>
       if (!certificate || !certificate.pdfUrl) {
         return res.status(404).json({ message: "Certificate PDF not found" });
       }
-      
+
+      await storage.incrementCertificatePrintCount(certificate.id);
+
+      // Cloudinary / remote URL — redirect directly
+      if (certificate.pdfUrl.startsWith('https://') || certificate.pdfUrl.startsWith('http://')) {
+        res.setHeader('Content-Disposition', `attachment; filename="${certificate.certificateNumber.replace('/', '-')}.pdf"`);
+        return res.redirect(certificate.pdfUrl);
+      }
+
       const fs = await import('fs');
       const path = await import('path');
-      
-      // Handle both absolute and relative paths
-      const pdfPath = certificate.pdfUrl.startsWith('/') 
-        ? certificate.pdfUrl 
+
+      const pdfPath = certificate.pdfUrl.startsWith('/')
+        ? certificate.pdfUrl
         : path.join(process.cwd(), certificate.pdfUrl);
 
       if (!fs.existsSync(pdfPath)) {
         console.error(`[PDF Download] File not found at path: ${pdfPath}`);
-        return res.status(404).json({ message: "PDF file not found" });
+        return res.status(404).json({ message: "PDF file not found. Please regenerate this certificate." });
       }
-      
-      await storage.incrementCertificatePrintCount(certificate.id);
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${certificate.certificateNumber.replace('/', '-')}.pdf"`);
       fs.createReadStream(pdfPath).pipe(res);
@@ -11521,21 +11526,26 @@ ${pages.map(p => `  <url>
       if (!transcript || !transcript.pdfUrl) {
         return res.status(404).json({ message: "Transcript PDF not found" });
       }
-      
+
+      await storage.incrementTranscriptPrintCount(transcript.id);
+
+      // Cloudinary / remote URL — redirect directly
+      if (transcript.pdfUrl.startsWith('https://') || transcript.pdfUrl.startsWith('http://')) {
+        res.setHeader('Content-Disposition', `attachment; filename="${transcript.transcriptNumber.replace('/', '-')}.pdf"`);
+        return res.redirect(transcript.pdfUrl);
+      }
+
       const fs = await import('fs');
-      
-      // Handle both absolute and relative paths
-      const pdfPath = transcript.pdfUrl.startsWith('/') 
-        ? transcript.pdfUrl 
+
+      const pdfPath = transcript.pdfUrl.startsWith('/')
+        ? transcript.pdfUrl
         : path.join(process.cwd(), transcript.pdfUrl);
 
       if (!fs.existsSync(pdfPath)) {
         console.error(`[PDF Download] Transcript PDF not found at path: ${pdfPath}`);
         return res.status(404).json({ message: "PDF file not found. Please click Generate again to recreate this PDF." });
       }
-      
-      await storage.incrementTranscriptPrintCount(transcript.id);
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${transcript.transcriptNumber.replace('/', '-')}.pdf"`);
       fs.createReadStream(pdfPath).pipe(res);
