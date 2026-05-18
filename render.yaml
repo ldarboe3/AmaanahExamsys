@@ -3,6 +3,7 @@ services:
     name: amaanah
     runtime: node
     buildCommand: npm install && npm run build
+    preDeployCommand: npx drizzle-kit push --force
     startCommand: npm start
     healthCheckPath: /api/auth/user
     envVars:
