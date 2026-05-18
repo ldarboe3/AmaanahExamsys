@@ -2,7 +2,7 @@ services:
   - type: web
     name: amaanah
     runtime: node
-    buildCommand: npm install --include=dev && npm run build
+    buildCommand: npm install --include=dev && npx puppeteer browsers install chrome && npm run build
     preDeployCommand: npx drizzle-kit push
     startCommand: npm start
     healthCheckPath: /api/auth/user
