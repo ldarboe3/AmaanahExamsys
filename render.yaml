@@ -2,7 +2,7 @@ services:
   - type: web
     name: amaanah
     runtime: node
-    buildCommand: npm install --include=dev && npx puppeteer browsers install chrome && npm run build
+    buildCommand: npm install --include=dev && PUPPETEER_CACHE_DIR=/opt/render/.cache/puppeteer npx puppeteer browsers install chrome && npm run build
     preDeployCommand: npx drizzle-kit push
     startCommand: npm start
     healthCheckPath: /api/auth/user
@@ -11,6 +11,8 @@ services:
         value: production
       - key: NODE_VERSION
         value: 20.20.0
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/.cache/puppeteer
       - key: DATABASE_URL
         sync: false
       - key: SESSION_SECRET
