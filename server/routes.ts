@@ -7616,24 +7616,28 @@ ${pages.map(p => `  <url>
     try {
       const examYearId = req.query.examYearId ? parseInt(req.query.examYearId as string) : undefined;
       const grade = req.query.grade ? parseInt(req.query.grade as string) : undefined;
-      
-      // If no examYearId provided, get active exam year
-      let targetExamYearId = examYearId;
-      if (!targetExamYearId) {
-        const activeYear = await storage.getActiveExamYear();
-        if (activeYear) {
-          targetExamYearId = activeYear.id;
+      const all = req.query.all === "true";
+
+      let timetable: any[];
+
+      if (all) {
+        // Return every timetable entry across all exam years (used by packet tracking)
+        timetable = await storage.getAllTimetableEntries();
+      } else {
+        // If no examYearId provided, default to active exam year
+        let targetExamYearId = examYearId;
+        if (!targetExamYearId) {
+          const activeYear = await storage.getActiveExamYear();
+          if (activeYear) targetExamYearId = activeYear.id;
         }
+
+        if (!targetExamYearId) return res.json([]);
+
+        timetable = grade
+          ? await storage.getTimetableByGrade(targetExamYearId, grade)
+          : await storage.getTimetableByExamYear(targetExamYearId);
       }
-      
-      if (!targetExamYearId) {
-        return res.json([]);
-      }
-      
-      const timetable = grade
-        ? await storage.getTimetableByGrade(targetExamYearId, grade)
-        : await storage.getTimetableByExamYear(targetExamYearId);
-      
+
       // Add subject relations
       const subjects = await storage.getAllSubjects();
       const examYears = await storage.getAllExamYears();
@@ -7642,7 +7646,7 @@ ${pages.map(p => `  <url>
         subject: subjects.find(s => s.id === entry.subjectId),
         examYear: examYears.find(ey => ey.id === entry.examYearId),
       }));
-      
+
       res.json(enrichedTimetable);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

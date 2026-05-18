@@ -1306,6 +1306,10 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(examTimetable).where(inArray(examTimetable.grade, grades)).orderBy(asc(examTimetable.examDate));
   }
 
+  async getAllTimetableEntries(): Promise<ExamTimetable[]> {
+    return db.select().from(examTimetable).orderBy(asc(examTimetable.examDate));
+  }
+
   async updateTimetableEntry(id: number, entry: Partial<InsertExamTimetable>): Promise<ExamTimetable | undefined> {
     const [updated] = await db.update(examTimetable).set(entry).where(eq(examTimetable.id, id)).returning();
     return updated;

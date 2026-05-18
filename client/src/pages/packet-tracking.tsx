@@ -1803,7 +1803,10 @@ export default function PacketTracking() {
   const { data: subjects = [] } = useQuery<Subject[]>({ queryKey: ["/api/subjects"] });
   const { data: centers = [] } = useQuery<ExamCenter[]>({ queryKey: ["/api/centers"] });
   const { data: examYears = [] } = useQuery<ExamYear[]>({ queryKey: ["/api/exam-years"] });
-  const { data: timetable = [] } = useQuery<ExamTimetable[]>({ queryKey: ["/api/timetable"] });
+  const { data: timetable = [] } = useQuery<ExamTimetable[]>({
+    queryKey: ["/api/timetable", "all"],
+    queryFn: () => fetch("/api/timetable?all=true", { credentials: "include" }).then(r => r.json()),
+  });
   const { data: regions = [] } = useQuery<Region[]>({ queryKey: ["/api/regions"] });
   const { data: clusters = [] } = useQuery<Cluster[]>({ queryKey: ["/api/clusters"] });
   const { data: allHalls = [] } = useQuery<CenterHallSimple[]>({ queryKey: ["/api/center-halls"] });
@@ -1820,9 +1823,9 @@ export default function PacketTracking() {
   const centerToRegionMap = Object.fromEntries(centers.map(c => [c.id, (c as any).regionId]));
   const centerToClusterMap = Object.fromEntries(centers.map(c => [c.id, (c as any).clusterId]));
   const availableGrades = Array.from(new Set(packets.map(p => p.grade))).sort((a, b) => a - b);
-  // keyed by "subjectId-grade" so the same subject in different grades gets its own entry
+  // keyed by "examYearId-subjectId-grade" so packets from different exam years get the right entry
   const timetableBySubject = Object.fromEntries(
-    [...timetable].reverse().map(t => [`${t.subjectId}-${t.grade}`, t])
+    [...timetable].reverse().map(t => [`${t.examYearId}-${t.subjectId}-${t.grade}`, t])
   );
 
   // unique exam years that actually have packets
@@ -2115,7 +2118,7 @@ export default function PacketTracking() {
                       const rId = p.destinationRegionId ?? centerToRegionMap[p.destinationCenterId];
                       const cId = p.destinationClusterId ?? centerToClusterMap[p.destinationCenterId];
                       const hId = (p as any).hallId;
-                      const tt = timetableBySubject[`${p.subjectId}-${p.grade}`];
+                      const tt = timetableBySubject[`${p.examYearId}-${p.subjectId}-${p.grade}`];
                       return {
                         packet: p,
                         centerId: p.destinationCenterId,
@@ -2224,7 +2227,7 @@ export default function PacketTracking() {
                             size="sm"
                             variant="ghost"
                             onClick={() => {
-                              const tt = timetableBySubject[`${p.subjectId}-${p.grade}`];
+                              const tt = timetableBySubject[`${p.examYearId}-${p.subjectId}-${p.grade}`];
                               printPacketLabel({
                                 packet: p,
                                 centerId: p.destinationCenterId,
@@ -2438,7 +2441,7 @@ export default function PacketTracking() {
                                   onClick={() => {
                                     const rId2 = p.destinationRegionId ?? centerToRegionMap[p.destinationCenterId];
                                     const cId2 = p.destinationClusterId ?? centerToClusterMap[p.destinationCenterId];
-                                    const tt = timetableBySubject[`${p.subjectId}-${p.grade}`];
+                                    const tt = timetableBySubject[`${p.examYearId}-${p.subjectId}-${p.grade}`];
                                     printPacketLabel({
                                       packet: p,
                                       centerId: p.destinationCenterId,
