@@ -1,3 +1,4 @@
+import express from "express";
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
@@ -3695,45 +3696,15 @@ ${pages.map(p => `  <url>
       const { ObjectStorageService } = await import("./objectStorage");
       const objectStorageService = new ObjectStorageService();
 
-      // Get upload URL from object storage
-      let uploadURL: string;
-      let objectPath: string;
-      try {
-        const result = await objectStorageService.getObjectEntityUploadURL(file.originalname);
-        uploadURL = result.uploadURL;
-        objectPath = result.objectPath;
-      } catch (urlError: any) {
-        console.error("Failed to get upload URL:", urlError);
-        return res.status(500).json({ message: "Failed to prepare file upload. Please try again." });
-      }
-
-      // Upload file buffer to object storage
-      const uploadResponse = await fetch(uploadURL, {
-        method: 'PUT',
-        body: file.buffer,
-        headers: {
-          'Content-Type': file.mimetype,
-        },
-      });
-
-      if (!uploadResponse.ok) {
-        console.error("Object storage upload failed:", uploadResponse.status, uploadResponse.statusText);
-        return res.status(500).json({ message: "Failed to upload file to storage. Please try again." });
-      }
-
-      // Set ACL policy to make file publicly accessible
       let publicPath: string;
       try {
-        publicPath = await objectStorageService.trySetObjectEntityAclPolicy(
-          uploadURL,
-          { owner: user.id, visibility: 'public' }
+        publicPath = await objectStorageService.uploadFile(
+          file.buffer, file.originalname, file.mimetype,
+          { owner: user.id, visibility: "public" }
         );
-        if (!publicPath) {
-          throw new Error("ACL policy returned empty path");
-        }
-      } catch (aclError: any) {
-        console.error("Failed to set ACL policy:", aclError);
-        return res.status(500).json({ message: "File uploaded but failed to make it accessible. Please try again." });
+      } catch (uploadError: any) {
+        console.error("Failed to upload file to storage:", uploadError);
+        return res.status(500).json({ message: "Failed to upload file to storage. Please try again." });
       }
 
       // Update school with document URL
@@ -7005,53 +6976,22 @@ ${pages.map(p => `  <url>
         return res.status(400).json({ message: "Invalid file type. Please upload PDF, JPG, or PNG." });
       }
       
-      // Upload file to object storage instead of storing base64
+      // Upload file to object storage
       const { ObjectStorageService } = await import("./objectStorage");
       const objectStorageService = new ObjectStorageService();
-      
-      // Generate unique filename for the bank slip
+
       const fileExt = req.file.originalname.split('.').pop() || 'png';
       const uniqueFilename = `bank-slip-${invoiceId}-${Date.now()}.${fileExt}`;
-      
-      // Get upload URL from object storage
-      let uploadURL: string;
-      let objectPath: string;
-      try {
-        const result = await objectStorageService.getObjectEntityUploadURL(uniqueFilename);
-        uploadURL = result.uploadURL;
-        objectPath = result.objectPath;
-      } catch (urlError: any) {
-        console.error("Failed to get upload URL for bank slip:", urlError);
-        return res.status(500).json({ message: "Failed to prepare file upload. Please try again." });
-      }
-      
-      // Upload file buffer to object storage
-      const uploadResponse = await fetch(uploadURL, {
-        method: 'PUT',
-        body: req.file.buffer,
-        headers: {
-          'Content-Type': req.file.mimetype,
-        },
-      });
-      
-      if (!uploadResponse.ok) {
-        console.error("Bank slip upload failed:", uploadResponse.status, uploadResponse.statusText);
-        return res.status(500).json({ message: "Failed to upload file. Please try again." });
-      }
-      
-      // Set ACL policy to make file accessible
+
       let bankSlipUrl: string;
       try {
-        bankSlipUrl = await objectStorageService.trySetObjectEntityAclPolicy(
-          uploadURL,
-          { owner: user.id, visibility: 'public' }
+        bankSlipUrl = await objectStorageService.uploadFile(
+          req.file.buffer, uniqueFilename, req.file.mimetype,
+          { owner: user.id, visibility: "public" }
         );
-        if (!bankSlipUrl) {
-          throw new Error("ACL policy returned empty path");
-        }
-      } catch (aclError: any) {
-        console.error("Failed to set ACL policy for bank slip:", aclError);
-        return res.status(500).json({ message: "File uploaded but failed to make it accessible. Please try again." });
+      } catch (uploadError: any) {
+        console.error("Failed to upload bank slip:", uploadError);
+        return res.status(500).json({ message: "Failed to upload file. Please try again." });
       }
       
       // Update invoice with bank slip URL and set to processing status
@@ -14388,7 +14328,23 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
   });
 
   // Object Storage - File Upload Routes
-  const { ObjectStorageService, ObjectNotFoundError } = await import("./objectStorage");
+  const { ObjectStorageService, ObjectNotFoundError, stagingStore } = await import("./objectStorage");
+
+  // Internal staging endpoint: client PUTs raw file body here before finalizing
+  app.put("/api/internal/stage/:token", express.raw({ type: "*/*", limit: "50mb" }), async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!stagingStore.has(token)) {
+        return res.status(404).json({ message: "Unknown upload token" });
+      }
+      const mime = ((req.headers["content-type"] || "application/octet-stream") as string).split(";")[0].trim();
+      const entry = stagingStore.get(token)!;
+      stagingStore.set(token, { ...entry, buffer: req.body as Buffer, mimetype: mime });
+      res.status(200).json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Get upload URL for file upload
   app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
@@ -17605,45 +17561,22 @@ ${JSON.stringify(schoolsForAI, null, 2)}`;
 
       if (!req.file) return res.status(400).json({ message: "No photo uploaded" });
 
-      // Upload to persistent object storage (not ephemeral local disk)
+      // Upload to Cloudinary
       const { ObjectStorageService } = await import("./objectStorage");
       const objectStorageService = new ObjectStorageService();
 
       const fileExt = req.file.originalname.split('.').pop() || 'jpg';
       const uniqueFilename = `staff-photo-${id}-${Date.now()}.${fileExt}`;
 
-      let uploadURL: string;
-      let objectPath: string;
-      try {
-        const result = await objectStorageService.getObjectEntityUploadURL(uniqueFilename);
-        uploadURL = result.uploadURL;
-        objectPath = result.objectPath;
-      } catch (urlError: any) {
-        console.error("Failed to get upload URL for staff photo:", urlError);
-        return res.status(500).json({ message: "Failed to prepare photo upload. Please try again." });
-      }
-
-      const uploadResponse = await fetch(uploadURL, {
-        method: 'PUT',
-        body: req.file.buffer,
-        headers: { 'Content-Type': req.file.mimetype },
-      });
-
-      if (!uploadResponse.ok) {
-        console.error("Staff photo upload to object storage failed:", uploadResponse.status);
-        return res.status(500).json({ message: "Failed to upload photo. Please try again." });
-      }
-
       let photoUrl: string;
       try {
-        photoUrl = await objectStorageService.trySetObjectEntityAclPolicy(
-          uploadURL,
-          { owner: user.id, visibility: 'public' }
+        photoUrl = await objectStorageService.uploadFile(
+          req.file.buffer, uniqueFilename, req.file.mimetype,
+          { owner: user.id, visibility: "public" }
         );
-        if (!photoUrl) throw new Error("ACL policy returned empty path");
-      } catch (aclError: any) {
-        console.error("Failed to set ACL for staff photo:", aclError);
-        return res.status(500).json({ message: "Photo uploaded but could not be made accessible. Please try again." });
+      } catch (uploadError: any) {
+        console.error("Failed to upload staff photo:", uploadError);
+        return res.status(500).json({ message: "Failed to upload photo. Please try again." });
       }
 
       const updated = await storage.updateStaffProfile(id, { photoUrl });

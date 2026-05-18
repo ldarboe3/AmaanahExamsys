@@ -4,7 +4,7 @@ import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
 
 const allowlist = [
-  "@google-cloud/storage",
+  "cloudinary",
   "@neondatabase/serverless",
   "@sendgrid/mail",
   "connect-pg-simple",
