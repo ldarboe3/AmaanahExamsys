@@ -3,12 +3,14 @@ services:
     name: amaanah
     runtime: node
     buildCommand: npm install && npm run build
-    preDeployCommand: npx drizzle-kit push --force
+    preDeployCommand: npx drizzle-kit push
     startCommand: npm start
     healthCheckPath: /api/auth/user
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 20.20.0
       - key: DATABASE_URL
         sync: false
       - key: SESSION_SECRET
