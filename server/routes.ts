@@ -11498,10 +11498,12 @@ ${pages.map(p => `  <url>
 
       await storage.incrementCertificatePrintCount(certificate.id);
 
-      // Cloudinary / remote URL — redirect directly
+      // Cloudinary / remote URL — redirect with fl_attachment to force download
       if (certificate.pdfUrl.startsWith('https://') || certificate.pdfUrl.startsWith('http://')) {
-        res.setHeader('Content-Disposition', `attachment; filename="${certificate.certificateNumber.replace('/', '-')}.pdf"`);
-        return res.redirect(certificate.pdfUrl);
+        const downloadUrl = certificate.pdfUrl.includes('res.cloudinary.com') && certificate.pdfUrl.includes('/upload/')
+          ? certificate.pdfUrl.replace('/upload/', `/upload/fl_attachment:${encodeURIComponent(certificate.certificateNumber.replace(/\//g, '-'))}/`)
+          : certificate.pdfUrl;
+        return res.redirect(downloadUrl);
       }
 
       const fs = await import('fs');
@@ -11533,10 +11535,12 @@ ${pages.map(p => `  <url>
 
       await storage.incrementTranscriptPrintCount(transcript.id);
 
-      // Cloudinary / remote URL — redirect directly
+      // Cloudinary / remote URL — redirect with fl_attachment to force download
       if (transcript.pdfUrl.startsWith('https://') || transcript.pdfUrl.startsWith('http://')) {
-        res.setHeader('Content-Disposition', `attachment; filename="${transcript.transcriptNumber.replace('/', '-')}.pdf"`);
-        return res.redirect(transcript.pdfUrl);
+        const downloadUrl = transcript.pdfUrl.includes('res.cloudinary.com') && transcript.pdfUrl.includes('/upload/')
+          ? transcript.pdfUrl.replace('/upload/', `/upload/fl_attachment:${encodeURIComponent(transcript.transcriptNumber.replace(/\//g, '-'))}/`)
+          : transcript.pdfUrl;
+        return res.redirect(downloadUrl);
       }
 
       const fs = await import('fs');
