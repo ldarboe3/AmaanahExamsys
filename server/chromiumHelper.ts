@@ -12,12 +12,12 @@ function findChromiumInCacheDir(cacheDir: string): string | null {
     
     const entries = readdirSync(cacheDir);
     for (const entry of entries) {
-      if (entry.startsWith('chromium')) {
-        const chromiumDir = join(cacheDir, entry);
+      if (entry.startsWith('chromium') || entry === 'chrome' || entry === 'chrome-headless-shell') {
+        const browserDir = join(cacheDir, entry);
         const possiblePaths = [
-          join(chromiumDir, 'chrome-linux', 'chrome'),
-          join(chromiumDir, 'chrome-linux64', 'chrome'),
-          join(chromiumDir, 'chrome'),
+          join(browserDir, 'chrome-linux', 'chrome'),
+          join(browserDir, 'chrome-linux64', 'chrome'),
+          join(browserDir, 'chrome'),
         ];
         
         for (const p of possiblePaths) {
@@ -28,12 +28,13 @@ function findChromiumInCacheDir(cacheDir: string): string | null {
         }
         
         try {
-          const subEntries = readdirSync(chromiumDir);
+          const subEntries = readdirSync(browserDir);
           for (const sub of subEntries) {
-            const subPath = join(chromiumDir, sub);
+            const subPath = join(browserDir, sub);
             const chromePaths = [
               join(subPath, 'chrome-linux', 'chrome'),
               join(subPath, 'chrome-linux64', 'chrome'),
+              join(subPath, 'chrome-headless-shell-linux64', 'chrome-headless-shell'),
               join(subPath, 'chrome'),
             ];
             for (const cp of chromePaths) {
@@ -66,8 +67,11 @@ export async function getChromiumExecutable(): Promise<string | undefined> {
   
   const cacheDirs = [
     process.env.PUPPETEER_CACHE_DIR,
+    join(process.cwd(), '.puppeteer-cache'),
+    '/opt/render/project/src/.puppeteer-cache',
     '/opt/chromium',
     join(process.cwd(), '.cache', 'puppeteer'),
+    '/opt/render/.cache/puppeteer',
     '/workspace/.cache/puppeteer',
   ].filter(Boolean) as string[];
   
