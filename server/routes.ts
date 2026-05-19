@@ -11501,7 +11501,9 @@ ${pages.map(p => `  <url>
       // Cloudinary / remote URL — buffer the file then send with attachment headers
       if (certificate.pdfUrl.startsWith('https://') || certificate.pdfUrl.startsWith('http://')) {
         try {
-          const upstream = await fetch(certificate.pdfUrl);
+          const { getSignedPdfUrl } = await import("./objectStorage");
+          const fetchUrl = getSignedPdfUrl(certificate.pdfUrl);
+          const upstream = await fetch(fetchUrl);
           if (!upstream.ok) {
             console.error(`[PDF Download] Upstream fetch failed: ${upstream.status} ${upstream.statusText} for ${certificate.pdfUrl}`);
             return res.status(502).json({ message: "Failed to fetch PDF from storage" });
@@ -11555,7 +11557,9 @@ ${pages.map(p => `  <url>
       // Cloudinary / remote URL — buffer the file then send with attachment headers
       if (transcript.pdfUrl.startsWith('https://') || transcript.pdfUrl.startsWith('http://')) {
         try {
-          const upstream = await fetch(transcript.pdfUrl);
+          const { getSignedPdfUrl } = await import("./objectStorage");
+          const fetchUrl = getSignedPdfUrl(transcript.pdfUrl);
+          const upstream = await fetch(fetchUrl);
           if (!upstream.ok) {
             console.error(`[PDF Download] Upstream fetch failed: ${upstream.status} ${upstream.statusText} for ${transcript.pdfUrl}`);
             return res.status(502).json({ message: "Failed to fetch PDF from storage" });

@@ -31,6 +31,32 @@ export class ObjectNotFoundError extends Error {
  * Standalone helper — upload a PDF buffer to Cloudinary and return the HTTPS URL.
  * Used directly by PDF generation services.
  */
+/**
+ * Given a Cloudinary public HTTPS URL for a `raw` PDF resource, return a
+ * server-signed download URL that bypasses Cloudinary's PDF/ZIP delivery
+ * restriction (which 401s unsigned public requests by default).
+ *
+ * Falls back to the original URL if parsing fails.
+ */
+export function getSignedPdfUrl(publicUrl: string): string {
+  try {
+    // Expected: https://res.cloudinary.com/<cloud>/raw/upload/v<version>/<public_id>.<ext>
+    const m = publicUrl.match(/\/(?:raw|image|video)\/upload\/(?:v\d+\/)?(.+)$/);
+    if (!m) return publicUrl;
+    const publicIdWithExt = m[1];
+    const lastDot = publicIdWithExt.lastIndexOf(".");
+    const publicId = lastDot > 0 ? publicIdWithExt.slice(0, lastDot) : publicIdWithExt;
+    const format = lastDot > 0 ? publicIdWithExt.slice(lastDot + 1) : "pdf";
+    return cloudinary.utils.private_download_url(publicId, format, {
+      resource_type: "raw",
+      type: "upload",
+      expires_at: Math.floor(Date.now() / 1000) + 300,
+    });
+  } catch {
+    return publicUrl;
+  }
+}
+
 export async function uploadPDFBuffer(buffer: Buffer, filename: string): Promise<string> {
   const publicId = filename.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
   const result = await new Promise<any>((resolve, reject) => {
