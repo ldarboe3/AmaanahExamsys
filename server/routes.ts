@@ -11498,19 +11498,28 @@ ${pages.map(p => `  <url>
 
       await storage.incrementCertificatePrintCount(certificate.id);
 
-      // Cloudinary / remote URL — proxy the file with attachment headers to force download
+      // Cloudinary / remote URL — buffer the file then send with attachment headers
       if (certificate.pdfUrl.startsWith('https://') || certificate.pdfUrl.startsWith('http://')) {
-        const upstream = await fetch(certificate.pdfUrl);
-        if (!upstream.ok || !upstream.body) {
-          return res.status(502).json({ message: "Failed to fetch PDF from storage" });
+        try {
+          const upstream = await fetch(certificate.pdfUrl);
+          if (!upstream.ok) {
+            console.error(`[PDF Download] Upstream fetch failed: ${upstream.status} ${upstream.statusText} for ${certificate.pdfUrl}`);
+            return res.status(502).json({ message: "Failed to fetch PDF from storage" });
+          }
+          const arrayBuf = await upstream.arrayBuffer();
+          const buf = Buffer.from(arrayBuf);
+          const filename = `${certificate.certificateNumber.replace(/\//g, '-')}.pdf`;
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          res.setHeader('Content-Length', buf.length.toString());
+          res.setHeader('Cache-Control', 'no-store');
+          res.end(buf);
+        } catch (fetchErr: any) {
+          console.error(`[PDF Download] Error fetching certificate PDF:`, fetchErr);
+          if (!res.headersSent) {
+            res.status(502).json({ message: "Failed to fetch PDF from storage" });
+          }
         }
-        const filename = `${certificate.certificateNumber.replace(/\//g, '-')}.pdf`;
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        const contentLength = upstream.headers.get('content-length');
-        if (contentLength) res.setHeader('Content-Length', contentLength);
-        const { Readable } = await import('stream');
-        Readable.fromWeb(upstream.body as any).pipe(res);
         return;
       }
 
@@ -11543,19 +11552,28 @@ ${pages.map(p => `  <url>
 
       await storage.incrementTranscriptPrintCount(transcript.id);
 
-      // Cloudinary / remote URL — proxy the file with attachment headers to force download
+      // Cloudinary / remote URL — buffer the file then send with attachment headers
       if (transcript.pdfUrl.startsWith('https://') || transcript.pdfUrl.startsWith('http://')) {
-        const upstream = await fetch(transcript.pdfUrl);
-        if (!upstream.ok || !upstream.body) {
-          return res.status(502).json({ message: "Failed to fetch PDF from storage" });
+        try {
+          const upstream = await fetch(transcript.pdfUrl);
+          if (!upstream.ok) {
+            console.error(`[PDF Download] Upstream fetch failed: ${upstream.status} ${upstream.statusText} for ${transcript.pdfUrl}`);
+            return res.status(502).json({ message: "Failed to fetch PDF from storage" });
+          }
+          const arrayBuf = await upstream.arrayBuffer();
+          const buf = Buffer.from(arrayBuf);
+          const filename = `${transcript.transcriptNumber.replace(/\//g, '-')}.pdf`;
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          res.setHeader('Content-Length', buf.length.toString());
+          res.setHeader('Cache-Control', 'no-store');
+          res.end(buf);
+        } catch (fetchErr: any) {
+          console.error(`[PDF Download] Error fetching transcript PDF:`, fetchErr);
+          if (!res.headersSent) {
+            res.status(502).json({ message: "Failed to fetch PDF from storage" });
+          }
         }
-        const filename = `${transcript.transcriptNumber.replace(/\//g, '-')}.pdf`;
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        const contentLength = upstream.headers.get('content-length');
-        if (contentLength) res.setHeader('Content-Length', contentLength);
-        const { Readable } = await import('stream');
-        Readable.fromWeb(upstream.body as any).pipe(res);
         return;
       }
 
