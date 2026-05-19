@@ -40,14 +40,13 @@ export class ObjectNotFoundError extends Error {
  */
 export function getSignedPdfUrl(publicUrl: string): string {
   try {
-    // Expected: https://res.cloudinary.com/<cloud>/raw/upload/v<version>/<public_id>.<ext>
-    const m = publicUrl.match(/\/(?:raw|image|video)\/upload\/(?:v\d+\/)?(.+)$/);
+    // Expected: https://res.cloudinary.com/<cloud>/raw/upload/v<version>/<public_id>
+    // For raw resources the file extension IS part of the public_id.
+    const m = publicUrl.match(/\/raw\/upload\/(?:v\d+\/)?(.+)$/);
     if (!m) return publicUrl;
-    const publicIdWithExt = m[1];
-    const lastDot = publicIdWithExt.lastIndexOf(".");
-    const publicId = lastDot > 0 ? publicIdWithExt.slice(0, lastDot) : publicIdWithExt;
-    const format = lastDot > 0 ? publicIdWithExt.slice(lastDot + 1) : "pdf";
-    return cloudinary.utils.private_download_url(publicId, format, {
+    const publicId = m[1];
+    // For raw uploads pass an empty `format` — public_id already has the extension.
+    return cloudinary.utils.private_download_url(publicId, "", {
       resource_type: "raw",
       type: "upload",
       expires_at: Math.floor(Date.now() / 1000) + 300,
