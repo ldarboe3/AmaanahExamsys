@@ -11498,12 +11498,20 @@ ${pages.map(p => `  <url>
 
       await storage.incrementCertificatePrintCount(certificate.id);
 
-      // Cloudinary / remote URL — redirect with fl_attachment to force download
+      // Cloudinary / remote URL — proxy the file with attachment headers to force download
       if (certificate.pdfUrl.startsWith('https://') || certificate.pdfUrl.startsWith('http://')) {
-        const downloadUrl = certificate.pdfUrl.includes('res.cloudinary.com') && certificate.pdfUrl.includes('/upload/')
-          ? certificate.pdfUrl.replace('/upload/', `/upload/fl_attachment:${encodeURIComponent(certificate.certificateNumber.replace(/\//g, '-'))}/`)
-          : certificate.pdfUrl;
-        return res.redirect(downloadUrl);
+        const upstream = await fetch(certificate.pdfUrl);
+        if (!upstream.ok || !upstream.body) {
+          return res.status(502).json({ message: "Failed to fetch PDF from storage" });
+        }
+        const filename = `${certificate.certificateNumber.replace(/\//g, '-')}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        const contentLength = upstream.headers.get('content-length');
+        if (contentLength) res.setHeader('Content-Length', contentLength);
+        const { Readable } = await import('stream');
+        Readable.fromWeb(upstream.body as any).pipe(res);
+        return;
       }
 
       const fs = await import('fs');
@@ -11535,12 +11543,20 @@ ${pages.map(p => `  <url>
 
       await storage.incrementTranscriptPrintCount(transcript.id);
 
-      // Cloudinary / remote URL — redirect with fl_attachment to force download
+      // Cloudinary / remote URL — proxy the file with attachment headers to force download
       if (transcript.pdfUrl.startsWith('https://') || transcript.pdfUrl.startsWith('http://')) {
-        const downloadUrl = transcript.pdfUrl.includes('res.cloudinary.com') && transcript.pdfUrl.includes('/upload/')
-          ? transcript.pdfUrl.replace('/upload/', `/upload/fl_attachment:${encodeURIComponent(transcript.transcriptNumber.replace(/\//g, '-'))}/`)
-          : transcript.pdfUrl;
-        return res.redirect(downloadUrl);
+        const upstream = await fetch(transcript.pdfUrl);
+        if (!upstream.ok || !upstream.body) {
+          return res.status(502).json({ message: "Failed to fetch PDF from storage" });
+        }
+        const filename = `${transcript.transcriptNumber.replace(/\//g, '-')}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        const contentLength = upstream.headers.get('content-length');
+        if (contentLength) res.setHeader('Content-Length', contentLength);
+        const { Readable } = await import('stream');
+        Readable.fromWeb(upstream.body as any).pipe(res);
+        return;
       }
 
       const fs = await import('fs');
