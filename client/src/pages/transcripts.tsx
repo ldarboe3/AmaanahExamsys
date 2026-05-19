@@ -427,8 +427,12 @@ export default function Transcripts() {
 
   const handleDownload = async (transcriptId: number, studentId?: number) => {
     try {
-      const response = await fetch(`/api/transcripts/${transcriptId}/download`, { credentials: 'include' });
-      if (response.status === 404) {
+      const headResponse = await fetch(`/api/transcripts/${transcriptId}/download`, {
+        method: 'HEAD',
+        credentials: 'include',
+        redirect: 'manual',
+      });
+      if (headResponse.status === 404) {
         toast({
           title: isRTL ? "ملف PDF غير موجود" : "PDF File Missing",
           description: isRTL
@@ -440,20 +444,14 @@ export default function Transcripts() {
         }
         return;
       }
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.status}`);
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      const contentDisposition = response.headers.get('Content-Disposition');
-      const filename = contentDisposition?.match(/filename="(.+)"/)?.[1] || `transcript_${transcriptId}.pdf`;
-      a.download = filename;
+      a.href = `/api/transcripts/${transcriptId}/download`;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.download = `transcript_${transcriptId}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
     } catch (err: any) {
       toast({
         title: isRTL ? "خطأ في التنزيل" : "Download Error",

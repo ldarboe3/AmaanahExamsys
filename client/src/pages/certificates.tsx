@@ -432,8 +432,12 @@ export default function Certificates() {
 
   const handleDownload = async (certificateId: number, studentId?: number) => {
     try {
-      const response = await fetch(`/api/certificates/${certificateId}/download`, { credentials: 'include' });
-      if (response.status === 404) {
+      const headResponse = await fetch(`/api/certificates/${certificateId}/download`, {
+        method: 'HEAD',
+        credentials: 'include',
+        redirect: 'manual',
+      });
+      if (headResponse.status === 404) {
         toast({
           title: isRTL ? "ملف PDF غير موجود" : "PDF File Missing",
           description: isRTL
@@ -445,20 +449,14 @@ export default function Certificates() {
         }
         return;
       }
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.status}`);
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      const contentDisposition = response.headers.get('Content-Disposition');
-      const filename = contentDisposition?.match(/filename="(.+)"/)?.[1] || `certificate_${certificateId}.pdf`;
-      a.download = filename;
+      a.href = `/api/certificates/${certificateId}/download`;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.download = `certificate_${certificateId}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
     } catch (err: any) {
       toast({
         title: isRTL ? "خطأ في التنزيل" : "Download Error",
