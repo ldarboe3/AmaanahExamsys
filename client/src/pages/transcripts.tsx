@@ -556,28 +556,6 @@ export default function Transcripts() {
         <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
-            onClick={() => importFiqhMutation.mutate()}
-            disabled={importFiqhMutation.isPending}
-            data-testid="button-import-fiqh"
-          >
-            {importFiqhMutation.isPending ? (
-              <Loader2 className="w-4 h-4 me-2 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4 me-2" />
-            )}
-            {isRTL ? "استيراد درجات الفقه" : "Import Fiqh Marks"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setShowDeleteConfirm(true)}
-            disabled={deleteAllTranscriptsMutation.isPending || !allTranscripts || allTranscripts.length === 0}
-            data-testid="button-delete-all-transcripts"
-          >
-            <Trash2 className="w-4 h-4 me-2" />
-            {isRTL ? "حذف الكل" : "Delete All"}
-          </Button>
-          <Button
-            variant="outline"
             onClick={handlePrintAll}
             disabled={summary.withTranscript === 0}
             data-testid="button-print-all"
