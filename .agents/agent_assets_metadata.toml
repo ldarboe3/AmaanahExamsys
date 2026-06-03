@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "0UB26jGi1ILAkMl81OBur"
@@ -18,3 +17,9 @@ id = "4FBWEiv9tp28wajJFI4vH"
 uri = "file://attached_assets/generated_images/islamic_school_graduation_ceremony.png"
 type = "image"
 title = "african muslim graduation"
+
+[[outputs]]
+id = "vfIXuCmdUSknVMwk6jNry"
+uri = "file://docs/BRD_Examination_System.md"
+type = "text"
+title = "BRD — Examination & Multi-School Management System"
