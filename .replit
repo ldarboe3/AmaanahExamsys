@@ -9,7 +9,6 @@ packages = ["glib", "nss", "nspr", "at-spi2-atk", "cups", "libdrm", "xorg.libXco
 [deployment]
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
-publicDir = "dist/public"
 run = ["npm", "run", "start"]
 
 [[ports]]
