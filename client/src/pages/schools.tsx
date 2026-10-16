@@ -197,6 +197,7 @@ export default function Schools() {
   const { t, isRTL } = useLanguage();
   const [schoolToDelete, setSchoolToDelete] = useState<SchoolWithRelations | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSchoolName, setDeleteSchoolName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -335,16 +336,25 @@ export default function Schools() {
   };
 
   const deleteSchoolMutation = useMutation({
-    mutationFn: async (schoolId: number) => {
-      const res = await apiRequest("DELETE", `/api/schools/${schoolId}`, undefined, { skipOfflineQueue: true });
+    mutationFn: async ({ id, schoolName }: { id: number; schoolName: string }) => {
+      const res = await apiRequest("DELETE", `/api/schools/${id}`, {
+        schoolName, deleteLinkedRecords: true,
+      }, { skipOfflineQueue: true });
       return res.json();
     },
     onSuccess: () => {
       invalidateSchoolQueries();
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && /^\/api\/(students|invoices|payments|certificates|transcripts|exam-cards|exam-card-batches|exam-centers|centers|users|results|school-exam-registrations)([/?]|$)/.test(key);
+        },
+      });
       if (schools.length === 1 && currentPage > 0) setCurrentPage(currentPage - 1);
       setSchoolToDelete(null);
       setDeleteError(null);
+      setDeleteSchoolName("");
       toast({
         title: t.common.success,
         description: isRTL ? "تم حذف المدرسة بنجاح." : "School deleted successfully.",
@@ -1255,6 +1265,7 @@ export default function Schools() {
                                   data-testid={`button-delete-school-${school.id}`}
                                   onClick={() => {
                                     setDeleteError(null);
+                                    setDeleteSchoolName("");
                                     setSchoolToDelete(school);
                                   }}
                                 >
@@ -2334,6 +2345,7 @@ export default function Schools() {
           if (!open && !deleteSchoolMutation.isPending) {
             setSchoolToDelete(null);
             setDeleteError(null);
+            setDeleteSchoolName("");
           }
         }}
       >
@@ -2342,10 +2354,24 @@ export default function Schools() {
             <AlertDialogTitle>{isRTL ? "حذف المدرسة؟" : "Delete school?"}</AlertDialogTitle>
             <AlertDialogDescription>
               {isRTL
-                ? `هل تريد حذف "${schoolToDelete?.name}" (${schoolToDelete?.email}) نهائياً؟ لا يمكن التراجع عن هذا الإجراء. لن يتم حذف المدرسة إذا كانت مرتبطة بطلاب أو سجلات اختبارات أو فواتير أو حسابات مستخدمين أو سجلات أخرى.`
-                : `Permanently delete "${schoolToDelete?.name}" (${schoolToDelete?.email})? This cannot be undone. Schools with linked students, exam records, invoices, user accounts, or other records cannot be deleted.`}
+                ? `سيتم حذف "${schoolToDelete?.name}" (${schoolToDelete?.email}) وجميع الطلاب والنتائج والحضور والشهادات وكشوف الدرجات وبطاقات الاختبار والفواتير والتسجيلات والسجلات المرتبطة بها نهائياً. لا يمكن التراجع عن هذا الإجراء. سيتم تعطيل الحسابات المخصصة لهذه المدرسة مع الاحتفاظ بها لسجل التدقيق. ستبقى مراكز الاختبار المشتركة وسجلاتها دون حذف.`
+                : `Permanently delete "${schoolToDelete?.name}" (${schoolToDelete?.email}) and its students, results, attendance, certificates, transcripts, exam cards, invoices, registrations, and related records. This cannot be undone. Dedicated school/student accounts will be disabled and retained for audit history. Exam centers and their logistics history will be retained, with the school link removed.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-school-confirmation">
+              {isRTL ? "اكتب اسم المدرسة للتأكيد:" : "Type the school name to confirm:"}{" "}
+              <span className="font-semibold">{schoolToDelete?.name}</span>
+            </Label>
+            <Input
+              id="delete-school-confirmation"
+              data-testid="input-delete-school-confirmation"
+              value={deleteSchoolName}
+              onChange={(event) => setDeleteSchoolName(event.target.value)}
+              disabled={deleteSchoolMutation.isPending}
+              autoComplete="off"
+            />
+          </div>
           {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
           <div className="flex gap-3 justify-end">
             <AlertDialogCancel disabled={deleteSchoolMutation.isPending}>
@@ -2353,17 +2379,17 @@ export default function Schools() {
             </AlertDialogCancel>
             <Button
               variant="destructive"
-              disabled={deleteSchoolMutation.isPending}
+              disabled={deleteSchoolMutation.isPending || !schoolToDelete || deleteSchoolName.trim() !== schoolToDelete.name.trim()}
               data-testid="button-confirm-delete-school"
               onClick={() => {
                 if (schoolToDelete && !deleteSchoolMutation.isPending) {
                   setDeleteError(null);
-                  deleteSchoolMutation.mutate(schoolToDelete.id);
+                  deleteSchoolMutation.mutate({ id: schoolToDelete.id, schoolName: deleteSchoolName.trim() });
                 }
               }}
             >
               {deleteSchoolMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
-              {isRTL ? "حذف المدرسة" : "Delete school"}
+              {isRTL ? "حذف المدرسة وسجلاتها نهائياً" : "Permanently delete school and records"}
             </Button>
           </div>
         </AlertDialogContent>

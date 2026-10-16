@@ -3523,14 +3523,21 @@ ${pages.map(p => `  <url>
       if (!/^[1-9]\d*$/.test(req.params.id) || !Number.isSafeInteger(id)) {
         return res.status(400).json({ message: "Invalid school ID." });
       }
-      await deleteSchoolSafely(pool, id, user.id);
+      const confirmation = z.object({
+        schoolName: z.string().min(1),
+        deleteLinkedRecords: z.literal(true),
+      }).safeParse(req.body);
+      if (!confirmation.success) {
+        return res.status(400).json({ message: "Confirm permanent deletion and enter the school's name." });
+      }
+      await deleteSchoolSafely(pool, id, user.id, confirmation.data);
       res.json({ message: "School deleted successfully." });
     } catch (error: any) {
       if (error instanceof SchoolDeletionError) {
         return res.status(error.status).json({ message: error.message });
       }
       if (error.code === '23503') {
-        return res.status(409).json({ message: "This school has linked records and cannot be deleted. No records were deleted." });
+        return res.status(409).json({ message: "A shared record prevents deletion. No records were deleted. Contact an administrator to review the linked records." });
       }
       if (error.code === '55P03' || error.code === '40P01') {
         return res.status(409).json({ message: "The school's records are currently being updated. Please try again." });
