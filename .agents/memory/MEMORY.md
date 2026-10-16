@@ -1,0 +1,1 @@
+- [Safe school deletion](safe-school-deletion.md) — duplicate cleanup must preserve linked school records and identities, not cascade-delete them.

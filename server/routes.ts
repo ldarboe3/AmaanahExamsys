@@ -7,6 +7,7 @@ import { fireSkyOSExamImportWebhook } from "./skyosWebhook";
 import fs from "fs";
 import path from "path";
 import { storage } from "./storage";
+import { deleteSchoolSafely, SchoolDeletionError } from "./schoolDeletion";
 import { db } from "./db";
 import { users, sessions, schools, invoices, students, invoiceItems, bulkUploads, invigilatorAssignments, studentResults, examCards, attendanceRecords, packetEvents, userSessionMetadata } from "@shared/schema";
 import { eq, and, sql, desc, inArray } from "drizzle-orm";
@@ -3518,10 +3519,24 @@ ${pages.map(p => `  <url>
       if (!user || user.role !== 'super_admin') {
         return res.status(403).json({ message: "School deletion is restricted to super administrators only." });
       }
-      await storage.deleteSchool(parseInt(req.params.id));
-      res.json({ message: "Deleted" });
+      const id = Number(req.params.id);
+      if (!/^[1-9]\d*$/.test(req.params.id) || !Number.isSafeInteger(id)) {
+        return res.status(400).json({ message: "Invalid school ID." });
+      }
+      await deleteSchoolSafely(pool, id, user.id);
+      res.json({ message: "School deleted successfully." });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      if (error instanceof SchoolDeletionError) {
+        return res.status(error.status).json({ message: error.message });
+      }
+      if (error.code === '23503') {
+        return res.status(409).json({ message: "This school has linked records and cannot be deleted. No records were deleted." });
+      }
+      if (error.code === '55P03' || error.code === '40P01') {
+        return res.status(409).json({ message: "The school's records are currently being updated. Please try again." });
+      }
+      console.error("School deletion failed:", error);
+      res.status(500).json({ message: "Could not delete the school. No records were deleted." });
     }
   });
 

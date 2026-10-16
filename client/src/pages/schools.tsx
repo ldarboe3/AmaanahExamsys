@@ -89,9 +89,11 @@ import {
   MapPinOff,
   CircleDot,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { School, Region, Cluster } from "@shared/schema";
 
@@ -191,7 +193,10 @@ interface SchoolWithRelations extends School {
 
 export default function Schools() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { t, isRTL } = useLanguage();
+  const [schoolToDelete, setSchoolToDelete] = useState<SchoolWithRelations | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -328,6 +333,33 @@ export default function Schools() {
       },
     });
   };
+
+  const deleteSchoolMutation = useMutation({
+    mutationFn: async (schoolId: number) => {
+      const res = await apiRequest("DELETE", `/api/schools/${schoolId}`, undefined, { skipOfflineQueue: true });
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateSchoolQueries();
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      if (schools.length === 1 && currentPage > 0) setCurrentPage(currentPage - 1);
+      setSchoolToDelete(null);
+      setDeleteError(null);
+      toast({
+        title: t.common.success,
+        description: isRTL ? "تم حذف المدرسة بنجاح." : "School deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      let message = error.message;
+      try {
+        message = JSON.parse(message.replace(/^\d+:\s*/, "")).message || message;
+      } catch {
+        // Network errors are already plain text.
+      }
+      setDeleteError(message);
+    },
+  });
 
   const createSchoolMutation = useMutation({
     mutationFn: async (data: AddSchoolFormData) => {
@@ -1214,6 +1246,22 @@ export default function Schools() {
                                 <CreditCard className="w-4 h-4 me-2" />
                                 {isRTL ? "تأكيد رسوم التسجيل (دفع يدوي)" : "Mark Registration Fee Paid"}
                               </DropdownMenuItem>
+                            )}
+                            {user?.role === "super_admin" && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  data-testid={`button-delete-school-${school.id}`}
+                                  onClick={() => {
+                                    setDeleteError(null);
+                                    setSchoolToDelete(school);
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4 me-2" />
+                                  {isRTL ? "حذف المدرسة" : "Delete school"}
+                                </DropdownMenuItem>
+                              </>
                             )}
                             {school.status === 'pending' || school.status === 'verified' ? (
                               <>
@@ -2273,6 +2321,47 @@ export default function Schools() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!schoolToDelete}
+        onOpenChange={(open) => {
+          if (!open && !deleteSchoolMutation.isPending) {
+            setSchoolToDelete(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <AlertDialogContent dir={isRTL ? "rtl" : "ltr"}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isRTL ? "حذف المدرسة؟" : "Delete school?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRTL
+                ? `هل تريد حذف "${schoolToDelete?.name}" (${schoolToDelete?.email}) نهائياً؟ لا يمكن التراجع عن هذا الإجراء. لن يتم حذف المدرسة إذا كانت مرتبطة بطلاب أو سجلات اختبارات أو فواتير أو حسابات مستخدمين أو سجلات أخرى.`
+                : `Permanently delete "${schoolToDelete?.name}" (${schoolToDelete?.email})? This cannot be undone. Schools with linked students, exam records, invoices, user accounts, or other records cannot be deleted.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
+          <div className="flex gap-3 justify-end">
+            <AlertDialogCancel disabled={deleteSchoolMutation.isPending}>
+              {t.common.cancel}
+            </AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={deleteSchoolMutation.isPending}
+              data-testid="button-confirm-delete-school"
+              onClick={() => {
+                if (schoolToDelete && !deleteSchoolMutation.isPending) {
+                  setDeleteError(null);
+                  deleteSchoolMutation.mutate(schoolToDelete.id);
+                }
+              }}
+            >
+              {deleteSchoolMutation.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+              {isRTL ? "حذف المدرسة" : "Delete school"}
+            </Button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Close Confirmation Dialog */}
       <AlertDialog open={showCloseConfirmation} onOpenChange={setShowCloseConfirmation}>
