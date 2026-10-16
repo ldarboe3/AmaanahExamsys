@@ -1872,6 +1872,12 @@ export default function Schools() {
                 </div>
                 <div className="space-y-3">
                   <div className="text-sm">
+                    <span className="text-muted-foreground">{isRTL ? "رمز المدرسة" : "School Code"}:</span>{" "}
+                    <span className="font-medium font-mono" dir="ltr" data-testid="text-school-code">
+                      SCH-{selectedSchool.id}
+                    </span>
+                  </div>
+                  <div className="text-sm">
                     <span className="text-muted-foreground">{t.schools.region}:</span>{" "}
                     <span className="font-medium">{getRegionName(selectedSchool.regionId)}</span>
                   </div>
