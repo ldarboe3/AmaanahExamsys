@@ -190,7 +190,12 @@ export default function Certificates() {
   });
 
   // Paginated query for display
-  const { data: eligibleStudentsData, isLoading: eligibleLoading } = useQuery<{
+  const {
+    data: eligibleStudentsData,
+    isLoading: eligibleLoading,
+    isError: eligibleStudentsError,
+    refetch: refetchEligibleStudents,
+  } = useQuery<{
     students: EligibleStudent[];
     total: number;
     limit: number;
@@ -759,6 +764,22 @@ export default function Certificates() {
             </div>
           ) : eligibleLoading ? (
             <CertificatesTableSkeleton />
+          ) : eligibleStudentsError ? (
+            <div className="text-center py-12" role="alert">
+              <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">
+                {isRTL ? "تعذر تحميل الطلاب" : "Could not load students"}
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                {isRTL
+                  ? "حدث خطأ أثناء جلب بيانات الشهادات. يرجى المحاولة مرة أخرى."
+                  : "There was a problem loading certificate eligibility data. Please try again."}
+              </p>
+              <Button variant="outline" onClick={() => refetchEligibleStudents()}>
+                <RefreshCw className="w-4 h-4 me-2" />
+                {isRTL ? "إعادة المحاولة" : "Retry"}
+              </Button>
+            </div>
           ) : eligibleStudentsData?.students && eligibleStudentsData.students.length > 0 ? (
             <div className="space-y-4">
               <div className="space-y-3">
@@ -979,8 +1000,8 @@ export default function Certificates() {
               <h3 className="text-lg font-medium mb-2">{isRTL ? "لا توجد طلاب" : "No Students Found"}</h3>
               <p className="text-muted-foreground">
                 {isRTL 
-                  ? "لا يوجد طلاب مطابقون للمعايير المحددة" 
-                  : "No students match the selected criteria"}
+                  ? "لا توجد نتائج منشورة لطلاب معتمدين في السنة المحددة. تحقق من السنة وحالة نشر النتائج."
+                  : "No approved students with published results were found for this exam year. Check the selected year and result publication status."}
               </p>
             </div>
           )}

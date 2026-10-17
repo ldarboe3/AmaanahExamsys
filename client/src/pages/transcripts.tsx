@@ -183,7 +183,12 @@ export default function Transcripts() {
     return true;
   });
 
-  const { data: eligibleStudents, isLoading: studentsLoading } = useQuery<EligibleStudent[]>({
+  const {
+    data: eligibleStudents,
+    isLoading: studentsLoading,
+    isError: eligibleStudentsError,
+    refetch: refetchEligibleStudents,
+  } = useQuery<EligibleStudent[]>({
     queryKey: ["/api/transcripts/eligible-g6-students", selectedExamYear],
     queryFn: async () => {
       const url = selectedExamYear 
@@ -807,6 +812,22 @@ export default function Transcripts() {
             </div>
           ) : studentsLoading ? (
             <TranscriptsTableSkeleton />
+          ) : eligibleStudentsError ? (
+            <div className="text-center py-12" role="alert">
+              <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">
+                {isRTL ? "تعذر تحميل الطلاب" : "Could not load students"}
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                {isRTL
+                  ? "حدث خطأ أثناء جلب بيانات كشوف الدرجات. يرجى المحاولة مرة أخرى."
+                  : "There was a problem loading transcript eligibility data. Please try again."}
+              </p>
+              <Button variant="outline" onClick={() => refetchEligibleStudents()}>
+                <RefreshCw className="w-4 h-4 me-2" />
+                {isRTL ? "إعادة المحاولة" : "Retry"}
+              </Button>
+            </div>
           ) : paginatedStudents.length > 0 ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -1015,8 +1036,8 @@ export default function Transcripts() {
               <h3 className="text-lg font-medium mb-2">{isRTL ? "لا يوجد طلاب مؤهلين" : "No Eligible Students"}</h3>
               <p className="text-muted-foreground">
                 {isRTL 
-                  ? "لا يوجد طلاب صف سادس لديهم نتائج منشورة" 
-                  : "No Grade 6 students with published results found"}
+                  ? "لا يوجد طلاب صف سادس معتمدون لديهم نتائج منشورة في السنة المحددة. تحقق من السنة وحالة نشر النتائج."
+                  : "No approved Grade 6 students with published results were found for this exam year. Check the selected year and result publication status."}
               </p>
             </div>
           )}
