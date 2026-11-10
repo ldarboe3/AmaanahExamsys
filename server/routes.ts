@@ -11133,6 +11133,7 @@ ${pages.map(p => `  <url>
         GRADE_6_SUBJECTS,
         validateTranscriptRequirements,
         generateTranscriptNumber,
+        getTranscriptAcademicYearEnd,
         generateQRToken,
         generateQRCodeDataUrl,
         transliterateArabicToEnglish,
@@ -11279,6 +11280,7 @@ ${pages.map(p => `  <url>
           {
             id: targetExamYear.id,
             year: targetExamYear.year,
+            name: targetExamYear.name,
           },
           marksMap
         );
@@ -11300,20 +11302,8 @@ ${pages.map(p => `  <url>
           // This ensures idempotent generation - same student always gets same number
           const existingTranscript = await storage.getTranscriptByStudentAndExamYear(studentId, targetExamYear.id);
           if (existingTranscript) {
-            // Check if the PDF file actually exists on disk
-            const fsCheck = await import('fs');
-            const pdfExists = existingTranscript.pdfUrl && fsCheck.existsSync(existingTranscript.pdfUrl);
-            if (pdfExists) {
-              // PDF file exists - return existing transcript
-              generatedTranscripts.push({
-                ...existingTranscript,
-                studentName: `${student.firstName} ${student.middleName || ''} ${student.lastName}`.trim(),
-                percentage: transcriptData.percentage.toFixed(1),
-                finalGrade: transcriptData.finalGrade.arabic,
-              });
-              continue;
-            }
-            // PDF file is missing - regenerate using existing transcript data
+            // This path is also used by the explicit "Regenerate PDF" action.
+            // Always rebuild the PDF so corrected exam-year labels take effect.
             const existingQrToken = existingTranscript.qrToken || generateQRToken();
             const existingBaseUrl = process.env.PRODUCTION_DOMAIN || 'https://amaanah.gm';
             const existingVerifyUrl = `${existingBaseUrl}/verify/transcript/${existingQrToken}`;
@@ -11334,7 +11324,8 @@ ${pages.map(p => `  <url>
           
           // Generate unique transcript number using timestamp + student ID
           const timestamp = Date.now().toString().slice(-6);
-          const transcriptNumber = `G6TR-${targetExamYear.year}-${String(studentId).padStart(4, '0')}${timestamp.slice(-2)}`;
+          const transcriptYear = getTranscriptAcademicYearEnd(targetExamYear.year, targetExamYear.name);
+          const transcriptNumber = `G6TR-${transcriptYear}-${String(studentId).padStart(4, '0')}${timestamp.slice(-2)}`;
           
           // Generate unique QR token
           const qrToken = generateQRToken();
@@ -13375,7 +13366,9 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
       else if (percentage >= 50) finalGrade = 'D';
 
       // Generate transcript number
-      const year = examYear.year.toString().slice(-2);
+      const { getTranscriptAcademicYearEnd } = await import('./transcriptService');
+      const transcriptYear = getTranscriptAcademicYearEnd(examYear.year, examYear.name);
+      const year = transcriptYear.toString().slice(-2);
       const gradeStr = student.grade.toString().padStart(2, '0');
       const existingCount = await storage.getTranscriptCountForYear(examYear.id);
       const sequence = (existingCount + 1).toString().padStart(4, '0');
@@ -13411,6 +13404,7 @@ Fatima Bah,Al-Ihsan Islamic School,Bakau Old Town Kanifing,Region 1,Cluster 2,Fe
         examYear: {
           id: examYear.id,
           year: examYear.year,
+          name: examYear.name,
         },
         subjectMarks: subjects.map(s => ({
           name: s.name,

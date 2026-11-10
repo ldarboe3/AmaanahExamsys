@@ -271,6 +271,30 @@ export interface TranscriptSchoolData {
 export interface TranscriptExamYearData {
   id: number;
   year: number;
+  name?: string | null;
+}
+
+function getAcademicYearRange(year: number, name?: string | null): { label: string; endYear: number } {
+  const match = name?.match(/\b((?:19|20|21)\d{2})\s*([/–-])\s*((?:19|20|21)\d{2})\b/);
+  if (match) {
+    return {
+      label: `${match[1]}${match[2]}${match[3]}`,
+      endYear: Number(match[3]),
+    };
+  }
+
+  return {
+    label: `${year - 1}-${year}`,
+    endYear: year,
+  };
+}
+
+export function getTranscriptAcademicYearLabel(year: number, name?: string | null): string {
+  return getAcademicYearRange(year, name).label;
+}
+
+export function getTranscriptAcademicYearEnd(year: number, name?: string | null): number {
+  return getAcademicYearRange(year, name).endYear;
 }
 
 export interface SubjectMark {
@@ -669,7 +693,7 @@ function generateTranscriptHTML(data: TranscriptData, logoBase64: string, qrCode
       
       <!-- TITLE -->
       <div class="main-title">
-        كشف نتائج الامتحانات للشهادة الابتدائية للعام ${examYear.year - 1}-${examYear.year} م
+        كشف نتائج الامتحانات للشهادة الابتدائية للعام <span dir="ltr" style="unicode-bidi: isolate">${getTranscriptAcademicYearLabel(examYear.year, examYear.name)}</span> م
       </div>
       
       <div class="transcript-number">
